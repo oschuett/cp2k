@@ -1,0 +1,92 @@
+%\documentclass[paper=A4, BCOR=8.00mm, draft=false, DIV=13, parskip=half, headsepline=true]{scrbook}
+\documentclass{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{bbm}
+\newcommand{\tr}{\operatorname{tr}}
+
+\setlength{\parskip}{2ex}
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+
+
+%==============================================================================
+\section*{PAO LNV for arbitrary A and B matrices}
+
+The LNV energy functional is:
+
+\begin{align*}
+    \Omega & = 3\tr[\tilde P \tilde S \tilde P \tilde H ] - 2\tr[\tilde P \tilde S \tilde P \tilde S \tilde P \tilde H]
+\end{align*}
+
+The tilded variables are in the smaller PAO-basis. The transformations between the larger primary basis and the PAO-basis are:
+\begin{align*}
+    \tilde P & = A^T P A &
+    \tilde H &= B^T  H B &
+    \tilde S &= B^T  S B
+\end{align*}
+
+Notice that: $ A^T B = B^T A = \tilde I $, where $\tilde I$ is the identity matrix in the smaller PAO basis.
+
+The relationship between $A$ and $B$ is defined via the Moore-Penrose pseudo-inverse:
+\begin{align*}
+    B & = A (A^T A) ^{-1}
+\end{align*}
+
+
+
+%==============================================================================
+\newpage
+\section*{1. Derivative}
+
+\begin{align*}
+    \frac{d \Omega}{d A_{ij}}
+ &= \sum_{ab} \frac{\partial \Omega}{\partial \tilde P_{ab}}  \frac{\partial \tilde P_{ab}}{\partial A_{ij}}
+  + \sum_{ab} \frac{\partial \Omega}{\partial \tilde H_{ab}}  \frac{\partial \tilde H_{ab}}{\partial A_{ij}}
+  + \sum_{ab} \frac{\partial \Omega}{\partial \tilde S_{ab}}  \frac{\partial \tilde S_{ab}}{\partial A_{ij}}\\
+  %
+ &= \sum_{ab} M^1_{ab} \frac{\partial \tilde P_{ab}}{\partial A_{ij}}
+  + \sum_{ab} M^2_{ab} \frac{\partial \tilde H_{ab}}{\partial A_{ij}}
+  + \sum_{ab} M^3_{ab} \frac{\partial \tilde S_{ab}}{\partial A_{ij}}\\
+  %
+ &= T^1_{ij} + T^2_{ij} + T^3_{ij}
+ %&= 2 N^{-1T} P A M^1 Y^T
+ % + 2 N^{T}   H B M^2 Y^T
+ % + 2 N^{T}   S B M^3 Y^T
+\end{align*}
+
+\begin{align*}
+T^1_{ij} &= \sum_{ab} M^1_{ab} \frac{\partial \tilde P_{ab}}{\partial A_{ij}} \\
+         &= \sum_{ablk} M^1_{ab} \frac{\partial}{\partial A_{ij}} A_{la} P_{lk}  A_{kb} \\
+         &= \sum_{ablk} M^1_{ab} \left [ \delta_{li} \delta_{aj} P_{lk}  A_{kb} + A_{la} P_{lk} \delta_{ki} \delta_{bj} \right ]\\
+         &= \left [ P A M^{1T} \right ]_{ij}  +  \left [ P^T A M^1 \right ]_{ij} \\
+         &= 2 \left [ P A M^{1} \right ]_{ij}
+\end{align*}
+
+\begin{align*}
+    M^1_{ab} &= \frac{\partial \Omega}{\partial \tilde P_{ab}}\\
+    & = \frac{\partial}{\partial \tilde P_{ab}} \left (3\tr[\tilde P \tilde S \tilde P \tilde H ] - 2\tr[\tilde P \tilde S \tilde P \tilde S \tilde P \tilde H] \right )\\
+    & = 3 \tilde H \tilde P \tilde S  + 3 \tilde S \tilde  P \tilde H        -2 \tilde H\tilde P\tilde S\tilde P\tilde S   -2 \tilde S\tilde P\tilde H\tilde P\tilde S  -2\tilde  S\tilde P\tilde S\tilde P\tilde H
+\end{align*}
+
+\begin{align*}
+    M^2_{ab} &= \frac{\partial \Omega}{\partial \tilde H_{ab}}\\
+    & = \frac{\partial}{\partial \tilde H_{ab}} \left (3\tr[\tilde P \tilde S \tilde P \tilde H ] - 2\tr[\tilde P \tilde S \tilde P \tilde S \tilde P \tilde H] \right )\\
+    & = 3 \tilde P \tilde S \tilde P - 2 \tilde P \tilde S \tilde P \tilde S \tilde P
+\end{align*}
+
+\begin{align*}
+    M^3_{ab} &= \frac{\partial \Omega}{\partial \tilde S_{ab}}\\
+    & = \frac{\partial}{\partial \tilde S_{ab}} \left (3\tr[\tilde P \tilde S \tilde P \tilde H ] - 2\tr[\tilde P \tilde S \tilde P \tilde S \tilde P \tilde H] \right )\\
+    & =  3\tilde P \tilde H  \tilde P - 2 \tilde P \tilde H\tilde P\tilde  S\tilde  P  - 2 \tilde P\tilde S \tilde P\tilde H\tilde P
+\end{align*}
+
+
+%==============================================================================
+\end{document}
+
+%EOF
