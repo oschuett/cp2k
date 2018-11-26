@@ -25,7 +25,7 @@ The LNV energy functional is:
 
 The tilded variables are in the smaller PAO-basis. The transformations between the larger primary basis and the PAO-basis are:
 \begin{align*}
-    \tilde P & = A^T P A &
+    \tilde P &= A^T  P A &
     \tilde H &= B^T  H B &
     \tilde S &= B^T  S B
 \end{align*}
@@ -66,6 +66,32 @@ T^1_{ij} &= \sum_{ab} M^1_{ab} \frac{\partial \tilde P_{ab}}{\partial A_{ij}} \\
          &= \left [ P A M^{1T} \right ]_{ij}  +  \left [ P^T A M^1 \right ]_{ij} \\
          &= 2 \left [ P A M^{1} \right ]_{ij}
 \end{align*}
+
+\begin{align*}
+T^2_{ij} &= \sum_{ab} R^2_{ab} \frac{\partial B_{ab}}{\partial A_{ij}}
+\end{align*}
+
+\begin{align*}
+T^3_{ij} &= \sum_{ab} R^3_{ab} \frac{\partial B_{ab}}{\partial A_{ij}}
+\end{align*}
+
+\newpage
+
+\begin{align*}
+R^2_{ij} &= \sum_{ab} M^2_{ab} \frac{\partial \tilde H_{ab}}{\partial B_{ij}} \\
+         &= \sum_{ablk} M^2_{ab} \frac{\partial}{\partial B_{ij}} B_{la} H_{lk} B_{kb} \\
+         &= \sum_{ablk} M^2_{ab} \left [ \delta_{li} \delta_{aj} H_{lk} B_{kb}  +  \delta_{ki} \delta_{bj} B_{la} H_{lk} \right] \\
+         &= \left [H B M^{2T} \right]_{ij} + \left [ H^{T}B M^2 \right ]_{ij}  \\
+         &= 2 \left [H B M^{2} \right]_{ij}
+\end{align*}
+
+Educated guess:
+\begin{align*}
+R^3_{ij} &= \sum_{ab} M^3_{ab} \frac{\partial \tilde S_{ab}}{\partial B_{ij}}\\
+         &= 2 \left [S B M^{3} \right]_{ij}
+\end{align*}
+
+\newpage
 
 \begin{align*}
     M^1_{ab} &= \frac{\partial \Omega}{\partial \tilde P_{ab}}\\
