@@ -2,13 +2,14 @@
 
 # author: Ole Schuett
 
-if (( $# != 2 )) ; then
-    echo "Usage: install_regtest.sh <ARCH> <VERSION>"
+if (( $# < 2 )) || (( 3 < $# )) ; then
+    echo "Usage: install_regtest.sh <ARCH> <VERSION> [ <TESTOPTS> ]"
     exit 1
 fi
 
 ARCH=$1
 VERSION=$2
+TESTOPTS="${TESTOPTS} $3"
 
 # setup arch files
 cd /workspace/cp2k/arch
@@ -24,7 +25,7 @@ make -j ARCH="${ARCH}" VERSION="${VERSION}"
 # run regtests which lack fixed reference value
 # Disable LeakSanitizer during docker build as it requires ptrace capabilities.
 export LSAN_OPTIONS="detect_leaks=0"
-make test ARCH="${ARCH}" VERSION="${VERSION}" TESTOPTS="-restrictdir QS/regtest-almo-md -restrictdir QS/regtest-almo-1 -restrictdir SE/regtest-3-4 -restrictdir QS/regtest-ot-1-vib -restrictdir Fist/regtest-5-vib -restrictdir QS/regtest-optbas -restrictdir TMC/regtest_ana_post_proc"
+make test ARCH="${ARCH}" VERSION="${VERSION}" TESTOPTS="${TESTOPTS} -restrictdir QS/regtest-almo-md -restrictdir QS/regtest-almo-1 -restrictdir SE/regtest-3-4 -restrictdir QS/regtest-ot-1-vib -restrictdir Fist/regtest-5-vib -restrictdir QS/regtest-optbas -restrictdir TMC/regtest_ana_post_proc"
 rm -rf lib exe "regtesting/${ARCH}/${VERSION}"/TEST-*
 
 #EOF
