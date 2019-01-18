@@ -37,8 +37,8 @@ MODULE pao_main
    USE pao_methods,                     ONLY: &
         pao_add_forces, pao_build_core_hamiltonian, pao_build_diag_distribution, &
         pao_build_matrix_X, pao_build_orthogonalizer, pao_build_selector, pao_calc_energy, &
-        pao_calc_outer_grad_lnv, pao_check_grad, pao_check_trace_ps, pao_guess_initial_P, &
-        pao_init_kinds, pao_print_atom_info, pao_store_P, pao_test_convergence
+        pao_check_grad, pao_check_trace_ps, pao_guess_initial_P, pao_init_kinds, &
+        pao_print_atom_info, pao_store_P, pao_test_convergence
    USE pao_ml,                          ONLY: pao_ml_init,&
                                               pao_ml_predict
    USE pao_optimizer,                   ONLY: pao_opt_finalize,&
@@ -201,7 +201,7 @@ CONTAINS
       INTEGER                                            :: handle, icycle
       LOGICAL                                            :: cycle_converged, do_mixing, should_stop
       REAL(KIND=dp)                                      :: energy, penalty
-      TYPE(dbcsr_type)                                   :: matrix_M, matrix_X_mixing
+      TYPE(dbcsr_type)                                   :: matrix_X_mixing
       TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
       TYPE(pao_env_type), POINTER                        :: pao
 
@@ -256,9 +256,7 @@ CONTAINS
          IF (pao%linesearch%starts) THEN
             icycle = icycle+1
             ! calc new gradient including penalty terms
-            CALL pao_calc_outer_grad_lnv(qs_env, ls_scf_env, matrix_M)
-            CALL pao_calc_U(pao, qs_env, matrix_M=matrix_M, matrix_G=pao%matrix_G, penalty=penalty)
-            CALL dbcsr_release(matrix_M)
+            CALL pao_calc_U(pao, qs_env, ls_scf_env, matrix_G=pao%matrix_G, penalty=penalty)
             CALL pao_check_grad(pao, qs_env, ls_scf_env)
 
             ! calculate new direction for line-search
