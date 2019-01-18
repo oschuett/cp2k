@@ -256,7 +256,7 @@ CONTAINS
          IF (pao%linesearch%starts) THEN
             icycle = icycle+1
             ! calc new gradient including penalty terms
-            CALL pao_calc_U(pao, qs_env, ls_scf_env, matrix_G=pao%matrix_G, penalty=penalty)
+            CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient=.TRUE., penalty=penalty)
             CALL pao_check_grad(pao, qs_env, ls_scf_env)
 
             ! calculate new direction for line-search

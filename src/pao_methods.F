@@ -987,7 +987,7 @@ CONTAINS
 
       ALLOCATE (forces(natoms, 3))
       forces(:, :) = 0.0_dp
-      CALL pao_calc_U(pao, qs_env, ls_scf_env, pao%matrix_G, forces=forces) ! without penalty terms
+      CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient=.TRUE., forces=forces) ! without penalty terms
 
       IF (SIZE(pao%ml_training_set) > 0) &
          CALL pao_ml_forces(pao, qs_env, pao%matrix_G, forces)

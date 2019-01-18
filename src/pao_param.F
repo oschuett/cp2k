@@ -85,7 +85,7 @@ CONTAINS
 
       ls_mstruct => ls_scf_env%ls_mstruct
 
-      CALL pao_calc_U(pao, qs_env, penalty=penalty) !update matrix_U = Function of matrix_X
+      CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient=.FALSE., penalty=penalty) !update matrix_U = Function of matrix_X
 
       ! pao%matrix_U uses pao%diag_distribution, need to redistribute using distribution of matrix_s
       CALL get_qs_env(qs_env, matrix_s=matrix_s)
@@ -271,11 +271,11 @@ CONTAINS
 !> \param penalty ...
 !> \param forces ...
 ! **************************************************************************************************
-   SUBROUTINE pao_calc_U(pao, qs_env, ls_scf_env, matrix_G, penalty, forces)
+   SUBROUTINE pao_calc_U(pao, qs_env, ls_scf_env, gradient, penalty, forces)
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(qs_environment_type), POINTER                 :: qs_env
-      TYPE(ls_scf_env_type), OPTIONAL                    :: ls_scf_env
-      TYPE(dbcsr_type), OPTIONAL                         :: matrix_G
+      TYPE(ls_scf_env_type)                              :: ls_scf_env
+      LOGICAL                                            :: gradient
       REAL(dp), INTENT(OUT), OPTIONAL                    :: penalty
       REAL(dp), DIMENSION(:, :), INTENT(INOUT), OPTIONAL :: forces
 
@@ -288,17 +288,16 @@ CONTAINS
 
       IF (PRESENT(penalty)) penalty = 0.0_dp
 
-      IF (PRESENT(matrix_G)) THEN
-         CPASSERT(PRESENT(ls_scf_env))
+      IF (gradient) THEN
          CALL pao_calc_grad_lnv_wrt_U(qs_env, ls_scf_env, matrix_M)
 
          SELECT CASE (pao%parameterization)
          CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, matrix_M, matrix_G)
+            CALL pao_calc_U_exp(pao, matrix_M, pao%matrix_G)
          CASE (pao_fock_param, pao_rotinv_param)
-            CALL pao_calc_U_linpot(pao, qs_env, penalty, matrix_M, matrix_G, forces)
+            CALL pao_calc_U_linpot(pao, qs_env, penalty, matrix_M, pao%matrix_G, forces)
          CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, penalty, matrix_M, matrix_G)
+            CALL pao_calc_U_gth(pao, penalty, matrix_M, pao%matrix_G)
          CASE DEFAULT
             CPABORT("PAO: unkown parametrization")
          END SELECT
@@ -309,7 +308,7 @@ CONTAINS
 
          SELECT CASE (pao%parameterization)
          CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, matrix_M)
+            CALL pao_calc_U_exp(pao)
          CASE (pao_fock_param, pao_rotinv_param)
             CALL pao_calc_U_linpot(pao, qs_env, penalty)
          CASE (pao_gth_param)
