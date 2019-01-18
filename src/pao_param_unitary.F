@@ -80,11 +80,11 @@ CONTAINS
 
          SELECT CASE (pao%parameterization)
          CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, pao%matrix_U, matrix_M, pao%matrix_G)
+            CALL pao_calc_U_exp(pao, pao%matrix_U_foo, matrix_M, pao%matrix_G)
          CASE (pao_fock_param, pao_rotinv_param)
-            CALL pao_calc_U_linpot(pao, qs_env, penalty, matrix_M, pao%matrix_G, forces)
+            CALL pao_calc_U_linpot(pao, qs_env, pao%matrix_U_foo, matrix_M, pao%matrix_G, penalty, forces)
          CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, pao%matrix_U, matrix_M, pao%matrix_G, penalty)
+            CALL pao_calc_U_gth(pao, pao%matrix_U_foo, matrix_M, pao%matrix_G, penalty)
          CASE DEFAULT
             CPABORT("PAO: unkown parametrization")
          END SELECT
@@ -95,11 +95,11 @@ CONTAINS
 
          SELECT CASE (pao%parameterization)
          CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, pao%matrix_U)
+            CALL pao_calc_U_exp(pao, pao%matrix_U_foo)
          CASE (pao_fock_param, pao_rotinv_param)
-            CALL pao_calc_U_linpot(pao, qs_env, penalty)
+            CALL pao_calc_U_linpot(pao, qs_env, pao%matrix_U_foo, penalty=penalty)
          CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, pao%matrix_U, penalty=penalty)
+            CALL pao_calc_U_gth(pao, pao%matrix_U_foo, penalty=penalty)
          CASE DEFAULT
             CPABORT("PAO: unkown parametrization")
          END SELECT
@@ -108,14 +108,14 @@ CONTAINS
 
       ! --------------------------------------------------------------------------------------------
       ! sanity check matrix U
-      CALL pao_assert_unitary(pao)
+      CALL pao_assert_unitary(pao, pao%matrix_U_foo)
 
       ! --------------------------------------------------------------------------------------------
-      ! pao%matrix_U uses pao%diag_distribution, need to redistribute using distribution of matrix_s
+      ! redistribute matrix_U from diag_distribution to distribution of matrix_s
       CALL get_qs_env(qs_env, matrix_s=matrix_s)
       CALL dbcsr_create(matrix_U, matrix_type="N", template=matrix_s(1)%matrix)
       CALL dbcsr_reserve_diag_blocks(matrix_U)
-      CALL dbcsr_complete_redistribute(pao%matrix_U, matrix_U)
+      CALL dbcsr_complete_redistribute(pao%matrix_U_foo, matrix_U)
 
       ! --------------------------------------------------------------------------------------------
       ! calculate matrix A and B from matrix U
@@ -220,8 +220,9 @@ CONTAINS
 !> \brief Debugging routine, check unitaryness of U
 !> \param pao ...
 ! **************************************************************************************************
-   SUBROUTINE pao_assert_unitary(pao)
+   SUBROUTINE pao_assert_unitary(pao, matrix_U)
       TYPE(pao_env_type), POINTER                        :: pao
+      TYPE(dbcsr_type)                                   :: matrix_U
 
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_assert_unitary', &
          routineP = moduleN//':'//routineN
@@ -241,7 +242,7 @@ CONTAINS
 
 !$OMP PARALLEL DEFAULT(NONE) SHARED(pao,blk_sizes_pri,blk_sizes_pao,delta_max) &
 !$OMP PRIVATE(iter,arow,acol,iatom,N,M,block_test,tmp1,tmp2)
-      CALL dbcsr_iterator_start(iter, pao%matrix_U)
+      CALL dbcsr_iterator_start(iter, matrix_U)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_test)
          iatom = arow; CPASSERT(arow == acol)
@@ -264,7 +265,7 @@ CONTAINS
       CALL dbcsr_iterator_stop(iter)
 !$OMP END PARALLEL
 
-      CALL dbcsr_get_info(pao%matrix_U, group=group)
+      CALL dbcsr_get_info(matrix_U, group=group)
       CALL mp_max(delta_max, group)
       IF (pao%iw > 0) WRITE (pao%iw, *) 'PAO| checked unitaryness, max delta:', delta_max
       IF (delta_max > pao%check_unitary_tol) &

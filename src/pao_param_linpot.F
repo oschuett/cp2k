@@ -348,11 +348,12 @@ CONTAINS
 !> \param matrix_G ...
 !> \param forces ...
 ! **************************************************************************************************
-   SUBROUTINE pao_calc_U_linpot(pao, qs_env, penalty, matrix_M, matrix_G, forces)
+   SUBROUTINE pao_calc_U_linpot(pao, qs_env, matrix_U, matrix_M, matrix_G, penalty, forces)
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(qs_environment_type), POINTER                 :: qs_env
-      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
+      TYPE(dbcsr_type)                                   :: matrix_U
       TYPE(dbcsr_type), OPTIONAL                         :: matrix_M, matrix_G
+      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
       REAL(dp), DIMENSION(:, :), INTENT(INOUT), OPTIONAL :: forces
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_calc_U_linpot'
@@ -379,14 +380,14 @@ CONTAINS
       evals(:, :) = 0.0_dp
       gaps(:) = HUGE(1.0_dp)
       regu_energy = 0.0_dp
-      CALL dbcsr_get_info(pao%matrix_U, group=group)
+      CALL dbcsr_get_info(matrix_U, group=group)
 
       CALL dbcsr_iterator_start(iter, pao%matrix_X)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_X)
          iatom = arow; CPASSERT(arow == acol)
          CALL dbcsr_get_block_p(matrix=pao%matrix_R, row=iatom, col=iatom, block=block_R, found=found)
-         CALL dbcsr_get_block_p(matrix=pao%matrix_U, row=iatom, col=iatom, block=block_U, found=found)
+         CALL dbcsr_get_block_p(matrix=matrix_U, row=iatom, col=iatom, block=block_U, found=found)
          CPASSERT(ASSOCIATED(block_R) .AND. ASSOCIATED(block_U))
          n = SIZE(block_U, 1)
 

@@ -98,7 +98,6 @@ MODULE pao_types
 !> \var constants_ready           set when stuff, which does not depend of atomic positions is ready
 !> \var need_initial_scf          set when the initial density matrix is not self-consistend
 !> \var matrix_X                  parameters of pao basis, which eventually determine matrix_U. Uses diag_distribution.
-!> \var matrix_U                  roation matrix derived from matrix_X. Uses diag_distribution.
 !> \var matrix_U0                 constant pre-rotation which serves as initial guess for exp-parametrization. Uses diag_distribution.
 !> \var matrix_H0                 Diagonal blocks of core hamiltonian, uses diag_distribution
 !> \var matrix_Y                  selector matrix which translates between primary and pao basis.
@@ -178,7 +177,7 @@ MODULE pao_types
 
       ! matrices
       TYPE(dbcsr_type)              :: matrix_X
-      TYPE(dbcsr_type)              :: matrix_U
+      TYPE(dbcsr_type)              :: matrix_U_foo
       TYPE(dbcsr_type)              :: matrix_U0
       TYPE(dbcsr_type)              :: matrix_H0
       TYPE(dbcsr_type)              :: matrix_Y

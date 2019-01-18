@@ -166,12 +166,12 @@ CONTAINS
       CALL dbcsr_copy(pao%matrix_G, pao%matrix_X)
       CALL dbcsr_set(pao%matrix_G, 0.0_dp)
 
-      CALL dbcsr_create(pao%matrix_U, &
+      CALL dbcsr_create(pao%matrix_U_foo, &
                         name="PAO matrix_U", &
                         matrix_type="N", &
                         dist=pao%diag_distribution, &
                         template=matrix_s(1)%matrix)
-      CALL dbcsr_reserve_diag_blocks(pao%matrix_U)
+      CALL dbcsr_reserve_diag_blocks(pao%matrix_U_foo)
 
       CALL dbcsr_create(ls_mstruct%matrix_A, template=pao%matrix_Y)
       CALL dbcsr_reserve_diag_blocks(ls_mstruct%matrix_A)
@@ -371,7 +371,7 @@ CONTAINS
       ! We keep pao%matrix_X for next scf-run, e.g. during MD or GEO-OPT
       CALL dbcsr_release(pao%matrix_X_orig)
       CALL dbcsr_release(pao%matrix_G)
-      CALL dbcsr_release(pao%matrix_U)
+      CALL dbcsr_release(pao%matrix_U_foo)
       CALL dbcsr_release(ls_mstruct%matrix_A)
       CALL dbcsr_release(ls_mstruct%matrix_B)
 
