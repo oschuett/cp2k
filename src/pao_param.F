@@ -61,13 +61,13 @@ CONTAINS
 !> \brief Takes current matrix_X and recalculates derived matrices U, A, and B.
 !> \param pao ...
 !> \param qs_env ...
-!> \param ls_mstruct ...
+!> \param ls_scf_env ...
 !> \param penalty ...
 ! **************************************************************************************************
-   SUBROUTINE pao_update_AB(pao, qs_env, ls_mstruct, penalty)
+   SUBROUTINE pao_update_AB(pao, qs_env, ls_scf_env, penalty)
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(qs_environment_type), POINTER                 :: qs_env
-      TYPE(ls_mstruct_type)                              :: ls_mstruct
+      TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
       REAL(dp), INTENT(OUT), OPTIONAL                    :: penalty
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_update_AB'
@@ -79,8 +79,11 @@ CONTAINS
       TYPE(dbcsr_iterator_type)                          :: iter
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
       TYPE(dbcsr_type)                                   :: matrix_U
+      TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
 
       CALL timeset(routineN, handle)
+
+      ls_mstruct => ls_scf_env%ls_mstruct
 
       CALL pao_calc_U(pao, qs_env, penalty=penalty) !update matrix_U = Function of matrix_X
 
