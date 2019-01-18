@@ -343,9 +343,10 @@ CONTAINS
 !> \brief Calculate new matrix U and optinally its gradient G
 !> \param pao ...
 !> \param qs_env ...
-!> \param penalty ...
+!> \param matrix_U ...
 !> \param matrix_M ...
 !> \param matrix_G ...
+!> \param penalty ...
 !> \param forces ...
 ! **************************************************************************************************
    SUBROUTINE pao_calc_U_linpot(pao, qs_env, matrix_U, matrix_M, matrix_G, penalty, forces)
@@ -411,17 +412,18 @@ CONTAINS
          IF (PRESENT(penalty) .AND. nterms > 0) &
             regu_energy = regu_energy+DOT_PRODUCT(block_X(:, 1), MATMUL(block_R, block_X(:, 1)))
 
-         IF (.NOT. PRESENT(matrix_G) .AND. .NOT. PRESENT(matrix_G)) THEN
-            CALL pao_calc_U_block_fock(pao, iatom=iatom, penalty=penalty, V=block_V, U=block_U, &
-                                       gap=gaps(iatom), evals=evals(:, iatom))
+         CALL pao_calc_U_block_fock(pao, iatom=iatom, penalty=penalty, V=block_V, U=block_U, &
+                                    gap=gaps(iatom), evals=evals(:, iatom))
 
-         ELSE ! TURNING POINT (if calc grad) -------------------------------------------------------
+         IF (PRESENT(matrix_G)) THEN ! TURNING POINT (if calc grad) --------------------------------
+            CPASSERT(PRESENT(matrix_M))
             CALL dbcsr_get_block_p(matrix=matrix_M, row=iatom, col=iatom, block=block_M1, found=found)
 
             ! corner-cases: block_M1 might have been filtered out or there might be zero pao parameters
             IF (ASSOCIATED(block_M1) .AND. SIZE(block_V_terms) > 0) THEN
                ALLOCATE (vec_M2(n*n))
                block_M2(1:n, 1:n) => vec_M2(:) ! map vector into matrix
+               !TODO: this 2nd call does double work. However, *sometimes* this branch is not taken.
                CALL pao_calc_U_block_fock(pao, iatom=iatom, penalty=penalty, V=block_V, U=block_U, &
                                           M1=block_M1, G=block_M2, gap=gaps(iatom), evals=evals(:, iatom))
                IF (MAXVAL(ABS(block_M2-TRANSPOSE(block_M2))) > 1e-14_dp) CPABORT("matrix not symmetric")

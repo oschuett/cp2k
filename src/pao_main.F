@@ -109,7 +109,6 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_optimization_start'
 
       INTEGER                                            :: handle
-      TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
       TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(section_vals_type), POINTER                   :: input, section
@@ -117,10 +116,7 @@ CONTAINS
       IF (.NOT. ls_scf_env%do_pao) RETURN
 
       CALL timeset(routineN, handle)
-      CALL get_qs_env(qs_env=qs_env, &
-                      matrix_s=matrix_s, &
-                      input=input)
-
+      CALL get_qs_env(qs_env, input=input)
       pao => ls_scf_env%pao_env
       ls_mstruct => ls_scf_env%ls_mstruct
 
@@ -165,13 +161,6 @@ CONTAINS
       ! create some more matrices
       CALL dbcsr_copy(pao%matrix_G, pao%matrix_X)
       CALL dbcsr_set(pao%matrix_G, 0.0_dp)
-
-      CALL dbcsr_create(pao%matrix_U_foo, &
-                        name="PAO matrix_U", &
-                        matrix_type="N", &
-                        dist=pao%diag_distribution, &
-                        template=matrix_s(1)%matrix)
-      CALL dbcsr_reserve_diag_blocks(pao%matrix_U_foo)
 
       CALL dbcsr_create(ls_mstruct%matrix_A, template=pao%matrix_Y)
       CALL dbcsr_reserve_diag_blocks(ls_mstruct%matrix_A)
@@ -371,7 +360,6 @@ CONTAINS
       ! We keep pao%matrix_X for next scf-run, e.g. during MD or GEO-OPT
       CALL dbcsr_release(pao%matrix_X_orig)
       CALL dbcsr_release(pao%matrix_G)
-      CALL dbcsr_release(pao%matrix_U_foo)
       CALL dbcsr_release(ls_mstruct%matrix_A)
       CALL dbcsr_release(ls_mstruct%matrix_B)
 

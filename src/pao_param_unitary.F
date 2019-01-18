@@ -66,13 +66,17 @@ CONTAINS
                                                             block_U, block_Y
       TYPE(dbcsr_iterator_type)                          :: iter
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
-      TYPE(dbcsr_type)                                   :: matrix_M, matrix_U
+      TYPE(dbcsr_type)                                   :: matrix_M, matrix_U, matrix_U_sdist
       TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
 
       CALL timeset(routineN, handle)
+      CALL get_qs_env(qs_env, matrix_s=matrix_s)
+      ls_mstruct => ls_scf_env%ls_mstruct
 
       ! --------------------------------------------------------------------------------------------
-      ! calculate matrix U
+      ! calculate matrix_U using diag_distribution
+      CALL dbcsr_create(matrix_U, matrix_type="N", dist=pao%diag_distribution, template=matrix_s(1)%matrix)
+      CALL dbcsr_reserve_diag_blocks(matrix_U)
 
       ! TODO: clean up this duplicationed SELECT block.
       IF (gradient) THEN
@@ -80,11 +84,11 @@ CONTAINS
 
          SELECT CASE (pao%parameterization)
          CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, pao%matrix_U_foo, matrix_M, pao%matrix_G)
+            CALL pao_calc_U_exp(pao, matrix_U, matrix_M, pao%matrix_G)
          CASE (pao_fock_param, pao_rotinv_param)
-            CALL pao_calc_U_linpot(pao, qs_env, pao%matrix_U_foo, matrix_M, pao%matrix_G, penalty, forces)
+            CALL pao_calc_U_linpot(pao, qs_env, matrix_U, matrix_M, pao%matrix_G, penalty, forces)
          CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, pao%matrix_U_foo, matrix_M, pao%matrix_G, penalty)
+            CALL pao_calc_U_gth(pao, matrix_U, matrix_M, pao%matrix_G, penalty)
          CASE DEFAULT
             CPABORT("PAO: unkown parametrization")
          END SELECT
@@ -95,36 +99,37 @@ CONTAINS
 
          SELECT CASE (pao%parameterization)
          CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, pao%matrix_U_foo)
+            CALL pao_calc_U_exp(pao, matrix_U)
          CASE (pao_fock_param, pao_rotinv_param)
-            CALL pao_calc_U_linpot(pao, qs_env, pao%matrix_U_foo, penalty=penalty)
+            CALL pao_calc_U_linpot(pao, qs_env, matrix_U, penalty=penalty)
          CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, pao%matrix_U_foo, penalty=penalty)
+            CALL pao_calc_U_gth(pao, matrix_U, penalty=penalty)
          CASE DEFAULT
             CPABORT("PAO: unkown parametrization")
          END SELECT
 
       ENDIF
 
-      ! --------------------------------------------------------------------------------------------
-      ! sanity check matrix U
-      CALL pao_assert_unitary(pao, pao%matrix_U_foo)
+      !TODO: move the remainder of this into its own subroutine
+      !TODO: replace this routine with pao_calc_AB_(exp/linpot/gth)
+
+      CALL pao_assert_unitary(pao, matrix_U) ! sanity check matrix U
 
       ! --------------------------------------------------------------------------------------------
       ! redistribute matrix_U from diag_distribution to distribution of matrix_s
       CALL get_qs_env(qs_env, matrix_s=matrix_s)
-      CALL dbcsr_create(matrix_U, matrix_type="N", template=matrix_s(1)%matrix)
-      CALL dbcsr_reserve_diag_blocks(matrix_U)
-      CALL dbcsr_complete_redistribute(pao%matrix_U_foo, matrix_U)
+      CALL dbcsr_create(matrix_U_sdist, matrix_type="N", template=matrix_s(1)%matrix)
+      CALL dbcsr_reserve_diag_blocks(matrix_U_sdist)
+      CALL dbcsr_complete_redistribute(matrix_U, matrix_U_sdist)
+      CALL dbcsr_release(matrix_U)
 
       ! --------------------------------------------------------------------------------------------
       ! calculate matrix A and B from matrix U
       ! Multiplying diagonal matrices is a local operation.
       ! To take advantage of this we're using an iterator instead of calling dbcsr_multiply().
-      ls_mstruct => ls_scf_env%ls_mstruct
-!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,ls_mstruct,matrix_U) &
+!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,ls_mstruct,matrix_U_sdist) &
 !$OMP PRIVATE(iter,arow,acol,iatom,block_U,block_Y,block_A,block_B,block_N,block_N_inv,found)
-      CALL dbcsr_iterator_start(iter, matrix_U)
+      CALL dbcsr_iterator_start(iter, matrix_U_sdist)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_U)
          iatom = arow; CPASSERT(arow == acol)
@@ -146,7 +151,7 @@ CONTAINS
       CALL dbcsr_iterator_stop(iter)
 !$OMP END PARALLEL
 
-      CALL dbcsr_release(matrix_U)
+      CALL dbcsr_release(matrix_U_sdist)
 
       CALL timestop(handle)
    END SUBROUTINE pao_calc_AB_unitary
@@ -219,6 +224,7 @@ CONTAINS
 ! **************************************************************************************************
 !> \brief Debugging routine, check unitaryness of U
 !> \param pao ...
+!> \param matrix_U ...
 ! **************************************************************************************************
    SUBROUTINE pao_assert_unitary(pao, matrix_U)
       TYPE(pao_env_type), POINTER                        :: pao

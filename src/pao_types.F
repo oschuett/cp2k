@@ -177,7 +177,6 @@ MODULE pao_types
 
       ! matrices
       TYPE(dbcsr_type)              :: matrix_X
-      TYPE(dbcsr_type)              :: matrix_U_foo
       TYPE(dbcsr_type)              :: matrix_U0
       TYPE(dbcsr_type)              :: matrix_H0
       TYPE(dbcsr_type)              :: matrix_Y
