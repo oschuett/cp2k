@@ -43,8 +43,8 @@ MODULE pao_methods
    USE message_passing,                 ONLY: mp_max,&
                                               mp_sum
    USE pao_ml,                          ONLY: pao_ml_forces
-   USE pao_param,                       ONLY: pao_param_count,&
-                                              pao_update_AB
+   USE pao_param,                       ONLY: pao_calc_AB,&
+                                              pao_param_count
    USE pao_types,                       ONLY: pao_env_type
    USE particle_types,                  ONLY: particle_type
    USE qs_energy_types,                 ONLY: qs_energy_type
@@ -489,7 +489,7 @@ CONTAINS
       CALL timeset(routineN, handle)
 
       ! calculate matrix U, which determines the pao basis
-      CALL pao_update_AB(pao, qs_env, ls_scf_env, gradient=.FALSE., penalty=penalty)
+      CALL pao_calc_AB(pao, qs_env, ls_scf_env, gradient=.FALSE., penalty=penalty)
 
       ! calculat S, S_inv, S_sqrt, and S_sqrt_inv in the new pao basis
       CALL pao_rebuild_S(qs_env, ls_scf_env)
@@ -985,7 +985,7 @@ CONTAINS
                       natom=natoms)
 
       ALLOCATE (forces(natoms, 3))
-      CALL pao_update_AB(pao, qs_env, ls_scf_env, gradient=.TRUE., forces=forces) ! without penalty terms
+      CALL pao_calc_AB(pao, qs_env, ls_scf_env, gradient=.TRUE., forces=forces) ! without penalty terms
 
       IF (SIZE(pao%ml_training_set) > 0) &
          CALL pao_ml_forces(pao, qs_env, pao%matrix_G, forces)

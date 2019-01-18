@@ -52,7 +52,7 @@ MODULE pao_param
 
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'pao_param'
 
-   PUBLIC :: pao_update_AB, pao_param_count, pao_param_initial_guess
+   PUBLIC :: pao_calc_AB, pao_param_count, pao_param_initial_guess
    PUBLIC :: pao_param_init, pao_param_finalize
 
 CONTAINS
@@ -66,7 +66,7 @@ CONTAINS
 !> \param penalty ...
 !> \param forces ...
 ! **************************************************************************************************
-   SUBROUTINE pao_update_AB(pao, qs_env, ls_scf_env, gradient, penalty, forces)
+   SUBROUTINE pao_calc_AB(pao, qs_env, ls_scf_env, gradient, penalty, forces)
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
@@ -74,7 +74,7 @@ CONTAINS
       REAL(dp), INTENT(OUT), OPTIONAL                    :: penalty
       REAL(dp), DIMENSION(:, :), INTENT(OUT), OPTIONAL   :: forces
 
-      CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_update_AB'
+      CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_calc_AB'
 
       INTEGER                                            :: acol, arow, handle, iatom
       LOGICAL                                            :: found
@@ -130,7 +130,7 @@ CONTAINS
       CALL dbcsr_release(matrix_U)
 
       CALL timestop(handle)
-   END SUBROUTINE pao_update_AB
+   END SUBROUTINE pao_calc_AB
 
 ! **************************************************************************************************
 !> \brief Initialize PAO parametrization
