@@ -53,7 +53,7 @@ MODULE pao_param
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'pao_param'
 
    PUBLIC :: pao_update_AB, pao_param_count, pao_param_initial_guess
-   PUBLIC :: pao_param_init, pao_param_finalize, pao_calc_U
+   PUBLIC :: pao_param_init, pao_param_finalize
 
 CONTAINS
 
@@ -64,13 +64,15 @@ CONTAINS
 !> \param ls_scf_env ...
 !> \param gradient ...
 !> \param penalty ...
+!> \param forces ...
 ! **************************************************************************************************
-   SUBROUTINE pao_update_AB(pao, qs_env, ls_scf_env, gradient, penalty)
+   SUBROUTINE pao_update_AB(pao, qs_env, ls_scf_env, gradient, penalty, forces)
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
       LOGICAL, INTENT(IN)                                :: gradient
       REAL(dp), INTENT(OUT), OPTIONAL                    :: penalty
+      REAL(dp), DIMENSION(:, :), INTENT(OUT), OPTIONAL   :: forces
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_update_AB'
 
@@ -88,8 +90,10 @@ CONTAINS
       ls_mstruct => ls_scf_env%ls_mstruct
 
       IF (PRESENT(penalty)) penalty = 0.0_dp
+      IF (PRESENT(forces)) forces(:, :) = 0.0_dp
 
-      CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient, penalty=penalty) !update matrix_U = Function of matrix_X
+      !update matrix_U = Function of matrix_X
+      CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient, penalty=penalty, forces=forces)
 
       ! pao%matrix_U uses pao%diag_distribution, need to redistribute using distribution of matrix_s
       CALL get_qs_env(qs_env, matrix_s=matrix_s)
@@ -290,8 +294,6 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
-      IF (PRESENT(penalty)) penalty = 0.0_dp !TODO: remove later, happens also in update_AB
-
       IF (gradient) THEN
          CALL pao_calc_grad_lnv_wrt_U(qs_env, ls_scf_env, matrix_M)
 
@@ -327,7 +329,7 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE pao_calc_U
 
-   ! **************************************************************************************************
+! **************************************************************************************************
 !> \brief Helper routine, calculates partial derivative dE/dU
 !> \param qs_env ...
 !> \param ls_scf_env ...

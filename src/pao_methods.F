@@ -43,8 +43,7 @@ MODULE pao_methods
    USE message_passing,                 ONLY: mp_max,&
                                               mp_sum
    USE pao_ml,                          ONLY: pao_ml_forces
-   USE pao_param,                       ONLY: pao_calc_U,&
-                                              pao_param_count,&
+   USE pao_param,                       ONLY: pao_param_count,&
                                               pao_update_AB
    USE pao_types,                       ONLY: pao_env_type
    USE particle_types,                  ONLY: particle_type
@@ -986,8 +985,7 @@ CONTAINS
                       natom=natoms)
 
       ALLOCATE (forces(natoms, 3))
-      forces(:, :) = 0.0_dp
-      CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient=.TRUE., forces=forces) ! without penalty terms
+      CALL pao_update_AB(pao, qs_env, ls_scf_env, gradient=.TRUE., forces=forces) ! without penalty terms
 
       IF (SIZE(pao%ml_training_set) > 0) &
          CALL pao_ml_forces(pao, qs_env, pao%matrix_G, forces)

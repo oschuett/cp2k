@@ -44,8 +44,7 @@ MODULE pao_main
    USE pao_optimizer,                   ONLY: pao_opt_finalize,&
                                               pao_opt_init,&
                                               pao_opt_new_dir
-   USE pao_param,                       ONLY: pao_calc_U,&
-                                              pao_param_finalize,&
+   USE pao_param,                       ONLY: pao_param_finalize,&
                                               pao_param_init,&
                                               pao_param_initial_guess,&
                                               pao_update_AB
@@ -256,7 +255,7 @@ CONTAINS
          IF (pao%linesearch%starts) THEN
             icycle = icycle+1
             ! calc new gradient including penalty terms
-            CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient=.TRUE., penalty=penalty)
+            CALL pao_update_AB(pao, qs_env, ls_scf_env, gradient=.TRUE., penalty=penalty)
             CALL pao_check_grad(pao, qs_env, ls_scf_env)
 
             ! calculate new direction for line-search
