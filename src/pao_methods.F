@@ -721,7 +721,8 @@ CONTAINS
       IF (nspin /= 1) CPABORT("open shell not yet implemented")
       !TODO: handle openshell case properly
 
-      ! notation according to pao_math_lnv.pdf
+      ! Notation according to equation (4.6) on page 50 from:
+      ! https://dx.doi.org/10.3929%2Fethz-a-010819495
 
       ! calculation uses distribution of matrix_s, after we redistribute using pao%diag_distribution
       CALL dbcsr_create(matrix_M, template=matrix_s(1)%matrix, matrix_type="N")
