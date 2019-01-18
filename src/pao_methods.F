@@ -685,8 +685,7 @@ CONTAINS
    SUBROUTINE pao_calc_grad_lnv_wrt_AB(qs_env, ls_scf_env, matrix_Ma, matrix_Mb)
       TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
-      TYPE(dbcsr_type)                                   :: matrix_Ma
-      TYPE(dbcsr_type)                                   :: matrix_Mb
+      TYPE(dbcsr_type)                                   :: matrix_Ma, matrix_Mb
 
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_calc_grad_lnv_wrt_AB', &
          routineP = moduleN//':'//routineN
@@ -722,15 +721,8 @@ CONTAINS
       IF (nspin /= 1) CPABORT("open shell not yet implemented")
       !TODO: handle openshell case properly
 
-      !TODO: update reference
       ! Notation according to equation (4.6) on page 50 from:
       ! https://dx.doi.org/10.3929%2Fethz-a-010819495
-
-      ! calculation uses distribution of matrix_s
-      CALL dbcsr_create(matrix_Ma, template=ls_mstruct%matrix_A, matrix_type="N")
-      CALL dbcsr_reserve_diag_blocks(matrix_Ma)
-      CALL dbcsr_create(matrix_Mb, template=ls_mstruct%matrix_B, matrix_type="N")
-      CALL dbcsr_reserve_diag_blocks(matrix_Mb)
 
       !---------------------------------------------------------------------------
       ! calculate need products in pao basis
@@ -746,7 +738,7 @@ CONTAINS
       CALL dbcsr_multiply("N", "N", 1.0_dp, ls_scf_env%matrix_s, ls_scf_env%matrix_p(1), &
                           0.0_dp, matrix_SP, filter_eps=filter_eps)
 
-      IF (SIZE(ls_scf_env%matrix_p) == 1) CALL dbcsr_scale(matrix_SP, 0.5_dp)
+      IF (nspin == 1) CALL dbcsr_scale(matrix_SP, 0.5_dp)
 
       CALL dbcsr_create(matrix_HPS, template=ls_scf_env%matrix_s, matrix_type="N")
       CALL dbcsr_multiply("N", "T", 1.0_dp, ls_scf_env%matrix_ks(1), matrix_SP, &
@@ -818,21 +810,23 @@ CONTAINS
       CALL matrix_decluster(matrix_M3_dc, matrix_M3, ls_mstruct)
 
       !---------------------------------------------------------------------------
+      ! assemble Ma and Mb
+      ! matrix_Ma = dE_lnv / dA = P * A * M1
+      ! matrix_Mb = dE_lnv / dB = H * B * M2  +  S * B * M3
+      CALL dbcsr_create(matrix_Ma, template=ls_mstruct%matrix_A, matrix_type="N")
+      CALL dbcsr_reserve_diag_blocks(matrix_Ma)
+      CALL dbcsr_create(matrix_Mb, template=ls_mstruct%matrix_B, matrix_type="N")
+      CALL dbcsr_reserve_diag_blocks(matrix_Mb)
+
+      !---------------------------------------------------------------------------
       ! combine M1 with matrices from primary basis
       CALL dbcsr_create(matrix_PA, template=ls_mstruct%matrix_A, matrix_type="N")
       CALL dbcsr_multiply("N", "N", 1.0_dp, rho_ao(1)%matrix, ls_mstruct%matrix_A, &
                           0.0_dp, matrix_PA, filter_eps=filter_eps)
 
-      !CALL dbcsr_create(matrix_NPA, template=ls_mstruct%matrix_A, matrix_type="N")
-      !CALL dbcsr_multiply("N", "N", 1.0_dp, pao%matrix_N_inv, matrix_PA, &
-      !                    0.0_dp, matrix_NPA, filter_eps=filter_eps)
-
-      ! matrix_Ma += P * A * M1
+      ! matrix_Ma = P * A * M1
       CALL dbcsr_multiply("N", "N", 1.0_dp, matrix_PA, matrix_M1_dc, &
-                          1.0_dp, matrix_Ma, filter_eps=filter_eps)
-
-      !CALL dbcsr_multiply("N", "T", 1.0_dp, matrix_NPAM1, pao%matrix_Y, &
-      !                    1.0_dp, matrix_M, filter_eps=filter_eps)
+                          0.0_dp, matrix_Ma, filter_eps=filter_eps)
 
       !---------------------------------------------------------------------------
       ! combine M2 with matrices from primary basis
@@ -840,17 +834,9 @@ CONTAINS
       CALL dbcsr_multiply("N", "N", 1.0_dp, matrix_ks(1)%matrix, ls_mstruct%matrix_B, &
                           0.0_dp, matrix_HB, filter_eps=filter_eps)
 
-      !CALL dbcsr_create(matrix_NHB, template=ls_mstruct%matrix_B, matrix_type="N")
-      !CALL dbcsr_multiply("N", "N", 1.0_dp, pao%matrix_N, matrix_HB, &
-      !                    0.0_dp, matrix_NHB, filter_eps=filter_eps)
-
-      !CALL dbcsr_create(matrix_HBM2, template=ls_mstruct%matrix_B, matrix_type="N")
-      ! matrix_Mb += H * B * M2
+      ! matrix_Mb = H * B * M2
       CALL dbcsr_multiply("N", "N", 1.0_dp, matrix_HB, matrix_M2_dc, &
-                          1.0_dp, matrix_Mb, filter_eps=filter_eps)
-
-      !CALL dbcsr_multiply("N", "T", 1.0_dp, matrix_NHBM2, pao%matrix_Y, &
-      !                    1.0_dp, matrix_M, filter_eps=filter_eps)
+                          0.0_dp, matrix_Mb, filter_eps=filter_eps)
 
       !---------------------------------------------------------------------------
       ! combine M3 with matrices from primary basis
@@ -858,26 +844,17 @@ CONTAINS
       CALL dbcsr_multiply("N", "N", 1.0_dp, matrix_s(1)%matrix, ls_mstruct%matrix_B, &
                           0.0_dp, matrix_SB, filter_eps=filter_eps)
 
-      IF (SIZE(ls_scf_env%matrix_p) == 1) CALL dbcsr_scale(matrix_SB, 0.5_dp)
+      IF (nspin == 1) CALL dbcsr_scale(matrix_SB, 0.5_dp)
 
-      !CALL dbcsr_create(matrix_NSB, template=ls_mstruct%matrix_B, matrix_type="N")
-      !CALL dbcsr_multiply("N", "N", 1.0_dp, pao%matrix_N, matrix_SB, &
-      !                    0.0_dp, matrix_NSB, filter_eps=filter_eps)
-
-      !CALL dbcsr_create(matrix_SBM3, template=ls_mstruct%matrix_B, matrix_type="N")   
       ! matrix_Mb += S * B * M3
       CALL dbcsr_multiply("N", "N", 1.0_dp, matrix_SB, matrix_M3_dc, &
                           1.0_dp, matrix_Mb, filter_eps=filter_eps)
 
-      !CALL dbcsr_multiply("N", "T", 1.0_dp, matrix_NSBM3, pao%matrix_Y, &
-      !                    1.0_dp, matrix_M, filter_eps=filter_eps)
-
-      IF (SIZE(ls_scf_env%matrix_p) == 1) CALL dbcsr_scale(matrix_Ma, 2.0_dp)
-      IF (SIZE(ls_scf_env%matrix_p) == 1) CALL dbcsr_scale(matrix_Mb, 2.0_dp)
+      IF (nspin == 1) CALL dbcsr_scale(matrix_Ma, 2.0_dp)
+      IF (nspin == 1) CALL dbcsr_scale(matrix_Mb, 2.0_dp)
 
       !---------------------------------------------------------------------------
       ! cleanup: TODO release matrices as early as possible
-      ! TODO: remove unused matrices
       CALL dbcsr_release(matrix_PH)
       CALL dbcsr_release(matrix_PHP)
       CALL dbcsr_release(matrix_SP)
@@ -911,40 +888,23 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_calc_outer_grad_lnv', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: handle !, nspin
-      !INTEGER, DIMENSION(:), POINTER                     :: pao_blk_sizes
+      INTEGER                                            :: handle
       REAL(KIND=dp)                                      :: filter_eps
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
-      !TYPE(dbcsr_type) :: matrix_HB, matrix_HPS, matrix_M, matrix_M1, matrix_M1_dc, matrix_M2, &
-      !   matrix_M2_dc, matrix_M3, matrix_M3_dc, matrix_NHB, matrix_NHBM2, matrix_NPA, &
-      !   matrix_NPAM1, matrix_NSB, matrix_NSBM3, matrix_PA, matrix_PH, matrix_PHP, matrix_PSP, &
-      !   matrix_SB, matrix_SP
-      TYPE(dbcsr_type)                                   :: matrix_Ma, matrix_Mb
-      TYPE(dbcsr_type)                                   :: matrix_NM, matrix_M
-      !TYPE(dft_control_type), POINTER                    :: dft_control
+      TYPE(dbcsr_type)                                   :: matrix_M, matrix_Ma, matrix_Mb, matrix_NM
       TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
       TYPE(pao_env_type), POINTER                        :: pao
-      !TYPE(qs_rho_type), POINTER                         :: rho
 
       CALL timeset(routineN, handle)
 
-      CALL pao_calc_grad_lnv_wrt_AB(qs_env, ls_scf_env, matrix_Ma, matrix_Mb)
-
       ls_mstruct => ls_scf_env%ls_mstruct
       pao => ls_scf_env%pao_env
-      !
-      CALL get_qs_env(qs_env, matrix_s=matrix_s)
-      !CALL qs_rho_get(rho, rho_ao=rho_ao)
-      !nspin = dft_control%nspins
       filter_eps = ls_scf_env%eps_filter
-      !
-      !CALL dbcsr_get_info(ls_mstruct%matrix_A, col_blk_size=pao_blk_sizes)
-      !
+      CALL get_qs_env(qs_env, matrix_s=matrix_s)
 
-      ! Notation according to equation (4.6) on page 50 from:
-      ! https://dx.doi.org/10.3929%2Fethz-a-010819495
+      CALL pao_calc_grad_lnv_wrt_AB(qs_env, ls_scf_env, matrix_Ma, matrix_Mb)
 
-      ! calculation uses distribution of matrix_s, after we redistribute using pao%diag_distribution
+      ! Calculation uses distr. of matrix_s, afterwards we redistribute to pao%diag_distribution.
       CALL dbcsr_create(matrix_M, template=matrix_s(1)%matrix, matrix_type="N")
       CALL dbcsr_reserve_diag_blocks(matrix_M)
 
@@ -972,6 +932,8 @@ CONTAINS
       !---------------------------------------------------------------------------
       ! cleanup:
       CALL dbcsr_release(matrix_M)
+      CALL dbcsr_release(matrix_Ma)
+      CALL dbcsr_release(matrix_Mb)
       CALL dbcsr_release(matrix_NM)
 
       CALL timestop(handle)
