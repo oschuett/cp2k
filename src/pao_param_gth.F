@@ -241,10 +241,11 @@ CONTAINS
 !> \param matrix_M1 ...
 !> \param matrix_G ...
 ! **************************************************************************************************
-   SUBROUTINE pao_calc_U_gth(pao, penalty, matrix_M1, matrix_G)
+   SUBROUTINE pao_calc_U_gth(pao, matrix_U, matrix_M1, matrix_G, penalty)
       TYPE(pao_env_type), POINTER                        :: pao
-      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
+      TYPE(dbcsr_type)                                   :: matrix_U
       TYPE(dbcsr_type), OPTIONAL                         :: matrix_M1, matrix_G
+      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_calc_U_gth'
 
@@ -282,7 +283,7 @@ CONTAINS
       CALL mp_sum(world_X, group) ! sync world view across MPI ranks
 
       ! loop over atoms
-      CALL dbcsr_iterator_start(iter, pao%matrix_U)
+      CALL dbcsr_iterator_start(iter, matrix_U)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_U)
          iatom = arow; CPASSERT(arow == acol)

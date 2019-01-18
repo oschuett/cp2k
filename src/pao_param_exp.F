@@ -167,8 +167,9 @@ CONTAINS
 !> \param matrix_M ...
 !> \param matrix_G ...
 ! **************************************************************************************************
-   SUBROUTINE pao_calc_U_exp(pao, matrix_M, matrix_G)
+   SUBROUTINE pao_calc_U_exp(pao, matrix_U, matrix_M, matrix_G)
       TYPE(pao_env_type), POINTER                        :: pao
+      TYPE(dbcsr_type)                                   :: matrix_U
       TYPE(dbcsr_type), OPTIONAL                         :: matrix_M, matrix_G
 
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_calc_U_exp', routineP = moduleN//':'//routineN
@@ -197,7 +198,7 @@ CONTAINS
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_X)
          iatom = arow; CPASSERT(arow == acol)
-         CALL dbcsr_get_block_p(matrix=pao%matrix_U, row=iatom, col=iatom, block=block_U, found=found)
+         CALL dbcsr_get_block_p(matrix=matrix_U, row=iatom, col=iatom, block=block_U, found=found)
          CPASSERT(ASSOCIATED(block_U))
          CALL dbcsr_get_block_p(matrix=pao%matrix_U0, row=iatom, col=iatom, block=block_U0, found=found)
          CPASSERT(ASSOCIATED(block_U0))

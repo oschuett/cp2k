@@ -80,11 +80,11 @@ CONTAINS
 
          SELECT CASE (pao%parameterization)
          CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, matrix_M, pao%matrix_G)
+            CALL pao_calc_U_exp(pao, pao%matrix_U, matrix_M, pao%matrix_G)
          CASE (pao_fock_param, pao_rotinv_param)
             CALL pao_calc_U_linpot(pao, qs_env, penalty, matrix_M, pao%matrix_G, forces)
          CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, penalty, matrix_M, pao%matrix_G)
+            CALL pao_calc_U_gth(pao, pao%matrix_U, matrix_M, pao%matrix_G, penalty)
          CASE DEFAULT
             CPABORT("PAO: unkown parametrization")
          END SELECT
@@ -95,11 +95,11 @@ CONTAINS
 
          SELECT CASE (pao%parameterization)
          CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao)
+            CALL pao_calc_U_exp(pao, pao%matrix_U)
          CASE (pao_fock_param, pao_rotinv_param)
             CALL pao_calc_U_linpot(pao, qs_env, penalty)
          CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, penalty)
+            CALL pao_calc_U_gth(pao, pao%matrix_U, penalty=penalty)
          CASE DEFAULT
             CPABORT("PAO: unkown parametrization")
          END SELECT
