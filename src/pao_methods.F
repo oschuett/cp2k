@@ -490,7 +490,7 @@ CONTAINS
       CALL timeset(routineN, handle)
 
       ! calculate matrix U, which determines the pao basis
-      CALL pao_update_AB(pao, qs_env, ls_scf_env, penalty=penalty)
+      CALL pao_update_AB(pao, qs_env, ls_scf_env, gradient=.FALSE., penalty=penalty)
 
       ! calculat S, S_inv, S_sqrt, and S_sqrt_inv in the new pao basis
       CALL pao_rebuild_S(qs_env, ls_scf_env)

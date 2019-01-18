@@ -180,7 +180,7 @@ CONTAINS
       CALL dbcsr_reserve_diag_blocks(ls_mstruct%matrix_B)
 
       ! fill PAO transformation matrices
-      CALL pao_update_AB(pao, qs_env, ls_scf_env)
+      CALL pao_update_AB(pao, qs_env, ls_scf_env, gradient=.FALSE.)
 
       CALL timestop(handle)
    END SUBROUTINE pao_optimization_start

@@ -62,12 +62,14 @@ CONTAINS
 !> \param pao ...
 !> \param qs_env ...
 !> \param ls_scf_env ...
+!> \param gradient ...
 !> \param penalty ...
 ! **************************************************************************************************
-   SUBROUTINE pao_update_AB(pao, qs_env, ls_scf_env, penalty)
+   SUBROUTINE pao_update_AB(pao, qs_env, ls_scf_env, gradient, penalty)
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
+      LOGICAL, INTENT(IN)                                :: gradient
       REAL(dp), INTENT(OUT), OPTIONAL                    :: penalty
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_update_AB'
@@ -85,7 +87,9 @@ CONTAINS
 
       ls_mstruct => ls_scf_env%ls_mstruct
 
-      CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient=.FALSE., penalty=penalty) !update matrix_U = Function of matrix_X
+      IF (PRESENT(penalty)) penalty = 0.0_dp
+
+      CALL pao_calc_U(pao, qs_env, ls_scf_env, gradient, penalty=penalty) !update matrix_U = Function of matrix_X
 
       ! pao%matrix_U uses pao%diag_distribution, need to redistribute using distribution of matrix_s
       CALL get_qs_env(qs_env, matrix_s=matrix_s)
@@ -267,7 +271,7 @@ CONTAINS
 !> \param pao ...
 !> \param qs_env ...
 !> \param ls_scf_env ...
-!> \param matrix_G ...
+!> \param gradient ...
 !> \param penalty ...
 !> \param forces ...
 ! **************************************************************************************************
@@ -275,8 +279,8 @@ CONTAINS
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(ls_scf_env_type)                              :: ls_scf_env
-      LOGICAL                                            :: gradient
-      REAL(dp), INTENT(OUT), OPTIONAL                    :: penalty
+      LOGICAL, INTENT(IN)                                :: gradient
+      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
       REAL(dp), DIMENSION(:, :), INTENT(INOUT), OPTIONAL :: forces
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_calc_U'
@@ -286,7 +290,7 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
-      IF (PRESENT(penalty)) penalty = 0.0_dp
+      IF (PRESENT(penalty)) penalty = 0.0_dp !TODO: remove later, happens also in update_AB
 
       IF (gradient) THEN
          CALL pao_calc_grad_lnv_wrt_U(qs_env, ls_scf_env, matrix_M)
