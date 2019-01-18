@@ -26,6 +26,8 @@ MODULE pao_param_gth
                                               mp_sum
    USE orbital_pointers,                ONLY: init_orbital_pointers
    USE pao_param_fock,                  ONLY: pao_calc_U_block_fock
+   USE pao_param_unitary,               ONLY: pao_calc_AB_from_U,&
+                                              pao_calc_grad_lnv_wrt_U
    USE pao_potentials,                  ONLY: pao_calc_gaussian
    USE pao_types,                       ONLY: pao_env_type
    USE particle_types,                  ONLY: particle_type
@@ -40,7 +42,7 @@ MODULE pao_param_gth
 
    PRIVATE
 
-   PUBLIC :: pao_param_init_gth, pao_param_finalize_gth, pao_calc_U_gth
+   PUBLIC :: pao_param_init_gth, pao_param_finalize_gth, pao_calc_AB_gth
    PUBLIC :: pao_param_count_gth, pao_param_initguess_gth
 
 CONTAINS
@@ -233,6 +235,46 @@ CONTAINS
 
       CALL timestop(handle)
    END SUBROUTINE pao_param_gth_preconditioner
+
+! **************************************************************************************************
+!> \brief Takes current matrix_X and calculates the matrices A and B.
+!> \param pao ...
+!> \param qs_env ...
+!> \param ls_scf_env ...
+!> \param gradient ...
+!> \param penalty ...
+! **************************************************************************************************
+   SUBROUTINE pao_calc_AB_gth(pao, qs_env, ls_scf_env, gradient, penalty)
+      TYPE(pao_env_type), POINTER                        :: pao
+      TYPE(qs_environment_type), POINTER                 :: qs_env
+      TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
+      LOGICAL, INTENT(IN)                                :: gradient
+      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
+
+      CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_calc_AB_gth'
+
+      INTEGER                                            :: handle
+      TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
+      TYPE(dbcsr_type)                                   :: matrix_M, matrix_U
+
+      CALL timeset(routineN, handle)
+      CALL get_qs_env(qs_env, matrix_s=matrix_s)
+      CALL dbcsr_create(matrix_U, matrix_type="N", dist=pao%diag_distribution, template=matrix_s(1)%matrix)
+      CALL dbcsr_reserve_diag_blocks(matrix_U)
+
+      !TODO: move this condition into pao_calc_U, use matrix_N as template
+      IF (gradient) THEN
+         CALL pao_calc_grad_lnv_wrt_U(qs_env, ls_scf_env, matrix_M)
+         CALL pao_calc_U_gth(pao, matrix_U, matrix_M, pao%matrix_G, penalty)
+         CALL dbcsr_release(matrix_M)
+      ELSE
+         CALL pao_calc_U_gth(pao, matrix_U, penalty=penalty)
+      ENDIF
+
+      CALL pao_calc_AB_from_U(pao, qs_env, ls_scf_env, matrix_U)
+      CALL dbcsr_release(matrix_U)
+      CALL timestop(handle)
+   END SUBROUTINE pao_calc_AB_gth
 
 ! **************************************************************************************************
 !> \brief Calculate new matrix U and optinally its gradient G

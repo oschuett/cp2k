@@ -19,19 +19,21 @@ MODULE pao_param
                                               pao_fock_param,&
                                               pao_gth_param,&
                                               pao_rotinv_param
-   USE pao_param_exp,                   ONLY: pao_param_count_exp,&
+   USE pao_param_exp,                   ONLY: pao_calc_AB_exp,&
+                                              pao_param_count_exp,&
                                               pao_param_finalize_exp,&
                                               pao_param_init_exp,&
                                               pao_param_initguess_exp
-   USE pao_param_gth,                   ONLY: pao_param_count_gth,&
+   USE pao_param_gth,                   ONLY: pao_calc_AB_gth,&
+                                              pao_param_count_gth,&
                                               pao_param_finalize_gth,&
                                               pao_param_init_gth,&
                                               pao_param_initguess_gth
-   USE pao_param_linpot,                ONLY: pao_param_count_linpot,&
+   USE pao_param_linpot,                ONLY: pao_calc_AB_linpot,&
+                                              pao_param_count_linpot,&
                                               pao_param_finalize_linpot,&
                                               pao_param_init_linpot,&
                                               pao_param_initguess_linpot
-   USE pao_param_unitary,               ONLY: pao_calc_AB_unitary
    USE pao_types,                       ONLY: pao_env_type
    USE qs_environment_types,            ONLY: qs_environment_type
 #include "./base/base_uses.f90"
@@ -75,8 +77,12 @@ CONTAINS
 
       !calculate matrix_A/B = Function of matrix_X
       SELECT CASE (pao%parameterization)
-      CASE (pao_exp_param, pao_fock_param, pao_rotinv_param, pao_gth_param)
-         CALL pao_calc_AB_unitary(pao, qs_env, ls_scf_env, gradient, penalty, forces)
+      CASE (pao_exp_param)
+         CALL pao_calc_AB_exp(pao, qs_env, ls_scf_env, gradient)
+      CASE (pao_fock_param, pao_rotinv_param)
+         CALL pao_calc_AB_linpot(pao, qs_env, ls_scf_env, gradient, penalty, forces)
+      CASE (pao_gth_param)
+         CALL pao_calc_AB_gth(pao, qs_env, ls_scf_env, gradient, penalty)
       CASE DEFAULT
          CPABORT("PAO: unkown parametrization")
       END SELECT

@@ -18,14 +18,7 @@ MODULE pao_param_unitary
                                               ls_scf_env_type
    USE kinds,                           ONLY: dp
    USE message_passing,                 ONLY: mp_max
-   USE pao_input,                       ONLY: pao_exp_param,&
-                                              pao_fock_param,&
-                                              pao_gth_param,&
-                                              pao_rotinv_param
    USE pao_lnv,                         ONLY: pao_calc_grad_lnv_wrt_AB
-   USE pao_param_exp,                   ONLY: pao_calc_U_exp
-   USE pao_param_gth,                   ONLY: pao_calc_U_gth
-   USE pao_param_linpot,                ONLY: pao_calc_U_linpot
    USE pao_types,                       ONLY: pao_env_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
@@ -37,154 +30,9 @@ MODULE pao_param_unitary
 
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'pao_param_unitary'
 
-   PUBLIC :: pao_calc_AB_unitary
+   PUBLIC :: pao_calc_grad_lnv_wrt_U, pao_calc_AB_from_U
 
 CONTAINS
-
-! **************************************************************************************************
-!> \brief Takes current matrix_X and calculates the matrices A and B.
-!> \param pao ...
-!> \param qs_env ...
-!> \param ls_scf_env ...
-!> \param gradient ...
-!> \param penalty ...
-!> \param forces ...
-! **************************************************************************************************
-   SUBROUTINE pao_calc_AB_unitary(pao, qs_env, ls_scf_env, gradient, penalty, forces)
-      TYPE(pao_env_type), POINTER                        :: pao
-      TYPE(qs_environment_type), POINTER                 :: qs_env
-      TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
-      LOGICAL, INTENT(IN)                                :: gradient
-      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
-      REAL(dp), DIMENSION(:, :), INTENT(INOUT), OPTIONAL :: forces
-
-      CHARACTER(len=*), PARAMETER :: routineN = 'pao_calc_AB_unitary'
-
-      INTEGER                                            :: handle
-      TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
-      TYPE(dbcsr_type)                                   :: matrix_M, matrix_U
-
-      CALL timeset(routineN, handle)
-      CALL get_qs_env(qs_env, matrix_s=matrix_s)
-
-      ! --------------------------------------------------------------------------------------------
-      ! calculate matrix_U using diag_distribution
-
-      CALL dbcsr_create(matrix_U, matrix_type="N", dist=pao%diag_distribution, template=matrix_s(1)%matrix)
-      CALL dbcsr_reserve_diag_blocks(matrix_U)
-
-      ! TODO: clean up this duplicationed SELECT block.
-      IF (gradient) THEN
-         CALL pao_calc_grad_lnv_wrt_U(qs_env, ls_scf_env, matrix_M)
-
-         SELECT CASE (pao%parameterization)
-         CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, matrix_U, matrix_M, pao%matrix_G)
-         CASE (pao_fock_param, pao_rotinv_param)
-            CALL pao_calc_U_linpot(pao, qs_env, matrix_U, matrix_M, pao%matrix_G, penalty, forces)
-         CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, matrix_U, matrix_M, pao%matrix_G, penalty)
-         CASE DEFAULT
-            CPABORT("PAO: unkown parametrization")
-         END SELECT
-
-         CALL dbcsr_release(matrix_M)
-
-      ELSE
-
-         SELECT CASE (pao%parameterization)
-         CASE (pao_exp_param)
-            CALL pao_calc_U_exp(pao, matrix_U)
-         CASE (pao_fock_param, pao_rotinv_param)
-            CALL pao_calc_U_linpot(pao, qs_env, matrix_U, penalty=penalty)
-         CASE (pao_gth_param)
-            CALL pao_calc_U_gth(pao, matrix_U, penalty=penalty)
-         CASE DEFAULT
-            CPABORT("PAO: unkown parametrization")
-         END SELECT
-
-      ENDIF
-
-      CALL pao_calc_AB_from_U(pao, qs_env, ls_scf_env, matrix_U)
-      CALL dbcsr_release(matrix_U)
-
-
-      CALL timestop(handle)
-   END SUBROUTINE pao_calc_AB_unitary
-
-! **************************************************************************************************
-!> \brief Takes current matrix_X and calculates the matrices A and B.
-!> \param pao ...
-!> \param qs_env ...
-!> \param ls_scf_env ...
-!> \param gradient ...
-!> \param penalty ...
-!> \param forces ...
-! **************************************************************************************************
-   SUBROUTINE pao_calc_AB_from_U(pao, qs_env, ls_scf_env, matrix_U_diag)
-      TYPE(pao_env_type), POINTER                        :: pao
-      TYPE(qs_environment_type), POINTER                 :: qs_env
-      TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
-      TYPE(dbcsr_type)                                   :: matrix_U_diag
-
-      CHARACTER(len=*), PARAMETER :: routineN = 'pao_calc_AB_from_U'
-
-      INTEGER                                            :: acol, arow, handle, iatom
-      LOGICAL                                            :: found
-      REAL(dp), DIMENSION(:, :), POINTER                 :: block_A, block_B, block_N, block_N_inv, &
-                                                            block_U, block_Y
-      TYPE(dbcsr_iterator_type)                          :: iter
-      TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
-      TYPE(dbcsr_type)                                   :: matrix_U
-      TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
-
-      CALL timeset(routineN, handle)
-      CALL get_qs_env(qs_env, matrix_s=matrix_s)
-      ls_mstruct => ls_scf_env%ls_mstruct
-
-      ! --------------------------------------------------------------------------------------------
-      ! sanity check matrix U
-      CALL pao_assert_unitary(pao, matrix_U_diag)
-
-      ! --------------------------------------------------------------------------------------------
-      ! redistribute matrix_U_diag from diag_distribution to distribution of matrix_s
-      CALL get_qs_env(qs_env, matrix_s=matrix_s)
-      CALL dbcsr_create(matrix_U, matrix_type="N", template=matrix_s(1)%matrix)
-      CALL dbcsr_reserve_diag_blocks(matrix_U)
-      CALL dbcsr_complete_redistribute(matrix_U_diag, matrix_U)
-
-      ! --------------------------------------------------------------------------------------------
-      ! calculate matrix A and B from matrix U
-      ! Multiplying diagonal matrices is a local operation.
-      ! To take advantage of this we're using an iterator instead of calling dbcsr_multiply().
-!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,ls_mstruct,matrix_U) &
-!$OMP PRIVATE(iter,arow,acol,iatom,block_U,block_Y,block_A,block_B,block_N,block_N_inv,found)
-      CALL dbcsr_iterator_start(iter, matrix_U)
-      DO WHILE (dbcsr_iterator_blocks_left(iter))
-         CALL dbcsr_iterator_next_block(iter, arow, acol, block_U)
-         iatom = arow; CPASSERT(arow == acol)
-
-         CALL dbcsr_get_block_p(matrix=pao%matrix_Y, row=iatom, col=iatom, block=block_Y, found=found)
-         CPASSERT(ASSOCIATED(block_Y))
-
-         CALL dbcsr_get_block_p(matrix=ls_mstruct%matrix_A, row=iatom, col=iatom, block=block_A, found=found)
-         CALL dbcsr_get_block_p(matrix=pao%matrix_N_inv, row=iatom, col=iatom, block=block_N_inv, found=found)
-         CPASSERT(ASSOCIATED(block_A) .AND. ASSOCIATED(block_N_inv))
-
-         CALL dbcsr_get_block_p(matrix=ls_mstruct%matrix_B, row=iatom, col=iatom, block=block_B, found=found)
-         CALL dbcsr_get_block_p(matrix=pao%matrix_N, row=iatom, col=iatom, block=block_N, found=found)
-         CPASSERT(ASSOCIATED(block_B) .AND. ASSOCIATED(block_N))
-
-         block_A = MATMUL(MATMUL(block_N_inv, block_U), block_Y)
-         block_B = MATMUL(MATMUL(block_N, block_U), block_Y)
-      ENDDO
-      CALL dbcsr_iterator_stop(iter)
-!$OMP END PARALLEL
-
-      CALL dbcsr_release(matrix_U)
-
-      CALL timestop(handle)
-   END SUBROUTINE pao_calc_AB_from_U
 
 ! **************************************************************************************************
 !> \brief Helper routine, calculates partial derivative dE/dU
@@ -250,6 +98,78 @@ CONTAINS
 
       CALL timestop(handle)
    END SUBROUTINE pao_calc_grad_lnv_wrt_U
+
+! **************************************************************************************************
+!> \brief Takes current matrix_X and calculates the matrices A and B.
+!> \param pao ...
+!> \param qs_env ...
+!> \param ls_scf_env ...
+!> \param matrix_U_diag ...
+! **************************************************************************************************
+   SUBROUTINE pao_calc_AB_from_U(pao, qs_env, ls_scf_env, matrix_U_diag)
+      TYPE(pao_env_type), POINTER                        :: pao
+      TYPE(qs_environment_type), POINTER                 :: qs_env
+      TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
+      TYPE(dbcsr_type)                                   :: matrix_U_diag
+
+      CHARACTER(len=*), PARAMETER :: routineN = 'pao_calc_AB_from_U'
+
+      INTEGER                                            :: acol, arow, handle, iatom
+      LOGICAL                                            :: found
+      REAL(dp), DIMENSION(:, :), POINTER                 :: block_A, block_B, block_N, block_N_inv, &
+                                                            block_U, block_Y
+      TYPE(dbcsr_iterator_type)                          :: iter
+      TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
+      TYPE(dbcsr_type)                                   :: matrix_U
+      TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
+
+      CALL timeset(routineN, handle)
+      CALL get_qs_env(qs_env, matrix_s=matrix_s)
+      ls_mstruct => ls_scf_env%ls_mstruct
+
+      ! --------------------------------------------------------------------------------------------
+      ! sanity check matrix U
+      CALL pao_assert_unitary(pao, matrix_U_diag)
+
+      ! --------------------------------------------------------------------------------------------
+      ! redistribute matrix_U_diag from diag_distribution to distribution of matrix_s
+      CALL get_qs_env(qs_env, matrix_s=matrix_s)
+      CALL dbcsr_create(matrix_U, matrix_type="N", template=matrix_s(1)%matrix)
+      CALL dbcsr_reserve_diag_blocks(matrix_U)
+      CALL dbcsr_complete_redistribute(matrix_U_diag, matrix_U)
+
+      ! --------------------------------------------------------------------------------------------
+      ! calculate matrix A and B from matrix U
+      ! Multiplying diagonal matrices is a local operation.
+      ! To take advantage of this we're using an iterator instead of calling dbcsr_multiply().
+!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,ls_mstruct,matrix_U) &
+!$OMP PRIVATE(iter,arow,acol,iatom,block_U,block_Y,block_A,block_B,block_N,block_N_inv,found)
+      CALL dbcsr_iterator_start(iter, matrix_U)
+      DO WHILE (dbcsr_iterator_blocks_left(iter))
+         CALL dbcsr_iterator_next_block(iter, arow, acol, block_U)
+         iatom = arow; CPASSERT(arow == acol)
+
+         CALL dbcsr_get_block_p(matrix=pao%matrix_Y, row=iatom, col=iatom, block=block_Y, found=found)
+         CPASSERT(ASSOCIATED(block_Y))
+
+         CALL dbcsr_get_block_p(matrix=ls_mstruct%matrix_A, row=iatom, col=iatom, block=block_A, found=found)
+         CALL dbcsr_get_block_p(matrix=pao%matrix_N_inv, row=iatom, col=iatom, block=block_N_inv, found=found)
+         CPASSERT(ASSOCIATED(block_A) .AND. ASSOCIATED(block_N_inv))
+
+         CALL dbcsr_get_block_p(matrix=ls_mstruct%matrix_B, row=iatom, col=iatom, block=block_B, found=found)
+         CALL dbcsr_get_block_p(matrix=pao%matrix_N, row=iatom, col=iatom, block=block_N, found=found)
+         CPASSERT(ASSOCIATED(block_B) .AND. ASSOCIATED(block_N))
+
+         block_A = MATMUL(MATMUL(block_N_inv, block_U), block_Y)
+         block_B = MATMUL(MATMUL(block_N, block_U), block_Y)
+      ENDDO
+      CALL dbcsr_iterator_stop(iter)
+!$OMP END PARALLEL
+
+      CALL dbcsr_release(matrix_U)
+
+      CALL timestop(handle)
+   END SUBROUTINE pao_calc_AB_from_U
 
 ! **************************************************************************************************
 !> \brief Debugging routine, check unitaryness of U

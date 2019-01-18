@@ -15,7 +15,8 @@ MODULE pao_param_linpot
    USE dbcsr_api,                       ONLY: &
         dbcsr_create, dbcsr_get_block_p, dbcsr_get_info, dbcsr_iterator_blocks_left, &
         dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, &
-        dbcsr_release, dbcsr_reserve_diag_blocks, dbcsr_type
+        dbcsr_p_type, dbcsr_release, dbcsr_reserve_diag_blocks, dbcsr_type
+   USE dm_ls_scf_types,                 ONLY: ls_scf_env_type
    USE kinds,                           ONLY: dp
    USE machine,                         ONLY: m_flush
    USE mathlib,                         ONLY: diamat_all
@@ -30,6 +31,8 @@ MODULE pao_param_linpot
                                               linpot_rotinv_calc_terms,&
                                               linpot_rotinv_count_terms
    USE pao_param_fock,                  ONLY: pao_calc_U_block_fock
+   USE pao_param_unitary,               ONLY: pao_calc_AB_from_U,&
+                                              pao_calc_grad_lnv_wrt_U
    USE pao_potentials,                  ONLY: pao_guess_initial_potential
    USE pao_types,                       ONLY: pao_env_type
    USE particle_types,                  ONLY: particle_type
@@ -43,7 +46,7 @@ MODULE pao_param_linpot
 
    PRIVATE
 
-   PUBLIC :: pao_param_init_linpot, pao_param_finalize_linpot, pao_calc_U_linpot
+   PUBLIC :: pao_param_init_linpot, pao_param_finalize_linpot, pao_calc_AB_linpot
    PUBLIC :: pao_param_count_linpot, pao_param_initguess_linpot
 
 CONTAINS
@@ -338,6 +341,48 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE pao_param_count_linpot
+
+! **************************************************************************************************
+!> \brief Takes current matrix_X and calculates the matrices A and B.
+!> \param pao ...
+!> \param qs_env ...
+!> \param ls_scf_env ...
+!> \param gradient ...
+!> \param penalty ...
+!> \param forces ...
+! **************************************************************************************************
+   SUBROUTINE pao_calc_AB_linpot(pao, qs_env, ls_scf_env, gradient, penalty, forces)
+      TYPE(pao_env_type), POINTER                        :: pao
+      TYPE(qs_environment_type), POINTER                 :: qs_env
+      TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
+      LOGICAL, INTENT(IN)                                :: gradient
+      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
+      REAL(dp), DIMENSION(:, :), INTENT(INOUT), OPTIONAL :: forces
+
+      CHARACTER(len=*), PARAMETER :: routineN = 'pao_calc_AB_linpot'
+
+      INTEGER                                            :: handle
+      TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
+      TYPE(dbcsr_type)                                   :: matrix_M, matrix_U
+
+      CALL timeset(routineN, handle)
+      CALL get_qs_env(qs_env, matrix_s=matrix_s)
+      CALL dbcsr_create(matrix_U, matrix_type="N", dist=pao%diag_distribution, template=matrix_s(1)%matrix)
+      CALL dbcsr_reserve_diag_blocks(matrix_U)
+
+      !TODO: move this condition into pao_calc_U, use matrix_N as template
+      IF (gradient) THEN
+         CALL pao_calc_grad_lnv_wrt_U(qs_env, ls_scf_env, matrix_M)
+         CALL pao_calc_U_linpot(pao, qs_env, matrix_U, matrix_M, pao%matrix_G, penalty, forces)
+         CALL dbcsr_release(matrix_M)
+      ELSE
+         CALL pao_calc_U_linpot(pao, qs_env, matrix_U, penalty=penalty)
+      ENDIF
+
+      CALL pao_calc_AB_from_U(pao, qs_env, ls_scf_env, matrix_U)
+      CALL dbcsr_release(matrix_U)
+      CALL timestop(handle)
+   END SUBROUTINE pao_calc_AB_linpot
 
 ! **************************************************************************************************
 !> \brief Calculate new matrix U and optinally its gradient G
