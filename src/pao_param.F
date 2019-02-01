@@ -18,12 +18,18 @@ MODULE pao_param
    USE pao_input,                       ONLY: pao_exp_param,&
                                               pao_fock_param,&
                                               pao_gth_param,&
-                                              pao_rotinv_param
+                                              pao_rotinv_param,&
+                                              pao_direct_param
    USE pao_param_exp,                   ONLY: pao_calc_AB_exp,&
                                               pao_param_count_exp,&
                                               pao_param_finalize_exp,&
                                               pao_param_init_exp,&
                                               pao_param_initguess_exp
+   USE pao_param_direct,                ONLY: pao_calc_AB_direct,&
+                                              pao_param_count_direct,&
+                                              pao_param_finalize_direct,&
+                                              pao_param_init_direct,&
+                                              pao_param_initguess_direct
    USE pao_param_gth,                   ONLY: pao_calc_AB_gth,&
                                               pao_param_count_gth,&
                                               pao_param_finalize_gth,&
@@ -83,6 +89,8 @@ CONTAINS
          CALL pao_calc_AB_linpot(pao, qs_env, ls_scf_env, gradient, penalty, forces)
       CASE (pao_gth_param)
          CALL pao_calc_AB_gth(pao, qs_env, ls_scf_env, gradient, penalty)
+      CASE (pao_direct_param)
+         CALL pao_calc_AB_direct(pao, qs_env, ls_scf_env, gradient)
       CASE DEFAULT
          CPABORT("PAO: unkown parametrization")
       END SELECT
@@ -112,6 +120,8 @@ CONTAINS
          CALL pao_param_init_linpot(pao, qs_env)
       CASE (pao_gth_param)
          CALL pao_param_init_gth(pao, qs_env)
+      CASE (pao_direct_param)
+         CALL pao_param_init_direct(pao)
       CASE DEFAULT
          CPABORT("PAO: unkown parametrization")
       END SELECT
@@ -141,6 +151,8 @@ CONTAINS
          CALL pao_param_finalize_linpot(pao)
       CASE (pao_gth_param)
          CALL pao_param_finalize_gth(pao)
+      CASE (pao_direct_param)
+         CALL pao_param_finalize_direct()
       CASE DEFAULT
          CPABORT("PAO: unkown parametrization")
       END SELECT
@@ -176,6 +188,8 @@ CONTAINS
          CALL pao_param_count_linpot(pao, qs_env, ikind=ikind, nparams=nparams)
       CASE (pao_gth_param)
          CALL pao_param_count_gth(qs_env, ikind=ikind, nparams=nparams)
+      CASE (pao_direct_param)
+         CALL pao_param_count_direct(qs_env, ikind=ikind, nparams=nparams)
       CASE DEFAULT
          CPABORT("PAO: unkown parametrization")
       END SELECT
@@ -209,6 +223,8 @@ CONTAINS
          CALL pao_param_initguess_linpot(pao, qs_env)
       CASE (pao_gth_param)
          CALL pao_param_initguess_gth(pao)
+      CASE (pao_direct_param)
+         CALL pao_param_initguess_direct(pao)
       CASE DEFAULT
          CPABORT("PAO: unkown parametrization")
       END SELECT

@@ -44,6 +44,7 @@ MODULE pao_input
                                                pao_fock_param = 102, &
                                                pao_exp_param = 103, &
                                                pao_gth_param = 104, &
+                                               pao_direct_param = 105, &
                                                pao_opt_cg = 301, &
                                                pao_opt_bfgs = 302, &
                                                pao_ml_gp = 401, &
@@ -224,6 +225,8 @@ CONTAINS
          s = "FOCK"
       CASE (pao_exp_param)
          s = "EXP"
+      CASE (pao_direct_param)
+         s = "DIRECT"
       CASE (pao_opt_cg)
          s = "CG"
       CASE (pao_opt_bfgs)
@@ -299,12 +302,13 @@ CONTAINS
       ! Parametrization **********************************************************
       CALL keyword_create(keyword, name="PARAMETERIZATION", &
                           description="Parametrization of the mapping between the primary and the PAO basis.", &
-                          enum_c_vals=s2a("ROTINV", "FOCK", "GTH", "EXP"), &
-                          enum_i_vals=(/pao_rotinv_param, pao_fock_param, pao_gth_param, pao_exp_param/), &
+                          enum_c_vals=s2a("ROTINV", "FOCK", "GTH", "EXP", "DIRECT"), &
+                          enum_i_vals=(/pao_rotinv_param, pao_fock_param, pao_gth_param, pao_exp_param, pao_direct_param /), &
                           enum_desc=s2a("Rotational invariant parametrization (machine learnable)", &
                                         "Fock matrix parametrization", &
                                         "Parametrization based on GTH pseudo potentials", &
-                                        "Original matrix exponential parametrization"), &
+                                        "Original matrix exponential parametrization", &
+                                        "Direct parametrization"), &
                           default_i_val=pao_rotinv_param)
       CALL section_add_keyword(section, keyword)
       CALL keyword_release(keyword)
