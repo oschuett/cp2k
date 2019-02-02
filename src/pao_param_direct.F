@@ -98,7 +98,7 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'pao_param_initguess_direct'
 
-      REAL(dp), DIMENSION(:, :), POINTER                 :: block_X, my_block 
+      REAL(dp), DIMENSION(:, :), POINTER                 :: block_X
       INTEGER                                            :: handle, iatom, arow, acol, m, n, i
       TYPE(dbcsr_iterator_type)                          :: iter
       INTEGER, DIMENSION(:), POINTER                     :: blk_sizes_pao, blk_sizes_pri
@@ -108,7 +108,7 @@ CONTAINS
       CALL dbcsr_get_info(pao%matrix_Y, row_blk_size=blk_sizes_pri, col_blk_size=blk_sizes_pao)
 
 !$OMP PARALLEL DEFAULT(NONE) SHARED(pao,ls_mstruct,blk_sizes_pri,blk_sizes_pao) &
-!$OMP PRIVATE(iter,arow,acol,iatom,n,m,block_X)
+!$OMP PRIVATE(iter,arow,acol,iatom,n,m,i,block_X)
       CALL dbcsr_iterator_start(iter, pao%matrix_X)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_X)
@@ -116,14 +116,11 @@ CONTAINS
 
          n = blk_sizes_pri(iatom) ! size of primary basis
          m = blk_sizes_pao(iatom) ! size of pao basis
-         ALLOCATE(my_block(n,m)) !TODO: do this without allocation
-         my_block = 0.0_dp
+         block_X(:,:) = 0.0_dp
          DO i = 1, m
-            my_block(i,i) = 1.0_dp
+            block_X((i-1)*n + i, 1) = 1.0
          ENDDO
-         block_X = my_block
-         DEALLOCATE(my_block)
-
+         !WRITE (*,*) "OLE block_X: ",block_X
       END DO
       CALL dbcsr_iterator_stop(iter)
 !$OMP END PARALLEL
@@ -178,15 +175,15 @@ CONTAINS
          CALL dbcsr_get_block_p(matrix=ls_mstruct%matrix_B, row=iatom, col=iatom, block=block_B, found=found)
          CPASSERT(ASSOCIATED(block_B))
 
-         block_A = block_X
          n = SIZE(block_A, 1) ! size of primary basis
          m = SIZE(block_A, 2) ! size of pao basis
+         block_A = RESHAPE(block_X, (/n, m/))
 
-         WRITE(*,*) "OLE iatom: ", iatom, " block_X: ", block_X
+         !WRITE(*,*) "OLE iatom: ", iatom, " block_X: ", block_X
          !WRITE(*,*) "OLE N: ", N, " M: ", M
-         !DO i=1, n
-         !  WRITE (*,*) "OLE A:", block_A(i,:)
-         !ENDDO
+         DO i=1, n
+           WRITE (*,*) "OLE iatom: ", iatom, " A:", block_A(i,:)
+         ENDDO
 
          ALLOCATE(AA(m,m))
          AA = MATMUL(TRANSPOSE(block_A), block_A)
