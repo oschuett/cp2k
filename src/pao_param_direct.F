@@ -175,7 +175,7 @@ CONTAINS
       REAL(dp), DIMENSION(:), POINTER                    :: AA_evals
       REAL(dp), DIMENSION(:, :), POINTER                 :: AA, AA_evecs, AA_inv, block_A, block_B, &
                                                             block_G, block_Ma, block_Mb, block_X, &
-                                                            D1, G, M1, M2, M3
+                                                            D1, G, M1, M2, M3, block_N
       TYPE(dbcsr_iterator_type)                          :: iter
       TYPE(dbcsr_type)                                   :: matrix_Ma, matrix_Mb
       TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
@@ -199,6 +199,9 @@ CONTAINS
          CPASSERT(ASSOCIATED(block_A))
          CALL dbcsr_get_block_p(matrix=ls_mstruct%matrix_B, row=iatom, col=iatom, block=block_B, found=found)
          CPASSERT(ASSOCIATED(block_B))
+
+         CALL dbcsr_get_block_p(matrix=pao%matrix_N_diag, row=iatom, col=iatom, block=block_N, found=found)
+         CPASSERT(ASSOCIATED(block_N))
 
          n = SIZE(block_A, 1) ! size of primary basis
          m = SIZE(block_A, 2) ! size of pao basis
@@ -224,7 +227,8 @@ CONTAINS
             ENDDO
          ENDDO
 
-         block_B = MATMUL(block_A, AA_inv)
+         !block_B = MATMUL(block_A, AA_inv)
+         block_B = MATMUL(block_A, block_N)
 
          WRITE (*,*) "OLE atom:", iatom, " block_A(:,1)", block_A(:,1)
          WRITE (*,*) "OLE atom:", iatom, " block_B(:,1)", block_B(:,1)
