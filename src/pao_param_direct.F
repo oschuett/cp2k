@@ -20,6 +20,7 @@ MODULE pao_param_direct
    USE pao_types,                       ONLY: pao_env_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
+   USE pao_potentials,                  ONLY: pao_guess_initial_potential
    USE qs_kind_types,                   ONLY: get_qs_kind,&
                                               qs_kind_type
 #include "./base/base_uses.f90"
@@ -87,15 +88,19 @@ CONTAINS
 !> \brief Fills matrix_X with an initial guess
 !> \param pao ...
 ! **************************************************************************************************
-   SUBROUTINE pao_param_initguess_direct(pao)
+   SUBROUTINE pao_param_initguess_direct(pao, qs_env)
+      TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(pao_env_type), POINTER                        :: pao
 
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_param_initguess_direct'
 
-      INTEGER                                            :: acol, arow, handle, i, iatom, m, n
+      INTEGER                                            :: acol, arow, handle, iatom, m, n
       INTEGER, DIMENSION(:), POINTER                     :: blk_sizes_pao, blk_sizes_pri
-      REAL(dp), DIMENSION(:, :), POINTER                 :: block_X
+      REAL(dp), DIMENSION(:, :), POINTER                 :: block_X, H, A, V0, block_H0, H_evecs, &
+                                                            block_N, block_N_inv
+      REAL(dp), DIMENSION(:), POINTER                    :: H_evals
       TYPE(dbcsr_iterator_type)                          :: iter
+      LOGICAL                                            :: found
 
       CALL timeset(routineN, handle)
 
@@ -108,13 +113,39 @@ CONTAINS
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_X)
          iatom = arow; CPASSERT(arow == acol)
 
+         CALL dbcsr_get_block_p(matrix=pao%matrix_H0, row=iatom, col=iatom, block=block_H0, found=found)
+         CALL dbcsr_get_block_p(matrix=pao%matrix_N_diag, row=iatom, col=iatom, block=block_N, found=found)
+         ! TODO: matrix_N_inv has wrong distribution,  pao%matrix_N_inv_diag does not yet exist
+         CALL dbcsr_get_block_p(matrix=pao%matrix_N_inv, row=iatom, col=iatom, block=block_N_inv, found=found)
+         !CALL dbcsr_get_block_p(matrix=pao%matrix_N_inv_diag, row=iatom, col=iatom, block=block_N_inv, found=found)
+         CPASSERT(ASSOCIATED(block_H0) .AND. ASSOCIATED(block_N) .AND. ASSOCIATED(block_N_inv))
+
          n = blk_sizes_pri(iatom) ! size of primary basis
          m = blk_sizes_pao(iatom) ! size of pao basis
-         block_X(:, :) = 0.0_dp
-         DO i = 1, m
-            block_X((i-1)*n+i, 1) = 1.0
-         ENDDO
-         !WRITE (*,*) "OLE block_X: ",block_X
+
+         ALLOCATE (V0(n, n))
+         CALL pao_guess_initial_potential(qs_env, iatom, V0)
+
+         ! construct H
+         ALLOCATE (H(n, n))
+         H = MATMUL(MATMUL(block_N, block_H0 + V0), block_N) ! transform into orthonormal basis
+         !H = block_H0 + V0
+
+         ! diagonalize H
+         ALLOCATE (H_evecs(n, n), H_evals(n))
+         H_evecs = H
+         CALL diamat_all(H_evecs, H_evals)
+
+         ! use first m eigenvectors as initial guess
+         ALLOCATE (A(n, m))
+         A = MATMUL(block_N_inv, H_evecs(:, 1:m))
+         !A = H_evecs(:, 1:m)
+
+         WRITE (*,*) "OLE atom:", iatom, " init guess ", A(:, 1)
+
+         block_X = RESHAPE(A, (/n*m,1/))
+         DEALLOCATE (H, V0, A, H_evecs, H_evals)
+
       END DO
       CALL dbcsr_iterator_stop(iter)
 !$OMP END PARALLEL
@@ -185,7 +216,7 @@ CONTAINS
          ALLOCATE (AA_inv(m, m))
          AA_inv(:, :) = 0.0_dp
          DO k = 1, m
-            w = 1.0_dp/SQRT(AA_evals(k))
+            w = 1.0_dp / AA_evals(k)
             DO i = 1, m
             DO j = 1, m
                AA_inv(i, j) = AA_inv(i, j)+w*AA_evecs(i, k)*AA_evecs(j, k)
@@ -194,6 +225,12 @@ CONTAINS
          ENDDO
 
          block_B = MATMUL(block_A, AA_inv)
+
+         WRITE (*,*) "OLE atom:", iatom, " block_A(:,1)", block_A(:,1)
+         WRITE (*,*) "OLE atom:", iatom, " block_B(:,1)", block_B(:,1)
+
+         WRITE (*,*) "OLE atom:", iatom, " A*B^T", MATMUL(block_A, TRANSPOSE(block_B))
+         WRITE (*,*) "OLE atom:", iatom, " A^T*B", MATMUL(TRANSPOSE(block_A), block_B)
 
          ! TURNING POINT (if calc grad) ------------------------------------------
          IF (gradient) THEN

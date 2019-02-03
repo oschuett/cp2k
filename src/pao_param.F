@@ -224,7 +224,7 @@ CONTAINS
       CASE (pao_gth_param)
          CALL pao_param_initguess_gth(pao)
       CASE (pao_direct_param)
-         CALL pao_param_initguess_direct(pao)
+         CALL pao_param_initguess_direct(pao, qs_env)
       CASE DEFAULT
          CPABORT("PAO: unkown parametrization")
       END SELECT
