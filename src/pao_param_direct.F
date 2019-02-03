@@ -10,7 +10,7 @@
 MODULE pao_param_direct
    USE basis_set_types,                 ONLY: gto_basis_set_type
    USE dbcsr_api,                       ONLY: &
-        dbcsr_get_block_p, dbcsr_get_info, dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, &
+        dbcsr_get_block_p, dbcsr_p_type, dbcsr_get_info, dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, &
         dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, dbcsr_release, dbcsr_type
    USE dm_ls_scf_types,                 ONLY: ls_mstruct_type,&
                                               ls_scf_env_type
@@ -199,16 +199,19 @@ CONTAINS
          CPASSERT(ASSOCIATED(block_A))
          CALL dbcsr_get_block_p(matrix=ls_mstruct%matrix_B, row=iatom, col=iatom, block=block_B, found=found)
          CPASSERT(ASSOCIATED(block_B))
-
          CALL dbcsr_get_block_p(matrix=pao%matrix_N_diag, row=iatom, col=iatom, block=block_N, found=found)
          CPASSERT(ASSOCIATED(block_N))
+
 
          n = SIZE(block_A, 1) ! size of primary basis
          m = SIZE(block_A, 2) ! size of pao basis
          block_A = RESHAPE(block_X, (/n, m/))
 
+         !TODO: rename AA -> AS_invA
          ALLOCATE (AA(m, m))
-         AA = MATMUL(TRANSPOSE(block_A), block_A)
+         !AA = MATMUL(TRANSPOSE(block_A), block_A)
+         !AA = MATMUL(MATMUL(TRANSPOSE(block_A), block_s), block_A)
+         AA = MATMUL(MATMUL(MATMUL(TRANSPOSE(block_A), block_N), block_N), block_A)
 
          ! diagonalize AA
          ALLOCATE (AA_evecs(m, m), AA_evals(m))
@@ -227,8 +230,8 @@ CONTAINS
             ENDDO
          ENDDO
 
-         !block_B = MATMUL(block_A, AA_inv)
-         block_B = MATMUL(block_A, block_N)
+         !B = 1/S * A * 1/(A^T 1/S A)
+         block_B = MATMUL(MATMUL(MATMUL(block_N, block_N), block_A), AA_inv)
 
          WRITE (*,*) "OLE atom:", iatom, " block_A(:,1)", block_A(:,1)
          WRITE (*,*) "OLE atom:", iatom, " block_B(:,1)", block_B(:,1)
