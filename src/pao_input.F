@@ -303,7 +303,7 @@ CONTAINS
       CALL keyword_create(keyword, name="PARAMETERIZATION", &
                           description="Parametrization of the mapping between the primary and the PAO basis.", &
                           enum_c_vals=s2a("ROTINV", "FOCK", "GTH", "EXP", "DIRECT"), &
-                          enum_i_vals=(/pao_rotinv_param, pao_fock_param, pao_gth_param, pao_exp_param, pao_direct_param /), &
+                          enum_i_vals=(/pao_rotinv_param, pao_fock_param, pao_gth_param, pao_exp_param, pao_direct_param/), &
                           enum_desc=s2a("Rotational invariant parametrization (machine learnable)", &
                                         "Fock matrix parametrization", &
                                         "Parametrization based on GTH pseudo potentials", &

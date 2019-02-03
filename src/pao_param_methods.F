@@ -9,32 +9,22 @@
 ! **************************************************************************************************
 MODULE pao_param_methods
    USE cp_control_types,                ONLY: dft_control_type
+   USE cp_log_handling,                 ONLY: cp_to_string
    USE dbcsr_api,                       ONLY: &
-        dbcsr_add, dbcsr_create, dbcsr_get_info, dbcsr_multiply, dbcsr_p_type, dbcsr_release, &
+        dbcsr_add, dbcsr_complete_redistribute, dbcsr_create, dbcsr_get_block_p, dbcsr_get_info, &
+        dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, dbcsr_iterator_start, &
+        dbcsr_iterator_stop, dbcsr_iterator_type, dbcsr_multiply, dbcsr_p_type, dbcsr_release, &
         dbcsr_reserve_diag_blocks, dbcsr_scale, dbcsr_type
    USE dm_ls_scf_qs,                    ONLY: matrix_decluster
    USE dm_ls_scf_types,                 ONLY: ls_mstruct_type,&
                                               ls_scf_env_type
    USE kinds,                           ONLY: dp
+   USE message_passing,                 ONLY: mp_max
    USE pao_types,                       ONLY: pao_env_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_rho_types,                    ONLY: qs_rho_get,&
                                               qs_rho_type
-   USE cp_log_handling,                 ONLY: cp_to_string
-   USE dbcsr_api,                       ONLY: &
-        dbcsr_complete_redistribute, dbcsr_create, dbcsr_get_block_p, dbcsr_get_info, &
-        dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, dbcsr_iterator_start, &
-        dbcsr_iterator_stop, dbcsr_iterator_type, dbcsr_multiply, dbcsr_p_type, dbcsr_release, &
-        dbcsr_reserve_diag_blocks, dbcsr_type
-   USE dm_ls_scf_types,                 ONLY: ls_mstruct_type,&
-                                              ls_scf_env_type
-   USE kinds,                           ONLY: dp
-   USE message_passing,                 ONLY: mp_max
-   USE pao_lnv,                         ONLY: pao_calc_grad_lnv_wrt_AB
-   USE pao_types,                       ONLY: pao_env_type
-   USE qs_environment_types,            ONLY: get_qs_env,&
-                                              qs_environment_type
 #include "./base/base_uses.f90"
 
    IMPLICIT NONE
@@ -244,7 +234,8 @@ CONTAINS
    END SUBROUTINE pao_assert_unitary
 
 ! **************************************************************************************************
-!> \brief Helper routine, calculates partial derivative dE/dA and dE/dB
+!> \brief Helper routine, calculates partial derivative dE/dA and dE/dB.
+!>        As energy functional serves the definition by LNV (Li, Nunes, Vanderbilt).
 !> \param qs_env ...
 !> \param ls_scf_env ...
 !> \param matrix_Ma the derivate wrt A, matrix uses s_matrix-distribution.

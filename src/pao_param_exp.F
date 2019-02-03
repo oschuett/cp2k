@@ -16,7 +16,7 @@ MODULE pao_param_exp
    USE dm_ls_scf_types,                 ONLY: ls_scf_env_type
    USE kinds,                           ONLY: dp
    USE mathlib,                         ONLY: diamat_all
-   USE pao_param_unitary,               ONLY: pao_calc_AB_from_U,&
+   USE pao_param_methods,               ONLY: pao_calc_AB_from_U,&
                                               pao_calc_grad_lnv_wrt_U
    USE pao_potentials,                  ONLY: pao_guess_initial_potential
    USE pao_types,                       ONLY: pao_env_type

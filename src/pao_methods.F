@@ -746,7 +746,7 @@ CONTAINS
                IF (ASSOCIATED(block_X)) THEN
                   delta = ABS(Gij_num-block_G(i, j))
                   delta_max = MAX(delta_max, delta)
-                  !WRITE (*,*) "gradient check", iatom, i, j, Gij_num, block_G(i,j), delta
+                  WRITE (*, *) "gradient check", iatom, i, j, Gij_num, block_G(i, j), delta
                ENDIF
             ENDDO
          ENDDO

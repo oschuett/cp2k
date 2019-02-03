@@ -31,7 +31,7 @@ MODULE pao_param_linpot
                                               linpot_rotinv_calc_terms,&
                                               linpot_rotinv_count_terms
    USE pao_param_fock,                  ONLY: pao_calc_U_block_fock
-   USE pao_param_unitary,               ONLY: pao_calc_AB_from_U,&
+   USE pao_param_methods,               ONLY: pao_calc_AB_from_U,&
                                               pao_calc_grad_lnv_wrt_U
    USE pao_potentials,                  ONLY: pao_guess_initial_potential
    USE pao_types,                       ONLY: pao_env_type

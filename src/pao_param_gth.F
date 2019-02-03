@@ -26,7 +26,7 @@ MODULE pao_param_gth
                                               mp_sum
    USE orbital_pointers,                ONLY: init_orbital_pointers
    USE pao_param_fock,                  ONLY: pao_calc_U_block_fock
-   USE pao_param_unitary,               ONLY: pao_calc_AB_from_U,&
+   USE pao_param_methods,               ONLY: pao_calc_AB_from_U,&
                                               pao_calc_grad_lnv_wrt_U
    USE pao_potentials,                  ONLY: pao_calc_gaussian
    USE pao_types,                       ONLY: pao_env_type

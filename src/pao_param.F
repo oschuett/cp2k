@@ -15,21 +15,21 @@ MODULE pao_param
                                               dbcsr_type
    USE dm_ls_scf_types,                 ONLY: ls_scf_env_type
    USE kinds,                           ONLY: dp
-   USE pao_input,                       ONLY: pao_exp_param,&
+   USE pao_input,                       ONLY: pao_direct_param,&
+                                              pao_exp_param,&
                                               pao_fock_param,&
                                               pao_gth_param,&
-                                              pao_rotinv_param,&
-                                              pao_direct_param
-   USE pao_param_exp,                   ONLY: pao_calc_AB_exp,&
-                                              pao_param_count_exp,&
-                                              pao_param_finalize_exp,&
-                                              pao_param_init_exp,&
-                                              pao_param_initguess_exp
+                                              pao_rotinv_param
    USE pao_param_direct,                ONLY: pao_calc_AB_direct,&
                                               pao_param_count_direct,&
                                               pao_param_finalize_direct,&
                                               pao_param_init_direct,&
                                               pao_param_initguess_direct
+   USE pao_param_exp,                   ONLY: pao_calc_AB_exp,&
+                                              pao_param_count_exp,&
+                                              pao_param_finalize_exp,&
+                                              pao_param_init_exp,&
+                                              pao_param_initguess_exp
    USE pao_param_gth,                   ONLY: pao_calc_AB_gth,&
                                               pao_param_count_gth,&
                                               pao_param_finalize_gth,&
