@@ -10,17 +10,17 @@
 MODULE pao_param_direct
    USE basis_set_types,                 ONLY: gto_basis_set_type
    USE dbcsr_api,                       ONLY: &
-        dbcsr_get_block_p, dbcsr_p_type, dbcsr_get_info, dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, &
+        dbcsr_get_block_p, dbcsr_get_info, dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, &
         dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, dbcsr_release, dbcsr_type
    USE dm_ls_scf_types,                 ONLY: ls_mstruct_type,&
                                               ls_scf_env_type
    USE kinds,                           ONLY: dp
    USE mathlib,                         ONLY: diamat_all
    USE pao_param_methods,               ONLY: pao_calc_grad_lnv_wrt_AB
+   USE pao_potentials,                  ONLY: pao_guess_initial_potential
    USE pao_types,                       ONLY: pao_env_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
-   USE pao_potentials,                  ONLY: pao_guess_initial_potential
    USE qs_kind_types,                   ONLY: get_qs_kind,&
                                               qs_kind_type
 #include "./base/base_uses.f90"
@@ -87,20 +87,21 @@ CONTAINS
 ! **************************************************************************************************
 !> \brief Fills matrix_X with an initial guess
 !> \param pao ...
+!> \param qs_env ...
 ! **************************************************************************************************
    SUBROUTINE pao_param_initguess_direct(pao, qs_env)
-      TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(pao_env_type), POINTER                        :: pao
+      TYPE(qs_environment_type), POINTER                 :: qs_env
 
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_param_initguess_direct'
 
       INTEGER                                            :: acol, arow, handle, iatom, m, n
       INTEGER, DIMENSION(:), POINTER                     :: blk_sizes_pao, blk_sizes_pri
-      REAL(dp), DIMENSION(:, :), POINTER                 :: block_X, H, A, V0, block_H0, H_evecs, &
-                                                            block_N, block_N_inv
-      REAL(dp), DIMENSION(:), POINTER                    :: H_evals
-      TYPE(dbcsr_iterator_type)                          :: iter
       LOGICAL                                            :: found
+      REAL(dp), DIMENSION(:), POINTER                    :: H_evals
+      REAL(dp), DIMENSION(:, :), POINTER                 :: A, block_H0, block_N, block_N_inv, &
+                                                            block_X, H, H_evecs, V0
+      TYPE(dbcsr_iterator_type)                          :: iter
 
       CALL timeset(routineN, handle)
 
@@ -128,8 +129,7 @@ CONTAINS
 
          ! construct H
          ALLOCATE (H(n, n))
-         H = MATMUL(MATMUL(block_N, block_H0 + V0), block_N) ! transform into orthonormal basis
-         !H = block_H0 + V0
+         H = MATMUL(MATMUL(block_N, block_H0+V0), block_N) ! transform into orthonormal basis
 
          ! diagonalize H
          ALLOCATE (H_evecs(n, n), H_evals(n))
@@ -139,11 +139,8 @@ CONTAINS
          ! use first m eigenvectors as initial guess
          ALLOCATE (A(n, m))
          A = MATMUL(block_N_inv, H_evecs(:, 1:m))
-         !A = H_evecs(:, 1:m)
 
-         WRITE (*,*) "OLE atom:", iatom, " init guess ", A(:, 1)
-
-         block_X = RESHAPE(A, (/n*m,1/))
+         block_X = RESHAPE(A, (/n*m, 1/))
          DEALLOCATE (H, V0, A, H_evecs, H_evals)
 
       END DO
@@ -172,10 +169,11 @@ CONTAINS
       INTEGER                                            :: acol, arow, handle, i, iatom, j, k, m, n
       LOGICAL                                            :: found
       REAL(dp)                                           :: denom, nom, w
-      REAL(dp), DIMENSION(:), POINTER                    :: AA_evals
-      REAL(dp), DIMENSION(:, :), POINTER                 :: AA, AA_evecs, AA_inv, block_A, block_B, &
-                                                            block_G, block_Ma, block_Mb, block_X, &
-                                                            D1, G, M1, M2, M3, block_N
+      REAL(dp), DIMENSION(:), POINTER                    :: ANNA_evals
+      REAL(dp), DIMENSION(:, :), POINTER                 :: ANNA, ANNA_evecs, ANNA_inv, block_A, &
+                                                            block_B, block_G, block_Ma, block_Mb, &
+                                                            block_N, block_X, D, G, M1, M2, M3, &
+                                                            M4, M5, NN
       TYPE(dbcsr_iterator_type)                          :: iter
       TYPE(dbcsr_type)                                   :: matrix_Ma, matrix_Mb
       TYPE(ls_mstruct_type), POINTER                     :: ls_mstruct
@@ -202,42 +200,33 @@ CONTAINS
          CALL dbcsr_get_block_p(matrix=pao%matrix_N_diag, row=iatom, col=iatom, block=block_N, found=found)
          CPASSERT(ASSOCIATED(block_N))
 
-
          n = SIZE(block_A, 1) ! size of primary basis
          m = SIZE(block_A, 2) ! size of pao basis
          block_A = RESHAPE(block_X, (/n, m/))
 
-         !TODO: rename AA -> AS_invA
-         ALLOCATE (AA(m, m))
-         !AA = MATMUL(TRANSPOSE(block_A), block_A)
-         !AA = MATMUL(MATMUL(TRANSPOSE(block_A), block_s), block_A)
-         AA = MATMUL(MATMUL(MATMUL(TRANSPOSE(block_A), block_N), block_N), block_A)
+         ALLOCATE (NN(n, n), ANNA(m, m))
+         NN = MATMUL(block_N, block_N) ! it's actually S^{-1}
+         ANNA = MATMUL(MATMUL(TRANSPOSE(block_A), NN), block_A)
 
-         ! diagonalize AA
-         ALLOCATE (AA_evecs(m, m), AA_evals(m))
-         AA_evecs(:, :) = AA
-         CALL diamat_all(AA_evecs, AA_evals)
+         ! diagonalize ANNA
+         ALLOCATE (ANNA_evecs(m, m), ANNA_evals(m))
+         ANNA_evecs(:, :) = ANNA
+         CALL diamat_all(ANNA_evecs, ANNA_evals)
 
-         ! build AA_inv
-         ALLOCATE (AA_inv(m, m))
-         AA_inv(:, :) = 0.0_dp
+         ! build ANNA_inv
+         ALLOCATE (ANNA_inv(m, m))
+         ANNA_inv(:, :) = 0.0_dp
          DO k = 1, m
-            w = 1.0_dp / AA_evals(k)
+            w = 1.0_dp/ANNA_evals(k)
             DO i = 1, m
             DO j = 1, m
-               AA_inv(i, j) = AA_inv(i, j)+w*AA_evecs(i, k)*AA_evecs(j, k)
+               ANNA_inv(i, j) = ANNA_inv(i, j)+w*ANNA_evecs(i, k)*ANNA_evecs(j, k)
             ENDDO
             ENDDO
          ENDDO
 
          !B = 1/S * A * 1/(A^T 1/S A)
-         block_B = MATMUL(MATMUL(MATMUL(block_N, block_N), block_A), AA_inv)
-
-         WRITE (*,*) "OLE atom:", iatom, " block_A(:,1)", block_A(:,1)
-         WRITE (*,*) "OLE atom:", iatom, " block_B(:,1)", block_B(:,1)
-
-         WRITE (*,*) "OLE atom:", iatom, " A*B^T", MATMUL(block_A, TRANSPOSE(block_B))
-         WRITE (*,*) "OLE atom:", iatom, " A^T*B", MATMUL(TRANSPOSE(block_A), block_B)
+         block_B = MATMUL(MATMUL(NN, block_A), ANNA_inv)
 
          ! TURNING POINT (if calc grad) ------------------------------------------
          IF (gradient) THEN
@@ -254,41 +243,39 @@ CONTAINS
             ENDIF
 
             IF (ASSOCIATED(block_Mb)) THEN
+               G = G+MATMUL(MATMUL(NN, block_Mb), TRANSPOSE(ANNA_inv))
 
-               G = G+MATMUL(block_Mb, AA_inv)
-
-               ALLOCATE (D1(m, m), M1(m, m), M2(m, m), M3(m, m))
-               ! apparently this term is really negelitable :-/
+               ALLOCATE (D(m, m), M1(m, m), M2(m, m), M3(m, m), M4(m, m), M5(m, m))
 
                ! calculate derivatives dAA_inv/ dAA
                DO i = 1, m
                DO j = 1, m
-                  denom = AA_evals(i)-AA_evals(j)
+                  denom = ANNA_evals(i)-ANNA_evals(j)
                   IF (i == j) THEN
-                     D1(i, i) = -1.0_dp/AA_evals(i)**2 ! diagonal elements
+                     D(i, i) = -1.0_dp/ANNA_evals(i)**2 ! diagonal elements
                   ELSE IF (ABS(denom) > 1e-10_dp) THEN
-                     nom = -1.0_dp/AA_evals(i)**2+1.0_dp/AA_evals(j)**2
-                     D1(i, j) = nom/denom
+                     nom = -1.0_dp/ANNA_evals(i)**2+1.0_dp/ANNA_evals(j)**2
+                     D(i, j) = nom/denom
                   ELSE
-                     D1(i, j) = 1.0_dp !TODO: ! limit according to L'Hospital's rule
+                     D(i, j) = 0.0_dp ! limit according to L'Hospital's rule !TODO: Really????
                   ENDIF
                ENDDO
                ENDDO
 
-               M1 = MATMUL(TRANSPOSE(block_A), block_Mb) !TODO: or the transposed?
-               M2 = M1*D1 ! Hadamard product
-               M3 = MATMUL(MATMUL(AA_evecs, M2), TRANSPOSE(AA_evecs))
-
-               ! calculate derivatives dAA / dA
-               G = G+2.0_dp*MATMUL(block_A, M3)
-               DEALLOCATE (D1, M1, M2, M3)
+               M1 = MATMUL(MATMUL(TRANSPOSE(block_A), NN), block_Mb)
+               M2 = MATMUL(TRANSPOSE(M1), ANNA_evecs)
+               M3 = M2*D ! Hadamard product
+               M4 = MATMUL(MATMUL(ANNA_evecs, M3), TRANSPOSE(ANNA_evecs))
+               M5 = 0.5_dp*(M4+TRANSPOSE(M4))
+               G = G+2.0_dp*MATMUL(MATMUL(NN, block_A), M5) ! TODO: term is very small - not sure it's right.
+               DEALLOCATE (D, M1, M2, M3, M4, M5)
             ENDIF
 
             block_G = RESHAPE(G, (/n*m, 1/))
             DEALLOCATE (G)
          ENDIF
 
-         DEALLOCATE (AA, AA_evecs, AA_evals, AA_inv)
+         DEALLOCATE (NN, ANNA, ANNA_evecs, ANNA_evals, ANNA_inv)
       END DO
       CALL dbcsr_iterator_stop(iter)
 !$OMP END PARALLEL

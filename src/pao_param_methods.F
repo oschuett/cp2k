@@ -166,11 +166,6 @@ CONTAINS
          block_A = MATMUL(MATMUL(block_N_inv, block_U), block_Y)
          block_B = MATMUL(MATMUL(block_N, block_U), block_Y)
 
-         WRITE (*,*) "OLE atom:", iatom, " block_A(:,1)", block_A(:,1)
-         WRITE (*,*) "OLE atom:", iatom, " block_B(:,1)", block_B(:,1)
-         WRITE (*,*) "OLE atom:", iatom, " A*B^T", MATMUL(block_A, TRANSPOSE(block_B))
-         WRITE (*,*) "OLE atom:", iatom, " A^T*B", MATMUL(TRANSPOSE(block_A), block_B)
-
       ENDDO
       CALL dbcsr_iterator_stop(iter)
 !$OMP END PARALLEL

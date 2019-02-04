@@ -34,9 +34,8 @@ Notice that: $ A^T B = B^T A = \tilde I $, where $\tilde I$ is the identity matr
 
 The relationship between $A$ and $B$ is defined via the Moore-Penrose pseudo-inverse:
 \begin{align*}
-    B & = S^{-1} A (A^T S^{-1} A) ^{-1}
+    B & = S^{-1} A (A^T S^{-1} A) ^{-1} = NN A (A^T NN A) ^{-1}
 \end{align*}
-
 
 
 %==============================================================================
@@ -112,6 +111,56 @@ R^3_{ij} &= \sum_{ab} M^3_{ab} \frac{\partial \tilde S_{ab}}{\partial B_{ij}}\\
 \end{align*}
 
 
+%==============================================================================
+\newpage
+\section*{direct param}
+
+\begin{align*}
+T &= NN = S^{-1}\\
+Z &= (A^T S^{-1} A) ^{-1}
+\end{align*}
+
+
+\begin{align*}
+B &= S^{-1} A (A^T S^{-1} A) ^{-1}\\
+  &= T A Z
+\end{align*}
+
+\begin{align*}
+FOO_{ij} &= \sum_{ab} M_{ab} \frac{\partial B_{ab}}{\partial A_{ij}} \\
+         &= \sum_{ablk} M_{ab} \frac{\partial}{\partial A_{ij}}  T_{al} A_{lk} Z_{kb}\\
+         &= \sum_{ablk} M_{ab} T_{al} \frac{\partial  A_{lk}}{\partial A_{ij}} Z_{kb} + \sum_{ablk} M_{ab} T_{al} A_{lk} \frac{\partial Z_{kb}}{\partial A_{ij}} \\
+         &= \sum_{ablk} M_{ab} T_{al} \delta_{li} \delta_{kj} Z_{kb} + \sum_{ablk} M_{ab} T_{al} A_{lk} \frac{\partial Z_{kb}}{\partial A_{ij}} \\
+         &= \sum_{ab} M_{ab} T_{ai} Z_{jb} + \sum_{abk} (A^T T^T M)_{kb} \frac{\partial Z_{kb}}{\partial A_{ij}} \\
+         &= (T^T M Z^T)_{ij} + \sum_{abk} (A^T T^T M)_{kb} \frac{\partial Z_{kb}}{\partial A_{ij}} \\
+         &= (T M Z^T)_{ij} + \sum_{abk} (A^T T M)_{kb} \frac{\partial Z_{kb}}{\partial A_{ij}} \\
+\end{align*}
+
+
+\begin{align*}
+BAR_{ij} &= \sum_{ab} M_{ab} \frac{\partial  (A^T T A)_{ab} }{\partial A_{ij}} \\
+         &= \sum_{ablk} M_{ab} \frac{\partial}{\partial A_{ij}} A_{la} T_{lk} A_{kb} \\
+         &= \sum_{ablk} M_{ab} \frac{\partial A_{la}}{\partial A_{ij}} T_{lk} A_{kb} +  \sum_{ablk} M_{ab}A_{la} T_{lk}  \frac{\partial  A_{kb}}{\partial A_{ij}} \\
+         &= \sum_{ablk} M_{ab} \delta_{li} \delta_{aj} T_{lk} A_{kb} +  \sum_{ablk} M_{ab}A_{la} T_{lk}  \delta_{ki} \delta_{bj} \\
+         &= \sum_{bk} M_{jb} T_{ik} A_{kb}                           +  \sum_{al} M_{aj}A_{la} T_{li}  \\
+         &= (T A M^T)_{ij}                                           + (T^T AM)_{ij} \\
+         &= 2 (T A M)_{ij}
+\end{align*}
+
+
+
+% 
+%    \frac{d B_{ab}}{d A_{ij}}
+% &= \sum_{ab} \frac{\partial \Omega}{\partial \tilde P_{ab}}  \frac{\partial \tilde P_{ab}}{\partial A_{ij}}
+%  + \sum_{ab} \frac{\partial \Omega}{\partial \tilde H_{ab}}  \frac{\partial \tilde H_{ab}}{\partial A_{ij}}
+%  + \sum_{ab} \frac{\partial \Omega}{\partial \tilde S_{ab}}  \frac{\partial \tilde S_{ab}}{\partial A_{ij}}\\
+%  %
+% &= \sum_{ab} M^1_{ab} \frac{\partial \tilde P_{ab}}{\partial A_{ij}}
+%  + \sum_{ab} M^2_{ab} \frac{\partial \tilde H_{ab}}{\partial A_{ij}}
+%  + \sum_{ab} M^3_{ab} \frac{\partial \tilde S_{ab}}{\partial A_{ij}}\\
+%  %
+% &= T^1_{ij} + T^2_{ij} + T^3_{ij}
+%
 %==============================================================================
 \end{document}
 
