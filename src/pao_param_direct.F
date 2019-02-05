@@ -107,8 +107,9 @@ CONTAINS
 
       CALL dbcsr_get_info(pao%matrix_Y, row_blk_size=blk_sizes_pri, col_blk_size=blk_sizes_pao)
 
-!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,ls_mstruct,blk_sizes_pri,blk_sizes_pao) &
-!$OMP PRIVATE(iter,arow,acol,iatom,n,m,i,block_X)
+!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,qs_env,blk_sizes_pri,blk_sizes_pao) &
+!$OMP PRIVATE(iter,arow,acol,iatom,n,m,found) &
+!$OMP PRIVATE(block_X,block_H0,block_N,block_N_inv,A,H,H_evecs,H_evals,V0)
       CALL dbcsr_iterator_start(iter, pao%matrix_X)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_X)
@@ -116,9 +117,7 @@ CONTAINS
 
          CALL dbcsr_get_block_p(matrix=pao%matrix_H0, row=iatom, col=iatom, block=block_H0, found=found)
          CALL dbcsr_get_block_p(matrix=pao%matrix_N_diag, row=iatom, col=iatom, block=block_N, found=found)
-         ! TODO: matrix_N_inv has wrong distribution,  pao%matrix_N_inv_diag does not yet exist
-         CALL dbcsr_get_block_p(matrix=pao%matrix_N_inv, row=iatom, col=iatom, block=block_N_inv, found=found)
-         !CALL dbcsr_get_block_p(matrix=pao%matrix_N_inv_diag, row=iatom, col=iatom, block=block_N_inv, found=found)
+         CALL dbcsr_get_block_p(matrix=pao%matrix_N_inv_diag, row=iatom, col=iatom, block=block_N_inv, found=found)
          CPASSERT(ASSOCIATED(block_H0) .AND. ASSOCIATED(block_N) .AND. ASSOCIATED(block_N_inv))
 
          n = blk_sizes_pri(iatom) ! size of primary basis
@@ -170,7 +169,7 @@ CONTAINS
 
       INTEGER                                            :: acol, arow, handle, i, iatom, j, k, m, n
       LOGICAL                                            :: found
-      REAL(dp)                                           :: denom, nom, w
+      REAL(dp)                                           :: denom, w
       REAL(dp), DIMENSION(:), POINTER                    :: ANNA_evals
       REAL(dp), DIMENSION(:, :), POINTER                 :: ANNA, ANNA_evecs, ANNA_inv, block_A, &
                                                             block_B, block_G, block_Ma, block_Mb, &
@@ -187,10 +186,10 @@ CONTAINS
          CALL pao_calc_grad_lnv_wrt_AB(qs_env, ls_scf_env, matrix_Ma, matrix_Mb)
       ENDIF
 
-!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,ls_mstruct,matrix_Ma,matrix_Mb) &
-!$OMP PRIVATE(iter,arow,acol,iatom,found,n,m,w,i,j,k) &
-!$OMP PRIVATE(block_X,block_A,block_B,AA,AA_evals,AA_evecs,AA_inv) &
-!$OMP PRIVATE(block_Ma, block_Mb, block_G)
+!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,ls_mstruct,matrix_Ma,matrix_Mb,gradient,penalty) &
+!$OMP PRIVATE(iter,arow,acol,iatom,found,n,m,w,i,j,k,denom) &
+!$OMP PRIVATE(NN,ANNA,ANNA_evals,ANNA_evecs,ANNA_inv,D,G,M1,M2,M3,M4,M5) &
+!$OMP PRIVATE(block_X,block_A,block_B,block_N,block_Ma, block_Mb, block_G)
       CALL dbcsr_iterator_start(iter, pao%matrix_X)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, arow, acol, block_X)
@@ -272,8 +271,7 @@ CONTAINS
                   IF (i == j) THEN
                      D(i, i) = -1.0_dp/ANNA_evals(i)**2 ! diagonal elements
                   ELSE IF (ABS(denom) > 1e-10_dp) THEN
-                     nom = -1.0_dp/ANNA_evals(i)**2+1.0_dp/ANNA_evals(j)**2
-                     D(i, j) = nom/denom
+                     D(i, j) = -1.0_dp/ANNA_evals(i)**2+1.0_dp/ANNA_evals(j)**2/denom
                   ELSE
                      D(i, j) = 0.0_dp ! limit according to L'Hospital's rule !TODO: Really????
                   ENDIF
@@ -285,7 +283,7 @@ CONTAINS
                M3 = M2*D ! Hadamard product
                M4 = MATMUL(MATMUL(ANNA_evecs, M3), TRANSPOSE(ANNA_evecs))
                M5 = 0.5_dp*(M4+TRANSPOSE(M4))
-               G = G+2.0_dp*MATMUL(MATMUL(NN, block_A), M5) ! TODO: term is very small - not sure it's right.
+               G = G+2.0_dp*MATMUL(MATMUL(NN, block_A), M5) ! TODO: term is very small - not sure it's correct.
                DEALLOCATE (D, M1, M2, M3, M4, M5)
             ENDIF
 

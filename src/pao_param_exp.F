@@ -232,7 +232,7 @@ CONTAINS
 
       CALL dbcsr_get_info(pao%matrix_Y, row_blk_size=blk_sizes_pri, col_blk_size=blk_sizes_pao)
 
-!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,matrix_M,matrix_G,blk_sizes_pri,blk_sizes_pao) &
+!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,matrix_U,matrix_M,matrix_G,blk_sizes_pri,blk_sizes_pao) &
 !$OMP PRIVATE(iter,arow,acol,iatom,N,M,nparams,i,j,k,found) &
 !$OMP PRIVATE(block_X,block_U,block_U0,block_X_full,evals,evecs) &
 !$OMP PRIVATE(block_M,block_G,block_D,block_tmp,block_G_full,denom)

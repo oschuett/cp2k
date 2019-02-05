@@ -225,13 +225,19 @@ CONTAINS
       CALL dbcsr_iterator_stop(iter)
 !$OMP END PARALLEL
 
-      ! store a copy that is distributed according to pao%diag_distribution
+      ! store a copies of N and N_inv that are distributed according to pao%diag_distribution
       CALL dbcsr_create(pao%matrix_N_diag, &
                         name="PAO matrix_N_diag", &
                         dist=pao%diag_distribution, &
                         template=matrix_s(1)%matrix)
       CALL dbcsr_reserve_diag_blocks(pao%matrix_N_diag)
       CALL dbcsr_complete_redistribute(pao%matrix_N, pao%matrix_N_diag)
+      CALL dbcsr_create(pao%matrix_N_inv_diag, &
+                        name="PAO matrix_N_inv_diag", &
+                        dist=pao%diag_distribution, &
+                        template=matrix_s(1)%matrix)
+      CALL dbcsr_reserve_diag_blocks(pao%matrix_N_inv_diag)
+      CALL dbcsr_complete_redistribute(pao%matrix_N_inv, pao%matrix_N_inv_diag)
 
       CALL timestop(handle)
    END SUBROUTINE pao_build_orthogonalizer

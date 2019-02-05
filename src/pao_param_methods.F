@@ -200,7 +200,7 @@ CONTAINS
 
       CALL dbcsr_get_info(pao%matrix_Y, row_blk_size=blk_sizes_pri, col_blk_size=blk_sizes_pao)
 
-!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,blk_sizes_pri,blk_sizes_pao,delta_max) &
+!$OMP PARALLEL DEFAULT(NONE) SHARED(pao,matrix_U,blk_sizes_pri,blk_sizes_pao,delta_max) &
 !$OMP PRIVATE(iter,arow,acol,iatom,N,M,block_test,tmp1,tmp2)
       CALL dbcsr_iterator_start(iter, matrix_U)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
