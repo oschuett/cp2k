@@ -157,12 +157,14 @@ CONTAINS
 !> \param qs_env ...
 !> \param ls_scf_env ...
 !> \param gradient ...
+!> \param penalty ...
 ! **************************************************************************************************
-   SUBROUTINE pao_calc_AB_direct(pao, qs_env, ls_scf_env, gradient)
+   SUBROUTINE pao_calc_AB_direct(pao, qs_env, ls_scf_env, gradient, penalty)
       TYPE(pao_env_type), POINTER                        :: pao
       TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(ls_scf_env_type), TARGET                      :: ls_scf_env
       LOGICAL, INTENT(IN)                                :: gradient
+      REAL(dp), INTENT(INOUT), OPTIONAL                  :: penalty
 
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_calc_AB_direct'
 
@@ -204,6 +206,14 @@ CONTAINS
          m = SIZE(block_A, 2) ! size of pao basis
          block_A = RESHAPE(block_X, (/n, m/))
 
+         ! restrain pao basis vectors to unit norm
+         IF (PRESENT(penalty)) THEN
+            DO i = 1, m
+               w = 1.0_dp-SUM(block_A(:, i)**2)
+               penalty = penalty+pao%penalty_strength*w**2
+            ENDDO
+         ENDIF
+
          ALLOCATE (NN(n, n), ANNA(m, m))
          NN = MATMUL(block_N, block_N) ! it's actually S^{-1}
          ANNA = MATMUL(MATMUL(TRANSPOSE(block_A), NN), block_A)
@@ -238,8 +248,16 @@ CONTAINS
 
             ALLOCATE (G(n, m))
             G(:, :) = 0.0_dp
+
+            IF (PRESENT(penalty)) THEN
+               DO i = 1, m
+                  w = 1.0_dp-SUM(block_A(:, i)**2)
+                  G(:, i) = -4.0_dp*pao%penalty_strength*w*block_A(:, i)
+               ENDDO
+            ENDIF
+
             IF (ASSOCIATED(block_Ma)) THEN
-               G = block_Ma
+               G = G+block_Ma
             ENDIF
 
             IF (ASSOCIATED(block_Mb)) THEN

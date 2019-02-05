@@ -90,7 +90,7 @@ CONTAINS
       CASE (pao_gth_param)
          CALL pao_calc_AB_gth(pao, qs_env, ls_scf_env, gradient, penalty)
       CASE (pao_direct_param)
-         CALL pao_calc_AB_direct(pao, qs_env, ls_scf_env, gradient)
+         CALL pao_calc_AB_direct(pao, qs_env, ls_scf_env, gradient, penalty)
       CASE DEFAULT
          CPABORT("PAO: unkown parametrization")
       END SELECT
