@@ -95,7 +95,7 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER :: routineN = 'pao_param_initguess_direct'
 
-      INTEGER                                            :: acol, arow, handle, iatom, m, n
+      INTEGER                                            :: acol, arow, handle, i, iatom, m, n
       INTEGER, DIMENSION(:), POINTER                     :: blk_sizes_pao, blk_sizes_pri
       LOGICAL                                            :: found
       REAL(dp), DIMENSION(:), POINTER                    :: H_evals
@@ -108,7 +108,7 @@ CONTAINS
       CALL dbcsr_get_info(pao%matrix_Y, row_blk_size=blk_sizes_pri, col_blk_size=blk_sizes_pao)
 
 !$OMP PARALLEL DEFAULT(NONE) SHARED(pao,qs_env,blk_sizes_pri,blk_sizes_pao) &
-!$OMP PRIVATE(iter,arow,acol,iatom,n,m,found) &
+!$OMP PRIVATE(iter,arow,acol,iatom,n,m,i,found) &
 !$OMP PRIVATE(block_X,block_H0,block_N,block_N_inv,A,H,H_evecs,H_evals,V0)
       CALL dbcsr_iterator_start(iter, pao%matrix_X)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
@@ -138,6 +138,11 @@ CONTAINS
          ! use first m eigenvectors as initial guess
          ALLOCATE (A(n, m))
          A = MATMUL(block_N_inv, H_evecs(:, 1:m))
+
+         ! normalize vectors
+         DO i = 1, m
+            A(:, i) = A(:, i)/NORM2(A(:, i))
+         ENDDO
 
          block_X = RESHAPE(A, (/n*m, 1/))
          DEALLOCATE (H, V0, A, H_evecs, H_evals)
