@@ -291,7 +291,6 @@ CONTAINS
                M5 = 0.5_dp*(M4+TRANSPOSE(M4))
                G = G+2.0_dp*MATMUL(MATMUL(NN, block_A), M5)
 
-
                DEALLOCATE (D, M1, M2, M3, M4, M5)
             ENDIF
 
