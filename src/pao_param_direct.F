@@ -268,9 +268,9 @@ CONTAINS
             IF (ASSOCIATED(block_Mb)) THEN
                G = G+MATMUL(MATMUL(NN, block_Mb), TRANSPOSE(ANNA_inv))
 
+               ! calculate derivatives dAA_inv/ dAA
                ALLOCATE (D(m, m), M1(m, m), M2(m, m), M3(m, m), M4(m, m), M5(m, m))
 
-               ! calculate derivatives dAA_inv/ dAA
                DO i = 1, m
                DO j = 1, m
                   denom = ANNA_evals(i)-ANNA_evals(j)
