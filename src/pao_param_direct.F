@@ -285,11 +285,12 @@ CONTAINS
                ENDDO
 
                M1 = MATMUL(MATMUL(TRANSPOSE(block_A), NN), block_Mb)
-               M2 = MATMUL(MATMUL(ANNA_evecs, TRANSPOSE(M1)), TRANSPOSE(ANNA_evecs))
+               M2 = MATMUL(MATMUL(TRANSPOSE(ANNA_evecs), M1), ANNA_evecs)
                M3 = M2*D ! Hadamard product
-               M4 = MATMUL(MATMUL(TRANSPOSE(ANNA_evecs), M3), ANNA_evecs)
+               M4 = MATMUL(MATMUL(ANNA_evecs, M3), TRANSPOSE(ANNA_evecs))
                M5 = 0.5_dp*(M4+TRANSPOSE(M4))
                G = G+2.0_dp*MATMUL(MATMUL(NN, block_A), M5)
+
 
                DEALLOCATE (D, M1, M2, M3, M4, M5)
             ENDIF
