@@ -226,6 +226,7 @@ CONTAINS
          ALLOCATE (ANNA_evecs(m, m), ANNA_evals(m))
          ANNA_evecs(:, :) = ANNA
          CALL diamat_all(ANNA_evecs, ANNA_evals)
+         IF (MINVAL(ABS(ANNA_evals)) < 1e-10_dp) CPABORT("PAO basis singualar.")
 
          ! build ANNA_inv
          ALLOCATE (ANNA_inv(m, m))
@@ -276,19 +277,20 @@ CONTAINS
                   IF (i == j) THEN
                      D(i, i) = -1.0_dp/ANNA_evals(i)**2 ! diagonal elements
                   ELSE IF (ABS(denom) > 1e-10_dp) THEN
-                     D(i, j) = -1.0_dp/ANNA_evals(i)**2+1.0_dp/ANNA_evals(j)**2/denom
+                     D(i, j) = (1.0_dp/ANNA_evals(i)-1.0_dp/ANNA_evals(j))/denom
                   ELSE
-                     D(i, j) = 0.0_dp ! limit according to L'Hospital's rule !TODO: Really????
+                     D(i, j) = -1.0_dp ! limit according to L'Hospital's rule
                   ENDIF
                ENDDO
                ENDDO
 
                M1 = MATMUL(MATMUL(TRANSPOSE(block_A), NN), block_Mb)
-               M2 = MATMUL(TRANSPOSE(M1), ANNA_evecs)
+               M2 = MATMUL(MATMUL(ANNA_evecs, TRANSPOSE(M1)), TRANSPOSE(ANNA_evecs))
                M3 = M2*D ! Hadamard product
-               M4 = MATMUL(MATMUL(ANNA_evecs, M3), TRANSPOSE(ANNA_evecs))
+               M4 = MATMUL(MATMUL(TRANSPOSE(ANNA_evecs), M3), ANNA_evecs)
                M5 = 0.5_dp*(M4+TRANSPOSE(M4))
-               G = G+2.0_dp*MATMUL(MATMUL(NN, block_A), M5) ! TODO: term is very small - not sure it's correct.
+               G = G+2.0_dp*MATMUL(MATMUL(NN, block_A), M5)
+
                DEALLOCATE (D, M1, M2, M3, M4, M5)
             ENDIF
 
