@@ -266,7 +266,7 @@ CONTAINS
             ENDIF
 
             IF (ASSOCIATED(block_Mb)) THEN
-               G = G+MATMUL(MATMUL(NN, block_Mb), TRANSPOSE(ANNA_inv))
+               G = G+MATMUL(MATMUL(NN, block_Mb), ANNA_inv)
 
                ! calculate derivatives dAA_inv/ dAA
                ALLOCATE (D(m, m), M1(m, m), M2(m, m), M3(m, m), M4(m, m), M5(m, m))
