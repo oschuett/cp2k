@@ -1,0 +1,136 @@
+FROM ubuntu:18.04
+USER root
+
+# install Ubuntu packages
+# Include also packages for the CI to make check_runs similar to full toolchain builds.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    autogen \
+    automake \
+    autotools-dev \
+    bison \
+    bisonc++ \
+    build-essential \
+    ca-certificates \
+    cmake \
+    flex \
+    flexc++ \
+    gfortran \
+    git \
+    less \
+    libc6-dbg \
+    libtool \
+    make \
+    nano \
+    pkg-config \
+    python \
+    rsync \
+    unzip \
+    wget \
+    zlib1g-dev \
+   && rm -rf /var/lib/apt/lists/*
+
+# build toolchain
+WORKDIR /opt/cp2k-toolchain
+RUN mkdir /opt/cp2k-toolchain/scripts
+
+COPY ./scripts/tool_kit.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/common_vars.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/signal_trap.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/start.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/start.sh --install-all --with-cmake=system
+
+COPY ./scripts/install_lcov.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_lcov.sh && rm -rf ./build
+
+COPY ./scripts/install_valgrind.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_valgrind.sh && rm -rf ./build
+
+COPY ./scripts/install_cmake.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_cmake.sh && rm -rf ./build
+
+COPY ./scripts/install_gcc.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_gcc.sh && rm -rf ./build
+
+COPY ./scripts/install_mpich.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/install_openmpi.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/install_mpi.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_mpi.sh && rm -rf ./build
+
+COPY ./scripts/install_reflapack.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/install_mkl.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/install_acml.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/install_openblas.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/install_mathlibs.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_mathlibs.sh && rm -rf ./build
+
+COPY ./scripts/install_fftw.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_fftw.sh && rm -rf ./build
+
+COPY ./scripts/install_libint.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_libint.sh && rm -rf ./build
+
+COPY ./scripts/install_libxc.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_libxc.sh && rm -rf ./build
+
+COPY ./scripts/install_libsmm.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_libsmm.sh && rm -rf ./build
+
+COPY ./scripts/install_libxsmm.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_libxsmm.sh && rm -rf ./build
+
+COPY ./scripts/install_scalapack.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_scalapack.sh && rm -rf ./build
+
+COPY ./scripts/install_elpa.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_elpa.sh && rm -rf ./build
+
+COPY ./scripts/install_ptscotch.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_ptscotch.sh && rm -rf ./build
+
+COPY ./scripts/install_parmetis.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_parmetis.sh && rm -rf ./build
+
+COPY ./scripts/install_metis.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_metis.sh && rm -rf ./build
+
+COPY ./scripts/install_superlu.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_superlu.sh && rm -rf ./build
+
+COPY ./scripts/install_pexsi.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_pexsi.sh && rm -rf ./build
+
+COPY ./scripts/install_quip.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_quip.sh && rm -rf ./build
+
+COPY ./scripts/install_gsl.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_gsl.sh && rm -rf ./build
+
+COPY ./scripts/install_spglib.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_spglib.sh && rm -rf ./build
+
+COPY ./scripts/install_hdf5.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_hdf5.sh && rm -rf ./build
+
+COPY ./scripts/install_libvdwxc.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_libvdwxc.sh && rm -rf ./build
+
+COPY ./scripts/install_sirius.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_sirius.sh && rm -rf ./build
+
+COPY ./scripts/install_json_fortran.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/install_json_fortran.sh && rm -rf ./build
+
+COPY ./scripts/generate_arch_files.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/generate_arch_files.sh && rm -rf ./build
+
+#RUN ./install_cp2k_toolchain.sh --install-all --with-cmake=system \
+#    && rm -rf ./build
+
+# configure shell
+RUN ln -sf bash /bin/sh && \
+    echo "source /opt/cp2k-toolchain/install/setup" >> /etc/bash.bashrc
+
+WORKDIR /opt/cp2k-toolchain
+
+#EOF
