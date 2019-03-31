@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 elpa_ver=${elpa_ver:-2017.05.003}
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -217,3 +218,4 @@ export ELPAVERSION="${elpa_ver}"
 EOF
 fi
 cd "${ROOTDIR}"
+source "${SCRIPT_DIR}"/step_end.sh

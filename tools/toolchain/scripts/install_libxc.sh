@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 libxc_ver=${libxc_ver:-4.3.4}
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -84,3 +85,4 @@ export LIBXCROOT="$pkg_install_dir"
 EOF
 fi
 cd "${ROOTDIR}"
+source "${SCRIPT_DIR}"/step_end.sh

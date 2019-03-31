@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 libint_ver=${libint_ver:-1.1.6}
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -94,3 +95,4 @@ export CP_LIBS="-Wl,-Bstatic ${LIBINT_LIBS} -Wl,-Bdynamic \${CP_LIBS}"
 EOF
 fi
 cd "${ROOTDIR}"
+source "${SCRIPT_DIR}"/step_end.sh

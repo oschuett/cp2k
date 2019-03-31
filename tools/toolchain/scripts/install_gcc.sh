@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 gcc_ver=${gcc_ver:-8.3.0}
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -177,3 +178,4 @@ cat <<EOF >> ${SETUPFILE}
 export LSAN_OPTIONS=suppressions=${INSTALLDIR}/lsan.supp
 export TSAN_OPTIONS=suppressions=${INSTALLDIR}/tsan.supp
 EOF
+source "${SCRIPT_DIR}"/step_end.sh

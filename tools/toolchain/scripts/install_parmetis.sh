@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 parmetis_ver=${parmetis_ver:-4.0.3}
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -95,3 +96,4 @@ export CP_LIBS="IF_MPI(-lptscotchparmetis|) \${CP_LIBS}"
 EOF
 fi
 cd "${ROOTDIR}"
+source "${SCRIPT_DIR}"/step_end.sh

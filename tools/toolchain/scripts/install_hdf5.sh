@@ -3,7 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 hdf5_ver=${hdf5_ver:-1.10.4}
-
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -90,3 +90,4 @@ EOF
     cat "${BUILDDIR}/setup_hdf5" >> $SETUPFILE
 fi
 cd "${ROOTDIR}"
+source "${SCRIPT_DIR}"/step_end.sh

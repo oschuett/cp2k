@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 libvdwxc_ver=${libvdwxc_ver:-master-429a80027a2ec2c97e2f6d9a3dc84843f2739865}
 
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -129,3 +130,4 @@ EOF
         cat "${BUILDDIR}/setup_libvdwxc" >> $SETUPFILE
 fi
 cd "${ROOTDIR}"
+source "${SCRIPT_DIR}"/step_end.sh

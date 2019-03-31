@@ -891,11 +891,12 @@ esac
 ## need to setup tools after all of the tools are built. We should use
 ## consistent pairs of gcc and binutils etc for make. So we use system
 ## tool sets to compile the tool sets used to compile CP2K
-for ii in $tool_list ; do
-	echo $ii
-#    time_start=`date +%s`
-#    install_mode="$(eval echo \${with_${ii}})"
-#    "${SCRIPTDIR}"/install_${ii}.sh "$install_mode"
-#    time_stop=`date +%s`
-#    printf "Step took %0.2f seconds.\n" $((time_stop-time_start))
-done
+#for ii in $tool_list ; do
+#	echo $ii
+##    time_start=`date +%s`
+##    install_mode="$(eval echo \${with_${ii}})"
+##    "${SCRIPTDIR}"/install_${ii}.sh "$install_mode"
+##    time_stop=`date +%s`
+##    printf "Step took %0.2f seconds.\n" $((time_stop-time_start))
+#done
+export

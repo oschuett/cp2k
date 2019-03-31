@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 scalapack_ver=${scalapack_ver:-2.0.2}
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -110,3 +111,4 @@ cat <<EOF >> ${INSTALLDIR}/lsan.supp
 # leaks related to SCALAPACK
 leak:pdpotrf_
 EOF
+source "${SCRIPT_DIR}"/step_end.sh

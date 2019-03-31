@@ -3,6 +3,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 scotch_ver=${scotch_ver:-6.0.0}
+source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -96,3 +97,4 @@ export CP_LIBS="IF_MPI(${SCOTCH_LIBS}|) \${CP_LIBS}"
 EOF
 fi
 cd "${ROOTDIR}"
+source "${SCRIPT_DIR}"/step_end.sh
