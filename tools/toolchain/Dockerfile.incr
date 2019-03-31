@@ -59,6 +59,10 @@ RUN ./scripts/install_cmake.sh
 COPY ./scripts/install_gcc.sh /opt/cp2k-toolchain/scripts/
 RUN ./scripts/install_gcc.sh
 
+COPY ./scripts/get_openblas_arch.sh /opt/cp2k-toolchain/scripts/
+COPY ./scripts/setup_buildtools.sh /opt/cp2k-toolchain/scripts/
+RUN ./scripts/setup_buildtools.sh
+
 COPY ./scripts/install_mpich.sh /opt/cp2k-toolchain/scripts/
 COPY ./scripts/install_openmpi.sh /opt/cp2k-toolchain/scripts/
 COPY ./scripts/install_mpi.sh /opt/cp2k-toolchain/scripts/
