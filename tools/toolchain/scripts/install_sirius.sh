@@ -7,8 +7,7 @@ source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
-
-with_sirius=${1:-__INSTALL__}
+source "${BUILDDIR}"/toolchain.conf
 
 if [ "$MPI_MODE" = "no" ] && [ "$ENABLE_OMP" = "__FALSE__" ] ; then
     report_warning $LINENO "MPI and OpenMP are disabled, skipping sirius installation"

@@ -6,6 +6,7 @@ source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
+source "${BUILDDIR}"/toolchain.conf
 
 # helper to check if libsmm is available (uses https-redirect
 # to find latest version)
@@ -16,8 +17,6 @@ libsmm_exists() {
         echo $reply_url | cut -d/ -f7
     fi
 }
-
-with_libsmm=${1:-__INSTALL__}
 
 [ -f "${BUILDDIR}/setup_libsmm" ] && rm "${BUILDDIR}/setup_libsmm"
 

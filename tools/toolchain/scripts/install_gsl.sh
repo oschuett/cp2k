@@ -7,8 +7,7 @@ source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
-
-with_gsl=${1:-__INSTALL__}
+source "${BUILDDIR}"/toolchain.conf
 
 [ -f "${BUILDDIR}/setup_gsl" ] && rm "${BUILDDIR}/setup_gsl"
 

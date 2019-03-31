@@ -888,6 +888,18 @@ case $GPUVER in
         "--gpu-ver currently only supports K20X, K40, K80, P100 as options"
 esac
 
+# ======================= write toolchain config ===============================
+! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
+ls ${BUILDDIR}
+echo "# Toolchain config" > ${BUILDDIR}/toolchain.conf
+for ii in $package_list ; do
+	install_mode="$(eval echo \${with_${ii}})"
+	echo "with_${ii}='${install_mode}'" >> ${BUILDDIR}/toolchain.conf
+done
+#TODO: include toollist in config
+#cat ${BUILDDIR}/toolchain.conf
+
+
 ## need to setup tools after all of the tools are built. We should use
 ## consistent pairs of gcc and binutils etc for make. So we use system
 ## tool sets to compile the tool sets used to compile CP2K
@@ -899,4 +911,3 @@ esac
 ##    time_stop=`date +%s`
 ##    printf "Step took %0.2f seconds.\n" $((time_stop-time_start))
 #done
-export

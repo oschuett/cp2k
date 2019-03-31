@@ -1,5 +1,10 @@
 #!/bin/bash -e
 
+source "${SCRIPT_DIR}"/common_vars.sh
+source "${SCRIPT_DIR}"/tool_kit.sh
+source "${SCRIPT_DIR}"/signal_trap.sh
+source "${BUILDDIR}"/toolchain.conf
+
 for ii in $tool_list ; do
     load "${BUILDDIR}/setup_${ii}"
 done
@@ -30,7 +35,6 @@ export LDFLAGS="$TSANFLAGS"
 "${SCRIPTDIR}"/get_openblas_arch.sh; load "${BUILDDIR}/openblas_arch"
 
 # MPI libraries
-time_start=`date +%s`
 case "$MPI_MODE" in
     mpich)
         "${SCRIPTDIR}"/install_mpich.sh "${with_mpich}"; load "${BUILDDIR}/setup_mpich"
@@ -39,7 +43,5 @@ case "$MPI_MODE" in
         "${SCRIPTDIR}"/install_openmpi.sh "${with_openmpi}"; load "${BUILDDIR}/setup_openmpi"
         ;;
 esac
-time_stop=`date +%s`
-printf "Step took %0.2f seconds.\n" $((time_stop-time_start))
 
 #EOF
