@@ -3,7 +3,6 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 json_fortran_ver=${json_fortran_ver:-7.0.0}
-source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -80,4 +79,4 @@ EOF
     fi
 fi
 cd "${ROOTDIR}"
-source "${SCRIPT_DIR}"/step_end.sh
+report_timing "json-fortran"

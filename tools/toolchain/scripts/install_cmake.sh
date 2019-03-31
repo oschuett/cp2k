@@ -3,7 +3,6 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 cmake_ver=${cmake_ver:-3.13.4}
-source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -67,4 +66,4 @@ EOF
     fi
 fi
 cd "${ROOTDIR}"
-source "${SCRIPT_DIR}"/step_end.sh
+report_timing "cmake"

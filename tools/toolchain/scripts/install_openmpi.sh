@@ -3,7 +3,6 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 openmpi_ver=${openmpi_ver:-3.1.3}
-source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -187,4 +186,5 @@ leak:ompi_file_open_f
 leak:progress_engine
 leak:__GI___strdup
 EOF
-source "${SCRIPT_DIR}"/step_end.sh
+
+report_timing "openmpi"

@@ -3,7 +3,6 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 quip_ver=${quip_ver:-cc83ceea5776c40fcb5ab224a25ab04d62175449}
-source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -145,4 +144,4 @@ export CP_LIBS="${QUIP_LIBS} \${CP_LIBS}"
 EOF
 fi
 cd "${ROOTDIR}"
-source "${SCRIPT_DIR}"/step_end.sh
+report_timing "quip"

@@ -7,6 +7,7 @@ openblas_ver=${openblas_ver:-0.3.5}  #  Keep in sync with install_openblas.sh.
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
+source "${BUILDDIR}"/toolchain.conf
 
 find_openblas_dir() {
     local __dir=''

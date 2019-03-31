@@ -3,7 +3,6 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 openblas_ver=${openblas_ver:-0.3.5}  # Keep in sync with get_openblas_arch.sh.
-source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -168,4 +167,5 @@ export FAST_MATH_LIBS="\${FAST_MATH_LIBS} IF_OMP(${OPENBLAS_LIBS_OMP}|${OPENBLAS
 EOF
 fi
 cd "${ROOTDIR}"
-source "${SCRIPT_DIR}"/step_end.sh
+
+report_timing "openblas"

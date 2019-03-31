@@ -1,4 +1,6 @@
 #!/bin/bash -e
+[ "${BASH_SOURCE[0]}" ] && SCRIPT_NAME="${BASH_SOURCE[0]}" || SCRIPT_NAME=$0
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
@@ -28,11 +30,13 @@ export F77FLAGS=$(allowed_gfortran_flags $F77FLAGS)
 export F90FLAGS=$(allowed_gfortran_flags $F90FLAGS)
 export FCFLAGS=$(allowed_gfortran_flags $FCFLAGS)
 export CXXFLAGS=$(allowed_gxx_flags $CXXFLAGS)
-
 export LDFLAGS="$TSANFLAGS"
 
 # get system arch information using OpenBLAS prebuild
 "${SCRIPTDIR}"/get_openblas_arch.sh; load "${BUILDDIR}/openblas_arch"
+
+# update toolchain config
+export -p > ${BUILDDIR}/toolchain.conf
 
 # MPI libraries
 case "$MPI_MODE" in
@@ -44,4 +48,5 @@ case "$MPI_MODE" in
         ;;
 esac
 
-#EOF
+# update toolchain config again
+export -p > ${BUILDDIR}/toolchain.conf

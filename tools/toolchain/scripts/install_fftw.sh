@@ -3,7 +3,6 @@
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
 fftw_ver=${fftw_ver:-3.3.8}
-source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -113,4 +112,4 @@ cat <<EOF >> ${INSTALLDIR}/valgrind.supp
    fun:search0
 }
 EOF
-source "${SCRIPT_DIR}"/step_end.sh
+report_timing "fftw"

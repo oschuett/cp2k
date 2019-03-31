@@ -40,10 +40,12 @@ COPY ./scripts/checksums.sha256 /opt/cp2k-toolchain/scripts/
 COPY ./scripts/tool_kit.sh /opt/cp2k-toolchain/scripts/
 COPY ./scripts/common_vars.sh /opt/cp2k-toolchain/scripts/
 COPY ./scripts/signal_trap.sh /opt/cp2k-toolchain/scripts/
-COPY ./scripts/step_begin.sh /opt/cp2k-toolchain/scripts/
-COPY ./scripts/step_end.sh /opt/cp2k-toolchain/scripts/
 COPY ./scripts/start.sh /opt/cp2k-toolchain/scripts/
 RUN ./scripts/start.sh --install-all --with-cmake=system
+
+# need to setup tools after all of the tools are built. We should use
+# consistent pairs of gcc and binutils etc for make. So we use system
+# tool sets to compile the tool sets used to compile CP2K
 
 COPY ./scripts/install_lcov.sh /opt/cp2k-toolchain/scripts/
 RUN ./scripts/install_lcov.sh

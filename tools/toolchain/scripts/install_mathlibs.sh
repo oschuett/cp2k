@@ -1,7 +1,11 @@
 #!/bin/bash -e
+[ "${BASH_SOURCE[0]}" ] && SCRIPT_NAME="${BASH_SOURCE[0]}" || SCRIPT_NAME=$0
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 
-# get system arch information using OpenBLAS prebuild
-"${SCRIPTDIR}"/get_openblas_arch.sh; load "${BUILDDIR}/openblas_arch"
+source "${SCRIPT_DIR}"/common_vars.sh
+source "${SCRIPT_DIR}"/tool_kit.sh
+source "${SCRIPT_DIR}"/signal_trap.sh
+source "${BUILDDIR}"/toolchain.conf
 
 # math core libraries, need to use reflapack for valgrind builds, as
 # many fast libraries are not necessarily valgrind clean
@@ -11,6 +15,9 @@ export REF_MATH_LIBS=''
 export FAST_MATH_CFLAGS=''
 export FAST_MATH_LDFLAGS=''
 export FAST_MATH_LIBS=''
+
+# update toolchain config
+export -p > ${BUILDDIR}/toolchain.conf
 
 "${SCRIPTDIR}"/install_reflapack.sh "${with_reflapack}"; load "${BUILDDIR}/setup_reflapack"
 
@@ -46,4 +53,5 @@ export CP_CFLAGS="${CP_CFLAGS} IF_DEBUG(${REF_MATH_CFLAGS}|IF_VALGRIND(${REF_MAT
 export CP_LDFLAGS="${CP_LDFLAGS} IF_DEBUG(${REF_MATH_LDFLAGS}|IF_VALGRIND(${REF_MATH_LDFLAGS}|${FAST_MATH_LDFLAGS}))"
 export CP_LIBS="${CP_LIBS} IF_DEBUG(${REF_MATH_LIBS}|IF_VALGRIND(${REF_MATH_LIBS}|${FAST_MATH_LIBS}))"
 
-#EOF
+# update toolchain config again
+export -p > ${BUILDDIR}/toolchain.conf

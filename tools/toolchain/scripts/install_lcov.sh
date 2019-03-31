@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 # use git version due to https://github.com/linux-test-project/lcov/issues/38
 # see also https://bugzilla.redhat.com/show_bug.cgi?id=1552042
 lcov_ver=${lcov_ver:-94eac0ee870e58630d8052dca1181b0cf802525f}
-source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -60,4 +59,4 @@ EOF
     fi
 fi
 cd "${ROOTDIR}"
-source "${SCRIPT_DIR}"/step_end.sh
+report_timing "lcov"

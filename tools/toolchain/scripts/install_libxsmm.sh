@@ -5,7 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_NAME")" && pwd -P)"
 #TODO: Remove valgrind suppressions below after upgrading to next release.
 # For details see: https://github.com/hfp/libxsmm/issues/298 .
 libxsmm_ver=${libxsmm_ver:-1.10.0}
-source "${SCRIPT_DIR}"/step_begin.sh
 source "${SCRIPT_DIR}"/common_vars.sh
 source "${SCRIPT_DIR}"/tool_kit.sh
 source "${SCRIPT_DIR}"/signal_trap.sh
@@ -135,4 +134,5 @@ cat <<EOF >> ${INSTALLDIR}/valgrind.supp
    fun:libxsmm_otrans
 }
 EOF
-source "${SCRIPT_DIR}"/step_end.sh
+
+report_timing "libxsmm"

@@ -1,10 +1,17 @@
 # A set of tools used in the toolchain installer, intended to be used
 # by sourcing this file inside other scipts.
 
+time_start=`date +%s`
 SYS_INCLUDE_PATH=${SYS_INCLUDE_PATH:-"/usr/local/include:/usr/include"}
 SYS_LIB_PATH=${SYS_LIB_PATH:-"/user/local/lib64:/usr/local/lib:/usr/lib64:/usr/lib:/lib64:/lib"}
 INCLUDE_PATHS=${INCLUDE_PATHS:-"CPATH SYS_INCLUDE_PATH"}
 LIB_PATHS=${LIB_PATHS:-"LIBRARY_PATH LD_LIBRARY_PATH LD_RUN_PATH SYS_LIB_PATH"}
+
+# report timing
+report_timeing() {
+	time_stop=`date +%s`
+	printf "Step %s took %0.2f seconds.\n" $1 $((time_stop-time_start))
+}
 
 # report a warning message with script name and line number
 report_warning() {
