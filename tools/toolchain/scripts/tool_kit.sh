@@ -8,7 +8,7 @@ INCLUDE_PATHS=${INCLUDE_PATHS:-"CPATH SYS_INCLUDE_PATH"}
 LIB_PATHS=${LIB_PATHS:-"LIBRARY_PATH LD_LIBRARY_PATH LD_RUN_PATH SYS_LIB_PATH"}
 
 # report timing
-report_timeing() {
+report_timing() {
 	time_stop=`date +%s`
 	printf "Step %s took %0.2f seconds.\n" $1 $((time_stop-time_start))
 }
