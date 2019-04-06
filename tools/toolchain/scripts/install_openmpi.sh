@@ -15,7 +15,7 @@ OPENMPI_LDFLAGS=''
 OPENMPI_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_openmpi" in
+case "$cp2k_with_openmpi" in
     __INSTALL__)
         echo "==================== Installing OpenMPI ===================="
         pkg_install_dir="${INSTALLDIR}/openmpi-${openmpi_ver}"
@@ -68,7 +68,7 @@ case "$with_openmpi" in
         ;;
     *)
         echo "==================== Linking OpenMPI to user paths ===================="
-        pkg_install_dir="$with_openmpi"
+        pkg_install_dir="$cp2k_with_openmpi"
         check_dir "${pkg_install_dir}/bin"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
@@ -76,8 +76,8 @@ case "$with_openmpi" in
         OPENMPI_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_openmpi" != "__DONTUSE__" ] ; then
-    if [ "$with_openmpi" != "__SYSTEM__" ] ; then
+if [ "$cp2k_with_openmpi" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_openmpi" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_openmpi"
 prepend_path PATH "$pkg_install_dir/bin"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"

@@ -24,7 +24,7 @@ LIBSMM_LDFLAGS=''
 LIBSMM_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_libsmm" in
+case "$cp2k_with_libsmm" in
     __INSTALL__)
         echo "==================== Installing libsmm ===================="
         pkg_install_dir="${INSTALLDIR}/libsmm"
@@ -68,7 +68,7 @@ case "$with_libsmm" in
                 echo "Consider building an optimized libsmm on your system yourself"
                 echo "using the toolkid in tools/build_libsmm provided in cp2k package"
                 cat <<EOF > "${BUILDDIR}/setup_libsmm"
-with_libsmm="__DONTUSE__"
+cp2k_with_libsmm="__DONTUSE__"
 EOF
                 exit 0
             fi
@@ -85,14 +85,14 @@ EOF
         ;;
     *)
         echo "==================== Linking Libsmm to user paths ===================="
-        pkg_install_dir="$with_libsmm"
+        pkg_install_dir="$cp2k_with_libsmm"
         check_dir "${pkg_install_dir}/lib"
         LIBSMM_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_libsmm" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_libsmm" != "__DONTUSE__" ] ; then
     LIBSMM_LIBS="-lsmm_dnn"
-    if [ "$with_libsmm" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_libsmm" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_libsmm"
 prepend_path LD_LIBRARY_PATH "${pkg_install_dir}/lib"
 prepend_path LD_RUN_PATH "${pkg_install_dir}/lib"

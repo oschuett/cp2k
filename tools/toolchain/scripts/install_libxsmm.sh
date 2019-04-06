@@ -17,13 +17,13 @@ LIBXSMM_LDFLAGS=''
 LIBXSMM_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_libxsmm" in
+case "$cp2k_with_libxsmm" in
     __INSTALL__)
         echo "==================== Installing Libxsmm ===================="
         if [ "$OPENBLAS_ARCH" != "x86_64" ] ; then
             report_warning $LINENO "libxsmm is not supported on arch ${OPENBLAS_ARCH}"
             cat <<EOF > "${BUILDDIR}/setup_libxsmm"
-with_libxsmm="__DONTUSE__"
+cp2k_with_libxsmm="__DONTUSE__"
 EOF
             exit 0
         fi
@@ -86,7 +86,7 @@ EOF
         ;;
     *)
         echo "==================== Linking Libxsmm to user paths ===================="
-        pkg_install_dir="$with_libxsmm"
+        pkg_install_dir="$cp2k_with_libxsmm"
         check_dir "${pkg_install_dir}/bin"
         check_dir "${pkg_install_dir}/include"
         check_dir "${pkg_install_dir}/lib"
@@ -94,9 +94,9 @@ EOF
         LIBXSMM_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_libxsmm" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_libxsmm" != "__DONTUSE__" ] ; then
     LIBXSMM_LIBS="-lxsmmf -lxsmm -ldl -lpthread"
-    if [ "$with_libxsmm" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_libxsmm" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_libxsmm"
 prepend_path PATH "${pkg_install_dir}/bin"
 prepend_path LD_LIBRARY_PATH "${pkg_install_dir}/lib"

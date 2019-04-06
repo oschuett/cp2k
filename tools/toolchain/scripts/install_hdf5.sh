@@ -12,7 +12,7 @@ source "${BUILDDIR}"/toolchain.conf
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_hdf5" in
+case "$cp2k_with_hdf5" in
     __INSTALL__)
         echo "==================== Installing hdf5 ===================="
         pkg_install_dir="${INSTALLDIR}/hdf5-${hdf5_ver}"
@@ -55,9 +55,9 @@ case "$with_hdf5" in
     *)
         ;;
 esac
-if [ "$with_hdf5" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_hdf5" != "__DONTUSE__" ] ; then
     HDF5_LIBS="-lhdf5 -lhdf5_hl"
-    if [ "$with_hdf5" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_hdf5" != "__SYSTEM__" ] ; then
     cat <<EOF > "${BUILDDIR}/setup_hdf5"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

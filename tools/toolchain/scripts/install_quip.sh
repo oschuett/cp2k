@@ -13,7 +13,7 @@ source "${BUILDDIR}"/toolchain.conf
 if [ "${ENABLE_TSAN}" = "__TRUE__" ] ; then
     report_warning "QUIP is not combatiable with thread sanitizer, not installing..."
 cat <<EOF > setup_quip
-with_quip=__DONTUSE__
+cp2k_with_quip=__DONTUSE__
 EOF
     exit 0
 fi
@@ -23,7 +23,7 @@ QUIP_LDFLAGS=''
 QUIP_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_quip" in
+case "$cp2k_with_quip" in
     __INSTALL__)
         echo "==================== Installing QUIP ===================="
         require_env MATH_LIBS
@@ -115,16 +115,16 @@ case "$with_quip" in
         ;;
     *)
         echo "==================== Linking Quip_Dist to user paths ===================="
-        pkg_install_dir="$with_quip"
+        pkg_install_dir="$cp2k_with_quip"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         QUIP_CFLAGS="-I'${pkg_install_dir}/include'"
         QUIP_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_quip" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_quip" != "__DONTUSE__" ] ; then
     QUIP_LIBS="-lquip_core -latoms -lFoX_sax -lFoX_common -lFoX_utils -lFoX_fsys"
-    if [ "$with_quip" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_quip" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_quip"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

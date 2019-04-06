@@ -15,7 +15,7 @@ REFLAPACK_LDFLAGS=''
 REFLAPACK_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_reflapack" in
+case "$cp2k_with_reflapack" in
     __INSTALL__)
         echo "==================== Installing LAPACK ===================="
         pkg_install_dir="${INSTALLDIR}/lapack-${reflapack_ver}"
@@ -76,14 +76,14 @@ EOF
         ;;
     *)
         echo "==================== Linking LAPACK to user paths ===================="
-        pkg_install_dir="$with_reflapack"
+        pkg_install_dir="$cp2k_with_reflapack"
         check_dir "${pkg_install_dir}/lib"
         REFLAPACK_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_reflapack" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_reflapack" != "__DONTUSE__" ] ; then
     REFLAPACK_LIBS="-llapack -lblas"
-    if [ "$with_reflapack" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_reflapack" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_reflapack"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

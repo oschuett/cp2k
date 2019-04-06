@@ -93,6 +93,7 @@ RUN ./scripts/install_libxsmm.sh
 COPY ./scripts/install_scalapack.sh /opt/cp2k-toolchain/scripts/
 RUN ./scripts/install_scalapack.sh
 
+COPY ./scripts/parse_if.py /opt/cp2k-toolchain/scripts/
 COPY ./scripts/install_elpa.sh /opt/cp2k-toolchain/scripts/
 RUN ./scripts/install_elpa.sh
 

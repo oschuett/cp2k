@@ -14,7 +14,7 @@ ACML_LDFLAGS=''
 ACML_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_acml" in
+case "$cp2k_with_acml" in
     __INSTALL__)
         echo "==================== Installing ACML ===================="
         report_error $LINENO "To install ACML you should either contact your system administrator or go to https://developer.amd.com/tools-and-sdks/archive/amd-core-math-library-acml/acml-downloads-resources/ and download the correct version for your system."
@@ -30,15 +30,15 @@ case "$with_acml" in
         ;;
     *)
         echo "==================== Linking ACML to user paths ===================="
-        pkg_install_dir="$with_acml"
+        pkg_install_dir="$cp2k_with_acml"
         check_dir "${pkg_install_dir}/lib"
         ACML_CFLAGS="-I'${pkg_install_dir}/include'"
         ACML_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_acml" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_acml" != "__DONTUSE__" ] ; then
     ACML_LIBS="-lacml"
-    if [ "$with_acml" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_acml" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_acml"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

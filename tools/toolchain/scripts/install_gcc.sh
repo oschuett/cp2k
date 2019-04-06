@@ -15,7 +15,7 @@ GCC_CFLAGS=""
 TSANFLAGS=""
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_gcc" in
+case "$cp2k_with_gcc" in
     __INSTALL__)
         echo "==================== Installing GCC ===================="
         pkg_install_dir="${INSTALLDIR}/gcc-${gcc_ver}"
@@ -101,7 +101,7 @@ case "$with_gcc" in
         ;;
     *)
         echo "==================== Linking GCC to user paths ===================="
-        pkg_install_dir="$with_gcc"
+        pkg_install_dir="$cp2k_with_gcc"
         check_dir "${pkg_install_dir}/bin"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/lib64"
@@ -115,8 +115,8 @@ if [ "$ENABLE_TSAN" = "__TRUE__" ] ; then
 else
     TSANFLAGS=""
 fi
-if [ "$with_gcc" != "__DONTUSE__" ] ; then
-    if [ "$with_gcc" != "__SYSTEM__" ] ; then
+if [ "$cp2k_with_gcc" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_gcc" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_gcc"
 # needs full path for mpich/openmpi builds, triggers openblas bug
 export CC="${pkg_install_dir}/bin/gcc"

@@ -14,7 +14,7 @@ METIS_LDFLAGS=''
 METIS_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_metis" in
+case "$cp2k_with_metis" in
     __INSTALL__)
         echo "==================== Installing METIS ===================="
         require_env PARMETIS_INSTALL_MODE
@@ -37,20 +37,20 @@ case "$with_metis" in
         ;;
     *)
         echo "==================== Linking METIS to user paths ===================="
-        pkg_install_dir="$with_metis"
+        pkg_install_dir="$cp2k_with_metis"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         METIS_CFLAGS="-I'${pkg_install_dir}/include'"
         METIS_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_metis" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_metis" != "__DONTUSE__" ] ; then
     METIS_LIBS="-lmetis"
     # we assume if in __INSTALL__ mode, then METIS should have been
     # installed from ParMETIS, and this means we don't need to setup
     # the system paths for METIS
-    if [ "$with_metis" != "__SYSTEM__" ] && \
-       [ "$with_metis" != "__INSTALL__" ] ; then
+    if [ "$cp2k_with_metis" != "__SYSTEM__" ] && \
+       [ "$cp2k_with_metis" != "__INSTALL__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_metis"
 prepend_path PATH "$pkg_install_dir/bin"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"

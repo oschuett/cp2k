@@ -12,7 +12,7 @@ source "${BUILDDIR}"/toolchain.conf
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_gsl" in
+case "$cp2k_with_gsl" in
     __INSTALL__)
         echo "==================== Installing gsl ===================="
         pkg_install_dir="${INSTALLDIR}/gsl-${gsl_ver}"
@@ -53,7 +53,7 @@ case "$with_gsl" in
         ;;
     *)
         echo "==================== Linking gsl to user paths ===================="
-        pkg_install_dir="$with_gsl"
+        pkg_install_dir="$cp2k_with_gsl"
         check_dir "$pkg_install_dir/lib"
         check_dir "$pkg_install_dir/lib64"
         check_dir "$pkg_install_dir/include"
@@ -61,9 +61,9 @@ case "$with_gsl" in
         GSL_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_gsl" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_gsl" != "__DONTUSE__" ] ; then
     GSL_LIBS="-lgsl -lgslcblas"
-    if [ "$with_gsl" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_gsl" != "__SYSTEM__" ] ; then
         cat << EOF > "${BUILDDIR}/setup_gsl"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

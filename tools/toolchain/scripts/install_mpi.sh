@@ -10,10 +10,10 @@ source "${BUILDDIR}"/toolchain.conf
 # MPI libraries
 case "$MPI_MODE" in
     mpich)
-        "${SCRIPTDIR}"/install_mpich.sh "${with_mpich}"; load "${BUILDDIR}/setup_mpich"
+        "${SCRIPTDIR}"/install_mpich.sh "${cp2k_with_mpich}"; load "${BUILDDIR}/setup_mpich"
         ;;
     openmpi)
-        "${SCRIPTDIR}"/install_openmpi.sh "${with_openmpi}"; load "${BUILDDIR}/setup_openmpi"
+        "${SCRIPTDIR}"/install_openmpi.sh "${cp2k_with_openmpi}"; load "${BUILDDIR}/setup_openmpi"
         ;;
 esac
 

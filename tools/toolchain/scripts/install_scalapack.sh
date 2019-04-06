@@ -15,7 +15,7 @@ SCALAPACK_LDFLAGS=''
 SCALAPACK_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_scalapack" in
+case "$cp2k_with_scalapack" in
     __INSTALL__)
         echo "==================== Installing ScaLAPACK ===================="
         pkg_install_dir="${INSTALLDIR}/scalapack-${scalapack_ver}"
@@ -75,14 +75,14 @@ EOF
         ;;
     *)
         echo "==================== Linking ScaLAPACK to user paths ===================="
-        pkg_install_dir="$with_scalapack"
+        pkg_install_dir="$cp2k_with_scalapack"
         check_dir "${pkg_install_dir}/lib"
         SCALAPACK_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_scalapack" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_scalapack" != "__DONTUSE__" ] ; then
     SCALAPACK_LIBS="-lscalapack"
-    if [ "$with_scalapack" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_scalapack" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_scalapack"
 prepend_path LD_LIBRARY_PATH "${pkg_install_dir}/lib"
 prepend_path LD_RUN_PATH "${pkg_install_dir}/lib"

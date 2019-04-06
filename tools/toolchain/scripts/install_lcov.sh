@@ -14,7 +14,7 @@ source "${BUILDDIR}"/toolchain.conf
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_lcov" in
+case "$cp2k_with_lcov" in
     __INSTALL__)
         echo "==================== Installing Lcov ===================="
         pkg_install_dir="${INSTALLDIR}/lcov-${lcov_ver}"
@@ -46,12 +46,12 @@ case "$with_lcov" in
         ;;
     *)
         echo "==================== Linking Lcov to user paths ===================="
-        pkg_install_dir="$with_lcov"
-        check_dir "${with_lcov}/bin"
+        pkg_install_dir="$cp2k_with_lcov"
+        check_dir "${cp2k_with_lcov}/bin"
         ;;
 esac
-if [ "$with_lcov" != "__DONTUSE__" ] ; then
-    if [ "$with_lcov" != "__SYSTEM__" ] ; then
+if [ "$cp2k_with_lcov" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_lcov" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_lcov"
 prepend_path PATH "$pkg_install_dir/bin"
 EOF

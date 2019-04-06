@@ -17,7 +17,7 @@ PATCHES=()
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_openblas" in
+case "$cp2k_with_openblas" in
     __INSTALL__)
         echo "==================== Installing OpenBLAS ===================="
         pkg_install_dir="${INSTALLDIR}/openblas-${openblas_ver}"
@@ -137,17 +137,17 @@ case "$with_openblas" in
         ;;
     *)
         echo "==================== Linking LAPACK to user paths ===================="
-        pkg_install_dir="$with_openblas"
+        pkg_install_dir="$cp2k_with_openblas"
         check_dir "${pkg_install_dir}/include"
         check_dir "${pkg_install_dir}/lib"
         OPENBLAS_CFLAGS="-I'${pkg_install_dir}/include'"
         OPENBLAS_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_openblas" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_openblas" != "__DONTUSE__" ] ; then
     OPENBLAS_LIBS="-lopenblas"
     OPENBLAS_LIBS_OMP="-lopenblas"
-    if [ "$with_openblas" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_openblas" != "__SYSTEM__" ] ; then
         OPENBLAS_LIBS_OMP="-lopenblas_omp"
         cat <<EOF > "${BUILDDIR}/setup_openblas"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"

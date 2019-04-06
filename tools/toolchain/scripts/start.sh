@@ -269,7 +269,7 @@ package_list="$tool_list $mpi_list $math_list $lib_list"
 
 # first set everything to __DONTUSE__
 for ii in $package_list ; do
-    eval with_${ii}=__DONTUSE__
+    eval cp2k_with_${ii}=__DONTUSE__
 done
 
 # ------------------------------------------------------------------------
@@ -277,16 +277,16 @@ done
 # ------------------------------------------------------------------------
 
 # tools to turn on by default:
-with_gcc=__SYSTEM__
+cp2k_with_gcc=__SYSTEM__
 
 # libs to turn on by default, the math and mpi libraries are chosen by there respective modes:
-with_fftw=__INSTALL__
-with_libint=__INSTALL__
-with_libxsmm=__INSTALL__
-with_libxc=__INSTALL__
-with_scalapack=__INSTALL__
+cp2k_with_fftw=__INSTALL__
+cp2k_with_libint=__INSTALL__
+cp2k_with_libxsmm=__INSTALL__
+cp2k_with_libxc=__INSTALL__
+cp2k_with_scalapack=__INSTALL__
 # default math library settings, FAST_MATH_MODE picks the math library
-# to use, and with_* defines the default method of installation if it
+# to use, and cp2k_with_* defines the default method of installation if it
 # is picked. For non-CRAY systems defaults to mkl if $MKLROOT is
 # avaliable, otherwise defaults to openblas
 if [ "$MKLROOT" ] ; then
@@ -294,23 +294,23 @@ if [ "$MKLROOT" ] ; then
 else
     export FAST_MATH_MODE=openblas
 fi
-with_acml=__SYSTEM__
-with_mkl=__SYSTEM__
-with_openblas=__INSTALL__
-with_reflapack=__INSTALL__
+cp2k_with_acml=__SYSTEM__
+cp2k_with_mkl=__SYSTEM__
+cp2k_with_openblas=__INSTALL__
+cp2k_with_reflapack=__INSTALL__
 
 # sirius is activated by default
-with_sirius="__INSTALL__"
-with_gsl="__INSTALL__"
-with_spglib="__INSTALL__"
-with_hdf5="__INSTALL__"
-with_json_fortran="__INSTALL__"
-with_elpa="__INSTALL__"
-with_libvdwxc="__INSTALL__"
+cp2k_with_sirius="__INSTALL__"
+cp2k_with_gsl="__INSTALL__"
+cp2k_with_spglib="__INSTALL__"
+cp2k_with_hdf5="__INSTALL__"
+cp2k_with_json_fortran="__INSTALL__"
+cp2k_with_elpa="__INSTALL__"
+cp2k_with_libvdwxc="__INSTALL__"
 
 # for MPI, we try to detect system MPI variant
-with_openmpi=__SYSTEM__
-with_mpich=__SYSTEM__
+cp2k_with_openmpi=__SYSTEM__
+cp2k_with_mpich=__SYSTEM__
 if (command -v mpirun >&- 2>&-) ; then
     # check if we are dealing with openmpi or mpich
     if (mpirun --version 2>&1 | grep -s -q "HYDRA") ; then
@@ -352,13 +352,13 @@ if [ "$CRAY_LD_LIBRARY_PATH" ] ; then
     export FAST_MATH_MODE=cray
     # Default MPI used by CLE is assumed to be MPICH, in any case
     # don't use the installers for the MPI libraries
-    with_mpich="__DONTUSE__"
-    with_openmpi="__DONTUSE__"
+    cp2k_with_mpich="__DONTUSE__"
+    cp2k_with_openmpi="__DONTUSE__"
     export MPI_MODE=mpich
     # set default value for some installers appropriate for CLE
-    with_gcc="__DONTUSE__"
-    with_fftw="__SYSTEM__"
-    with_scalapack="__DONTUSE__"
+    cp2k_with_gcc="__DONTUSE__"
+    cp2k_with_fftw="__SYSTEM__"
+    cp2k_with_scalapack="__DONTUSE__"
 else
     enable_cray=__FALSE__
 fi
@@ -379,7 +379,7 @@ while [ $# -ge 1 ] ; do
         --install-all)
             # set all package to __INSTALL__ status
             for ii in $package_list ; do
-                eval with_${ii}=__INSTALL__
+                eval cp2k_with_${ii}=__INSTALL__
             done
             # default mpi-mode to MPICH
             MPI_MODE=mpich
@@ -494,106 +494,106 @@ while [ $# -ge 1 ] ; do
             fi
             ;;
         --with-gcc*)
-            with_gcc=$(read_with $1)
+            cp2k_with_gcc=$(read_with $1)
             ;;
         --with-cmake*)
-            with_cmake=$(read_with $1)
+            cp2k_with_cmake=$(read_with $1)
             ;;
         --with-lcov*)
-            with_lcov=$(read_with $1)
+            cp2k_with_lcov=$(read_with $1)
             ;;
         --with-valgrind*)
-            with_valgrind=$(read_with $1)
+            cp2k_with_valgrind=$(read_with $1)
             ;;
         --with-mpich*)
-            with_mpich=$(read_with $1)
-            if [ $with_mpich != __DONTUSE__ ] ; then
+            cp2k_with_mpich=$(read_with $1)
+            if [ $cp2k_with_mpich != __DONTUSE__ ] ; then
                 export MPI_MODE=mpich
             fi
             ;;
         --with-openmpi*)
-            with_openmpi=$(read_with $1)
-            if [ $with_openmpi != __DONTUSE__ ] ; then
+            cp2k_with_openmpi=$(read_with $1)
+            if [ $cp2k_with_openmpi != __DONTUSE__ ] ; then
                 export MPI_MODE=openmpi
             fi
             ;;
         --with-libint*)
-            with_libint=$(read_with $1)
+            cp2k_with_libint=$(read_with $1)
             ;;
         --with-libxc*)
-            with_libxc=$(read_with $1)
+            cp2k_with_libxc=$(read_with $1)
             ;;
         --with-fftw*)
-            with_fftw=$(read_with $1)
+            cp2k_with_fftw=$(read_with $1)
             ;;
         --with-reflapack*)
-            with_reflapack=$(read_with $1)
+            cp2k_with_reflapack=$(read_with $1)
             ;;
         --with-mkl*)
-            with_mkl=$(read_with $1)
-            if [ $with_mkl != __DONTUSE__ ] ; then
+            cp2k_with_mkl=$(read_with $1)
+            if [ $cp2k_with_mkl != __DONTUSE__ ] ; then
                 export FAST_MATH_MODE=mkl
             fi
             ;;
         --with-acml*)
-            with_acml=$(read_with $1)
-            if [ $with_acml != __DONTUSE__ ] ; then
+            cp2k_with_acml=$(read_with $1)
+            if [ $cp2k_with_acml != __DONTUSE__ ] ; then
                 export FAST_MATH_MODE=acml
             fi
             ;;
         --with-openblas*)
-            with_openblas=$(read_with $1)
-            if [ $with_openblas != __DONTUSE__ ] ; then
+            cp2k_with_openblas=$(read_with $1)
+            if [ $cp2k_with_openblas != __DONTUSE__ ] ; then
                 export FAST_MATH_MODE=openblas
             fi
             ;;
         --with-scalapack*)
-            with_scalapack=$(read_with $1)
+            cp2k_with_scalapack=$(read_with $1)
             ;;
         --with-libsmm*)
-            with_libsmm=$(read_with $1)
+            cp2k_with_libsmm=$(read_with $1)
             ;;
         --with-libxsmm*)
-            with_libxsmm=$(read_with $1)
+            cp2k_with_libxsmm=$(read_with $1)
             ;;
         --with-elpa*)
-            with_elpa=$(read_with $1)
+            cp2k_with_elpa=$(read_with $1)
             ;;
         --with-ptscotch*)
-            with_ptscotch=$(read_with $1)
+            cp2k_with_ptscotch=$(read_with $1)
             ;;
         --with-parmetis*)
-            with_parmetis=$(read_with $1)
+            cp2k_with_parmetis=$(read_with $1)
             ;;
         --with-metis*)
-            with_metis=$(read_with $1)
+            cp2k_with_metis=$(read_with $1)
             ;;
         --with-superlu*)
-            with_superlu=$(read_with $1)
+            cp2k_with_superlu=$(read_with $1)
             ;;
         --with-pexsi*)
-            with_pexsi=$(read_with $1)
+            cp2k_with_pexsi=$(read_with $1)
             ;;
         --with-quip*)
-            with_quip=$(read_with $1)
+            cp2k_with_quip=$(read_with $1)
             ;;
         --with-sirius*)
-            with_sirius=$(read_with $1)
+            cp2k_with_sirius=$(read_with $1)
             ;;
         --with-gsl*)
-            with_gsl=$(read_with $1)
+            cp2k_with_gsl=$(read_with $1)
             ;;
         --with-spglib*)
-            with_spglib=$(read_with $1)
+            cp2k_with_spglib=$(read_with $1)
             ;;
         --with-hdf5*)
-            with_hdf5=$(read_with $1)
+            cp2k_with_hdf5=$(read_with $1)
             ;;
         --with-json*)
-            with_json_fortran=$(read_with $1)
+            cp2k_with_json_fortran=$(read_with $1)
             ;;
         --with-libvdwxc*)
-            with_libvdwxc=$(read_with $1)
+            cp2k_with_libvdwxc=$(read_with $1)
             ;;
         --help*)
             show_help
@@ -618,8 +618,8 @@ export ENABLE_CUDA=$enable_cuda
 export ENABLE_CRAY=$enable_cray
 [ "$enable_gcc_master" = "__TRUE__" ] && export gcc_ver=master
 [ "$enable_libxsmm_master" = "__TRUE__" ] && export libxsmm_ver=master
-[ "$with_valgrind" != "__DONTUSE__"  ] && export ENABLE_VALGRIND="__TRUE__"
-[ "$with_lcov" != "__DONTUSE__" ] && export ENABLE_COVERAGE="__TRUE__"
+[ "$cp2k_with_valgrind" != "__DONTUSE__"  ] && export ENABLE_VALGRIND="__TRUE__"
+[ "$cp2k_with_lcov" != "__DONTUSE__" ] && export ENABLE_COVERAGE="__TRUE__"
 
 # ------------------------------------------------------------------------
 # Check and solve known conflicts before installations proceed
@@ -627,47 +627,47 @@ export ENABLE_CRAY=$enable_cray
 
 # GCC thread sanitizer conflicts
 if [ $ENABLE_TSAN = "__TRUE__" ] ; then
-    if [ "$with_openblas" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_openblas" != "__DONTUSE__" ] ; then
         echo "TSAN is enabled, cannot use openblas, we will use reflapack instead"
-        [ "$with_reflapack" = "__DONTUSE__" ] && with_reflapack="__INSTALL__"
+        [ "$cp2k_with_reflapack" = "__DONTUSE__" ] && cp2k_with_reflapack="__INSTALL__"
         export FAST_MATH_MODE=reflapack
     fi
     echo "TSAN is enabled, canoot use libsmm"
-    with_libsmm="__DONTUSE__"
+    cp2k_with_libsmm="__DONTUSE__"
 fi
 
 # valgrind conflicts
 if [ "$ENABLE_VALGRIND" = "__TRUE__" ] ; then
-    if [ "$with_reflapack" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_reflapack" = "__DONTUSE__" ] ; then
         echo "reflapack is automatically installed when valgrind is enabled"
-        with_reflapack="__INSTALL__"
+        cp2k_with_reflapack="__INSTALL__"
     fi
 fi
 
 # mpi library conflicts
 if [ $MPI_MODE = no ] ; then
-    if [ "$with_scalapack" != "__DONTUSE__"  ] ; then
+    if [ "$cp2k_with_scalapack" != "__DONTUSE__"  ] ; then
         echo "Not using MPI, so scalapack is disabled."
-        with_scalapack="__DONTUSE__"
+        cp2k_with_scalapack="__DONTUSE__"
     fi
-    if [ "$with_elpa" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_elpa" != "__DONTUSE__" ] ; then
         echo "Not using MPI, so ELPA is disabled."
-        with_elpa="__DONTUSE__"
+        cp2k_with_elpa="__DONTUSE__"
     fi
-    if [ "$with_pexi" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_pexi" != "__DONTUSE__" ] ; then
         echo "Not using MPI, so PEXSI is disabled."
-        with_pexsi="__DONTUSE__"
+        cp2k_with_pexsi="__DONTUSE__"
     fi
-    if [ "$with_sirius" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_sirius" != "__DONTUSE__" ] ; then
         echo "Not using MPI, so sirius is disabled"
-        with_sirius="__DONTUSE__"
+        cp2k_with_sirius="__DONTUSE__"
     fi
 else
     # if gcc is installed, then mpi needs to be installed too
-    if [ "$with_gcc" = "__INSTALL__" ] ; then
+    if [ "$cp2k_with_gcc" = "__INSTALL__" ] ; then
         echo "You have chosen to install GCC, therefore MPI libraries will have to be installed too"
-        with_openmpi="__INSTALL__"
-        with_mpich="__INSTALL__"
+        cp2k_with_openmpi="__INSTALL__"
+        cp2k_with_mpich="__INSTALL__"
     fi
 fi
 
@@ -680,85 +680,85 @@ if [ $ENABLE_CUDA = __TRUE__ ] ; then
 fi
 
 # PESXI and its dependencies
-if [ "$with_pexsi" = "__DONTUSE__" ] ; then
-    if [ "$with_ptscotch" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_pexsi" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_ptscotch" != "__DONTUSE__" ] ; then
         echo "Not using PEXSI, so PT-Scotch is disabled."
-        with_ptscotch="__DONTUSE__"
+        cp2k_with_ptscotch="__DONTUSE__"
     fi
-    if [ "$with_parmetis" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_parmetis" != "__DONTUSE__" ] ; then
         echo "Not using PEXSI, so ParMETIS is disabled."
-        with_parmetis="__DONTUSE__"
+        cp2k_with_parmetis="__DONTUSE__"
     fi
-    if [ "$with_metis" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_metis" != "__DONTUSE__" ] ; then
         echo "Not using PEXSI, so METIS is disabled."
-        with_metis="__DONTUSE__"
+        cp2k_with_metis="__DONTUSE__"
     fi
-    if [ "$with_superlu" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_superlu" != "__DONTUSE__" ] ; then
         echo "Not using PEXSI, so SuperLU-DIST is disabled."
-        with_superlu="__DONTUSE__"
+        cp2k_with_superlu="__DONTUSE__"
     fi
-elif [ "$with_pexsi" = "__INSTALL__" ] ; then
-    [ "$with_ptscotch" = "__DONTUSE__" ] && with_ptscotch="__INSTALL__"
-    [ "$with_parmetis" = "__DONTUSE__" ] && with_parmetis="__INSTALL__"
-    [ "$with_superlu" = "__DONTUSE__" ] && with_superlu="__INSTALL__"
+elif [ "$cp2k_with_pexsi" = "__INSTALL__" ] ; then
+    [ "$cp2k_with_ptscotch" = "__DONTUSE__" ] && cp2k_with_ptscotch="__INSTALL__"
+    [ "$cp2k_with_parmetis" = "__DONTUSE__" ] && cp2k_with_parmetis="__INSTALL__"
+    [ "$cp2k_with_superlu" = "__DONTUSE__" ] && cp2k_with_superlu="__INSTALL__"
 else
-    if [ "$with_ptscotch" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_ptscotch" = "__DONTUSE__" ] ; then
         report_error "For PEXSI to work you need a working PT-Scotch library use --with-ptscotch option to specify if you wish to install the library or specify its location."
         exit 1
     fi
-    if [ "$with_parmetis" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_parmetis" = "__DONTUSE__" ] ; then
         report_error "For PEXSI to work you need a working PARMETIS library use --with-parmetis option to specify if you wish to install the library or specify its location."
         exit 1
     fi
-    if [ "$with_metis" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_metis" = "__DONTUSE__" ] ; then
         report_error "For PEXSI to work you need a working METIS library use --with-metis option to specify if you wish to install the library or specify its location."
         exit 1
     fi
-    if [ "$with_superlu" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_superlu" = "__DONTUSE__" ] ; then
         report_error "For PEXSI to work you need a working SuperLU-DIST library use --with-superlu option to specify if you wish to install the library or specify its location."
         exit 1
     fi
 fi
 
 # ParMETIS requires cmake, it also installs METIS if it is chosen
-if [ "$with_parmetis" = "__INSTALL__" ] ; then
-    [ "$with_cmake" = "__DONTUSE__" ] && with_cmake="__INSTALL__"
-    with_metis="__INSTALL__"
+if [ "$cp2k_with_parmetis" = "__INSTALL__" ] ; then
+    [ "$cp2k_with_cmake" = "__DONTUSE__" ] && cp2k_with_cmake="__INSTALL__"
+    cp2k_with_metis="__INSTALL__"
 fi
 
 # spg library requires cmake.
-if [ "$with_spglib" = "__INSTALL__" ] ; then
-    [ "$with_cmake" = "__DONTUSE__" ] && with_cmake="__INSTALL__"
+if [ "$cp2k_with_spglib" = "__INSTALL__" ] ; then
+    [ "$cp2k_with_cmake" = "__DONTUSE__" ] && cp2k_with_cmake="__INSTALL__"
 fi
 
 # json-fortran requires cmake.
-if [ "$with_json_fortran" = "__INSTALL__" ] ; then
-    [ "$with_cmake" = "__DONTUSE__" ] && with_cmake="__INSTALL__"
+if [ "$cp2k_with_json_fortran" = "__INSTALL__" ] ; then
+    [ "$cp2k_with_cmake" = "__DONTUSE__" ] && cp2k_with_cmake="__INSTALL__"
 fi
 
 # SIRIUS dependencies. Remove the gsl library from the dependencies if SIRIUS is not activated
-if [ "$with_sirius" = "__INSTALL__" ] ; then
-    if [ "$with_gsl" = "__DONTUSE__" ] ; then
+if [ "$cp2k_with_sirius" = "__INSTALL__" ] ; then
+    if [ "$cp2k_with_gsl" = "__DONTUSE__" ] ; then
         report_error "For SIRIUS to work you need a working gsl library use --with-gsl option to specify if you wish to install the library or specify its location."
         exit 1
     fi
-    if [ "$with_libxc" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_libxc" = "__DONTUSE__" ] ; then
         report_error "For SIRIUS to work you need a working libxc library use --with-libxc option to specify if you wish to install the library or specify its location."
         exit 1
     fi
-    if [ "$with_fftw" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_fftw" = "__DONTUSE__" ] ; then
         report_error "For SIRIUS to work you need a working fftw library use --with-fftw option to specify if you wish to install the library or specify its location."
         exit 1
     fi
-    if [ "$with_spglib" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_spglib" = "__DONTUSE__" ] ; then
         report_error "For SIRIUS to work you need a working spglib library use --with-spglib option to specify if you wish to install the library or specify its location."
         exit 1
     fi
-    if [ "$with_hdf5" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_hdf5" = "__DONTUSE__" ] ; then
         report_error "For SIRIUS to work you need a working hdf5 library use --with-hdf5 option to specify if you wish to install the library or specify its location."
         exit 1
     fi
-    if [ "$with_json_fortran" = "__DONTUSE__"  ] ; then
+    if [ "$cp2k_with_json_fortran" = "__DONTUSE__"  ] ; then
         report_error "For SIRIUS to work you need a working json-fortran library use --with-json option to specify if you wish to install it or specify its location."
     exit 1
     fi
@@ -813,7 +813,7 @@ if [ "$ENABLE_CRAY" = "__TRUE__" ] ; then
     # doesn't need LDFLAGS or CFLAGS, nor do the one need to
     # explicitly link the math and scalapack libraries, as all is
     # taken care of by the cray compiler wrappers.
-    if [ "$with_scalapack" = "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_scalapack" = "__DONTUSE__" ] ; then
         export CP_DFLAGS="${CP_DFLAGS} IF_MPI(-D__SCALAPACK|)"
     fi
     case $MPI_MODE in
@@ -824,7 +824,7 @@ if [ "$ENABLE_CRAY" = "__TRUE__" ] ; then
                 export INCLUDE_PATHS="$INCLUDE_PATHS cray_mpich_include_path"
                 export LIB_PATHS="$LIB_PATHS cray_mpich_lib_path"
             fi
-            if [ "$with_mpich" = "__DONTUSE__" ] ; then
+            if [ "$cp2k_with_mpich" = "__DONTUSE__" ] ; then
                 add_include_from_paths MPI_CFLAGS "mpi.h" $INCLUDE_PATHS
                 add_include_from_paths MPI_LDFLAGS "libmpi.*" $LIB_PATHS
                 export MPI_CFLAGS
@@ -834,7 +834,7 @@ if [ "$ENABLE_CRAY" = "__TRUE__" ] ; then
             fi
             ;;
         openmpi)
-            if [ "$with_openmpi" = "__DONTUSE__" ] ; then
+            if [ "$cp2k_with_openmpi" = "__DONTUSE__" ] ; then
                 add_include_from_paths MPI_CFLAGS "mpi.h" $INCLUDE_PATHS
                 add_include_from_paths MPI_LDFLAGS "libmpi.*" $LIB_PATHS
                 export MPI_CFLAGS
@@ -892,6 +892,6 @@ esac
 
 # Write toolchain config
 for ii in $package_list ; do
-	export with_${ii}
+	export cp2k_with_${ii}
 done
 export -p > ${BUILDDIR}/toolchain.conf

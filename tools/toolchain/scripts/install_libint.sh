@@ -15,7 +15,7 @@ LIBINT_LDFLAGS=''
 LIBINT_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_libint" in
+case "$cp2k_with_libint" in
     __INSTALL__)
         echo "==================== Installing LIBINT ===================="
         pkg_install_dir="${INSTALLDIR}/libint-${libint_ver}"
@@ -63,16 +63,16 @@ case "$with_libint" in
         ;;
     *)
         echo "==================== Linking LIBINT to user paths ===================="
-        pkg_install_dir="$with_libint"
+        pkg_install_dir="$cp2k_with_libint"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         LIBINT_CFLAGS="-I'${pkg_install_dir}/include'"
         LIBINT_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_libint" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_libint" != "__DONTUSE__" ] ; then
     LIBINT_LIBS="-lderiv -lint"
-    if [ "$with_libint" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_libint" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_libint"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

@@ -15,7 +15,7 @@ PARMETIS_LDFLAGS=''
 PARMETIS_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_parmetis" in
+case "$cp2k_with_parmetis" in
     __INSTALL__)
         echo "==================== Installing ParMETIS ===================="
         pkg_install_dir="${INSTALLDIR}/parmetis-${parmetis_ver}"
@@ -64,16 +64,16 @@ case "$with_parmetis" in
         ;;
     *)
         echo "==================== Linking ParMETIS to user paths ===================="
-        pkg_install_dir="$with_parmetis"
+        pkg_install_dir="$cp2k_with_parmetis"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         PARMETIS_CFLAGS="-I'${pkg_install_dir}/include'"
         PARMETIS_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_parmetis" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_parmetis" != "__DONTUSE__" ] ; then
     PARMETIS_LIBS="-lparmetis"
-    if [ "$with_parmetis" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_parmetis" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_parmetis"
 prepend_path PATH "$pkg_install_dir/bin"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
@@ -84,7 +84,7 @@ EOF
         cat "${BUILDDIR}/setup_parmetis" >> $SETUPFILE
     fi
     cat <<EOF >> "${BUILDDIR}/setup_parmetis"
-export PARMETIS_INSTALL_MODE="${with_parmetis}"
+export PARMETIS_INSTALL_MODE="${cp2k_with_parmetis}"
 export PARMETIS_CFLAGS="${PARMETIS_CFLAGS}"
 export PARMETIS_LDFLAGS="${PARMETIS_LDFLAGS}"
 export PARMETIS_LIBS="${PARMETIS_LIBS}"

@@ -15,7 +15,7 @@ PEXSI_LDFLAGS=''
 PEXSI_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_pexsi" in
+case "$cp2k_with_pexsi" in
     __INSTALL__)
         echo "==================== Installing PEXSI ===================="
         require_env PARMETIS_LDFLAGS
@@ -94,14 +94,14 @@ case "$with_pexsi" in
         ;;
     *)
         echo "==================== Linking Pexsi_Dist to user paths ===================="
-        pkg_install_dir="$with_pexsi"
+        pkg_install_dir="$cp2k_with_pexsi"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         ;;
 esac
-if [ "$with_pexsi" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_pexsi" != "__DONTUSE__" ] ; then
     PEXSI_LIBS="-lpexsi"
-    if [ "$with_pexsi" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_pexsi" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_pexsi"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

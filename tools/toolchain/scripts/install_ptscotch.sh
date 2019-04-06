@@ -15,7 +15,7 @@ SCOTCH_LDFLAGS=''
 SCOTCH_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_scotch" in
+case "$cp2k_with_scotch" in
     __INSTALL__)
         echo "==================== Installing PT-Scotch ===================="
         pkg_install_dir="${INSTALLDIR}/scotch-${scotch_ver}"
@@ -66,16 +66,16 @@ case "$with_scotch" in
         ;;
     *)
         echo "==================== Linking PT-Scotch to user paths ===================="
-        pkg_install_dir="$with_scotch"
+        pkg_install_dir="$cp2k_with_scotch"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         SCOTCH_CFLAGS="-I'${pkg_install_dir}/include'"
         SCOTCH_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_scotch" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_scotch" != "__DONTUSE__" ] ; then
     SCOTCH_LIBS="-lptscotch -lptscotcherr -lscotchmetis -lscotch -lscotcherr"
-    if [ "$with_scotch" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_scotch" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_ptscotch"
 prepend_path PATH "$pkg_install_dir/bin"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"

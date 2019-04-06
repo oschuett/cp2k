@@ -12,7 +12,7 @@ source "${BUILDDIR}"/toolchain.conf
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_valgrind" in
+case "$cp2k_with_valgrind" in
     __INSTALL__)
         echo "==================== Installing Valgrind ===================="
         pkg_install_dir="${INSTALLDIR}/valgrind-${valgrind_ver}"
@@ -45,14 +45,14 @@ case "$with_valgrind" in
         ;;
     *)
         echo "==================== Linking Valgrind to user paths ===================="
-        pkg_install_dir="$with_valgrind"
-        check_dir "${with_valgrind}/bin"
-        check_dir "${with_valgrind}/lib"
-        check_dir "${with_valgrind}/include"
+        pkg_install_dir="$cp2k_with_valgrind"
+        check_dir "${cp2k_with_valgrind}/bin"
+        check_dir "${cp2k_with_valgrind}/lib"
+        check_dir "${cp2k_with_valgrind}/include"
         ;;
 esac
-if [ "$with_valgrind" != "__DONTUSE__" ] ; then
-    if [ "$with_valgrind" != "__SYSTEM__" ] ; then
+if [ "$cp2k_with_valgrind" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_valgrind" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_valgrind"
 prepend_path PATH "$pkg_install_dir/bin"
 prepend_path PATH "$pkg_install_dir/lib"

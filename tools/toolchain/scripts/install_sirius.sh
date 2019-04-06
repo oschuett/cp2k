@@ -10,7 +10,7 @@ source "${BUILDDIR}"/toolchain.conf
 
 if [ "$MPI_MODE" = "no" ] && [ "$ENABLE_OMP" = "__FALSE__" ] ; then
     report_warning $LINENO "MPI and OpenMP are disabled, skipping sirius installation"
-    echo 'with_sirius="__FALSE__"' >> ${BUILDDIR}/setup_sirius
+    echo 'cp2k_with_sirius="__FALSE__"' >> ${BUILDDIR}/setup_sirius
     exit 0
 fi
 
@@ -22,7 +22,7 @@ SIRIUS_LIBS=''
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_sirius" in
+case "$cp2k_with_sirius" in
     __DONTUSE__)
     ;;
     __INSTALL__)
@@ -200,18 +200,18 @@ case "$with_sirius" in
         ;;
     *)
         echo "==================== Linking SIRIUS_Dist to user paths ===================="
-        pkg_install_dir="$with_sirius"
+        pkg_install_dir="$cp2k_with_sirius"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/lib64"
         check_dir "${pkg_install_dir}/include"
         ;;
 esac
-if [ "$with_sirius" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_sirius" != "__DONTUSE__" ] ; then
     SIRIUS_LIBS="-lsirius_f"
     SIRIUS_CUDA_LDFLAGS="-L'${pkg_install_dir}/lib/cuda' -Wl,-rpath='${pkg_install_dir}/lib/cuda'"
     SIRIUS_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
     SIRIUS_CFLAGS="-I'${pkg_install_dir}/include'"
-    if [ "$with_sirius" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_sirius" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_sirius"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib/cuda"

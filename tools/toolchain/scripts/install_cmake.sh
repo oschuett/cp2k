@@ -12,7 +12,7 @@ source "${BUILDDIR}"/toolchain.conf
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_cmake" in
+case "$cp2k_with_cmake" in
     __INSTALL__)
         echo "==================== Installing CMake ===================="
         pkg_install_dir="${INSTALLDIR}/cmake-${cmake_ver}"
@@ -53,12 +53,12 @@ case "$with_cmake" in
         ;;
     *)
         echo "==================== Linking CMake to user paths ===================="
-        pkg_install_dir="$with_cmake"
-        check_dir "${with_cmake}/bin"
+        pkg_install_dir="$cp2k_with_cmake"
+        check_dir "${cp2k_with_cmake}/bin"
         ;;
 esac
-if [ "$with_cmake" != "__DONTUSE__" ] ; then
-    if [ "$with_cmake" != "__SYSTEM__" ] ; then
+if [ "$cp2k_with_cmake" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_cmake" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_cmake"
 prepend_path PATH "$pkg_install_dir/bin"
 EOF

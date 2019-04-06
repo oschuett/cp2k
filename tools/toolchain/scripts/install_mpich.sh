@@ -15,7 +15,7 @@ MPICH_LDFLAGS=''
 MPICH_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_mpich" in
+case "$cp2k_with_mpich" in
     __INSTALL__)
         echo "==================== Installing MPICH ===================="
         pkg_install_dir="${INSTALLDIR}/mpich-${mpich_ver}"
@@ -59,7 +59,7 @@ case "$with_mpich" in
         ;;
     *)
         echo "==================== Linking MPICH to user paths ===================="
-        pkg_install_dir="$with_mpich"
+        pkg_install_dir="$cp2k_with_mpich"
         check_dir "${pkg_install_dir}/bin"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
@@ -67,9 +67,9 @@ case "$with_mpich" in
         MPICH_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_mpich" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_mpich" != "__DONTUSE__" ] ; then
     MPICH_LIBS="-lmpi -lmpicxx"
-    if [ "$with_mpich" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_mpich" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_mpich"
 prepend_path PATH "$pkg_install_dir/bin"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"

@@ -162,7 +162,7 @@ FCLOGPIPE   =  2> \\\$(notdir \\\$<).warn
 export LC_ALL=C
 EOF
     fi
-    if [ "$with_gcc" != "__DONTUSE__" ] ; then
+    if [ "$cp2k_with_gcc" != "__DONTUSE__" ] ; then
         cat <<EOF >> $__filename
 #
 FYPPFLAGS   = -n --line-marker-format=gfortran5

@@ -11,7 +11,7 @@ source "${BUILDDIR}"/toolchain.conf
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_spglib" in
+case "$cp2k_with_spglib" in
     __INSTALL__)
         echo "==================== Installing spglib ===================="
         pkg_install_dir="${INSTALLDIR}/spglib-${spglib_ver}"
@@ -56,7 +56,7 @@ case "$with_spglib" in
         ;;
     *)
         echo "==================== Linking spglib to user paths ===================="
-        pkg_install_dir="$with_spglib"
+        pkg_install_dir="$cp2k_with_spglib"
         check_dir "$pkg_install_dir/lib"
         check_dir "$pkg_install_dir/lib64"
         check_dir "$pkg_install_dir/include"
@@ -64,9 +64,9 @@ case "$with_spglib" in
         SPGLIB_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_spglib" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_spglib" != "__DONTUSE__" ] ; then
     SPGLIB_LIBS="-lsymspg"
-    if [ "$with_spglib" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_spglib" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_spglib"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

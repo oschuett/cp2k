@@ -16,7 +16,7 @@ FFTW_LIBS=''
 FFTW_LIBS_OMP=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_fftw" in
+case "$cp2k_with_fftw" in
     __INSTALL__)
         require_env MPI_LIBS
         echo "==================== Installing FFTW ===================="
@@ -63,17 +63,17 @@ case "$with_fftw" in
         ;;
     *)
         echo "==================== Linking FFTW to user paths ===================="
-        pkg_install_dir="$with_fftw"
+        pkg_install_dir="$cp2k_with_fftw"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         FFTW_CFLAGS="-I'${pkg_install_dir}/include'"
         FFTW_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_fftw" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_fftw" != "__DONTUSE__" ] ; then
     FFTW_LIBS="-lfftw3"
     FFTW_LIBS_OMP="-lfftw3_omp"
-    if [ "$with_fftw" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_fftw" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_fftw"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

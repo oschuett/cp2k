@@ -14,7 +14,7 @@ MKL_LDFLAGS=''
 MKL_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_mkl" in
+case "$cp2k_with_mkl" in
     __INSTALL__)
         echo "==================== Installing MKL ===================="
         report_error ${LINENO} "To install MKL you should contact your system administrator."
@@ -35,11 +35,11 @@ case "$with_mkl" in
         ;;
     *)
         echo "==================== Linking MKL to user paths ===================="
-        check_dir "$with_mkl"
-        MKLROOT="$with_mkl"
+        check_dir "$cp2k_with_mkl"
+        MKLROOT="$cp2k_with_mkl"
         ;;
 esac
-if [ "$with_mkl" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_mkl" != "__DONTUSE__" ] ; then
     case $OPENBLAS_ARCH in
         x86_64)
             mkl_arch_dir=intel64
@@ -111,7 +111,7 @@ EOF
     if [ $enable_mkl_scalapack = "__TRUE__" ] ; then
         cat <<EOF >> "${BUILDDIR}/setup_mkl"
 export CP_DFLAGS="\${CP_DFLAGS} IF_MPI(-D__SCALAPACK|)"
-with_scalapack="__DONTUSE__"
+cp2k_with_scalapack="__DONTUSE__"
 EOF
     fi
 fi

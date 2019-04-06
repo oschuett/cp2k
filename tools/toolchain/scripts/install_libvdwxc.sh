@@ -10,14 +10,14 @@ source "${BUILDDIR}"/toolchain.conf
 
 [ -f "${BUILDDIR}/setup_libvdwxc" ] && rm "${BUILDDIR}/setup_libvdwxc"
 
-if [ "$MPI_MODE" = "no" ] && [ "$ENABLE_OMP" = "__FALSE__" ] && [ $with_sirius ="__FALSE__" ] ; then
+if [ "$MPI_MODE" = "no" ] && [ "$ENABLE_OMP" = "__FALSE__" ] && [ $cp2k_with_sirius ="__FALSE__" ] ; then
     report_warning $LINENO "MPI and OpenMP and SIRIUS are disabled, skipping libvdwxc installation"
     exit 0
 fi
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_libvdwxc" in
+case "$cp2k_with_libvdwxc" in
     __INSTALL__)
         require_env MPI_CFLAGS
         require_env MPI_LDFLAGS
@@ -96,7 +96,7 @@ case "$with_libvdwxc" in
         ;;
     *)
         echo "==================== Linking libvdwxc to user paths ===================="
-        pkg_install_dir="$with_libvdwxc"
+        pkg_install_dir="$cp2k_with_libvdwxc"
         check_dir "$pkg_install_dir/lib"
         check_dir "$pkg_install_dir/lib64"
         check_dir "$pkg_install_dir/include"
@@ -104,9 +104,9 @@ case "$with_libvdwxc" in
         LIBVDWXC_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_libvdwxc" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_libvdwxc" != "__DONTUSE__" ] ; then
     LIBVDWXC_LIBS="-lvdwxc"
-    if [ "$with_libvdwxc" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_libvdwxc" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_libvdwxc"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

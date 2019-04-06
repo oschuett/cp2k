@@ -15,7 +15,7 @@ SUPERLU_LDFLAGS=''
 SUPERLU_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_superlu" in
+case "$cp2k_with_superlu" in
     __INSTALL__)
         echo "==================== Installing SuperLU_DIST ===================="
         require_env PARMETIS_LDFLAGS
@@ -79,16 +79,16 @@ EOF
         ;;
     *)
         echo "==================== Linking Superlu_Dist to user paths ===================="
-        pkg_install_dir="$with_superlu"
+        pkg_install_dir="$cp2k_with_superlu"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         SUPERLU_CFLAGS="-I'${pkg_install_dir}/include'"
         SUPERLU_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_superlu" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_superlu" != "__DONTUSE__" ] ; then
     SUPERLU_LIBS="-lsuperlu_dist"
-    if [ "$with_superlu" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_superlu" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_superlu"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

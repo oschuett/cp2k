@@ -19,17 +19,17 @@ export FAST_MATH_LIBS=''
 # update toolchain config
 export -p > ${BUILDDIR}/toolchain.conf
 
-"${SCRIPTDIR}"/install_reflapack.sh "${with_reflapack}"; load "${BUILDDIR}/setup_reflapack"
+"${SCRIPTDIR}"/install_reflapack.sh "${cp2k_with_reflapack}"; load "${BUILDDIR}/setup_reflapack"
 
 case "$FAST_MATH_MODE" in
     mkl)
-        "${SCRIPTDIR}"/install_mkl.sh "${with_mkl}"; load "${BUILDDIR}/setup_mkl"
+        "${SCRIPTDIR}"/install_mkl.sh "${cp2k_with_mkl}"; load "${BUILDDIR}/setup_mkl"
         ;;
     acml)
-        "${SCRIPTDIR}"/install_acml.sh "${with_acml}"; load "${BUILDDIR}/setup_acml"
+        "${SCRIPTDIR}"/install_acml.sh "${cp2k_with_acml}"; load "${BUILDDIR}/setup_acml"
         ;;
     openblas)
-        "${SCRIPTDIR}"/install_openblas.sh "${with_openblas}"; load "${BUILDDIR}/setup_openblas"
+        "${SCRIPTDIR}"/install_openblas.sh "${cp2k_with_openblas}"; load "${BUILDDIR}/setup_openblas"
         ;;
     cray)
         # note the space is intentional so that the variable is

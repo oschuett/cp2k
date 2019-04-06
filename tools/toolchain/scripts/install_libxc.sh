@@ -15,7 +15,7 @@ LIBXC_LDFLAGS=''
 LIBXC_LIBS=''
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_libxc" in
+case "$cp2k_with_libxc" in
     __INSTALL__)
         echo "==================== Installing LIBXC ===================="
         pkg_install_dir="${INSTALLDIR}/libxc-${libxc_ver}"
@@ -53,16 +53,16 @@ case "$with_libxc" in
         ;;
     *)
         echo "==================== Linking LIBXC to user paths ===================="
-        pkg_install_dir="$with_libxc"
+        pkg_install_dir="$cp2k_with_libxc"
         check_dir "${pkg_install_dir}/lib"
         check_dir "${pkg_install_dir}/include"
         LIBXC_CFLAGS="-I'${pkg_install_dir}/include'"
         LIBXC_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_libxc" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_libxc" != "__DONTUSE__" ] ; then
     LIBXC_LIBS="-lxcf03 -lxc"
-    if [ "$with_libxc" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_libxc" != "__SYSTEM__" ] ; then
         cat <<EOF > "${BUILDDIR}/setup_libxc"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"

@@ -22,12 +22,12 @@ cd "${BUILDDIR}"
 if [ $MPI_MODE = no ] ; then
     report_warning $LINENO "MPI is disabled, skipping elpa installation"
 cat <<EOF > "${BUILDDIR}/setup_elpa"
-with_elpa="__FALSE__"
+cp2k_with_elpa="__FALSE__"
 EOF
     exit 0
 fi
 
-case "$with_elpa" in
+case "$cp2k_with_elpa" in
     __INSTALL__)
         echo "==================== Installing ELPA ===================="
         pkg_install_dir="${INSTALLDIR}/elpa-${elpa_ver}"
@@ -88,8 +88,8 @@ case "$with_elpa" in
                           CFLAGS="${CFLAGS} ${MATH_CFLAGS} ${SCALAPACK_CFLAGS} ${AVX_flag} ${FMA_flag} ${SSE4_flag}" \
                           CXXFLAGS="${CXXFLAGS} ${MATH_CFLAGS} ${SCALAPACK_CFLAGS} ${AVX_flag} ${FMA_flag} ${SSE4_flag}" \
                           LDFLAGS="-Wl,--enable-new-dtags ${MATH_LDFLAGS} ${SCALAPACK_LDFLAGS} ${cray_ldflags}" \
-                          LIBS="${SCALAPACK_LIBS} $(resolve_string "${MATH_LIBS}")" \
-                          > configure.log 2>&1
+                          LIBS="${SCALAPACK_LIBS} $(resolve_string "${MATH_LIBS}")" #\
+                          #> configure.log 2>&1
             make -j $NPROCS >  make.log 2>&1
             make install > install.log 2>&1
             cd ..
@@ -155,7 +155,7 @@ case "$with_elpa" in
         ;;
     *)
         echo "==================== Linking ELPA to user paths ===================="
-        pkg_install_dir="$with_elpa"
+        pkg_install_dir="$cp2k_with_elpa"
         check_dir "${pkg_install_dir}/include"
         check_dir "${pkg_install_dir}/lib"
         user_include_path="$pkg_install_dir/include"
@@ -182,14 +182,14 @@ case "$with_elpa" in
         ELPA_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_elpa" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_elpa" != "__DONTUSE__" ] ; then
     ELPA_LIBS="-lelpa"
     ELPA_LIBS_OMP="-lelpa_openmp"
     cat <<EOF > "${BUILDDIR}/setup_elpa"
 prepend_path CPATH "$elpa_include"
 prepend_path CPATH "$elpa_include_omp"
 EOF
-    if [ "$with_elpa" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_elpa" != "__SYSTEM__" ] ; then
         cat <<EOF >> "${BUILDDIR}/setup_elpa"
 prepend_path PATH "$pkg_install_dir/bin"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"

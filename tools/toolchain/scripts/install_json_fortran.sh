@@ -12,7 +12,7 @@ source "${BUILDDIR}"/toolchain.conf
 
 ! [ -d "${BUILDDIR}" ] && mkdir -p "${BUILDDIR}"
 cd "${BUILDDIR}"
-case "$with_json_fortran" in
+case "$cp2k_with_json_fortran" in
     __INSTALL__)
         echo "==================== Installing json_fortran ===================="
         pkg_install_dir="${INSTALLDIR}/json_fortran-${json_fortran_ver}"
@@ -52,7 +52,7 @@ case "$with_json_fortran" in
         ;;
     *)
         echo "==================== Linking json-fortran to user paths ===================="
-        pkg_install_dir="$with_json"
+        pkg_install_dir="$cp2k_with_json"
         check_dir "$pkg_install_dir/lib"
         check_dir "$pkg_install_dir/lib64"
         check_dir "$pkg_install_dir/include"
@@ -60,9 +60,9 @@ case "$with_json_fortran" in
         JSON_LDFLAGS="-L'${pkg_install_dir}/lib' -Wl,-rpath='${pkg_install_dir}/lib'"
         ;;
 esac
-if [ "$with_json_fortran" != "__DONTUSE__" ] ; then
+if [ "$cp2k_with_json_fortran" != "__DONTUSE__" ] ; then
     JSON_LIBS="-ljsonfortran"
-    if [ "$with_json_fortran" != "__SYSTEM__" ] ; then
+    if [ "$cp2k_with_json_fortran" != "__SYSTEM__" ] ; then
         cat << EOF > "${BUILDDIR}/setup_json_fortran"
 prepend_path LD_LIBRARY_PATH "$pkg_install_dir/lib"
 prepend_path LD_RUN_PATH "$pkg_install_dir/lib"
