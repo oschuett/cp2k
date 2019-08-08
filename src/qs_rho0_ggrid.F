@@ -45,7 +45,7 @@ MODULE qs_rho0_ggrid
                                               RECIPROCALSPACE,&
                                               pw_p_type,&
                                               pw_release
-   USE qs_collocate_density,            ONLY: collocate_pgf_product_rspace
+   USE qs_collocate_density,            ONLY: collocate_pgf_rspace
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_force_types,                  ONLY: qs_force_type
@@ -98,14 +98,13 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       INTEGER                                            :: auxbas_grid, handle, iat, iatom, igrid, &
-                                                            ikind, ithread, j, l0_ikind, lmax0, &
-                                                            lmax_global, nat, nch_ik, nch_max, npme
+                                                            ikind, j, l0_ikind, lmax0, nat, &
+                                                            nch_ik, nch_max, npme
       INTEGER, DIMENSION(:), POINTER                     :: atom_list, cores
       LOGICAL                                            :: paw_atom
       REAL(KIND=dp)                                      :: eps_rho_rspace, rpgf0, zet0
       REAL(KIND=dp), DIMENSION(3)                        :: ra
       REAL(KIND=dp), DIMENSION(:), POINTER               :: Qlm_c
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(cell_type), POINTER                           :: cell
       TYPE(cp_para_env_type), POINTER                    :: para_env
@@ -127,7 +126,7 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
-      NULLIFY (atomic_kind_set, qs_kind_set, cores, pab, Qlm_c)
+      NULLIFY (atomic_kind_set, qs_kind_set, cores, Qlm_c)
 
       NULLIFY (dft_control, pw_env, particle_set, para_env, cell, rho0_s_gs, rho0_s_rs)
       CALL get_qs_env(qs_env=qs_env, dft_control=dft_control, &
@@ -173,26 +172,15 @@ CONTAINS
 
       nch_max = ncoset(lmax0)
 
-      ALLOCATE (pab(nch_max, 1))
-
-      !Compute global lmax for use in collocate_pgf_product_rspace
-      lmax_global = 0
-      DO ikind = 1, SIZE(atomic_kind_set)
-         CALL get_rho0_mpole(rho0_mpole=rho0, ikind=ikind, l0_ikind=l0_ikind)
-         lmax_global = MAX(lmax_global, l0_ikind)
-      END DO
-
       DO ikind = 1, SIZE(atomic_kind_set)
          CALL get_atomic_kind(atomic_kind_set(ikind), atom_list=atom_list, natom=nat)
          CALL get_qs_kind(qs_kind_set(ikind), paw_atom=paw_atom)
 
          IF (.NOT. paw_atom .AND. dft_control%qs_control%gapw_control%nopaw_as_gpw) CYCLE
 
-         CALL get_rho0_mpole(rho0_mpole=rho0, ikind=ikind, l0_ikind=l0_ikind, &
-                             rpgf0_s=rpgf0)
+         CALL get_rho0_mpole(rho0_mpole=rho0, ikind=ikind, l0_ikind=l0_ikind, rpgf0_s=rpgf0)
 
          nch_ik = ncoset(l0_ikind)
-         pab = 0.0_dp
 
          CALL reallocate(cores, 1, nat)
          npme = 0
@@ -214,7 +202,6 @@ CONTAINS
 
          END DO
 
-         ithread = 0
          DO j = 1, npme
 
             iat = cores(j)
@@ -222,16 +209,9 @@ CONTAINS
 
             CALL get_rho0_mpole(rho0_mpole=rho0, iat=iatom, Qlm_car=Qlm_c)
 
-            pab(1:nch_ik, 1) = Qlm_c(1:nch_ik)
-
             ra(:) = pbc(particle_set(iatom)%r, cell)
 
-            CALL collocate_pgf_product_rspace( &
-               l0_ikind, zet0, 0, 0, 0.0_dp, 0, &
-               ra, (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, 1.0_dp, pab, 0, 0, &
-               rs_grid, cell, cube_info(igrid), eps_rho_rspace, ga_gb_function=401, &
-               ithread=ithread, collocate_rho0=.TRUE., rpgf0_s=rpgf0, &
-               use_subpatch=.TRUE., subpatch_pattern=0_int_8, lmax_global=lmax_global)
+            CALL collocate_pgf_rspace(l0_ikind, zet0, 0, ra, Qlm_c, rs_grid, cell, rpgf0, 1.0_dp)
 
          END DO !  j
 
@@ -240,8 +220,6 @@ CONTAINS
       IF (ASSOCIATED(cores)) THEN
          DEALLOCATE (cores)
       END IF
-
-      DEALLOCATE (pab)
 
       IF (igrid /= auxbas_grid) THEN
          CALL rs_pw_transfer(rs_grid, coeff_rspace%pw, rs2pw)
