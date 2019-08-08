@@ -10,6 +10,7 @@
 !> \author Nico Holmberg [03.2017]
 ! **************************************************************************************************
 MODULE qs_cdft_utils
+   USE ao_util,                         ONLY: exp_radius_single
    USE atomic_kind_types,               ONLY: atomic_kind_type,&
                                               get_atomic_kind
    USE bibliography,                    ONLY: Becke1988b,&
@@ -42,8 +43,7 @@ MODULE qs_cdft_utils
                                               section_vals_type,&
                                               section_vals_val_get
    USE kinds,                           ONLY: default_path_length,&
-                                              dp,&
-                                              int_8
+                                              dp
    USE memory_utilities,                ONLY: reallocate
    USE outer_scf_control_types,         ONLY: outer_scf_read_parameters
    USE particle_list_types,             ONLY: particle_list_type
@@ -58,12 +58,11 @@ MODULE qs_cdft_utils
                                               cdft_control_type,&
                                               cdft_group_type,&
                                               hirshfeld_constraint_type
-   USE qs_collocate_density,            ONLY: collocate_pgf_product_rspace
+   USE qs_collocate_density,            ONLY: collocate_pgf_rspace
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_kind_types,                   ONLY: get_qs_kind,&
                                               qs_kind_type
-   USE qs_modify_pab_block,             ONLY: FUNC_AB
    USE qs_scf_output,                   ONLY: qs_scf_cdft_constraint_info
    USE qs_subsys_types,                 ONLY: qs_subsys_get,&
                                               qs_subsys_type
@@ -102,17 +101,19 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       CHARACTER(len=2)                                   :: element_symbol
-      INTEGER :: atom_a, bounds(2), handle, i, iatom, iex, igroup, ikind, ip, ithread, iw, j, &
-         jatom, katom, natom, nkind, npme, nthread, numexp, unit_nr
+      INTEGER                                            :: atom_a, bounds(2), handle, i, iatom, &
+                                                            iex, igroup, ikind, ip, iw, j, jatom, &
+                                                            katom, natom, nkind, npme, numexp, &
+                                                            unit_nr
       INTEGER, DIMENSION(2, 3)                           :: bo
       INTEGER, DIMENSION(:), POINTER                     :: atom_list, cores, stride
       LOGICAL                                            :: build, in_memory, mpi_io
       LOGICAL, ALLOCATABLE, DIMENSION(:)                 :: is_constraint
       REAL(KIND=dp)                                      :: alpha, chi, coef, eps_cavity, ircov, &
-                                                            jrcov, uij
+                                                            jrcov, radius, uij
+      REAL(KIND=dp), DIMENSION(1)                        :: cab
       REAL(KIND=dp), DIMENSION(3)                        :: cell_v, dist_vec, r, r1, ra
       REAL(KIND=dp), DIMENSION(:), POINTER               :: radii_list
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(becke_constraint_type), POINTER               :: becke_control
       TYPE(cdft_control_type), POINTER                   :: cdft_control
@@ -133,7 +134,7 @@ CONTAINS
 
       NULLIFY (cores, stride, atom_list, cell, para_env, dft_control, &
                particle_set, logger, cdft_constraint_section, qs_kind_set, &
-               particles, subsys, pab, pw_env, rs_cavity, cavity_env, &
+               particles, subsys, pw_env, rs_cavity, cavity_env, &
                auxbas_pw_pool, atomic_kind_set, group, radii_list, cdft_control)
       logger => cp_get_default_logger()
       CALL timeset(routineN, handle)
@@ -340,9 +341,6 @@ CONTAINS
          CALL pw_env_get(pw_env, auxbas_rs_grid=rs_cavity, auxbas_pw_pool=auxbas_pw_pool)
          CALL rs_grid_retain(rs_cavity)
          CALL rs_grid_zero(rs_cavity)
-         ALLOCATE (pab(1, 1))
-         nthread = 1
-         ithread = 0
          DO ikind = 1, SIZE(atomic_kind_set)
             numexp = cavity_env%kind_shape_fn(ikind)%numexp
             IF (numexp <= 0) CYCLE
@@ -368,25 +366,19 @@ CONTAINS
                DO j = 1, npme
                   iatom = cores(j)
                   atom_a = atom_list(iatom)
-                  pab(1, 1) = coef
+                  cab(1) = coef
                   IF (becke_control%vector_buffer%store_vectors) THEN
                      ra(:) = becke_control%vector_buffer%position_vecs(:, atom_a)+cell_v(:)/2._dp
                   ELSE
                      ra(:) = pbc(particle_set(atom_a)%r, cell)
                   END IF
                   IF (is_constraint(atom_a)) &
-                     CALL collocate_pgf_product_rspace(0, alpha, 0, 0, 0.0_dp, 0, ra, &
-                                                       (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, 1.0_dp, &
-                                                       pab, 0, 0, rs_cavity, cell, pw_env%cube_info(1), &
-                                                       dft_control%qs_control%eps_rho_rspace, &
-                                                       ga_gb_function=FUNC_AB, ithread=ithread, &
-                                                       use_subpatch=.TRUE., subpatch_pattern=0_int_8, &
-                                                       lmax_global=0)
+                     radius = exp_radius_single(0, 0, cab, alpha, dft_control%qs_control%eps_rho_rspace, 1.0_dp)
+                  CALL collocate_pgf_rspace(0, alpha, 0, ra, cab, rs_cavity, cell, radius, 1.0_dp)
                END DO
             END DO
             DEALLOCATE (cores)
          END DO
-         DEALLOCATE (pab)
          CALL pw_pool_create_pw(auxbas_pw_pool, becke_control%cavity%pw, &
                                 use_data=REALDATA3D, in_space=REALSPACE)
          CALL rs_pw_transfer(rs_cavity, becke_control%cavity%pw, rs2pw)

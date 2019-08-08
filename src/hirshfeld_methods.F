@@ -10,6 +10,7 @@
 !> \author JGH
 ! **************************************************************************************************
 MODULE hirshfeld_methods
+   USE ao_util,                         ONLY: exp_radius_single
    USE atom_kind_orbitals,              ONLY: calculate_atomic_density
    USE atomic_kind_types,               ONLY: atomic_kind_type,&
                                               get_atomic_kind
@@ -45,13 +46,12 @@ MODULE hirshfeld_methods
                                               REALSPACE,&
                                               pw_p_type,&
                                               pw_release
-   USE qs_collocate_density,            ONLY: collocate_pgf_product_rspace
+   USE qs_collocate_density,            ONLY: collocate_pgf_rspace
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace
    USE qs_kind_types,                   ONLY: get_qs_kind,&
                                               qs_kind_type
-   USE qs_modify_pab_block,             ONLY: FUNC_AB
    USE qs_rho_types,                    ONLY: qs_rho_get,&
                                               qs_rho_type
    USE realspace_grid_types,            ONLY: pw2rs,&
@@ -414,14 +414,12 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'calculate_hirshfeld_normalization', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: atom_a, handle, iatom, iex, ikind, &
-                                                            ithread, j, natom, npme, nthread, &
-                                                            numexp
-      INTEGER(KIND=int_8)                                :: subpatch_pattern
+      INTEGER                                            :: atom_a, handle, iatom, iex, ikind, j, &
+                                                            natom, npme, numexp
       INTEGER, DIMENSION(:), POINTER                     :: atom_list, cores
-      REAL(KIND=dp)                                      :: alpha, coef, eps_rho_rspace
+      REAL(KIND=dp)                                      :: alpha, coef, eps_rho_rspace, radius
+      REAL(KIND=dp), DIMENSION(1)                        :: cab
       REAL(KIND=dp), DIMENSION(3)                        :: ra
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(cell_type), POINTER                           :: cell
       TYPE(cube_info_type)                               :: cube_info
@@ -445,9 +443,6 @@ CONTAINS
       CALL rs_grid_zero(rs_rho)
 
       eps_rho_rspace = dft_control%qs_control%eps_rho_rspace
-      ALLOCATE (pab(1, 1))
-      nthread = 1
-      ithread = 0
 
       DO ikind = 1, SIZE(atomic_kind_set)
          numexp = hirshfeld_env%kind_shape_fn(ikind)%numexp
@@ -477,21 +472,15 @@ CONTAINS
             DO j = 1, npme
                iatom = cores(j)
                atom_a = atom_list(iatom)
-               pab(1, 1) = hirshfeld_env%charges(atom_a)*coef
+               cab(1) = hirshfeld_env%charges(atom_a)*coef
                ra(:) = pbc(particle_set(atom_a)%r, cell)
-               subpatch_pattern = 0
-               ! la_max==0 so set lmax_global to 0
-               CALL collocate_pgf_product_rspace(0, alpha, 0, 0, 0.0_dp, 0, ra, &
-                                                 (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, 1.0_dp, pab, 0, 0, rs_rho, &
-                                                 cell, cube_info, eps_rho_rspace, ga_gb_function=FUNC_AB, &
-                                                 ithread=ithread, use_subpatch=.TRUE., subpatch_pattern=subpatch_pattern, &
-                                                 lmax_global=0)
+               radius = exp_radius_single(0, 0, cab, alpha, eps_rho_rspace, 1.0_dp)
+               CALL collocate_pgf_rspace(0, alpha, 0, ra, cab, rs_rho, cell, radius, 1.0_dp)
             END DO
          END DO
 
          DEALLOCATE (cores)
       END DO
-      DEALLOCATE (pab)
 
       NULLIFY (fnorm)
       CALL get_hirshfeld_info(hirshfeld_env, fnorm=fnorm)
@@ -531,9 +520,8 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'hirshfeld_integration', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: atom_a, handle, iatom, iex, ikind, &
-                                                            ithread, j, natom, npme, nthread, &
-                                                            numexp
+      INTEGER                                            :: atom_a, handle, iatom, iex, ikind, j, &
+                                                            natom, npme, numexp
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: cores
       INTEGER, DIMENSION(:), POINTER                     :: atom_list
       LOGICAL                                            :: do_force
@@ -566,8 +554,6 @@ CONTAINS
                       dft_control=dft_control, particle_set=particle_set)
       eps_rho_rspace = dft_control%qs_control%eps_rho_rspace
 
-      nthread = 1
-      ithread = 0
       ALLOCATE (hab(1, 1), pab(1, 1))
 
       DO ikind = 1, SIZE(atomic_kind_set)
