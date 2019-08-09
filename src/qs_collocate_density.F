@@ -57,7 +57,7 @@ MODULE qs_collocate_density
    USE gauss_colloc,                    ONLY: collocGauss
    USE gaussian_gridlevels,             ONLY: gaussian_gridlevel,&
                                               gridlevel_info_type
-   USE grid_base_operations,            ONLY: collocate_pgf_product_rspace
+   USE grid_base_operations,            ONLY: collocate_pgf_product_rspace, calculate_rho_elec
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
                                               int_8
@@ -1355,7 +1355,7 @@ CONTAINS
 !>      both rho and rho_gspace contain the new rho
 !>      (in real and g-space respectively)
 ! **************************************************************************************************
-   SUBROUTINE calculate_rho_elec(matrix_p, matrix_p_kp, rho, rho_gspace, total_rho, &
+   SUBROUTINE calculate_rho_elec_orig(matrix_p, matrix_p_kp, rho, rho_gspace, total_rho, &
                                  ks_env, soft_valid, compute_tau, compute_grad, &
                                  basis_type, der_type, idir, task_list_external, pw_env_external)
 
@@ -1900,7 +1900,7 @@ CONTAINS
 
       CALL timestop(handle)
 
-   END SUBROUTINE calculate_rho_elec
+   END SUBROUTINE calculate_rho_elec_orig
 
 ! **************************************************************************************************
 !> \brief computes the gradient of the density corresponding to a given
