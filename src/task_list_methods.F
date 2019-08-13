@@ -46,6 +46,7 @@ MODULE task_list_methods
    USE pw_env_types,                    ONLY: pw_env_get,&
                                               pw_env_type
    USE qs_kind_types,                   ONLY: get_qs_kind,&
+                                              get_qs_kind_set,&
                                               qs_kind_type
    USE qs_ks_types,                     ONLY: get_ks_env,&
                                               qs_ks_env_type
@@ -128,12 +129,12 @@ CONTAINS
       CHARACTER(LEN=default_string_length)               :: my_basis_type
       INTEGER :: cindex, curr_tasks, handle, i, iatom, iatom_old, igrid_level, igrid_level_old, &
          ikind, ilevel, img, img_old, inode, ipair, ipgf, iset, itask, jatom, jatom_old, jkind, &
-         jpgf, jset, maxpgf, maxset, natoms, nimages, nkind, nseta, nsetb
+         jpgf, jset, maxpgf, maxset, natoms, nimages, nkind, nseta, nsetb, lmax_all
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, ALLOCATABLE, DIMENSION(:, :, :)           :: blocks
       INTEGER, DIMENSION(3)                              :: cellind
       INTEGER, DIMENSION(:), POINTER                     :: la_max, la_min, lb_max, lb_min, npgfa, &
-                                                            npgfb
+                                                            npgfb, mylmax
       INTEGER, DIMENSION(:, :, :), POINTER               :: cell_to_index
       LOGICAL                                            :: dokp, my_soft
       REAL(KIND=dp)                                      :: kind_radius_a, kind_radius_b
@@ -193,6 +194,7 @@ CONTAINS
       natoms = SIZE(particle_set)
       maxset = 0
       maxpgf = 0
+      lmax_all = 0
       DO ikind = 1, nkind
          qs_kind => qs_kind_set(ikind)
          CALL get_qs_kind(qs_kind=qs_kind, &
@@ -200,10 +202,11 @@ CONTAINS
                           basis_set=orb_basis_set, basis_type=my_basis_type)
 
          IF (.NOT. ASSOCIATED(orb_basis_set)) CYCLE
-         CALL get_gto_basis_set(gto_basis_set=orb_basis_set, npgf=npgfa, nset=nseta)
-
+         CALL get_gto_basis_set(gto_basis_set=orb_basis_set, npgf=npgfa, nset=nseta, &
+                                lmax=mylmax)
          maxset = MAX(nseta, maxset)
          maxpgf = MAX(MAXVAL(npgfa), maxpgf)
+         lmax_all = MAX(MAXVAL(mylmax), lmax_all)
       END DO
 
       ! kpoint related
@@ -230,6 +233,18 @@ CONTAINS
       task_list%ntasks = 0
       curr_tasks = SIZE(task_list%tasks, 2)
 
+      !set system specific information
+      task_list%nimages = nimages
+      task_list%natoms  = natoms
+      task_list%maxset  = maxset
+      task_list%maxpgf  = maxpgf
+      CALL get_qs_kind_set(qs_kind_set=qs_kind_set, &
+                           maxco=task_list%maxco, &
+                           maxsgf_set=task_list%maxsgf_set, &
+                           basis_type=my_basis_type)
+      task_list%lmax_all  = lmax_all
+      task_list%eps_rho_rspace  = dft_control%qs_control%eps_rho_rspace
+ 
       ALLOCATE (basis_set_list(nkind))
       DO ikind = 1, nkind
          qs_kind => qs_kind_set(ikind)
@@ -574,8 +589,7 @@ CONTAINS
 !> \par History
 !>      10.2008 refactored [Joost VandeVondele]
 !> \note
-!>      -) this requires the radius to be computed in the same way as
-!>      collocate_pgf_product_rspace, we should factor that part into a subroutine
+!>      -) this requires the radius to be computed in the same way as the collocate routines
 !>      -) we're assuming that integrate_pgf and collocate_pgf are the same cost for load balancing
 !>         this is more or less true for map_consistent
 !>      -) in principle, the computed radius could be recycled in integrate_pgf/collocate_pgf if it is certainly
@@ -636,7 +650,7 @@ CONTAINS
 ! **************************************************************************************************
 !> \brief predicts the cost of a task in kcycles for a given task
 !>        the model is based on a fit of actual data, and might need updating
-!>        as collocate_pgf_product_rspace changes (or CPUs/compilers change)
+!>        as collocate routines change (or CPUs/compilers change)
 !>        maybe some dynamic approach, improving the cost model on the fly could
 !>        work as well
 !>        the cost model does not yet take into account the fraction of space

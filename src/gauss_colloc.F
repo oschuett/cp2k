@@ -20,7 +20,6 @@ MODULE gauss_colloc
         poly_padd_uneval2b, poly_padd_uneval3b, poly_size1, poly_size2, poly_size3
    USE kinds,                           ONLY: dp,&
                                               int_8
-   USE lgrid_types,                     ONLY: lgrid_type
 
 !$ USE OMP_LIB, ONLY: omp_get_max_threads, omp_get_thread_num, omp_get_num_threads
 #include "./base/base_uses.f90"
@@ -75,10 +74,10 @@ CONTAINS
 !> \param poly_shift position of posi in the polynomial reference system.
 !>  Set it to posi to use the global reference system.
 !> \param scale a global scale factor
-!> \param lgrid ...
+!> \param lgridr ...
 ! **************************************************************************************************
    SUBROUTINE collocGauss(h, h_inv, grid, poly, alphai, posi, max_r2, &
-                          periodic, gdim, local_bounds, local_shift, poly_shift, scale, lgrid)
+                          periodic, gdim, local_bounds, local_shift, poly_shift, scale, lgridr)
       REAL(dp), DIMENSION(0:2, 0:2), INTENT(in)          :: h, h_inv
       REAL(dp), DIMENSION(0:, 0:, 0:), INTENT(inout)     :: grid
       REAL(dp), DIMENSION(:), INTENT(inout)              :: poly
@@ -91,13 +90,13 @@ CONTAINS
       INTEGER, DIMENSION(0:2), INTENT(in), OPTIONAL      :: local_shift
       REAL(dp), DIMENSION(0:2), INTENT(in), OPTIONAL     :: poly_shift
       REAL(dp), INTENT(in), OPTIONAL                     :: scale
-      TYPE(lgrid_type), INTENT(inout), OPTIONAL          :: lgrid
+      REAL(dp), DIMENSION(:), OPTIONAL, INTENT(inout)    :: lgridr
 
       CHARACTER(len=*), PARAMETER :: routineN = 'collocGauss', routineP = moduleN//':'//routineN
 
       CALL colloc_int_body(h, h_inv, grid, poly, alphai, posi, max_r2, &
                            periodic, gdim, local_bounds, local_shift, &
-                           poly_shift, scale, lgrid, integrate=.FALSE.)
+                           poly_shift, scale, lgridr, integrate=.FALSE.)
 
    END SUBROUTINE
 
@@ -159,11 +158,11 @@ CONTAINS
 !> \param local_shift ...
 !> \param poly_shift ...
 !> \param scale ...
-!> \param lgrid ...
+!> \param lgridr ...
 !> \param integrate ...
 ! **************************************************************************************************
    SUBROUTINE colloc_int_body(h, h_inv, grid, poly, alphai, posi, max_r2, &
-                              periodic, gdim, local_bounds, local_shift, poly_shift, scale, lgrid, integrate)
+                              periodic, gdim, local_bounds, local_shift, poly_shift, scale, lgridr, integrate)
       REAL(dp), DIMENSION(0:2, 0:2), &
          INTENT(in)                             :: h, h_inv
       REAL(dp), DIMENSION(0:, 0:, 0:), &
@@ -182,8 +181,7 @@ CONTAINS
       REAL(dp), DIMENSION(0:2), INTENT(in), &
          OPTIONAL                               :: poly_shift
       REAL(dp), INTENT(in), OPTIONAL           :: scale
-      TYPE(lgrid_type), INTENT(inout), &
-         OPTIONAL                               :: lgrid
+      REAL(dp), DIMENSION(:), OPTIONAL, INTENT(inout)     :: lgridr 
       LOGICAL                                  :: integrate
 
       CHARACTER(len=*), PARAMETER :: routineN = 'colloc_int_body', &
@@ -194,7 +192,7 @@ CONTAINS
                  ijShift, iJump, ik, ikShift, ikShift2, ikstart, ikstart2, iend, iend2, &
                  imax, imax1, imin, imin1, istart, istart2, j, jend, jJump, jmax, jmax1, jmin, &
                  jmin1, jstart, k, kend, kend2, kgrad, kJump, kmax, kmax1, kmin, kmin1, &
-                 kstart, kstart2, max_j, size_jk, size_k, size_ijk, ig, ithread, nthread
+                 kstart, kstart2, max_j, size_jk, size_k, size_ijk, ig
       INTEGER, ALLOCATABLE, DIMENSION(:, :, :) :: k_bounds
       INTEGER, DIMENSION(0:2)                  :: cellShift, l_shift, l_ub, &
                                                   ndim, period, shiftPos, ldim2
@@ -223,12 +221,6 @@ CONTAINS
       REAL(dp) :: p_v
 
 #define IF_FLAT(x,y) y
-
-      ithread = 0
-!$    ithread = omp_get_thread_num()
-
-      nthread = 1
-!$    nthread = omp_get_num_threads()
 
       IF (integrate) THEN
          poly = 0.0_dp
