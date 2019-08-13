@@ -22,6 +22,14 @@ MODULE task_list_types
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'task_list_types'
 
 ! **************************************************************************************************
+   TYPE basis_type
+      INTEGER, DIMENSION(:), POINTER                :: first_sgf
+      INTEGER, DIMENSION(:), POINTER                :: lmax, lmin
+      INTEGER, DIMENSION(:), POINTER                :: npgf, nsgf
+      REAL(KIND=dp), DIMENSION(:, :), POINTER       :: sphi
+      REAL(KIND=dp), DIMENSION(:, :), POINTER       :: zet
+   END TYPE basis_type
+
    TYPE task_list_type
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER :: tasks
       REAL(KIND=dp), DIMENSION(:, :), POINTER       :: dist_ab
@@ -32,6 +40,7 @@ MODULE task_list_types
       INTEGER                                       :: nimages, natoms, maxset, maxpgf
       INTEGER                                       :: lmax_all, maxco, maxsgf_set
       REAL(KIND=dp)                                 :: eps_rho_rspace
+      TYPE(basis_type), DIMENSION(:), POINTER       :: basis
    END TYPE task_list_type
 
    PUBLIC :: task_list_type
@@ -64,6 +73,8 @@ CONTAINS
       NULLIFY (task_list%npairs)
       task_list%ntasks = 0
 
+      NULLIFY (task_list%basis)
+
    END SUBROUTINE allocate_task_list
 
 ! **************************************************************************************************
@@ -77,6 +88,8 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER :: routineN = 'deallocate_task_list', &
          routineP = moduleN//':'//routineN
+
+      INTEGER                                            :: ib
 
       IF (ASSOCIATED(task_list%tasks)) THEN
          DEALLOCATE (task_list%tasks)
@@ -100,6 +113,35 @@ CONTAINS
          DEALLOCATE (task_list%npairs)
       ENDIF
 
+      IF (ASSOCIATED(task_list%basis)) THEN
+         DO ib = 1, SIZE(task_list%basis)
+            IF (ASSOCIATED(task_list%basis(ib)%first_sgf)) THEN
+               DEALLOCATE (task_list%basis(ib)%first_sgf)
+            END IF
+            IF (ASSOCIATED(task_list%basis(ib)%lmax)) THEN
+               DEALLOCATE (task_list%basis(ib)%lmax)
+            END IF
+            IF (ASSOCIATED(task_list%basis(ib)%lmin)) THEN
+               DEALLOCATE (task_list%basis(ib)%lmin)
+            END IF
+            IF (ASSOCIATED(task_list%basis(ib)%npgf)) THEN
+               DEALLOCATE (task_list%basis(ib)%npgf)
+            END IF
+            IF (ASSOCIATED(task_list%basis(ib)%nsgf)) THEN
+               DEALLOCATE (task_list%basis(ib)%nsgf)
+            END IF
+            IF (ASSOCIATED(task_list%basis(ib)%sphi)) THEN
+               DEALLOCATE (task_list%basis(ib)%sphi)
+            END IF
+            IF (ASSOCIATED(task_list%basis(ib)%zet)) THEN
+               DEALLOCATE (task_list%basis(ib)%zet)
+            END IF
+         END DO
+         DEALLOCATE (task_list%basis)
+      ENDIF
+
       DEALLOCATE (task_list)
+
    END SUBROUTINE deallocate_task_list
+
 END MODULE task_list_types

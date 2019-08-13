@@ -53,7 +53,6 @@ MODULE qs_linres_current
         dbcsr_deallocate_matrix, dbcsr_distribution_type, dbcsr_finalize, dbcsr_get_block_p, &
         dbcsr_p_type, dbcsr_set, dbcsr_type, dbcsr_type_antisymmetric, dbcsr_type_no_symmetry
    USE gaussian_gridlevels,             ONLY: gridlevel_info_type
-   USE grid_base_operations,            ONLY: collocate_pgf_product_rspace
    USE input_constants,                 ONLY: current_gauge_atom
    USE input_section_types,             ONLY: section_get_ivals,&
                                               section_get_lval,&
@@ -80,6 +79,7 @@ MODULE qs_linres_current
    USE pw_types,                        ONLY: REALDATA3D,&
                                               REALSPACE,&
                                               pw_p_type
+   USE qs_collocate_density,            ONLY: collocate_pgf_product_rspace
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_kind_types,                   ONLY: get_qs_kind,&
