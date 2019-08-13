@@ -29,6 +29,9 @@ MODULE task_list_types
       INTEGER                                       :: ntasks
       INTEGER, DIMENSION(:, :), POINTER             :: taskstart, taskstop
       INTEGER, DIMENSION(:), POINTER                :: npairs
+      INTEGER                                       :: nimages, natoms, maxset, maxpgf
+      INTEGER                                       :: lmax_all, maxco, maxsgf_set
+      REAL(KIND=dp)                                 :: eps_rho_rspace
    END TYPE task_list_type
 
    PUBLIC :: task_list_type
@@ -60,6 +63,7 @@ CONTAINS
       NULLIFY (task_list%taskstop)
       NULLIFY (task_list%npairs)
       task_list%ntasks = 0
+
    END SUBROUTINE allocate_task_list
 
 ! **************************************************************************************************

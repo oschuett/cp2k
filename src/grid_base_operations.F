@@ -65,8 +65,6 @@ MODULE grid_base_operations
    USE gauss_colloc,                    ONLY: collocGauss
    USE kinds,                           ONLY: dp,&
                                               int_8, default_string_length
-   USE lgrid_types,                     ONLY: lgrid_allocate_grid,&
-                                              lgrid_type
    USE mathconstants,                   ONLY: fac
    USE orbital_pointers,                ONLY: coset,&
                                               ncoset
@@ -140,9 +138,10 @@ CONTAINS
       INTEGER :: bcol, brow, ga_gb_function, handle, iatom, iatom_old, igrid_level, &
          igrid_level_dummy, ikind, ikind_old, img, img_old, ipair, ipgf, iset, iset_old, itask, &
          ithread, jatom, jatom_old, jkind, jkind_old, jpgf, jset, jset_old, lb, lbr, lbw, &
-         lmax_global, maxco, maxpgf, maxset, maxsgf, maxsgf_set, my_der_type, my_idir, n, na1, &
-         na2, natoms, nb1, nb2, nblock, ncoa, ncob, nimages, nr, nrlevel, nseta, ntasks, &
+         lmax_global, maxco, maxpgf, maxset, maxsgf_set, my_der_type, my_idir, n, na1, &
+         na2, natoms, nb1, nb2, nblock, ncoa, ncob, nimages, nkind, nr, nrlevel, ntasks, &
          nthread, nw, nxy, nz, nzsize, sgfa, sgfb, ub
+      INTEGER, DIMENSION(:), POINTER                     :: kind_of
       INTEGER(kind=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, DIMENSION(:), POINTER                     :: la_max, la_min, lb_max, lb_min, mylmax, &
@@ -154,13 +153,13 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rab_inv, rb
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, p_block, pab, sphi_a, sphi_b, &
                                                             work, zeta, zetb
+      REAL(KIND=dp), DIMENSION(:, :), ALLOCATABLE        :: lgridr, posat
       TYPE(cell_type), POINTER                           :: cell
       TYPE(cube_info_type), DIMENSION(:), POINTER        :: cube_info
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: deltap
       TYPE(dft_control_type), POINTER                    :: dft_control
       TYPE(gridlevel_info_type), POINTER                 :: gridlevel_info
       TYPE(gto_basis_set_type), POINTER                  :: orb_basis_set
-      TYPE(lgrid_type), POINTER                          :: lgrid
       TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(qs_kind_type), DIMENSION(:), POINTER          :: qs_kind_set
@@ -180,7 +179,7 @@ CONTAINS
                dist_ab, la_max, la_min, &
                lb_max, lb_min, npgfa, npgfb, nsgfa, nsgfb, p_block, &
                sphi_a, sphi_b, zeta, zetb, first_sgfa, first_sgfb, tasks, &
-               lgrid, mylmax)
+               mylmax)
 
       ! by default, the full density is calculated
       my_soft = .FALSE.
@@ -251,36 +250,38 @@ CONTAINS
       gridlevel_info => pw_env%gridlevel_info
       cube_info => pw_env%cube_info
 
-      CALL get_qs_kind_set(qs_kind_set=qs_kind_set, &
-                           maxco=maxco, &
-                           maxsgf=maxsgf, &
-                           maxsgf_set=maxsgf_set, &
-                           basis_type=my_basis_type)
+      ! find maximum numbers, basis set information
+      nkind = SIZE(qs_kind_set)
+!     CALL get_qs_kind_set(qs_kind_set=qs_kind_set, &
+!                          maxco=maxco, &
+!                          maxsgf_set=maxsgf_set, &
+!                          basis_type=my_basis_type)
+!     lmax_global = 0
+!     DO ikind = 1, nkind
+!        qs_kind => qs_kind_set(ikind)
+!        CALL get_qs_kind(qs_kind=qs_kind, &
+!                         softb=my_soft, &
+!                         basis_set=orb_basis_set, basis_type=my_basis_type)
+!        IF (.NOT. ASSOCIATED(orb_basis_set)) CYCLE
+!        CALL get_gto_basis_set(gto_basis_set=orb_basis_set, lmax=mylmax)
+!        lmax_global = MAX(MAXVAL(mylmax), lmax_global)
+!     END DO
 
-      ! find maximum numbers
+      ! iatom - ikind mapping
       natoms = SIZE(particle_set)
-      maxset = 0
-      maxpgf = 0
-      lmax_global = 0
-
-      DO ikind = 1, SIZE(qs_kind_set)
-         qs_kind => qs_kind_set(ikind)
-         CALL get_qs_kind(qs_kind=qs_kind, &
-                          softb=my_soft, &
-                          basis_set=orb_basis_set, basis_type=my_basis_type)
-
-         IF (.NOT. ASSOCIATED(orb_basis_set)) CYCLE
-
-         CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
-                                npgf=npgfa, nset=nseta, lmax=mylmax)
-
-         maxset = MAX(nseta, maxset)
-         maxpgf = MAX(MAXVAL(npgfa), maxpgf)
-         lmax_global = MAX(MAXVAL(mylmax), lmax_global)
+      ALLOCATE (kind_of(natoms))
+      DO iatom=1,natoms
+         kind_of(iatom) = particle_set(iatom)%atomic_kind%kind_number
+      END DO
+      ! atomic positions
+      ALLOCATE (posat(3,natoms))
+      DO iatom=1,natoms
+         posat(:,iatom) = pbc(particle_set(iatom)%r, cell)
       END DO
 
       ! Optionally increment lmax_global depending on which ga_gb_function
       ! will be used for collocation
+      lmax_global = task_list%lmax_all
       SELECT CASE (ga_gb_function)
       CASE (FUNC_DADB)
          lmax_global = lmax_global+1
@@ -306,11 +307,10 @@ CONTAINS
 
       ! *** set up the pw multi-grids
       CPASSERT(ASSOCIATED(pw_env))
-      CALL pw_env_get(pw_env, rs_descs=rs_descs, rs_grids=rs_rho, lgrid=lgrid)
+      CALL pw_env_get(pw_env, rs_descs=rs_descs, rs_grids=rs_rho)
       ! *** set up the rs multi-grids
       CPASSERT(ASSOCIATED(rs_rho))
       CPASSERT(ASSOCIATED(rs_descs))
-      CPASSERT(ASSOCIATED(lgrid))
       distributed_rs_grids = .FALSE.
 
       DO igrid_level = 1, gridlevel_info%ngrid_levels
@@ -358,29 +358,43 @@ CONTAINS
          atom_pair_send => task_list%atom_pair_send
          atom_pair_recv => task_list%atom_pair_recv
          CALL rs_distribute_matrix(rs_descs, deltap, atom_pair_send, atom_pair_recv, &
-                                   natoms, nimages, scatter=.TRUE.)
+                                   task_list%natoms, task_list%nimages, scatter=.TRUE.)
       ENDIF
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! START OF NODE CODE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! INPUT maxco, maxsgf_set
-!       gridlevel_info
-!       rs_rho
-!       task_list
-!       lgrid
-!       particle_set
-!       cube_info
-!       ga_gb_function
+! INPUT 
+!          task_list
+!          deltap
+!          rs_rho
+!
+!          cell
+!          ga_gb_function,my_idir,map_consistent
+!
+!          cube_info
+!          gridlevel_info
+!
+!          eps_rho_rspace
+!          kind_of
+!          posat
+!          qs_kind_set,my_basis_type,my_soft
+!
+!          ncoset
+!          coset
+!
+!          lmax_global
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
       ! Allocate work storage
       nthread = 1
 !$    nthread = omp_get_max_threads()
       IF (nthread > 1) THEN
-         IF (.NOT. ASSOCIATED(lgrid%r)) THEN
-            CALL lgrid_allocate_grid(lgrid, nthread)
-         ENDIF
+         nr = 0
+         DO igrid_level = 1, gridlevel_info%ngrid_levels
+            nr = MAX(nr, rs_rho(igrid_level)%rs_grid%ngpts_local)
+         END DO
+         ALLOCATE(lgridr(nr, 0:nthread-1))
       END IF
 
       ! map all tasks on the grids
@@ -388,11 +402,18 @@ CONTAINS
       dist_ab => task_list%dist_ab
       ntasks = task_list%ntasks
 
+      nimages = task_list%nimages
+      natoms = task_list%natoms
+      maxpgf = task_list%maxpgf
+      maxset = task_list%maxset
+      maxco = task_list%maxco
+      maxsgf_set = task_list%maxsgf_set
+
 !$OMP PARALLEL DEFAULT(NONE), &
-!$OMP          SHARED(ntasks,tasks,nimages,natoms,maxset,maxsgf_set,maxpgf,particle_set), &
-!$OMP          SHARED(my_basis_type,my_soft,deltap,maxco,dist_ab,ncoset,nthread), &
-!$OMP          SHARED(cell,cube_info,eps_rho_rspace,ga_gb_function, my_idir,map_consistent), &
-!$OMP          SHARED(rs_rho,lgrid,gridlevel_info,task_list,qs_kind_set,lmax_global), &
+!$OMP          SHARED(ntasks,tasks,nimages,natoms,maxset,maxsgf_set,maxpgf,kind_of,posat), &
+!$OMP          SHARED(my_basis_type,my_soft,deltap,maxco,dist_ab,ncoset,coset,nthread), &
+!$OMP          SHARED(cell,cube_info,eps_rho_rspace,ga_gb_function,my_idir,map_consistent), &
+!$OMP          SHARED(rs_rho,lgridr,gridlevel_info,task_list,qs_kind_set,lmax_global), &
 !$OMP          PRIVATE(igrid_level,iatom,jatom,iset,jset,ipgf,jpgf,ikind,jkind,pab,work), &
 !$OMP          PRIVATE(img,img_old,iatom_old,jatom_old,iset_old,jset_old,ikind_old,jkind_old), &
 !$OMP          PRIVATE(brow,bcol,qs_kind,orb_basis_set,first_sgfa,la_max,la_min), &
@@ -411,13 +432,13 @@ CONTAINS
       ikind_old = -1; jkind_old = -1; img_old = -1
 
       ! Loop over each gridlevel first, then loop and load balance over atom pairs
-      ! We only need a single lgrid, which we sum back onto the rsgrid after each
+      ! We only need a single lgridr, which we sum back onto the rsgrid after each
       ! grid level is completed
       loop_gridlevels: DO igrid_level = 1, gridlevel_info%ngrid_levels
 
-         ! Only zero the region of the lgrid required for this grid level
+         ! Only zero the region of the lgridr required for this grid level
          IF (nthread > 1) THEN
-            lgrid%r(1:rs_rho(igrid_level)%rs_grid%ngpts_local, ithread) = 0._dp
+            lgridr(1:rs_rho(igrid_level)%rs_grid%ngpts_local, ithread) = 0._dp
          END IF
 !$OMP DO schedule(dynamic, MAX(1,task_list%npairs(igrid_level)/(nthread*50)))
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
@@ -425,12 +446,12 @@ CONTAINS
             !decode the atom pair and basis info (igrid_level_dummy equals do loop variable by construction).
             CALL int2pair(tasks(3, itask), igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
                           nimages, natoms, maxset, maxpgf)
-            ikind = particle_set(iatom)%atomic_kind%kind_number
-            jkind = particle_set(jatom)%atomic_kind%kind_number
+            ikind = kind_of(iatom)
+            jkind = kind_of(jatom)
 
             IF (iatom .NE. iatom_old .OR. jatom .NE. jatom_old .OR. img .NE. img_old) THEN
 
-               IF (iatom .NE. iatom_old) ra(:) = pbc(particle_set(iatom)%r, cell)
+               IF (iatom .NE. iatom_old) ra(:) = posat(:,iatom)
 
                IF (iatom <= jatom) THEN
                   brow = iatom
@@ -438,9 +459,6 @@ CONTAINS
                ELSE
                   brow = jatom
                   bcol = iatom
-!deb
-                CPABORT("WHY?")
-!deb
                END IF
 
                IF (ikind .NE. ikind_old) THEN
@@ -555,7 +573,7 @@ CONTAINS
                      eps_rho_rspace, &
                      ga_gb_function=ga_gb_function, &
                      idir=my_idir, &
-                     lgrid=lgrid, ithread=ithread, &
+                     lgridr=lgridr(:,ithread), &
                      map_consistent=map_consistent, use_subpatch=use_subpatch, &
                      subpatch_pattern=tasks(6, itask), lmax_global=lmax_global)
                ELSE
@@ -568,7 +586,7 @@ CONTAINS
                      eps_rho_rspace, &
                      ga_gb_function=ga_gb_function, &
                      idir=my_idir, &
-                     lgrid=lgrid, ithread=ithread, &
+                     lgridr=lgridr(:,ithread), &
                      map_consistent=map_consistent, use_subpatch=use_subpatch, &
                      subpatch_pattern=tasks(6, itask), lmax_global=lmax_global)
                END IF
@@ -629,7 +647,7 @@ CONTAINS
                n = nw+nblock/2
                IF (n < nthread) THEN
                   lbr = 1+nxy*lb
-                  CALL daxpy(nxy*(1+ub-lb), 1.0_dp, lgrid%r(lbr, n), 1, lgrid%r(lbw, nw), 1)
+                  CALL daxpy(nxy*(1+ub-lb), 1.0_dp, lgridr(lbr, n), 1, lgridr(lbw, nw), 1)
                END IF
 !$OMP BARRIER
             END DO
@@ -643,7 +661,7 @@ CONTAINS
             ub = ub+rs_rho(igrid_level)%rs_grid%lb_local(3)
             lbr = 1+nxy*(nz*ithread/nthread)
 
-            CALL daxpy(nxy*nzsize, 1.0_dp, lgrid%r(lbr, 0), 1, &
+            CALL daxpy(nxy*nzsize, 1.0_dp, lgridr(lbr, 0), 1, &
                        rs_rho(igrid_level)%rs_grid%r(:, :, lb:ub), 1)
 !$OMP BARRIER
          END IF
@@ -653,6 +671,10 @@ CONTAINS
 
 !$OMP END PARALLEL
 
+      IF (nthread > 1) THEN
+         DEALLOCATE(lgridr)
+      END IF 
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! END OF NODE CODE
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -660,6 +682,7 @@ CONTAINS
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
       !   *** Release work storage ***
+      DEALLOCATE (kind_of, posat)
 
       IF (distributed_rs_grids) THEN
          CALL dbcsr_deallocate_matrix_set(deltap)
@@ -698,8 +721,7 @@ CONTAINS
 !> \param cube_info ...
 !> \param eps_rho_rspace ...
 !> \param ga_gb_function ...
-!> \param lgrid ...
-!> \param ithread ...
+!> \param lgridr ...
 !> \param map_consistent ...
 !> \param idir ...
 !> \param ir ...
@@ -714,7 +736,7 @@ CONTAINS
                                            ra, rab, rab2, scale, pab, o1, o2, &
                                            rsgrid, cell, cube_info, &
                                            eps_rho_rspace, ga_gb_function, &
-                                           lgrid, ithread, &
+                                           lgridr, &
                                            map_consistent, &
                                            idir, ir, rsgauge, rsbuf, &
                                            use_subpatch, subpatch_pattern, &
@@ -734,8 +756,7 @@ CONTAINS
       TYPE(cube_info_type), INTENT(IN)         :: cube_info
       REAL(KIND=dp), INTENT(IN)                :: eps_rho_rspace
       INTEGER, INTENT(IN)                      :: ga_gb_function
-      TYPE(lgrid_type), OPTIONAL               :: lgrid
-      INTEGER, INTENT(IN), OPTIONAL            :: ithread
+      REAL(KIND=dp), DIMENSION(:), OPTIONAL    :: lgridr
       LOGICAL, INTENT(IN), OPTIONAL            :: map_consistent
       INTEGER, INTENT(IN), OPTIONAL            :: idir, ir
       TYPE(realspace_grid_type), POINTER, OPTIONAL :: rsgauge, rsbuf
@@ -746,7 +767,7 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'collocate_pgf_product_rspace', &
                                      routineP = moduleN//':'//routineN
 
-      INTEGER :: cmax, gridbounds(2, 3), i, ico, icoef, ider1, ider2, ig, ithread_l, &
+      INTEGER :: cmax, gridbounds(2, 3), i, ico, icoef, ider1, ider2, ig, &
                  jco, k, l, la_max_local, la_min_local, lb_max_local, lb_min_local, &
                  length, lxa, lxb, lxy, lxyz, lya, lyb, &
                  lza, lzb, o1_local, o2_local, offset, start
@@ -783,12 +804,6 @@ CONTAINS
             subpatch_collocate = .TRUE.
             CPASSERT(PRESENT(subpatch_pattern))
          ENDIF
-      ENDIF
-
-      IF (PRESENT(ithread)) THEN
-         ithread_l = ithread
-      ELSE
-         ithread_l = 0
       ENDIF
 
       ! use identical radii for integrate and collocate ?
@@ -1292,7 +1307,7 @@ CONTAINS
 
 #include "prep.f90"
 
-         IF (PRESENT(lgrid)) THEN
+         IF (PRESENT(lgridr)) THEN
 #include "call_collocate_omp.f90"
          ELSE
 #include "call_collocate.f90"
@@ -1602,9 +1617,9 @@ CONTAINS
                   res = res*exp2i
 
                   i_index = grid_map(i)
-                  IF (PRESENT(lgrid)) THEN
+                  IF (PRESENT(lgridr)) THEN
                      ig = (k_index-1)*ng(2)*ng(1)+(j_index-1)*ng(1)+(i_index-1)+1
-                     lgrid%r(ig, ithread_l) = lgrid%r(ig, ithread_l)+res
+                     lgridr(ig) = lgridr(ig)+res
                   ELSE
                      grid(i_index, j_index, k_index) = grid(i_index, j_index, k_index)+res
                   ENDIF
@@ -1643,11 +1658,11 @@ CONTAINS
          IF (BTEST(subpatch_pattern, 0)) local_s(1) = local_s(1)-rsgrid%desc%border
          IF (BTEST(subpatch_pattern, 2)) local_s(2) = local_s(2)-rsgrid%desc%border
          IF (BTEST(subpatch_pattern, 4)) local_s(3) = local_s(3)-rsgrid%desc%border
-         IF (PRESENT(lgrid)) THEN
+         IF (PRESENT(lgridr)) THEN
             CALL collocGauss(h=cell%hmat, h_inv=cell%h_inv, &
                              grid=grid, poly=poly_d3, alphai=zetp, posi=rp, max_r2=radius*radius, &
                              periodic=periodic, gdim=ng, local_bounds=local_b, local_shift=local_s, &
-                             lgrid=lgrid)
+                             lgridr=lgridr)
          ELSE
             CALL collocGauss(h=cell%hmat, h_inv=cell%h_inv, &
                              grid=grid, poly=poly_d3, alphai=zetp, posi=rp, max_r2=radius*radius, &
@@ -1683,11 +1698,11 @@ CONTAINS
          rShifted(3) = rp(3)+cell%hmat(3, 1)*local_shift(1) &
                        +cell%hmat(3, 2)*local_shift(2) &
                        +cell%hmat(3, 3)*local_shift(3)
-         IF (PRESENT(lgrid)) THEN
+         IF (PRESENT(lgridr)) THEN
             CALL collocGauss(h=cell%hmat, h_inv=cell%h_inv, &
                              grid=grid, poly=poly_d3, alphai=zetp, posi=rShifted, max_r2=radius*radius, &
                              periodic=periodic, gdim=ng, local_bounds=local_b, &
-                             lgrid=lgrid)
+                             lgridr=lgridr)
          ELSE
             CALL collocGauss(h=cell%hmat, h_inv=cell%h_inv, &
                              grid=grid, poly=poly_d3, alphai=zetp, posi=rShifted, max_r2=radius*radius, &
@@ -1732,9 +1747,9 @@ CONTAINS
             ! point on the grid (including pbc)
             ipoint = MODULO((/i, j, k/), ng)+1
             ! add to grid
-            IF (PRESENT(lgrid)) THEN
+            IF (PRESENT(lgridr)) THEN
                ig = ipoint(3)*ng(2)*ng(1)+ipoint(2)*ng(1)+ipoint(1)+1
-               lgrid%r(ig, ithread_l) = lgrid%r(ig, ithread_l)+primpt
+               lgridr(ig) = lgridr(ig)+primpt
             ELSE
                grid(ipoint(1), ipoint(2), ipoint(3)) = grid(ipoint(1), ipoint(2), ipoint(3))+primpt
             ENDIF

@@ -170,9 +170,8 @@ CONTAINS
       dft_control%use_kinetic_energy_density = (needs%tau_spin .OR. needs%tau)
 
       xc_deriv_method_id = section_get_ival(xc_section, "XC_GRID%XC_DERIV")
-      dft_control%drho_by_collocation = (needs%norm_drho .AND. (xc_deriv_method_id == xc_deriv_collocate))
-      IF (dft_control%drho_by_collocation) THEN
-         CPABORT("derivatives by collocation not implemented")
+      IF (needs%norm_drho .AND. (xc_deriv_method_id == xc_deriv_collocate)) THEN
+         CPABORT("Derivatives by collocation currently not implemented")
       END IF
 
       ! Automatic auxiliary basis set generation
