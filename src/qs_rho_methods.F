@@ -506,8 +506,10 @@ CONTAINS
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: rho_ao_in, rho_ao_out
       TYPE(dft_control_type), POINTER                    :: dft_control
       TYPE(pw_env_type), POINTER                         :: pw_env
-      TYPE(pw_p_type), DIMENSION(:), POINTER :: drho_g_in, drho_g_out, drho_r_in, drho_r_out, &
-         rho_g_in, rho_g_out, rho_r_in, rho_r_out, tau_g_in, tau_g_out, tau_r_in, tau_r_out
+      TYPE(pw_p_type), DIMENSION(:), POINTER             :: drho_g_in, drho_r_in, rho_g_in, &
+                                                            rho_g_out, rho_r_in, rho_r_out, &
+                                                            tau_g_in, tau_g_out, tau_r_in, &
+                                                            tau_r_out
       TYPE(pw_p_type), POINTER                           :: rho_r_sccs_in, rho_r_sccs_out
       TYPE(pw_pool_type), POINTER                        :: auxbas_pw_pool
 
@@ -515,8 +517,8 @@ CONTAINS
 
       NULLIFY (dft_control, pw_env, auxbas_pw_pool)
       NULLIFY (rho_ao_in, rho_ao_out)
-      NULLIFY (rho_r_in, rho_r_out, rho_g_in, rho_g_out, drho_r_in, drho_r_out)
-      NULLIFY (drho_g_in, drho_g_out, tau_r_in, tau_r_out, tau_g_in, tau_g_out)
+      NULLIFY (rho_r_in, rho_r_out, rho_g_in, rho_g_out, drho_r_in)
+      NULLIFY (drho_g_in, tau_r_in, tau_r_out, tau_g_in, tau_g_out)
       NULLIFY (tot_rho_r_in, tot_rho_r_out, tot_rho_g_in, tot_rho_g_out)
       NULLIFY (rho_r_sccs_in, rho_r_sccs_out)
 

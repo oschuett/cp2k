@@ -129,12 +129,12 @@ CONTAINS
       CHARACTER(LEN=default_string_length)               :: my_basis_type
       INTEGER :: cindex, curr_tasks, handle, i, iatom, iatom_old, igrid_level, igrid_level_old, &
          ikind, ilevel, img, img_old, inode, ipair, ipgf, iset, itask, jatom, jatom_old, jkind, &
-         jpgf, jset, maxpgf, maxset, natoms, nimages, nkind, nseta, nsetb, lmax_all
+         jpgf, jset, lmax_all, m1, maxpgf, maxset, n, n1, n2, natoms, nimages, nkind, nseta, nsetb
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, ALLOCATABLE, DIMENSION(:, :, :)           :: blocks
       INTEGER, DIMENSION(3)                              :: cellind
-      INTEGER, DIMENSION(:), POINTER                     :: la_max, la_min, lb_max, lb_min, npgfa, &
-                                                            npgfb, mylmax
+      INTEGER, DIMENSION(:), POINTER                     :: la_max, la_min, lb_max, lb_min, mylmax, &
+                                                            npgfa, npgfb
       INTEGER, DIMENSION(:, :, :), POINTER               :: cell_to_index
       LOGICAL                                            :: dokp, my_soft
       REAL(KIND=dp)                                      :: kind_radius_a, kind_radius_b
@@ -235,16 +235,42 @@ CONTAINS
 
       !set system specific information
       task_list%nimages = nimages
-      task_list%natoms  = natoms
-      task_list%maxset  = maxset
-      task_list%maxpgf  = maxpgf
+      task_list%natoms = natoms
+      task_list%maxset = maxset
+      task_list%maxpgf = maxpgf
       CALL get_qs_kind_set(qs_kind_set=qs_kind_set, &
                            maxco=task_list%maxco, &
                            maxsgf_set=task_list%maxsgf_set, &
                            basis_type=my_basis_type)
-      task_list%lmax_all  = lmax_all
-      task_list%eps_rho_rspace  = dft_control%qs_control%eps_rho_rspace
- 
+      task_list%lmax_all = lmax_all
+      task_list%eps_rho_rspace = dft_control%qs_control%eps_rho_rspace
+      ALLOCATE (task_list%basis(nkind))
+      DO ikind = 1, nkind
+         NULLIFY (task_list%basis(ikind)%first_sgf, task_list%basis(ikind)%lmax, task_list%basis(ikind)%lmin, &
+                  task_list%basis(ikind)%npgf, task_list%basis(ikind)%nsgf, task_list%basis(ikind)%sphi, &
+                  task_list%basis(ikind)%zet)
+         qs_kind => qs_kind_set(ikind)
+         CALL get_qs_kind(qs_kind=qs_kind, softb=my_soft, basis_set=basis_set_a, &
+                          basis_type=my_basis_type)
+         IF (ASSOCIATED(basis_set_a)) THEN
+            n = basis_set_a%nset
+            ALLOCATE (task_list%basis(ikind)%first_sgf(n), task_list%basis(ikind)%lmax(n), &
+                      task_list%basis(ikind)%lmin(n), task_list%basis(ikind)%npgf(n), &
+                      task_list%basis(ikind)%nsgf(n))
+            task_list%basis(ikind)%first_sgf(1:n) = basis_set_a%first_sgf(1, 1:n)
+            task_list%basis(ikind)%lmax(1:n) = basis_set_a%lmax(1:n)
+            task_list%basis(ikind)%lmin(1:n) = basis_set_a%lmin(1:n)
+            task_list%basis(ikind)%npgf(1:n) = basis_set_a%npgf(1:n)
+            task_list%basis(ikind)%nsgf(1:n) = basis_set_a%nsgf_set(1:n)
+            n1 = SIZE(basis_set_a%sphi, 1)
+            n2 = SIZE(basis_set_a%sphi, 2)
+            m1 = SIZE(basis_set_a%zet, 1)
+            ALLOCATE (task_list%basis(ikind)%sphi(n1, n2), task_list%basis(ikind)%zet(m1, n))
+            task_list%basis(ikind)%sphi(:, :) = basis_set_a%sphi(:, :)
+            task_list%basis(ikind)%zet(:, :) = basis_set_a%zet(:, :)
+         END IF
+      END DO
+
       ALLOCATE (basis_set_list(nkind))
       DO ikind = 1, nkind
          qs_kind => qs_kind_set(ikind)
