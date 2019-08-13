@@ -556,6 +556,7 @@ CONTAINS
          la_min_local = la_min
          lb_max_local = lb_max
          lb_min_local = lb_min
+!deb     ALLOCATE (pab_local(ncoset(la_max_local), ncoset(lb_max_local)))
          pab_local => pab
          o1_local = o1
          o2_local = o2
@@ -682,11 +683,6 @@ CONTAINS
          CALL collocate_general_opt()
       ELSE
          CALL collocate_ortho()
-!        IF (rsgrid%desc%orthorhombic) THEN
-!           CALL collocate_ortho()
-!        ELSE
-!           CALL collocate_general_opt()
-!        END IF
       END IF
 
       IF (ga_gb_function /= FUNC_AB) THEN
