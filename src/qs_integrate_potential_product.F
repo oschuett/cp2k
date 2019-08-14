@@ -42,6 +42,7 @@ MODULE qs_integrate_potential_product
         dbcsr_distribution_type, dbcsr_finalize, dbcsr_get_block_p, dbcsr_get_info, dbcsr_p_type, &
         dbcsr_type, dbcsr_work_create
    USE gaussian_gridlevels,             ONLY: gridlevel_info_type
+   USE grid_ibase_mp,                   ONLY: grid_integrate_mp
    USE input_constants,                 ONLY: do_admm_exch_scaling_merlot
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
@@ -148,45 +149,25 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       CHARACTER(len=default_string_length)               :: my_basis_type
-      INTEGER :: atom_a, atom_b, bcol, brow, handle, i, iatom, igrid_level, ikind, ikind_old, &
-         ilevel, img, ipair, ipgf, ipgf_new, iset, iset_new, iset_old, itask, ithread, jatom, &
-         jkind, jkind_old, jpgf, jpgf_new, jset, jset_new, jset_old, maxco, maxpgf, maxset, &
-         maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, ncob, nimages, nkind, nseta, nsetb, nthread, &
-         offs_dv, sgfa, sgfb
+      INTEGER                                            :: handle, i, iatom, igrid_level, img, &
+                                                            natom, nimages, offs_dv
       INTEGER(KIND=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
-      INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
-      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind
-      INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: block_touched
-      INTEGER, DIMENSION(:), POINTER                     :: la_max, la_min, lb_max, lb_min, npgfa, &
-                                                            npgfb, nsgfa, nsgfb
-      INTEGER, DIMENSION(:, :), POINTER                  :: first_sgfa, first_sgfb
-      LOGICAL :: atom_pair_changed, atom_pair_done, distributed_grids, do_kp, found, h_duplicated, &
-         has_threads, map_consistent, my_compute_tau, my_force_adm, my_gapw, new_set_pair_coming, &
-         p_duplicated, pab_required, scatter, use_subpatch, use_virial
-      REAL(KIND=dp)                                      :: admm_scal_fac, dab, eps_gvg_rspace, &
-                                                            rab2, scalef, zetp
-      REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra, rab, rab_inv, rb
-      REAL(KIND=dp), DIMENSION(3, 3)                     :: my_virial_a, my_virial_b
-      REAL(KIND=dp), DIMENSION(:), POINTER               :: set_radius_a, set_radius_b
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, h_block, hab, p_block, pab, &
-                                                            rpgfa, rpgfb, sphi_a, sphi_b, work, &
-                                                            zeta, zetb
-      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: habt, hadb, hdab, pabt, workt
-      REAL(kind=dp), DIMENSION(:, :, :, :), POINTER      :: hadbt, hdabt
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind, kind_of
+      LOGICAL :: distributed_grids, do_kp, h_duplicated, map_consistent, my_compute_tau, &
+         my_force_adm, my_gapw, p_duplicated, pab_required, scatter, use_virial
+      REAL(KIND=dp)                                      :: admm_scal_fac, eps_gvg_rspace
+      REAL(KIND=dp), ALLOCATABLE, DIMENSION(:, :)        :: posat
       TYPE(admm_type), POINTER                           :: admm_env
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(cell_type), POINTER                           :: cell
       TYPE(cube_info_type), DIMENSION(:), POINTER        :: cube_info
-      TYPE(dbcsr_distribution_type)                      :: dist
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: deltap, dhmat, htemp
       TYPE(dbcsr_type), POINTER                          :: href
       TYPE(dft_control_type), POINTER                    :: dft_control
       TYPE(gridlevel_info_type), POINTER                 :: gridlevel_info
-      TYPE(gto_basis_set_type), POINTER                  :: orb_basis_set
       TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
       TYPE(pw_env_type), POINTER                         :: pw_env
       TYPE(qs_force_type), DIMENSION(:), POINTER         :: force
-      TYPE(qs_kind_type), DIMENSION(:), POINTER          :: qs_kind_set
       TYPE(realspace_grid_desc_p_type), DIMENSION(:), &
          POINTER                                         :: rs_descs
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_v
@@ -205,9 +186,7 @@ CONTAINS
          CPASSERT(PRESENT(hmat_kp))
       END IF
 
-      NULLIFY (pw_env, rs_descs, tasks, dist_ab, admm_env)
-
-      debug_count = debug_count+1
+      NULLIFY (pw_env, rs_descs, admm_env)
 
       offs_dv = 0
 
@@ -257,7 +236,6 @@ CONTAINS
       ! get all the general information on the system we are working on
       CALL get_qs_env(qs_env=qs_env, &
                       atomic_kind_set=atomic_kind_set, &
-                      qs_kind_set=qs_kind_set, &
                       cell=cell, &
                       dft_control=dft_control, &
                       particle_set=particle_set, &
@@ -277,12 +255,6 @@ CONTAINS
          END IF
       END IF
 
-      ! short cuts to task list variables
-      tasks => task_list%tasks
-      dist_ab => task_list%dist_ab
-      atom_pair_send => task_list%atom_pair_send
-      atom_pair_recv => task_list%atom_pair_recv
-
       CPASSERT(ASSOCIATED(pw_env))
       CALL pw_env_get(pw_env, rs_descs=rs_descs, rs_grids=rs_v)
       DO i = 1, SIZE(rs_v)
@@ -300,10 +272,19 @@ CONTAINS
       IF (nimages > 1) THEN
          CPASSERT(do_kp)
       END IF
-      nkind = SIZE(qs_kind_set)
-      natom = SIZE(particle_set)
       use_virial = virial%pv_availability .AND. (.NOT. virial%pv_numer)
 
+      ! iatom - ikind mapping
+      natom = SIZE(particle_set)
+      ALLOCATE (kind_of(natom))
+      DO iatom = 1, natom
+         kind_of(iatom) = particle_set(iatom)%atomic_kind%kind_number
+      END DO
+      ! atomic positions
+      ALLOCATE (posat(3, natom))
+      DO iatom = 1, natom
+         posat(:, iatom) = pbc(particle_set(iatom)%r, cell)
+      END DO
       IF (calculate_forces) THEN
          ALLOCATE (atom_of_kind(natom))
          CALL get_atomic_kind_set(atomic_kind_set, atom_of_kind=atom_of_kind)
@@ -319,11 +300,6 @@ CONTAINS
 
       pab_required = (PRESENT(pmat) .OR. PRESENT(pmat_kp)) &
                      .AND. (calculate_forces .OR. .NOT. map_consistent)
-
-      CALL get_qs_kind_set(qs_kind_set=qs_kind_set, &
-                           maxco=maxco, &
-                           maxsgf_set=maxsgf_set, &
-                           basis_type=my_basis_type)
 
       distributed_grids = .FALSE.
       DO igrid_level = 1, gridlevel_info%ngrid_levels
@@ -379,399 +355,17 @@ CONTAINS
          END IF
       END IF
 
-      nthread = 1
-!$    nthread = omp_get_max_threads()
-
-      !   *** Allocate work storage ***
-      NULLIFY (pabt, habt, workt)
-      CALL reallocate(habt, 1, maxco, 1, maxco, 0, nthread)
-      CALL reallocate(workt, 1, maxco, 1, maxsgf_set, 0, nthread)
-      IF (pab_required) THEN
-         CALL reallocate(pabt, 1, maxco, 1, maxco, 0, nthread)
-      ELSE
-         CPASSERT(.NOT. calculate_forces)
-      END IF
-
-      NULLIFY (hdabt, hadbt, hdab, hadb)
-
-      !   get maximum numbers
-      natom = SIZE(particle_set)
-      maxset = 0
-      maxpgf = 0
-      DO ikind = 1, nkind
-         CALL get_qs_kind(qs_kind_set(ikind), &
-                          softb=my_gapw, &
-                          basis_set=orb_basis_set, basis_type=my_basis_type)
-
-         IF (.NOT. ASSOCIATED(orb_basis_set)) CYCLE
-
-         CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
-                                npgf=npgfa, nset=nseta)
-
-         maxset = MAX(nseta, maxset)
-         maxpgf = MAX(MAXVAL(npgfa), maxpgf)
-      END DO
-
+      atom_pair_send => task_list%atom_pair_send
+      atom_pair_recv => task_list%atom_pair_recv
       IF (distributed_grids .AND. pab_required) THEN
          CALL rs_distribute_matrix(rs_descs, deltap, atom_pair_send, atom_pair_recv, &
                                    natom, nimages, scatter=.TRUE.)
       ENDIF
 
-      IF (debug_this_module) THEN
-         ALLOCATE (block_touched(natom, natom))
-      END IF
-
-!$OMP PARALLEL DEFAULT(NONE), &
-!$OMP SHARED(workt,habt,hdabt,hadbt,pabt,tasks,particle_set,natom,maxset), &
-!$OMP SHARED(maxpgf,my_basis_type,my_gapw,dhmat,deltap,use_virial,admm_scal_fac), &
-!$OMP SHARED(pab_required,calculate_forces,ncoset,rs_v,cube_info,my_compute_tau), &
-!$OMP SHARED(map_consistent,eps_gvg_rspace,force,virial,cell,atom_of_kind,dist_ab), &
-!$OMP SHARED(gridlevel_info,task_list,block_touched,nthread,qs_kind_set), &
-!$OMP SHARED(nimages,do_kp), &
-!$OMP PRIVATE(ithread,work,hab,hdab,hadb,pab,iset_old,jset_old), &
-!$OMP PRIVATE(ikind_old,jkind_old,iatom,jatom,iset,jset,ikind,jkind,ilevel,ipgf,jpgf), &
-!$OMP PRIVATE(img,brow,bcol,orb_basis_set,first_sgfa,la_max,la_min,npgfa,nseta,nsgfa), &
-!$OMP PRIVATE(rpgfa,set_radius_a,sphi_a,zeta,first_sgfb,lb_max,lb_min,npgfb), &
-!$OMP PRIVATE(nsetb,nsgfb,rpgfb,set_radius_b,sphi_b,zetb,found,atom_a,atom_b), &
-!$OMP PRIVATE(force_a,force_b,my_virial_a,my_virial_b,atom_pair_changed,h_block), &
-!$OMP PRIVATE(p_block,ncoa,sgfa,ncob,sgfb,rab,rab2,ra,rb,zetp,dab,igrid_level), &
-!$OMP PRIVATE(na1,na2,nb1,nb2,use_subpatch,rab_inv,new_set_pair_coming,atom_pair_done), &
-!$OMP PRIVATE(iset_new,jset_new,ipgf_new,jpgf_new,scalef), &
-!$OMP PRIVATE(itask,dist,has_threads)
-
-      ithread = 0
-!$    ithread = omp_get_thread_num()
-      work => workt(:, :, ithread)
-      hab => habt(:, :, ithread)
-      IF (pab_required) THEN
-         pab => pabt(:, :, ithread)
-      END IF
-
-      iset_old = -1; jset_old = -1
-      ikind_old = -1; jkind_old = -1
-
-      ! Here we loop over gridlevels first, finalising the matrix after each grid level is
-      ! completed.  On each grid level, we loop over atom pairs, which will only access
-      ! a single block of each matrix, so with OpenMP, each matrix block is only touched
-      ! by a single thread for each grid level
-      loop_gridlevels: DO igrid_level = 1, gridlevel_info%ngrid_levels
-
-         DO img = 1, nimages
-            CALL dbcsr_work_create(dhmat(img)%matrix, work_mutable=.TRUE., n=nthread)
-            CALL dbcsr_get_info(dhmat(img)%matrix, distribution=dist)
-            CALL dbcsr_distribution_get(dist, has_threads=has_threads)
-!$          IF (.NOT. has_threads) &
-!$             CPABORT("No thread distribution defined.")
-         END DO
-!$OMP BARRIER
-
-         IF (debug_this_module) THEN
-!$OMP SINGLE
-            block_touched = -1
-!$OMP END SINGLE
-!$OMP FLUSH
-         END IF
-
-!$OMP DO schedule (dynamic, MAX(1,task_list%npairs(igrid_level)/(nthread*50)))
-         loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
-         loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
-
-            CALL int2pair(tasks(3, itask), ilevel, img, iatom, jatom, iset, jset, ipgf, jpgf, &
-                          nimages, natom, maxset, maxpgf)
-            CPASSERT(img == 1 .OR. do_kp)
-
-            ! At the start of a block of tasks, get atom data (and kind data, if needed)
-            IF (itask .EQ. task_list%taskstart(ipair, igrid_level)) THEN
-
-               ikind = particle_set(iatom)%atomic_kind%kind_number
-               jkind = particle_set(jatom)%atomic_kind%kind_number
-
-               ra(:) = pbc(particle_set(iatom)%r, cell)
-
-               IF (iatom <= jatom) THEN
-                  brow = iatom
-                  bcol = jatom
-               ELSE
-                  brow = jatom
-                  bcol = iatom
-               END IF
-
-               IF (ikind .NE. ikind_old) THEN
-                  CALL get_qs_kind(qs_kind_set(ikind), &
-                                   softb=my_gapw, &
-                                   basis_set=orb_basis_set, basis_type=my_basis_type)
-
-                  CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
-                                         first_sgf=first_sgfa, &
-                                         lmax=la_max, &
-                                         lmin=la_min, &
-                                         npgf=npgfa, &
-                                         nset=nseta, &
-                                         nsgf_set=nsgfa, &
-                                         pgf_radius=rpgfa, &
-                                         set_radius=set_radius_a, &
-                                         sphi=sphi_a, &
-                                         zet=zeta)
-               ENDIF
-
-               IF (jkind .NE. jkind_old) THEN
-                  CALL get_qs_kind(qs_kind_set(jkind), &
-                                   softb=my_gapw, &
-                                   basis_set=orb_basis_set, basis_type=my_basis_type)
-                  CALL get_gto_basis_set(gto_basis_set=orb_basis_set, &
-                                         first_sgf=first_sgfb, &
-                                         lmax=lb_max, &
-                                         lmin=lb_min, &
-                                         npgf=npgfb, &
-                                         nset=nsetb, &
-                                         nsgf_set=nsgfb, &
-                                         pgf_radius=rpgfb, &
-                                         set_radius=set_radius_b, &
-                                         sphi=sphi_b, &
-                                         zet=zetb)
-
-               ENDIF
-
-               IF (debug_this_module) THEN
-!$OMP CRITICAL (block_touched_critical)
-                  IF ((block_touched(brow, bcol) .NE. ithread) .AND. (block_touched(brow, bcol) .NE. -1)) THEN
-                     CPABORT("Block has been modified by another thread")
-                  END IF
-                  block_touched(brow, bcol) = ithread
-!$OMP END CRITICAL (block_touched_critical)
-               END IF
-
-               NULLIFY (h_block)
-               CALL dbcsr_get_block_p(dhmat(img)%matrix, brow, bcol, h_block, found)
-               IF (.NOT. ASSOCIATED(h_block)) THEN
-                  CALL dbcsr_add_block_node(dhmat(img)%matrix, brow, bcol, h_block)
-               END IF
-
-               IF (pab_required) THEN
-                  CALL dbcsr_get_block_p(matrix=deltap(img)%matrix, &
-                                         row=brow, col=bcol, BLOCK=p_block, found=found)
-                  CPASSERT(found)
-               END IF
-
-               IF (calculate_forces) THEN
-                  atom_a = atom_of_kind(iatom)
-                  atom_b = atom_of_kind(jatom)
-                  force_a(:) = 0.0_dp
-                  force_b(:) = 0.0_dp
-               ENDIF
-               IF (use_virial) THEN
-                  my_virial_a = 0.0_dp
-                  my_virial_b = 0.0_dp
-               ENDIF
-
-               ikind_old = ikind
-               jkind_old = jkind
-
-               atom_pair_changed = .TRUE.
-
-            ELSE
-
-               atom_pair_changed = .FALSE.
-
-            ENDIF
-
-            IF (atom_pair_changed .OR. iset_old .NE. iset .OR. jset_old .NE. jset) THEN
-
-               ncoa = npgfa(iset)*ncoset(la_max(iset))
-               sgfa = first_sgfa(1, iset)
-               ncob = npgfb(jset)*ncoset(lb_max(jset))
-               sgfb = first_sgfb(1, jset)
-               IF (pab_required) THEN
-                  IF (iatom <= jatom) THEN
-                     CALL dgemm("N", "N", ncoa, nsgfb(jset), nsgfa(iset), &
-                                1.0_dp, sphi_a(1, sgfa), SIZE(sphi_a, 1), &
-                                p_block(sgfa, sgfb), SIZE(p_block, 1), &
-                                0.0_dp, work(1, 1), SIZE(work, 1))
-                     CALL dgemm("N", "T", ncoa, ncob, nsgfb(jset), &
-                                1.0_dp, work(1, 1), SIZE(work, 1), &
-                                sphi_b(1, sgfb), SIZE(sphi_b, 1), &
-                                0.0_dp, pab(1, 1), SIZE(pab, 1))
-                  ELSE
-                     CALL dgemm("N", "N", ncob, nsgfa(iset), nsgfb(jset), &
-                                1.0_dp, sphi_b(1, sgfb), SIZE(sphi_b, 1), &
-                                p_block(sgfb, sgfa), SIZE(p_block, 1), &
-                                0.0_dp, work(1, 1), SIZE(work, 1))
-                     CALL dgemm("N", "T", ncob, ncoa, nsgfa(iset), &
-                                1.0_dp, work(1, 1), SIZE(work, 1), &
-                                sphi_a(1, sgfa), SIZE(sphi_a, 1), &
-                                0.0_dp, pab(1, 1), SIZE(pab, 1))
-                  END IF
-               END IF
-
-               IF (iatom <= jatom) THEN
-                  hab(1:ncoa, 1:ncob) = 0._dp
-               ELSE
-                  hab(1:ncob, 1:ncoa) = 0._dp
-               ENDIF
-
-               iset_old = iset
-               jset_old = jset
-
-            ENDIF
-
-            rab(1) = dist_ab(1, itask)
-            rab(2) = dist_ab(2, itask)
-            rab(3) = dist_ab(3, itask)
-            rab2 = DOT_PRODUCT(rab, rab)
-            rb(1) = ra(1)+rab(1)
-            rb(2) = ra(2)+rab(2)
-            rb(3) = ra(3)+rab(3)
-            zetp = zeta(ipgf, iset)+zetb(jpgf, jset)
-            dab = SQRT(rab2)
-
-            na1 = (ipgf-1)*ncoset(la_max(iset))+1
-            na2 = ipgf*ncoset(la_max(iset))
-            nb1 = (jpgf-1)*ncoset(lb_max(jset))+1
-            nb2 = jpgf*ncoset(lb_max(jset))
-
-            ! check whether we need to use fawzi's generalised collocation scheme
-            IF (rs_v(igrid_level)%rs_grid%desc%distributed) THEN
-               !tasks(4,:) is 0 for replicated, 1 for distributed 2 for exceptional distributed tasks
-               IF (tasks(4, itask) .EQ. 2) THEN
-                  use_subpatch = .TRUE.
-               ELSE
-                  use_subpatch = .FALSE.
-               ENDIF
-            ELSE
-               use_subpatch = .FALSE.
-            ENDIF
-
-            IF (pab_required) THEN
-               IF (iatom <= jatom) THEN
-                  CALL integrate_pgf_product_rspace( &
-                     la_max(iset), zeta(ipgf, iset), la_min(iset), &
-                     lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
-                     ra, rab, rab2, rs_v(igrid_level)%rs_grid, cell, &
-                     cube_info(igrid_level), &
-                     hab, pab=pab, o1=na1-1, o2=nb1-1, &
-                     eps_gvg_rspace=eps_gvg_rspace, &
-                     calculate_forces=calculate_forces, &
-                     force_a=force_a, force_b=force_b, &
-                     compute_tau=my_compute_tau, map_consistent=map_consistent, &
-                     use_virial=use_virial, my_virial_a=my_virial_a, &
-                     my_virial_b=my_virial_b, use_subpatch=use_subpatch, subpatch_pattern=tasks(6, itask))
-               ELSE
-                  rab_inv = -rab
-                  CALL integrate_pgf_product_rspace( &
-                     lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
-                     la_max(iset), zeta(ipgf, iset), la_min(iset), &
-                     rb, rab_inv, rab2, rs_v(igrid_level)%rs_grid, cell, &
-                     cube_info(igrid_level), &
-                     hab, pab=pab, o1=nb1-1, o2=na1-1, &
-                     eps_gvg_rspace=eps_gvg_rspace, &
-                     calculate_forces=calculate_forces, &
-                     force_a=force_b, force_b=force_a, &
-                     compute_tau=my_compute_tau, map_consistent=map_consistent, &
-                     use_virial=use_virial, my_virial_a=my_virial_b, &
-                     my_virial_b=my_virial_a, use_subpatch=use_subpatch, subpatch_pattern=tasks(6, itask))
-               END IF
-            ELSE
-               IF (iatom <= jatom) THEN
-                  CALL integrate_pgf_product_rspace( &
-                     la_max(iset), zeta(ipgf, iset), la_min(iset), &
-                     lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
-                     ra, rab, rab2, rs_v(igrid_level)%rs_grid, cell, &
-                     cube_info(igrid_level), &
-                     hab, o1=na1-1, o2=nb1-1, &
-                     eps_gvg_rspace=eps_gvg_rspace, &
-                     calculate_forces=calculate_forces, &
-                     force_a=force_a, force_b=force_b, &
-                     compute_tau=my_compute_tau, &
-                     map_consistent=map_consistent, use_subpatch=use_subpatch, subpatch_pattern=tasks(6, itask))
-               ELSE
-                  rab_inv = -rab
-                  CALL integrate_pgf_product_rspace( &
-                     lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
-                     la_max(iset), zeta(ipgf, iset), la_min(iset), &
-                     rb, rab_inv, rab2, rs_v(igrid_level)%rs_grid, cell, &
-                     cube_info(igrid_level), &
-                     hab, o1=nb1-1, o2=na1-1, &
-                     eps_gvg_rspace=eps_gvg_rspace, &
-                     calculate_forces=calculate_forces, &
-                     force_a=force_b, force_b=force_a, &
-                     compute_tau=my_compute_tau, &
-                     map_consistent=map_consistent, use_subpatch=use_subpatch, subpatch_pattern=tasks(6, itask))
-               END IF
-            END IF
-
-            new_set_pair_coming = .FALSE.
-            atom_pair_done = .FALSE.
-            IF (itask < task_list%taskstop(ipair, igrid_level)) THEN
-               CALL int2pair(tasks(3, itask+1), ilevel, img, iatom, jatom, iset_new, jset_new, ipgf_new, jpgf_new, &
-                             nimages, natom, maxset, maxpgf)
-               IF (iset_new .NE. iset .OR. jset_new .NE. jset) THEN
-                  new_set_pair_coming = .TRUE.
-               ENDIF
-            ELSE
-               ! do not forget the last block
-               new_set_pair_coming = .TRUE.
-               atom_pair_done = .TRUE.
-            ENDIF
-
-            ! contract the block into h if we're done with the current set pair
-            IF (new_set_pair_coming) THEN
-               IF (iatom <= jatom) THEN
-                  CALL dgemm("N", "N", ncoa, nsgfb(jset), ncob, &
-                             1.0_dp, hab(1, 1), SIZE(hab, 1), &
-                             sphi_b(1, sgfb), SIZE(sphi_b, 1), &
-                             0.0_dp, work(1, 1), SIZE(work, 1))
-                  CALL dgemm("T", "N", nsgfa(iset), nsgfb(jset), ncoa, &
-                             1.0_dp, sphi_a(1, sgfa), SIZE(sphi_a, 1), &
-                             work(1, 1), SIZE(work, 1), &
-                             1.0_dp, h_block(sgfa, sgfb), SIZE(h_block, 1))
-               ELSE
-                  CALL dgemm("N", "N", ncob, nsgfa(iset), ncoa, &
-                             1.0_dp, hab(1, 1), SIZE(hab, 1), &
-                             sphi_a(1, sgfa), SIZE(sphi_a, 1), &
-                             0.0_dp, work(1, 1), SIZE(work, 1))
-                  CALL dgemm("T", "N", nsgfb(jset), nsgfa(iset), ncob, &
-                             1.0_dp, sphi_b(1, sgfb), SIZE(sphi_b, 1), &
-                             work(1, 1), SIZE(work, 1), &
-                             1.0_dp, h_block(sgfb, sgfa), SIZE(h_block, 1))
-               END IF
-            END IF
-
-            IF (atom_pair_done) THEN
-!$OMP CRITICAL(force_critical)
-               IF (iatom == jatom) THEN
-                  scalef = 1.0_dp
-               ELSE
-                  scalef = 2.0_dp
-               END IF
-               IF (calculate_forces) THEN
-                  force(ikind)%rho_elec(:, atom_a) = &
-                     force(ikind)%rho_elec(:, atom_a)+scalef*admm_scal_fac*force_a(:)
-                  force(jkind)%rho_elec(:, atom_b) = &
-                     force(jkind)%rho_elec(:, atom_b)+scalef*admm_scal_fac*force_b(:)
-               ENDIF
-               IF (use_virial) THEN
-                  IF (use_virial .AND. calculate_forces) THEN
-                     virial%pv_virial = virial%pv_virial+scalef*admm_scal_fac*my_virial_a
-                     virial%pv_virial = virial%pv_virial+scalef*admm_scal_fac*my_virial_b
-                  END IF
-               END IF
-!$OMP END CRITICAL (force_critical)
-            ENDIF
-         END DO loop_tasks
-         END DO loop_pairs
-!$OMP END DO
-
-         DO img = 1, nimages
-            CALL dbcsr_finalize(dhmat(img)%matrix)
-         END DO
-
-      END DO loop_gridlevels
-
-!$OMP END PARALLEL
-
-      IF (debug_this_module) THEN
-         DEALLOCATE (block_touched)
-      END IF
+      CALL grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, gridlevel_info, cell, &
+                             eps_gvg_rspace, admm_scal_fac, &
+                             my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
+                             calculate_forces, force, use_virial, virial)
 
       IF (h_duplicated) THEN
          ! Reconstruct H matrix if using distributed RS grids
@@ -809,20 +403,14 @@ CONTAINS
          END IF
       END IF
 
-      !   *** Release work storage ***
-
-      DEALLOCATE (habt, workt)
-
-      IF (pab_required) THEN
-         DEALLOCATE (pabt)
-      END IF
-
+      ! Release work storage
       IF (ASSOCIATED(rs_v)) THEN
          DO i = 1, SIZE(rs_v)
             CALL rs_grid_release(rs_v(i)%rs_grid)
          END DO
       END IF
 
+      DEALLOCATE (kind_of, posat)
       IF (calculate_forces) THEN
          DEALLOCATE (atom_of_kind)
       END IF
