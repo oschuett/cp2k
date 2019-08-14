@@ -26,6 +26,7 @@
 !> \author Matthias Krack (03.04.2001)
 ! **************************************************************************************************
 MODULE qs_integrate_potential_single
+   USE ao_util,                         ONLY: exp_radius_very_extended
    USE atomic_kind_types,               ONLY: atomic_kind_type,&
                                               get_atomic_kind
    USE atprop_types,                    ONLY: atprop_array_init,&
@@ -42,8 +43,7 @@ MODULE qs_integrate_potential_single
                                               gth_potential_type
    USE gaussian_gridlevels,             ONLY: gaussian_gridlevel,&
                                               gridlevel_info_type
-   USE kinds,                           ONLY: dp,&
-                                              int_8
+   USE kinds,                           ONLY: dp
    USE lri_environment_types,           ONLY: lri_kind_type
    USE memory_utilities,                ONLY: reallocate
    USE message_passing,                 ONLY: mp_sum
@@ -56,7 +56,8 @@ MODULE qs_integrate_potential_single
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_force_types,                  ONLY: qs_force_type
-   USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace
+   USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace,&
+                                              integrate_pgf_rspace
    USE qs_kind_types,                   ONLY: get_qs_kind,&
                                               qs_kind_type
    USE realspace_grid_types,            ONLY: pw2rs,&
@@ -106,7 +107,7 @@ CONTAINS
                                                             n, natom_of_kind, ni, npme
       INTEGER, DIMENSION(:), POINTER                     :: atom_list, cores
       LOGICAL                                            :: use_virial
-      REAL(KIND=dp)                                      :: alpha, eps_rho_rspace
+      REAL(KIND=dp)                                      :: alpha, eps_rho_rspace, radius
       REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra
       REAL(KIND=dp), DIMENSION(3, 3)                     :: my_virial_a, my_virial_b
       REAL(KIND=dp), DIMENSION(:), POINTER               :: cexp_ppl
@@ -243,13 +244,14 @@ CONTAINS
             END IF
             ni = 2*lppl-2
 
-            CALL integrate_pgf_product_rspace(ni, alpha, 0, &
-                                              0, 0.0_dp, 0, ra, (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, &
-                                              rs_v, cell, pw_env%cube_info(1), hab, pab=pab, o1=0, o2=0, &
-                                              eps_gvg_rspace=eps_rho_rspace, &
-                                              calculate_forces=.TRUE., force_a=force_a, &
-                                              force_b=force_b, use_virial=use_virial, my_virial_a=my_virial_a, &
-                                              my_virial_b=my_virial_b, use_subpatch=.TRUE., subpatch_pattern=0_int_8)
+            radius = exp_radius_very_extended(0, ni, 0, 0, pab, 0, 0, ra, ra, ra, &
+                                              alpha, eps_rho_rspace, 1.0_dp, 1.0_dp)
+
+            CALL integrate_pgf_rspace(ni, alpha, 0, &
+                                      ra, rs_v, cell, hab, pab, radius, &
+                                      calculate_forces=.TRUE., force_a=force_a, &
+                                      force_b=force_b, use_virial=use_virial, my_virial_a=my_virial_a, &
+                                      my_virial_b=my_virial_b)
 
             force(ikind)%gth_ppl(:, iatom) = &
                force(ikind)%gth_ppl(:, iatom)+force_a(:)*rho_rspace%pw%pw_grid%dvol
@@ -290,7 +292,7 @@ CONTAINS
                                                             ni, npme, nthread
       INTEGER, DIMENSION(:), POINTER                     :: atom_list, cores, nct_nlcc
       LOGICAL                                            :: nlcc, use_virial
-      REAL(KIND=dp)                                      :: alpha, eps_rho_rspace
+      REAL(KIND=dp)                                      :: alpha, eps_rho_rspace, radius
       REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra
       REAL(KIND=dp), DIMENSION(3, 3)                     :: my_virial_a, my_virial_b
       REAL(KIND=dp), DIMENSION(:), POINTER               :: alpha_nlcc
@@ -438,13 +440,14 @@ CONTAINS
                END IF
                ni = 2*nc-2
 
-               CALL integrate_pgf_product_rspace(ni, 1/(2*alpha**2), 0, &
-                                                 0, 0.0_dp, 0, ra, (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, &
-                                                 rs_v, cell, pw_env%cube_info(1), hab, pab=pab, o1=0, o2=0, &
-                                                 eps_gvg_rspace=eps_rho_rspace, &
-                                                 calculate_forces=.TRUE., force_a=force_a, &
-                                                 force_b=force_b, use_virial=use_virial, my_virial_a=my_virial_a, &
-                                                 my_virial_b=my_virial_b, use_subpatch=.TRUE., subpatch_pattern=0_int_8)
+               radius = exp_radius_very_extended(0, ni, 0, 0, pab, 0, 0, ra, ra, ra, &
+                                                 1.0_dp/(2.0_dp*alpha**2), eps_rho_rspace, 1.0_dp, 1.0_dp)
+
+               CALL integrate_pgf_rspace(ni, 1.0_dp/(2.0_dp*alpha**2), 0, &
+                                         ra, rs_v, cell, hab, pab, radius, &
+                                         calculate_forces=.TRUE., force_a=force_a, &
+                                         force_b=force_b, use_virial=use_virial, my_virial_a=my_virial_a, &
+                                         my_virial_b=my_virial_b)
 
                force(ikind)%gth_nlcc(:, iatom) = &
                   force(ikind)%gth_nlcc(:, iatom)+force_a(:)*rho_rspace%pw%pw_grid%dvol
@@ -487,7 +490,7 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER                     :: atom_list, cores
       LOGICAL                                            :: paw_atom, skip_fcore, use_virial
       REAL(KIND=dp)                                      :: alpha_core_charge, ccore_charge, &
-                                                            eps_rho_rspace
+                                                            eps_rho_rspace, radius
       REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra
       REAL(KIND=dp), DIMENSION(3, 3)                     :: my_virial_a, my_virial_b
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: hab, pab
@@ -597,13 +600,14 @@ CONTAINS
                   my_virial_b = 0.0_dp
                END IF
 
-               CALL integrate_pgf_product_rspace(0, alpha_core_charge, 0, &
-                                                 0, 0.0_dp, 0, ra, (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, &
-                                                 rs_v, cell, pw_env%cube_info(1), hab, pab=pab, o1=0, o2=0, &
-                                                 eps_gvg_rspace=eps_rho_rspace, &
-                                                 calculate_forces=.TRUE., force_a=force_a, &
-                                                 force_b=force_b, use_virial=use_virial, my_virial_a=my_virial_a, &
-                                                 my_virial_b=my_virial_b, use_subpatch=.TRUE., subpatch_pattern=0_int_8)
+               radius = exp_radius_very_extended(0, 0, 0, 0, pab, 0, 0, ra, ra, ra, &
+                                                 alpha_core_charge, eps_rho_rspace, 1.0_dp, 1.0_dp)
+
+               CALL integrate_pgf_rspace(0, alpha_core_charge, 0, &
+                                         ra, rs_v, cell, hab, pab, radius, &
+                                         calculate_forces=.TRUE., force_a=force_a, &
+                                         force_b=force_b, use_virial=use_virial, my_virial_a=my_virial_a, &
+                                         my_virial_b=my_virial_b)
 
                IF (ASSOCIATED(force)) THEN
                   force(ikind)%rho_core(:, iatom) = &

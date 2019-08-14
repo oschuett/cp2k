@@ -31,7 +31,7 @@ MODULE qs_integrate_potential_low
 ! *** Don't include this routines directly, use the interface to
 ! *** qs_integrate_potential
 
-   PUBLIC :: integrate_pgf_product_rspace
+   PUBLIC :: integrate_pgf_product_rspace, integrate_pgf_rspace
 
    INTERFACE
       SUBROUTINE call_to_xyz_to_vab(prefactor, coef_xyz, lp, la_max_local, lb_max_local, &
@@ -74,18 +74,13 @@ CONTAINS
 !> \param o2 ...
 !> \param eps_gvg_rspace ...
 !> \param calculate_forces ...
-!> \param hdab ...
-!> \param hadb ...
 !> \param force_a ...
 !> \param force_b ...
 !> \param compute_tau ...
 !> \param map_consistent ...
-!> \param collocate_rho0 ...
-!> \param rpgf0_s ...
 !> \param use_virial ...
 !> \param my_virial_a ...
 !> \param my_virial_b ...
-!> \param a_hdab ...
 !> \param use_subpatch ...
 !> \param subpatch_pattern ...
 ! **************************************************************************************************
@@ -94,10 +89,12 @@ CONTAINS
                                            ra, rab, rab2, rsgrid, cell, &
                                            cube_info, hab, pab, o1, o2, &
                                            eps_gvg_rspace, &
-                                           calculate_forces, hdab, hadb, force_a, force_b, &
+                                           calculate_forces, &
+                                           force_a, force_b, &
                                            compute_tau, map_consistent, &
-                                           collocate_rho0, rpgf0_s, use_virial, my_virial_a, &
-                                           my_virial_b, a_hdab, use_subpatch, subpatch_pattern)
+                                           use_virial, my_virial_a, &
+                                           my_virial_b, &
+                                           use_subpatch, subpatch_pattern)
 
       INTEGER, INTENT(IN)                      :: la_max
       REAL(KIND=dp), INTENT(IN)                :: zeta
@@ -115,16 +112,11 @@ CONTAINS
       INTEGER, INTENT(IN)                      :: o1, o2
       REAL(KIND=dp), INTENT(IN)                :: eps_gvg_rspace
       LOGICAL, INTENT(IN)                      :: calculate_forces
-      REAL(KIND=dp), DIMENSION(:, :, :), &
-         OPTIONAL, POINTER                      :: hdab, hadb
       REAL(KIND=dp), DIMENSION(3), &
          INTENT(INOUT), OPTIONAL                :: force_a, force_b
-      LOGICAL, INTENT(IN), OPTIONAL            :: compute_tau, map_consistent, &
-                                                  collocate_rho0
-      REAL(dp), INTENT(IN), OPTIONAL           :: rpgf0_s
+      LOGICAL, INTENT(IN), OPTIONAL            :: compute_tau, map_consistent
       LOGICAL, INTENT(IN), OPTIONAL            :: use_virial
       REAL(KIND=dp), DIMENSION(3, 3), OPTIONAL  :: my_virial_a, my_virial_b
-      REAL(KIND=dp), DIMENSION(:, :, :, :), OPTIONAL, POINTER  :: a_hdab
       LOGICAL, OPTIONAL                        :: use_subpatch
       INTEGER(KIND=int_8), INTENT(IN), OPTIONAL :: subpatch_pattern
 
@@ -132,19 +124,17 @@ CONTAINS
                                      routineP = moduleN//':'//routineN
 
       INTEGER :: ax, ay, az, bx, by, bz, cmax, coef_max, gridbounds(2, 3), i, &
-                 ico, icoef, ig, j, jco, la, la_max_local, la_min_local, lb, &
+                 ico, icoef, ig, jco, la, la_max_local, la_min_local, lb, &
                  lb_cube_min, lb_max_local, lb_min_local, length, lxa, lxb, lxy, &
                  lxyz, lya, lyb, lza, lzb, offset, start, ub_cube_max
       INTEGER, DIMENSION(3)                    :: cubecenter, lb_cube, ng, &
                                                   ub_cube
       INTEGER, DIMENSION(:), POINTER           :: sphere_bounds
-      LOGICAL                                  :: my_collocate_rho0, &
-                                                  my_compute_tau, &
+      LOGICAL                                  :: my_compute_tau, &
                                                   my_map_consistent, &
                                                   my_use_virial, &
                                                   subpatch_integrate
-      REAL(KIND=dp) :: axpm0, cutoff, &
-                       der_a(3), der_b(3), f, ftza, ftzb, pabval, pg, &
+      REAL(KIND=dp) :: axpm0, cutoff, f, ftza, ftzb, pabval, pg, &
                        prefactor, radius, rpg, zetp
       REAL(KIND=dp), DIMENSION(3)              :: dr, rap, rb, rbp, roffset, rp
       REAL(KIND=dp), DIMENSION(:, :, :), &
@@ -192,12 +182,6 @@ CONTAINS
          my_map_consistent = .FALSE.
       ENDIF
 
-      IF (PRESENT(collocate_rho0) .AND. PRESENT(rpgf0_s)) THEN
-         my_collocate_rho0 = collocate_rho0
-      ELSE
-         my_collocate_rho0 = .FALSE.
-      END IF
-
       IF (calculate_forces) THEN
          la_max_local = la_max+1 ! needed for the derivative of the gaussian, unimportant which one
          la_min_local = MAX(la_min-1, 0) ! just in case the la_min,lb_min is not zero
@@ -231,23 +215,13 @@ CONTAINS
       rp(:) = ra(:)+rap(:) ! this is the gaussian center in real coordinates
       rb(:) = ra(:)+rab(:)
 
-      IF (my_map_consistent) THEN ! still assumes that eps_gvg_rspace=eps_rho_rspace
-         cutoff = 1.0_dp
+      cutoff = 1.0_dp
+      IF (.NOT. PRESENT(pab) .OR. my_map_consistent) THEN
          radius = exp_radius_very_extended(la_min, la_max, lb_min, lb_max, ra=ra, rb=rb, rp=rp, &
                                            zetp=zetp, eps=eps_gvg_rspace, prefactor=prefactor, cutoff=cutoff)
-      ELSE IF (my_collocate_rho0) THEN
-         cutoff = 0.0_dp
-         prefactor = 1.0_dp
-         radius = rpgf0_s
       ELSE
-         cutoff = 1.0_dp
-         IF (PRESENT(pab)) THEN
-            radius = exp_radius_very_extended(la_min, la_max, lb_min, lb_max, pab, o1, o2, ra, rb, rp, &
-                                              zetp, eps_gvg_rspace, prefactor, cutoff)
-         ELSE
-            radius = exp_radius_very_extended(la_min, la_max, lb_min, lb_max, ra=ra, rb=rb, rp=rp, &
-                                              zetp=zetp, eps=eps_gvg_rspace, prefactor=prefactor, cutoff=cutoff)
-         ENDIF
+         radius = exp_radius_very_extended(la_min, la_max, lb_min, lb_max, pab, o1, o2, ra, rb, rp, &
+                                           zetp, eps_gvg_rspace, prefactor, cutoff)
       ENDIF
 
       IF (radius == 0.0_dp) THEN
@@ -338,22 +312,6 @@ CONTAINS
                               IF (my_use_virial) THEN
                                  CALL virial_update(my_virial_a, my_virial_b, rab, pabval, ftza, ftzb, ax, ay, az, bx, by, bz, vab)
                               ENDIF
-                           ENDIF
-                        END IF
-                        IF (calculate_forces .AND. PRESENT(hdab)) THEN
-                           der_a(1:3) = 0.0_dp
-                           der_b(1:3) = 0.0_dp
-                           CALL hab_derivatives(der_a, der_b, rab, ftza, ftzb, ax, ay, az, bx, by, bz, vab)
-                           hdab(1:3, o1+ico, o2+jco) = der_a(1:3)
-                           hadb(1:3, o1+ico, o2+jco) = der_b(1:3)
-                           pabval = 1.0_dp
-                           IF (my_use_virial .AND. PRESENT(a_hdab)) THEN
-                              my_virial_a = 0.0_dp
-                              my_virial_b = 0.0_dp
-                              CALL virial_update(my_virial_a, my_virial_b, rab, pabval, ftza, ftzb, ax, ay, az, bx, by, bz, vab)
-                              DO j = 1, 3
-                                 a_hdab(1:3, j, o1+ico, o2+jco) = a_hdab(1:3, j, o1+ico, o2+jco)+my_virial_a(1:3, j)
-                              END DO
                            ENDIF
                         END IF
                      END DO
@@ -869,6 +827,176 @@ CONTAINS
       END SUBROUTINE
 
    END SUBROUTINE integrate_pgf_product_rspace
+
+! **************************************************************************************************
+!> \brief low level function to compute matrix elements of primitive gaussian functions
+!> \param la_max ...
+!> \param zeta ...
+!> \param la_min ...
+!> \param ra ...
+!> \param rsgrid ...
+!> \param cell ...
+!> \param hab ...
+!> \param pab ...
+!> \param radius ...
+!> \param calculate_forces ...
+!> \param hdab ...
+!> \param hadb ...
+!> \param force_a ...
+!> \param force_b ...
+!> \param use_virial ...
+!> \param my_virial_a ...
+!> \param my_virial_b ...
+!> \param a_hdab ...
+! **************************************************************************************************
+   SUBROUTINE integrate_pgf_rspace(la_max, zeta, la_min, ra, rsgrid, cell, hab, pab, radius, &
+                                   calculate_forces, hdab, hadb, force_a, force_b, &
+                                   use_virial, my_virial_a, my_virial_b, a_hdab)
+
+      INTEGER, INTENT(IN)                      :: la_max
+      REAL(KIND=dp), INTENT(IN)                :: zeta
+      INTEGER, INTENT(IN)                      :: la_min
+      REAL(KIND=dp), DIMENSION(3), INTENT(IN)  :: ra
+      TYPE(realspace_grid_type), POINTER       :: rsgrid
+      TYPE(cell_type), POINTER                 :: cell
+      REAL(KIND=dp), DIMENSION(:, :), POINTER  :: hab
+      REAL(KIND=dp), DIMENSION(:, :), &
+         POINTER                      :: pab
+      REAL(KIND=dp), INTENT(IN)                :: radius
+      LOGICAL, INTENT(IN)                      :: calculate_forces
+      REAL(KIND=dp), DIMENSION(:, :, :), &
+         OPTIONAL, POINTER                      :: hdab, hadb
+      REAL(KIND=dp), DIMENSION(3), &
+         INTENT(INOUT), OPTIONAL                :: force_a, force_b
+      LOGICAL, INTENT(IN), OPTIONAL            :: use_virial
+      REAL(KIND=dp), DIMENSION(3, 3), OPTIONAL  :: my_virial_a, my_virial_b
+      REAL(KIND=dp), DIMENSION(:, :, :, :), OPTIONAL, POINTER  :: a_hdab
+
+      CHARACTER(len=*), PARAMETER :: routineN = 'integrate_pgf_rspace', &
+                                     routineP = moduleN//':'//routineN
+
+      INTEGER :: ax, ay, az, bx, by, bz, coef_max, ico, j, la, la_max_local, la_min_local, lb, &
+                 lb_max_local, lb_min_local, lp
+      INTEGER, DIMENSION(3)                    :: ng
+      LOGICAL                                  :: my_use_virial
+      REAL(KIND=dp) :: axpm0, der_a(3), der_b(3), ftza, ftzb, pabval, prefactor, rab(3)
+      REAL(KIND=dp), DIMENSION(:, :, :), POINTER                  :: grid
+
+      REAL(kind=dp), ALLOCATABLE, DIMENSION(:) :: coef_xyz
+      REAL(kind=dp), ALLOCATABLE, DIMENSION(:, :) :: vab
+
+      IF (radius == 0.0_dp) RETURN
+
+      IF (PRESENT(use_virial)) THEN
+         my_use_virial = use_virial
+      ELSE
+         my_use_virial = .FALSE.
+      ENDIF
+
+      IF (calculate_forces) THEN
+         la_max_local = la_max+1 ! needed for the derivative of the gaussian, unimportant which one
+         la_min_local = MAX(la_min-1, 0) ! just in case the la_min,lb_min is not zero
+         lb_min_local = 0
+         lb_max_local = 0
+         IF (my_use_virial) THEN
+            la_max_local = la_max_local+1
+            lb_max_local = lb_max_local+1
+         ENDIF
+      ELSE
+         la_max_local = la_max
+         la_min_local = la_min
+         lb_min_local = 0
+         lb_max_local = 0
+      END IF
+
+      coef_max = la_max_local+lb_max_local+1
+      prefactor = 1.0_dp
+      rab = 0.0_dp
+
+      ng(:) = rsgrid%desc%npts(:)
+      grid => rsgrid%r(:, :, :)
+      ALLOCATE (vab(ncoset(la_max_local), ncoset(lb_max_local)))
+      vab = 0.0_dp
+
+      CALL integrate_general_subpatch()
+
+!   *** vab contains all the information needed to find the elements of hab
+!   *** and optionally of derivatives of these elements
+
+      ftza = 2.0_dp*zeta
+      ftzb = 0.0_dp
+
+      DO la = la_min, la_max
+         DO ax = 0, la
+            DO ay = 0, la-ax
+               az = la-ax-ay
+               ico = coset(ax, ay, az)
+               lb = 0; bx = 0; by = 0; bz = 0
+               axpm0 = vab(ico, 1)
+               hab(ico, 1) = hab(ico, 1)+axpm0
+               IF (calculate_forces .AND. PRESENT(force_a)) THEN
+                  pabval = pab(ico, 1)
+                  CALL force_update(force_a, force_b, rab, pabval, ftza, ftzb, ax, ay, az, bx, by, bz, vab)
+                  IF (my_use_virial) THEN
+                     CALL virial_update(my_virial_a, my_virial_b, rab, pabval, ftza, ftzb, ax, ay, az, bx, by, bz, vab)
+                  ENDIF
+               END IF
+               IF (calculate_forces .AND. PRESENT(hdab)) THEN
+                  der_a(1:3) = 0.0_dp
+                  der_b(1:3) = 0.0_dp
+                  CALL hab_derivatives(der_a, der_b, rab, ftza, ftzb, ax, ay, az, bx, by, bz, vab)
+                  hdab(1:3, ico, 1) = der_a(1:3)
+                  hadb(1:3, ico, 1) = der_b(1:3)
+                  pabval = 1.0_dp
+                  IF (my_use_virial .AND. PRESENT(a_hdab)) THEN
+                     my_virial_a = 0.0_dp
+                     my_virial_b = 0.0_dp
+                     CALL virial_update(my_virial_a, my_virial_b, rab, pabval, ftza, ftzb, ax, ay, az, bx, by, bz, vab)
+                     DO j = 1, 3
+                        a_hdab(1:3, j, ico, 1) = a_hdab(1:3, j, ico, 1)+my_virial_a(1:3, j)
+                     END DO
+                  ENDIF
+               END IF
+            END DO
+         END DO
+      END DO
+      DEALLOCATE (vab)
+
+! **************************************************************************************************
+
+   CONTAINS
+
+! **************************************************************************************************
+!> \brief ...
+! **************************************************************************************************
+      SUBROUTINE integrate_general_subpatch()
+      INTEGER, DIMENSION(2, 3)                           :: local_b
+      INTEGER, DIMENSION(3)                              :: local_s, periodic
+      REAL(dp), DIMENSION((la_max_local+lb_max_local+1)*&
+         (la_max_local+lb_max_local+2)*(&
+         la_max_local+lb_max_local+3)/6)                 :: poly_d3
+
+         periodic = 1 ! cell%perd
+         lp = la_max_local+lb_max_local
+         local_b(1, :) = rsgrid%lb_real-rsgrid%desc%lb
+         local_b(2, :) = rsgrid%ub_real-rsgrid%desc%lb
+         local_s = rsgrid%lb_real-rsgrid%lb_local
+         CALL integrateGaussFull(h=cell%hmat, h_inv=cell%h_inv, &
+                                 grid=grid, poly=poly_d3, alphai=zeta, posi=ra, max_r2=radius*radius, &
+                                 periodic=periodic, gdim=ng, local_bounds=local_b, local_shift=local_s, &
+                                 scale=rsgrid%desc%ngpts/ABS(cell%deth))
+         ! defaults: local_shift=(/0,0,0/),poly_shift=(/0.0_dp,0.0_dp,0.0_dp/),scale=1.0_dp,
+         ALLOCATE (coef_xyz(((lp+1)*(lp+2)*(lp+3))/6))
+         CALL poly_d32cp2k(coef_xyz, lp, poly_d3)
+         CALL call_to_xyz_to_vab(prefactor, coef_xyz, lp, la_max_local, lb_max_local, &
+                                 ra, ra, rab, vab, coset, la_min_local, lb_min_local, &
+                                 current_maxl, ncoset(la_max_local), &
+                                 ncoset(lb_max_local))
+
+         DEALLOCATE (coef_xyz)
+      END SUBROUTINE
+
+   END SUBROUTINE integrate_pgf_rspace
 
 ! **************************************************************************************************
 !> \brief given a set of matrix elements, perform the correct contraction to obtain the virial
