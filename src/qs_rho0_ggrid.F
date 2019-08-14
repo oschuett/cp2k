@@ -15,8 +15,7 @@ MODULE qs_rho0_ggrid
    USE cp_para_types,                   ONLY: cp_para_env_type
    USE cube_utils,                      ONLY: cube_info_type
    USE input_constants,                 ONLY: tddfpt_singlet
-   USE kinds,                           ONLY: dp,&
-                                              int_8
+   USE kinds,                           ONLY: dp
    USE mathconstants,                   ONLY: dfac,&
                                               fourpi
    USE memory_utilities,                ONLY: reallocate
@@ -51,7 +50,7 @@ MODULE qs_rho0_ggrid
    USE qs_force_types,                  ONLY: qs_force_type
    USE qs_harmonics_atom,               ONLY: get_none0_cg_list,&
                                               harmonics_atom_type
-   USE qs_integrate_potential,          ONLY: integrate_pgf_product_rspace
+   USE qs_integrate_potential,          ONLY: integrate_pgf_rspace
    USE qs_kind_types,                   ONLY: get_qs_kind,&
                                               qs_kind_type
    USE qs_p_env_types,                  ONLY: qs_p_env_type
@@ -560,16 +559,14 @@ CONTAINS
                   a_hdab = 0.0_dp
                END IF
 
-               CALL integrate_pgf_product_rspace( &
-                  l0_ikind, zet0, 0, 0, 0.0_dp, 0, &
-                  ra, (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, rs_v, cell, &
-                  cube_info(igrid), hab, pab, o1=0, o2=0, &
-                  eps_gvg_rspace=eps_rho_rspace, &
+               CALL integrate_pgf_rspace( &
+                  l0_ikind, zet0, 0, &
+                  ra, rs_v, cell, &
+                  hab, pab, rpgf0, &
                   calculate_forces=calculate_forces, &
                   hdab=hdab, hadb=hadb, &
-                  collocate_rho0=.TRUE., rpgf0_s=rpgf0, &
                   use_virial=use_virial, my_virial_a=my_virial_a, my_virial_b=my_virial_b, &
-                  a_hdab=a_hdab, use_subpatch=.TRUE., subpatch_pattern=0_int_8)
+                  a_hdab=a_hdab)
 
                ! Convert from cartesian to spherical
                DO lshell = 0, l0_ikind

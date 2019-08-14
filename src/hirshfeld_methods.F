@@ -10,7 +10,8 @@
 !> \author JGH
 ! **************************************************************************************************
 MODULE hirshfeld_methods
-   USE ao_util,                         ONLY: exp_radius_single
+   USE ao_util,                         ONLY: exp_radius_single,&
+                                              exp_radius_very_extended
    USE atom_kind_orbitals,              ONLY: calculate_atomic_density
    USE atomic_kind_types,               ONLY: atomic_kind_type,&
                                               get_atomic_kind
@@ -30,8 +31,7 @@ MODULE hirshfeld_methods
                                               radius_vdw,&
                                               shape_function_density,&
                                               shape_function_gaussian
-   USE kinds,                           ONLY: dp,&
-                                              int_8
+   USE kinds,                           ONLY: dp
    USE mathconstants,                   ONLY: pi
    USE message_passing,                 ONLY: mp_sum
    USE particle_types,                  ONLY: particle_type
@@ -49,7 +49,7 @@ MODULE hirshfeld_methods
    USE qs_collocate_density,            ONLY: collocate_pgf_rspace
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
-   USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace
+   USE qs_integrate_potential,          ONLY: integrate_pgf_rspace
    USE qs_kind_types,                   ONLY: get_qs_kind,&
                                               qs_kind_type
    USE qs_rho_types,                    ONLY: qs_rho_get,&
@@ -525,7 +525,7 @@ CONTAINS
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: cores
       INTEGER, DIMENSION(:), POINTER                     :: atom_list
       LOGICAL                                            :: do_force
-      REAL(KIND=dp)                                      :: alpha, coef, dvol, eps_rho_rspace
+      REAL(KIND=dp)                                      :: alpha, coef, dvol, eps_rho_rspace, radius
       REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: hab, pab
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
@@ -591,12 +591,12 @@ CONTAINS
                force_a(:) = 0.0_dp
                force_b(:) = 0.0_dp
                !
-               CALL integrate_pgf_product_rspace(0, alpha, 0, &
-                                                 0, 0.0_dp, 0, ra, (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, &
-                                                 rs_v, cell, pw_env%cube_info(1), hab, pab=pab, o1=0, o2=0, &
-                                                 eps_gvg_rspace=eps_rho_rspace, calculate_forces=do_force, &
-                                                 force_a=force_a, force_b=force_b, use_virial=.FALSE., &
-                                                 use_subpatch=.TRUE., subpatch_pattern=0_int_8)
+               radius = exp_radius_very_extended(0, 0, 0, 0, pab, 0, 0, ra, ra, ra, &
+                                                 alpha, eps_rho_rspace, 1.0_dp, 1.0_dp)
+               CALL integrate_pgf_rspace(0, alpha, 0, &
+                                         ra, rs_v, cell, hab, pab, radius, &
+                                         calculate_forces=do_force, &
+                                         force_a=force_a, force_b=force_b, use_virial=.FALSE.)
                fval(atom_a) = fval(atom_a)+hab(1, 1)*dvol*coef
                IF (do_force) THEN
                   fderiv(:, atom_a) = fderiv(:, atom_a)+force_a(:)*dvol
