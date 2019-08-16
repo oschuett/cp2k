@@ -136,8 +136,6 @@ MODULE qs_collocate_density
              collocate_pgf_product_rspace, &
              calculate_rho_nlcc
 
-   INTEGER :: debug_count = 0
-
 CONTAINS
 
 ! **************************************************************************************************

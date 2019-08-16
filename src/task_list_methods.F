@@ -63,7 +63,8 @@ MODULE task_list_methods
                                               rs_grid_locate_rank,&
                                               rs_grid_release,&
                                               rs_grid_reorder_ranks
-   USE task_list_types,                 ONLY: task_list_type
+   USE task_list_types,                 ONLY: clear_task_list,&
+                                              task_list_type
    USE util,                            ONLY: sort
 
 !$ USE OMP_LIB, ONLY: omp_destroy_lock, omp_get_num_threads, omp_init_lock, &
@@ -221,15 +222,12 @@ CONTAINS
          NULLIFY (cell_to_index)
       END IF
 
-      ! free the atom_pair lists if allocated
-      IF (ASSOCIATED(task_list%atom_pair_send)) DEALLOCATE (task_list%atom_pair_send)
-      IF (ASSOCIATED(task_list%atom_pair_recv)) DEALLOCATE (task_list%atom_pair_recv)
+      ! deallocate all old components
+      CALL clear_task_list(task_list)
 
       ! construct a list of all tasks
-      IF (.NOT. ASSOCIATED(task_list%tasks)) THEN
-         CALL reallocate(task_list%tasks, 1, 6, 1, max_tasks)
-         CALL reallocate(task_list%dist_ab, 1, 3, 1, max_tasks)
-      ENDIF
+      ALLOCATE (task_list%tasks(6, max_tasks))
+      ALLOCATE (task_list%dist_ab(3, max_tasks))
       task_list%ntasks = 0
       curr_tasks = SIZE(task_list%tasks, 2)
 
@@ -246,17 +244,16 @@ CONTAINS
       task_list%eps_rho_rspace = dft_control%qs_control%eps_rho_rspace
       ALLOCATE (task_list%basis(nkind))
       DO ikind = 1, nkind
-         NULLIFY (task_list%basis(ikind)%first_sgf, task_list%basis(ikind)%lmax, task_list%basis(ikind)%lmin, &
-                  task_list%basis(ikind)%npgf, task_list%basis(ikind)%nsgf, task_list%basis(ikind)%sphi, &
-                  task_list%basis(ikind)%zet)
          qs_kind => qs_kind_set(ikind)
          CALL get_qs_kind(qs_kind=qs_kind, softb=my_soft, basis_set=basis_set_a, &
                           basis_type=my_basis_type)
          IF (ASSOCIATED(basis_set_a)) THEN
             n = basis_set_a%nset
-            ALLOCATE (task_list%basis(ikind)%first_sgf(n), task_list%basis(ikind)%lmax(n), &
-                      task_list%basis(ikind)%lmin(n), task_list%basis(ikind)%npgf(n), &
-                      task_list%basis(ikind)%nsgf(n))
+            ALLOCATE (task_list%basis(ikind)%first_sgf(n))
+            ALLOCATE (task_list%basis(ikind)%lmax(n))
+            ALLOCATE (task_list%basis(ikind)%lmin(n))
+            ALLOCATE (task_list%basis(ikind)%npgf(n))
+            ALLOCATE (task_list%basis(ikind)%nsgf(n))
             task_list%basis(ikind)%first_sgf(1:n) = basis_set_a%first_sgf(1, 1:n)
             task_list%basis(ikind)%lmax(1:n) = basis_set_a%lmax(1:n)
             task_list%basis(ikind)%lmin(1:n) = basis_set_a%lmin(1:n)
@@ -265,7 +262,8 @@ CONTAINS
             n1 = SIZE(basis_set_a%sphi, 1)
             n2 = SIZE(basis_set_a%sphi, 2)
             m1 = SIZE(basis_set_a%zet, 1)
-            ALLOCATE (task_list%basis(ikind)%sphi(n1, n2), task_list%basis(ikind)%zet(m1, n))
+            ALLOCATE (task_list%basis(ikind)%sphi(n1, n2))
+            ALLOCATE (task_list%basis(ikind)%zet(m1, n))
             task_list%basis(ikind)%sphi(:, :) = basis_set_a%sphi(:, :)
             task_list%basis(ikind)%zet(:, :) = basis_set_a%zet(:, :)
          END IF
