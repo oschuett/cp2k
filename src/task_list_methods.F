@@ -249,23 +249,25 @@ CONTAINS
                           basis_type=my_basis_type)
          IF (ASSOCIATED(basis_set_a)) THEN
             n = basis_set_a%nset
-            ALLOCATE (task_list%basis(ikind)%first_sgf(n))
-            ALLOCATE (task_list%basis(ikind)%lmax(n))
-            ALLOCATE (task_list%basis(ikind)%lmin(n))
-            ALLOCATE (task_list%basis(ikind)%npgf(n))
-            ALLOCATE (task_list%basis(ikind)%nsgf(n))
-            task_list%basis(ikind)%first_sgf(1:n) = basis_set_a%first_sgf(1, 1:n)
-            task_list%basis(ikind)%lmax(1:n) = basis_set_a%lmax(1:n)
-            task_list%basis(ikind)%lmin(1:n) = basis_set_a%lmin(1:n)
-            task_list%basis(ikind)%npgf(1:n) = basis_set_a%npgf(1:n)
-            task_list%basis(ikind)%nsgf(1:n) = basis_set_a%nsgf_set(1:n)
-            n1 = SIZE(basis_set_a%sphi, 1)
-            n2 = SIZE(basis_set_a%sphi, 2)
-            m1 = SIZE(basis_set_a%zet, 1)
-            ALLOCATE (task_list%basis(ikind)%sphi(n1, n2))
-            ALLOCATE (task_list%basis(ikind)%zet(m1, n))
-            task_list%basis(ikind)%sphi(:, :) = basis_set_a%sphi(:, :)
-            task_list%basis(ikind)%zet(:, :) = basis_set_a%zet(:, :)
+            IF (n > 0) THEN ! ignore empty basis sets
+               ALLOCATE (task_list%basis(ikind)%first_sgf(n))
+               ALLOCATE (task_list%basis(ikind)%lmax(n))
+               ALLOCATE (task_list%basis(ikind)%lmin(n))
+               ALLOCATE (task_list%basis(ikind)%npgf(n))
+               ALLOCATE (task_list%basis(ikind)%nsgf(n))
+               task_list%basis(ikind)%first_sgf(:) = basis_set_a%first_sgf(1, :)
+               task_list%basis(ikind)%lmax(:) = basis_set_a%lmax(:)
+               task_list%basis(ikind)%lmin(:) = basis_set_a%lmin(:)
+               task_list%basis(ikind)%npgf(:) = basis_set_a%npgf(:)
+               task_list%basis(ikind)%nsgf(:) = basis_set_a%nsgf_set(:)
+               n1 = SIZE(basis_set_a%sphi, 1)
+               n2 = SIZE(basis_set_a%sphi, 2)
+               m1 = SIZE(basis_set_a%zet, 1)
+               ALLOCATE (task_list%basis(ikind)%sphi(n1, n2))
+               ALLOCATE (task_list%basis(ikind)%zet(m1, n))
+               task_list%basis(ikind)%sphi(:, :) = basis_set_a%sphi(:, :)
+               task_list%basis(ikind)%zet(:, :) = basis_set_a%zet(:, :)
+            ENDIF
          END IF
       END DO
 
