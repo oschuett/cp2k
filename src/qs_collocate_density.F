@@ -1808,7 +1808,6 @@ CONTAINS
                                    task_list%natoms, task_list%nimages, scatter=.TRUE.)
       ENDIF
 
-      code_base = 1
       code_base = 0
       SELECT CASE (code_base)
       CASE (0)
