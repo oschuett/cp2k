@@ -8,11 +8,9 @@ MODULE grid_ibase_ref
    USE cell_types,                      ONLY: cell_type
    USE cube_utils,                      ONLY: cube_info_type
    USE dbcsr_api,                       ONLY: dbcsr_add_block_node,&
-                                              dbcsr_distribution_get,&
                                               dbcsr_distribution_type,&
                                               dbcsr_finalize,&
                                               dbcsr_get_block_p,&
-                                              dbcsr_get_info,&
                                               dbcsr_p_type,&
                                               dbcsr_work_create
    USE gaussian_gridlevels,             ONLY: gridlevel_info_type
@@ -25,7 +23,6 @@ MODULE grid_ibase_ref
    USE task_list_methods,               ONLY: int2pair
    USE task_list_types,                 ONLY: task_list_type
    USE virial_types,                    ONLY: virial_type
-
 #include "./base/base_uses.f90"
 
    IMPLICIT NONE
@@ -63,9 +60,9 @@ CONTAINS
 !> \param virial ...
 ! **************************************************************************************************
    SUBROUTINE grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, gridlevel_info, cell, &
-                                eps_gvg_rspace, admm_scal_fac, &
-                                my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
-                                calculate_forces, force, use_virial, virial)
+                                 eps_gvg_rspace, admm_scal_fac, &
+                                 my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
+                                 calculate_forces, force, use_virial, virial)
 
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_v
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: dhmat, deltap
@@ -87,21 +84,22 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       INTEGER :: atom_a, atom_b, bcol, brow, iatom, igrid_level, ikind, ilevel, img, ipair, ipgf, &
-         ipgf_new, iset, iset_new, iset_old, itask, jatom, jkind, jpgf, jpgf_new, jset, &
-         jset_new, jset_old, maxco, maxpgf, maxset, maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, &
-         ncob, nimages, sgfa, sgfb
+         ipgf_new, iset, iset_new, iset_old, itask, jatom, jkind, jpgf, jpgf_new, jset, jset_new, &
+         jset_old, maxco, maxpgf, maxset, maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, ncob, &
+         nimages, sgfa, sgfb
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
       LOGICAL                                            :: atom_pair_changed, atom_pair_done, &
-                                                            found, &
-                                                            new_set_pair_coming, use_subpatch
+                                                            found, new_set_pair_coming, &
+                                                            use_subpatch
       REAL(KIND=dp)                                      :: dab, rab2, scalef, zetp
       REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra, rab, rab_inv, rb
       REAL(KIND=dp), DIMENSION(3, 3)                     :: my_virial_a, my_virial_b
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, h_block, hab, p_block, pab, &
                                                             sphi_a, sphi_b, work, zeta, zetb
+
 !     TYPE(dbcsr_distribution_type)                      :: dist
 
       ! short cuts to task list variables

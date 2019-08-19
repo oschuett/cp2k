@@ -30,17 +30,15 @@ MODULE qs_integrate_potential_product
    USE admm_types,                      ONLY: admm_type
    USE atomic_kind_types,               ONLY: atomic_kind_type,&
                                               get_atomic_kind_set
-   USE basis_set_types,                 ONLY: get_gto_basis_set,&
-                                              gto_basis_set_type
    USE cell_types,                      ONLY: cell_type,&
                                               pbc
    USE cp_control_types,                ONLY: dft_control_type
    USE cp_dbcsr_operations,             ONLY: dbcsr_deallocate_matrix_set
    USE cube_utils,                      ONLY: cube_info_type
-   USE dbcsr_api,                       ONLY: &
-        dbcsr_add_block_node, dbcsr_copy, dbcsr_create, dbcsr_distribution_get, &
-        dbcsr_distribution_type, dbcsr_finalize, dbcsr_get_block_p, dbcsr_get_info, dbcsr_p_type, &
-        dbcsr_type, dbcsr_work_create
+   USE dbcsr_api,                       ONLY: dbcsr_copy,&
+                                              dbcsr_create,&
+                                              dbcsr_p_type,&
+                                              dbcsr_type
    USE gaussian_gridlevels,             ONLY: gridlevel_info_type
    USE grid_ibase_mp,                   ONLY: grid_integrate_mp
    USE grid_ibase_ref,                  ONLY: grid_integrate_ref
@@ -48,8 +46,6 @@ MODULE qs_integrate_potential_product
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
                                               int_8
-   USE memory_utilities,                ONLY: reallocate
-   USE orbital_pointers,                ONLY: ncoset
    USE particle_types,                  ONLY: particle_type
    USE pw_env_types,                    ONLY: pw_env_get,&
                                               pw_env_type
@@ -57,17 +53,12 @@ MODULE qs_integrate_potential_product
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_force_types,                  ONLY: qs_force_type
-   USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace
-   USE qs_kind_types,                   ONLY: get_qs_kind,&
-                                              get_qs_kind_set,&
-                                              qs_kind_type
    USE realspace_grid_types,            ONLY: realspace_grid_desc_p_type,&
                                               realspace_grid_p_type,&
                                               rs_grid_release,&
                                               rs_grid_retain
    USE rs_pw_interface,                 ONLY: potential_pw2rs
-   USE task_list_methods,               ONLY: int2pair,&
-                                              rs_distribute_matrix
+   USE task_list_methods,               ONLY: rs_distribute_matrix
    USE task_list_types,                 ONLY: task_list_type
    USE virial_types,                    ONLY: virial_type
 
@@ -150,8 +141,9 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       CHARACTER(len=default_string_length)               :: my_basis_type
-      INTEGER                                            :: handle, i, iatom, igrid_level, img, &
-                                                            natom, nimages, offs_dv, code_base
+      INTEGER                                            :: code_base, handle, i, iatom, &
+                                                            igrid_level, img, natom, nimages, &
+                                                            offs_dv
       INTEGER(KIND=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind, kind_of
       LOGICAL :: distributed_grids, do_kp, h_duplicated, map_consistent, my_compute_tau, &
@@ -367,9 +359,9 @@ CONTAINS
       SELECT CASE (code_base)
       CASE (0)
          CALL grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, gridlevel_info, cell, &
-                                eps_gvg_rspace, admm_scal_fac, &
-                                my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
-                                calculate_forces, force, use_virial, virial)
+                                 eps_gvg_rspace, admm_scal_fac, &
+                                 my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
+                                 calculate_forces, force, use_virial, virial)
       CASE (1)
          CALL grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, gridlevel_info, cell, &
                                 eps_gvg_rspace, admm_scal_fac, &
