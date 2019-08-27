@@ -15,7 +15,6 @@ MODULE grid_base_mp
    USE dbcsr_api,                       ONLY: dbcsr_get_block_p,&
                                               dbcsr_p_type
    USE gauss_colloc,                    ONLY: collocGauss
-   USE gaussian_gridlevels,             ONLY: gridlevel_info_type
    USE kinds,                           ONLY: dp,&
                                               int_8
    USE mathconstants,                   ONLY: fac
@@ -54,7 +53,6 @@ CONTAINS
 !> \param deltap ...
 !> \param task_list ...
 !> \param cube_info ...
-!> \param gridlevel_info ...
 !> \param cell ...
 !> \param ga_gb_function ...
 !> \param my_idir ...
@@ -63,7 +61,7 @@ CONTAINS
 !> \param posat ...
 !> \param lmax_global ...
 ! **************************************************************************************************
-   SUBROUTINE grid_collocate_mp(rs_rho, deltap, task_list, cube_info, gridlevel_info, cell, &
+   SUBROUTINE grid_collocate_mp(rs_rho, deltap, task_list, cube_info, cell, &
                                 ga_gb_function, my_idir, map_consistent, kind_of, posat, &
                                 lmax_global)
 
@@ -71,7 +69,6 @@ CONTAINS
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: deltap
       TYPE(task_list_type), POINTER                      :: task_list
       TYPE(cube_info_type), DIMENSION(:), POINTER        :: cube_info
-      TYPE(gridlevel_info_type), POINTER                 :: gridlevel_info
       TYPE(cell_type), POINTER                           :: cell
       INTEGER, INTENT(IN)                                :: ga_gb_function, my_idir
       LOGICAL, INTENT(IN)                                :: map_consistent
@@ -103,7 +100,7 @@ CONTAINS
 !$    nthread = omp_get_max_threads()
       IF (nthread > 1) THEN
          nr = 0
-         DO igrid_level = 1, gridlevel_info%ngrid_levels
+         DO igrid_level = 1, task_list%ngrid_levels
             nr = MAX(nr, rs_rho(igrid_level)%rs_grid%ngpts_local)
          END DO
          ALLOCATE (lgridr(nr, 0:nthread-1))
@@ -127,7 +124,7 @@ CONTAINS
 !$OMP          SHARED(ntasks,tasks,nimages,natoms,maxset,maxsgf_set,maxpgf,kind_of,posat), &
 !$OMP          SHARED(deltap,maxco,dist_ab,ncoset,coset,nthread), &
 !$OMP          SHARED(cell,cube_info,eps_rho_rspace,ga_gb_function,my_idir,map_consistent), &
-!$OMP          SHARED(rs_rho,lgridr,gridlevel_info,task_list,lmax_global), &
+!$OMP          SHARED(rs_rho,lgridr,task_list,lmax_global), &
 !$OMP          PRIVATE(igrid_level,iatom,jatom,iset,jset,ipgf,jpgf,ikind,jkind,pab,work), &
 !$OMP          PRIVATE(img,img_old,iatom_old,jatom_old,iset_old,jset_old), &
 !$OMP          PRIVATE(brow,bcol,first_sgfa,la_max,la_min), &
@@ -147,7 +144,7 @@ CONTAINS
       ! Loop over each gridlevel first, then loop and load balance over atom pairs
       ! We only need a single lgridr, which we sum back onto the rsgrid after each
       ! grid level is completed
-      loop_gridlevels: DO igrid_level = 1, gridlevel_info%ngrid_levels
+      loop_gridlevels: DO igrid_level = 1, task_list%ngrid_levels
 
          ! Only zero the region of the lgridr required for this grid level
          IF (nthread > 1) THEN

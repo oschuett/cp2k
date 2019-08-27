@@ -241,6 +241,7 @@ CONTAINS
             CALL integrate_general_wings()
          END IF
       ELSE
+!!       CALL integrate_general_wings()
          CALL integrate_general_subpatch()
       END IF
 
@@ -667,8 +668,6 @@ CONTAINS
          DEALLOCATE (coef_ijk)
          DEALLOCATE (coef_xyz)
       END SUBROUTINE integrate_general_opt
-
-! **************************************************************************************************
 
 ! **************************************************************************************************
 !> \brief ...

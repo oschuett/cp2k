@@ -15,7 +15,6 @@ MODULE grid_ibase_mp
                                               dbcsr_get_info,&
                                               dbcsr_p_type,&
                                               dbcsr_work_create
-   USE gaussian_gridlevels,             ONLY: gridlevel_info_type
    USE kinds,                           ONLY: dp,&
                                               int_8
    USE orbital_pointers,                ONLY: ncoset
@@ -49,7 +48,6 @@ CONTAINS
 !> \param deltap ...
 !> \param task_list ...
 !> \param cube_info ...
-!> \param gridlevel_info ...
 !> \param cell ...
 !> \param eps_gvg_rspace ...
 !> \param admm_scal_fac ...
@@ -64,7 +62,7 @@ CONTAINS
 !> \param use_virial ...
 !> \param virial ...
 ! **************************************************************************************************
-   SUBROUTINE grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, gridlevel_info, cell, &
+   SUBROUTINE grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, cell, &
                                 eps_gvg_rspace, admm_scal_fac, &
                                 my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
                                 calculate_forces, force, use_virial, virial)
@@ -73,7 +71,6 @@ CONTAINS
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: dhmat, deltap
       TYPE(task_list_type), POINTER                      :: task_list
       TYPE(cube_info_type), DIMENSION(:), POINTER        :: cube_info
-      TYPE(gridlevel_info_type), POINTER                 :: gridlevel_info
       TYPE(cell_type), POINTER                           :: cell
       REAL(KIND=dp), INTENT(IN)                          :: eps_gvg_rspace, admm_scal_fac
       LOGICAL, INTENT(IN)                                :: my_compute_tau, pab_required, &
@@ -124,7 +121,7 @@ CONTAINS
 !$OMP SHARED(maxco,maxsgf_set,maxpgf,dhmat,deltap,use_virial,admm_scal_fac), &
 !$OMP SHARED(pab_required,calculate_forces,ncoset,rs_v,cube_info,my_compute_tau), &
 !$OMP SHARED(map_consistent,eps_gvg_rspace,force,virial,cell,posat,kind_of,atom_of_kind,dist_ab), &
-!$OMP SHARED(gridlevel_info,task_list,nthread,nimages), &
+!$OMP SHARED(task_list,nthread,nimages), &
 !$OMP PRIVATE(ithread,work,hab,pab,iset_old,jset_old), &
 !$OMP PRIVATE(iatom,jatom,iset,jset,ikind,jkind,ilevel,ipgf,jpgf), &
 !$OMP PRIVATE(img,brow,bcol,first_sgfa,la_max,la_min,npgfa,nsgfa), &
@@ -151,7 +148,7 @@ CONTAINS
       ! completed.  On each grid level, we loop over atom pairs, which will only access
       ! a single block of each matrix, so with OpenMP, each matrix block is only touched
       ! by a single thread for each grid level
-      loop_gridlevels: DO igrid_level = 1, gridlevel_info%ngrid_levels
+      loop_gridlevels: DO igrid_level = 1, task_list%ngrid_levels
 
          DO img = 1, nimages
             CALL dbcsr_work_create(dhmat(img)%matrix, work_mutable=.TRUE., n=nthread)

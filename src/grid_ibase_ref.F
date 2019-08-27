@@ -13,7 +13,6 @@ MODULE grid_ibase_ref
                                               dbcsr_get_block_p,&
                                               dbcsr_p_type,&
                                               dbcsr_work_create
-   USE gaussian_gridlevels,             ONLY: gridlevel_info_type
    USE kinds,                           ONLY: dp,&
                                               int_8
    USE orbital_pointers,                ONLY: ncoset
@@ -44,7 +43,6 @@ CONTAINS
 !> \param deltap ...
 !> \param task_list ...
 !> \param cube_info ...
-!> \param gridlevel_info ...
 !> \param cell ...
 !> \param eps_gvg_rspace ...
 !> \param admm_scal_fac ...
@@ -59,7 +57,7 @@ CONTAINS
 !> \param use_virial ...
 !> \param virial ...
 ! **************************************************************************************************
-   SUBROUTINE grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, gridlevel_info, cell, &
+   SUBROUTINE grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, cell, &
                                  eps_gvg_rspace, admm_scal_fac, &
                                  my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
                                  calculate_forces, force, use_virial, virial)
@@ -68,7 +66,6 @@ CONTAINS
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: dhmat, deltap
       TYPE(task_list_type), POINTER                      :: task_list
       TYPE(cube_info_type), DIMENSION(:), POINTER        :: cube_info
-      TYPE(gridlevel_info_type), POINTER                 :: gridlevel_info
       TYPE(cell_type), POINTER                           :: cell
       REAL(KIND=dp), INTENT(IN)                          :: eps_gvg_rspace, admm_scal_fac
       LOGICAL, INTENT(IN)                                :: my_compute_tau, pab_required, &
@@ -122,14 +119,10 @@ CONTAINS
 
       ! Here we loop over gridlevels first, finalising the matrix after each grid level is
       ! completed.  On each grid level, we loop over atom pairs, which will only access
-      loop_gridlevels: DO igrid_level = 1, gridlevel_info%ngrid_levels
+      loop_gridlevels: DO igrid_level = 1, task_list%ngrid_levels
 
          DO img = 1, nimages
             CALL dbcsr_work_create(dhmat(img)%matrix, work_mutable=.TRUE.)
-!           CALL dbcsr_get_info(dhmat(img)%matrix, distribution=dist)
-!           CALL dbcsr_distribution_get(dist, has_threads=has_threads)
-!!$          IF (.NOT. has_threads) &
-!!$             CPABORT("No thread distribution defined.")
          END DO
 
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
@@ -255,14 +248,8 @@ CONTAINS
             nb1 = (jpgf-1)*ncoset(lb_max(jset))+1
             nb2 = jpgf*ncoset(lb_max(jset))
 
-            ! check whether we need to use fawzi's generalised collocation scheme
-            IF (rs_v(igrid_level)%rs_grid%desc%distributed) THEN
-               !tasks(4,:) is 0 for replicated, 1 for distributed 2 for exceptional distributed tasks
-               IF (tasks(4, itask) .EQ. 2) THEN
-                  use_subpatch = .TRUE.
-               ELSE
-                  use_subpatch = .FALSE.
-               ENDIF
+            IF (tasks(4, itask) .EQ. 2) THEN
+               use_subpatch = .TRUE.
             ELSE
                use_subpatch = .FALSE.
             ENDIF

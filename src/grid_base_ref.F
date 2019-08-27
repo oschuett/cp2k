@@ -6,25 +6,15 @@
 ! **************************************************************************************************
 MODULE grid_base_ref
    USE ao_util,                         ONLY: exp_radius_very_extended
-   USE cube_utils,                      ONLY: compute_cube_center,&
-                                              cube_info_type,&
-                                              return_cube,&
-                                              return_cube_nonortho
    USE dbcsr_api,                       ONLY: dbcsr_get_block_p,&
                                               dbcsr_p_type
-   USE gaussian_gridlevels,             ONLY: gridlevel_info_type
    USE kinds,                           ONLY: dp,&
                                               int_8
-   USE mathconstants,                   ONLY: fac
-   USE orbital_pointers,                ONLY: coset,&
-                                              ncoset
    USE qs_modify_pab_block,             ONLY: &
         FUNC_AB, FUNC_ADBmDAB, FUNC_ARB, FUNC_ARDBmDARB, FUNC_DABpADB, FUNC_DADB, FUNC_DX, &
         FUNC_DXDX, FUNC_DXDY, FUNC_DY, FUNC_DYDY, FUNC_DYDZ, FUNC_DZ, FUNC_DZDX, FUNC_DZDZ, &
         prepare_adb_m_dab, prepare_dab_p_adb, prepare_dadb, prepare_diadib, prepare_diiadiib, &
         prepare_dijadijb
-   USE realspace_grid_types,            ONLY: realspace_grid_p_type,&
-                                              realspace_grid_type
    USE task_list_methods,               ONLY: int2pair
    USE task_list_types,                 ONLY: task_list_type
 #include "./base/base_uses.f90"
@@ -35,7 +25,29 @@ MODULE grid_base_ref
 
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'grid_base_ref'
 
+   TYPE grid_base_type
+      REAL(KIND=dp), DIMENSION(:,:,:), POINTER       :: grid => NULL()
+   END TYPE grid_base_type 
+
+   INTEGER, PARAMETER :: maxfac = 30
+   REAL(KIND=dp), PARAMETER, DIMENSION(0:maxfac) :: fac = (/ &
+        0.10000000000000000000E+01_dp, 0.10000000000000000000E+01_dp, 0.20000000000000000000E+01_dp, &
+        0.60000000000000000000E+01_dp, 0.24000000000000000000E+02_dp, 0.12000000000000000000E+03_dp, &
+        0.72000000000000000000E+03_dp, 0.50400000000000000000E+04_dp, 0.40320000000000000000E+05_dp, &
+        0.36288000000000000000E+06_dp, 0.36288000000000000000E+07_dp, 0.39916800000000000000E+08_dp, &
+        0.47900160000000000000E+09_dp, 0.62270208000000000000E+10_dp, 0.87178291200000000000E+11_dp, &
+        0.13076743680000000000E+13_dp, 0.20922789888000000000E+14_dp, 0.35568742809600000000E+15_dp, &
+        0.64023737057280000000E+16_dp, 0.12164510040883200000E+18_dp, 0.24329020081766400000E+19_dp, &
+        0.51090942171709440000E+20_dp, 0.11240007277776076800E+22_dp, 0.25852016738884976640E+23_dp, &
+        0.62044840173323943936E+24_dp, 0.15511210043330985984E+26_dp, 0.40329146112660563558E+27_dp, &
+        0.10888869450418352161E+29_dp, 0.30488834461171386050E+30_dp, 0.88417619937397019545E+31_dp, &
+                      0.26525285981219105864E+33_dp/)
+   INTEGER, PARAMETER :: maxl = 18
+   INTEGER, PARAMETER, DIMENSION(-1:maxl) :: ncoset = (/ &
+        0, 1, 4, 10, 20, 35, 56, 84, 120, 165, 220, 286, 364, 455, 560, 680, 816, 969, 1140, 1330/)
+
    PUBLIC :: grid_collocate_ref
+   PUBLIC :: grid_base_type
 
 ! **************************************************************************************************
 
@@ -47,7 +59,6 @@ CONTAINS
 !> \param deltap input
 !> \param task_list input
 !> \param cube_info input
-!> \param gridlevel_info input
 !> \param ga_gb_function input
 !> \param idir input
 !> \param map_consistent input
@@ -55,15 +66,13 @@ CONTAINS
 !> \param posat input
 !> \param lmax_global input
 ! **************************************************************************************************
-   SUBROUTINE grid_collocate_ref(rs_rho, deltap, task_list, cube_info, gridlevel_info, &
+   SUBROUTINE grid_collocate_ref(rs_rho, deltap, task_list, &
                                  ga_gb_function, idir, map_consistent, kind_of, posat, &
                                  lmax_global)
 
-      TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_rho
+      TYPE(grid_base_type), DIMENSION(:)                 :: rs_rho
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: deltap
       TYPE(task_list_type), POINTER                      :: task_list
-      TYPE(cube_info_type), DIMENSION(:), POINTER        :: cube_info
-      TYPE(gridlevel_info_type), POINTER                 :: gridlevel_info
       INTEGER, INTENT(IN)                                :: ga_gb_function, idir
       LOGICAL, INTENT(IN)                                :: map_consistent
       INTEGER, DIMENSION(:), INTENT(IN)                  :: kind_of
@@ -76,14 +85,18 @@ CONTAINS
       INTEGER :: bcol, brow, iatom, iatom_old, igrid_level, igrid_level_dummy, ikind, img, &
          img_old, ipair, ipgf, iset, iset_old, itask, jatom, jatom_old, jkind, jpgf, jset, &
          jset_old, maxco, maxpgf, maxset, maxsgf_set, na1, na2, natoms, nb1, nb2, ncoa, ncob, &
-         nimages, ntasks, sgfa, sgfb
+         nimages, ntasks, sgfa, sgfb, max_radius
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
+      INTEGER, DIMENSION(3)                              :: lb_grid(3), npts(3), perd(3)
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
+      INTEGER, DIMENSION(:,:), POINTER                   :: glb_cube, gub_cube, gsphere_bound
       LOGICAL                                            :: atom_pair_changed, found, use_subpatch
-      REAL(KIND=dp)                                      :: eps_rho_rspace, rab2, rscale, zetp
+      REAL(KIND=dp)                                      :: eps_rho_rspace, rab2, rscale, zetp, &
+                                                            drmin, max_rad_ga
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rab_inv, rb
+      REAL(KIND=dp), DIMENSION(3,3)                      :: dh, dh_inv
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, p_block, pab, sphi_a, sphi_b, &
                                                             work, zeta, zetb
 
@@ -106,7 +119,23 @@ CONTAINS
       iatom_old = -1; jatom_old = -1; iset_old = -1; jset_old = -1; img_old = -1
 
       ! Loop over each gridlevel first, then loop and load balance over atom pairs
-      loop_gridlevels: DO igrid_level = 1, gridlevel_info%ngrid_levels
+      loop_gridlevels: DO igrid_level = 1, task_list%ngrid_levels
+
+         dh(1:3,1:3) = task_list%cinfo(igrid_level)%dh(1:3,1:3)
+         dh_inv(1:3,1:3) = task_list%cinfo(igrid_level)%dh_inv(1:3,1:3)
+
+         perd(1:3) = task_list%cinfo(igrid_level)%perd(1:3)
+         npts(1:3) = task_list%cinfo(igrid_level)%npts(1:3)
+         lb_grid(1:3) = task_list%cinfo(igrid_level)%lb_grid(1:3)
+
+         drmin = task_list%cinfo(igrid_level)%drmin
+         max_radius = task_list%cinfo(igrid_level)%max_radius
+         max_rad_ga = task_list%cinfo(igrid_level)%max_rad_ga
+
+         NULLIFY(glb_cube, gub_cube, gsphere_bound)
+         glb_cube => task_list%cinfo(igrid_level)%lb_cube
+         gub_cube => task_list%cinfo(igrid_level)%ub_cube
+         gsphere_bound => task_list%cinfo(igrid_level)%sphere_bounds
 
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
@@ -206,14 +235,9 @@ CONTAINS
                rscale = 2.0_dp
             END IF
 
-            ! check whether we need to use fawzi's generalised collocation scheme
-            IF (rs_rho(igrid_level)%rs_grid%desc%distributed) THEN
-               !tasks(4,:) is 0 for replicated, 1 for distributed 2 for exceptional distributed tasks
-               IF (tasks(4, itask) .EQ. 2) THEN
-                  use_subpatch = .TRUE.
-               ELSE
-                  use_subpatch = .FALSE.
-               ENDIF
+            ! check whether we need to use the generalised collocation scheme
+            IF (tasks(4, itask) == 2) THEN
+               use_subpatch = .TRUE.
             ELSE
                use_subpatch = .FALSE.
             ENDIF
@@ -223,7 +247,11 @@ CONTAINS
                   la_max(iset), zeta(ipgf, iset), la_min(iset), &
                   lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
                   ra, rab, rab2, rscale, pab, na1-1, nb1-1, &
-                  rs_rho(igrid_level)%rs_grid, cube_info(igrid_level), &
+                  rs_rho(igrid_level)%grid, &
+                  dh, dh_inv, &
+                  perd, npts, lb_grid, &
+                  drmin, max_radius, max_rad_ga, &
+                  glb_cube, gub_cube, gsphere_bound, &
                   eps_rho_rspace, ga_gb_function, map_consistent, idir, &
                   use_subpatch, lmax_global)
             ELSE
@@ -232,7 +260,11 @@ CONTAINS
                   lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
                   la_max(iset), zeta(ipgf, iset), la_min(iset), &
                   rb, rab_inv, rab2, rscale, pab, nb1-1, na1-1, &
-                  rs_rho(igrid_level)%rs_grid, cube_info(igrid_level), &
+                  rs_rho(igrid_level)%grid, &
+                  dh, dh_inv, &
+                  perd, npts, lb_grid, &
+                  drmin, max_radius, max_rad_ga, &
+                  glb_cube, gub_cube, gsphere_bound, &
                   eps_rho_rspace, ga_gb_function, map_consistent, idir, &
                   use_subpatch, lmax_global)
             END IF
@@ -272,7 +304,11 @@ CONTAINS
    SUBROUTINE collocate_pgf_product_rspace(la_max, zeta, la_min, &
                                            lb_max, zetb, lb_min, &
                                            ra, rab, rab2, rscale, pab, o1, o2, &
-                                           rsgrid, cube_info, &
+                                           grid, &
+                                           dh, dh_inv, &
+                                           perd, npts, lb_grid, &
+                                           drmin, max_radius, max_rad_ga, &
+                                           glb_cube, gub_cube, gsphere_bound, &
                                            eps_rho_rspace, ga_gb_function, &
                                            map_consistent, idir, &
                                            use_subpatch, lmax_global)
@@ -286,8 +322,15 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                :: rab2, rscale
       REAL(KIND=dp), DIMENSION(:, :), POINTER  :: pab
       INTEGER, INTENT(IN)                      :: o1, o2
-      TYPE(realspace_grid_type), POINTER       :: rsgrid
-      TYPE(cube_info_type), INTENT(IN)         :: cube_info
+      REAL(KIND=dp), DIMENSION(:, :, :), POINTER  :: grid
+      REAL(KIND=dp), DIMENSION(3,3), INTENT(IN):: dh, dh_inv
+      INTEGER, DIMENSION(3), INTENT(IN)        :: perd, npts, lb_grid
+      REAL(KIND=dp), INTENT(IN)                :: drmin
+      INTEGER, INTENT(IN)                      :: max_radius
+      REAL(KIND=dp), INTENT(IN)                :: max_rad_ga
+      INTEGER, DIMENSION(:,:), POINTER         :: glb_cube
+      INTEGER, DIMENSION(:,:), POINTER         :: gub_cube
+      INTEGER, DIMENSION(:,:), POINTER         :: gsphere_bound
       REAL(KIND=dp), INTENT(IN)                :: eps_rho_rspace
       INTEGER, INTENT(IN)                      :: ga_gb_function
       LOGICAL, INTENT(IN)                      :: map_consistent
@@ -298,20 +341,17 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'collocate_pgf_product_rspace', &
                                      routineP = moduleN//':'//routineN
 
-      INTEGER :: cmax, gridbounds(2, 3), i, ico, icoef, ider1, ider2, ig, &
-                 jco, k, l, la_max_local, la_min_local, lb_max_local, lb_min_local, &
+      INTEGER :: cmax, gridbounds(2, 3), i, ico, icoef, ider1, ider2, ig, imr, &
+                 jco, k, l, la, lb, la_max_local, la_min_local, lb_max_local, lb_min_local, &
                  length, lxa, lxb, lxy, lxyz, lya, lyb, &
                  lza, lzb, o1_local, o2_local, offset, start
       INTEGER, DIMENSION(3)                    :: cubecenter, lb_cube, ng, &
                                                   ub_cube
       INTEGER, DIMENSION(:), POINTER           :: sphere_bounds
-      LOGICAL                                  :: subpatch_collocate
       REAL(KIND=dp) :: a, b, binomial_k_lxa, binomial_l_lxb, cutoff, f, pg, &
                        prefactor, radius, rpg, zetp
-      REAL(KIND=dp), DIMENSION(3)              :: dr, rap, rb, rbp, roffset, rp
+      REAL(KIND=dp), DIMENSION(3)              :: dr, rap, rb, roffset, rp
       REAL(KIND=dp), DIMENSION(:, :), POINTER  :: pab_local
-      REAL(KIND=dp), DIMENSION(:, :, :), &
-         POINTER                                :: grid
 
       INTEGER :: lxp, lyp, lzp, lp, lxpm, iaxis
       INTEGER, ALLOCATABLE, DIMENSION(:, :) :: map
@@ -326,21 +366,11 @@ CONTAINS
       REAL(kind=dp), ALLOCATABLE, DIMENSION(:, :) :: pol_x
       REAL(KIND=dp) :: t_exp_1, t_exp_2, t_exp_min_1, t_exp_min_2, t_exp_plus_1, t_exp_plus_2
 
-      subpatch_collocate = .FALSE.
-      IF (use_subpatch) THEN
-         subpatch_collocate = .TRUE.
-      ENDIF
-
       zetp = zeta+zetb
       f = zetb/zetp
       rap(:) = f*rab(:)
-      rbp(:) = rap(:)-rab(:)
       rp(:) = ra(:)+rap(:)
       rb(:) = ra(:)+rab(:)
-
-      ! check to avoid overflows
-      a = MAXVAL(ABS(rsgrid%desc%dh))
-      a = 300._dp/(a*a)
 
       IF (map_consistent) THEN
          cutoff = 1.0_dp
@@ -356,7 +386,7 @@ CONTAINS
                                            zetp, eps_rho_rspace, prefactor, cutoff)
       ENDIF
 
-      a = MAXVAL(ABS(rsgrid%desc%dh))
+      a = MAXVAL(ABS(dh))
       IF (radius .LT. a/2.0_dp) THEN
          RETURN
       END IF
@@ -564,8 +594,7 @@ CONTAINS
          CPASSERT(.FALSE.)
       END SELECT
 
-      ng(:) = rsgrid%desc%npts(:)
-      grid => rsgrid%r(:, :, :)
+      ng(:) = npts(:)
       gridbounds(1, 1) = LBOUND(GRID, 1)
       gridbounds(2, 1) = UBOUND(GRID, 1)
       gridbounds(1, 2) = LBOUND(GRID, 2)
@@ -642,8 +671,12 @@ CONTAINS
             coef_xtt(0:lxpm) = 0.0_dp
             DO lxb = MAX(lb_min_local-lzb-lyb, 0), lb_max_local-lzb-lyb
             DO lxa = MAX(la_min_local-lza-lya, 0), la_max_local-lza-lya
-               ico = coset(lxa, lya, lza)
-               jco = coset(lxb, lyb, lzb)
+!              ico = coset(lxa, lya, lza)
+!              jco = coset(lxb, lyb, lzb)
+               la = lxa + lya + lza
+               lb = lxb + lyb + lzb
+               ico = ncoset(la-1) + 1 + (la-lxa)*(la-lxa+1)/2 + lza
+               jco = ncoset(lb-1) + 1 + (lb-lxb)*(lb-lxb+1)/2 + lzb
                p_ele = prefactor*pab_local(o1_local+ico, o2_local+jco)
                DO lxp = 0, lxa+lxb
                   coef_xtt(lxp) = coef_xtt(lxp)+p_ele*alpha(lxp, lxa, lxb, 1)
@@ -679,7 +712,7 @@ CONTAINS
       ENDDO
       ENDDO
 
-      IF (subpatch_collocate .OR. .NOT. rsgrid%desc%orthorhombic) THEN
+      IF (use_subpatch) THEN
          CALL collocate_general_opt()
       ELSE
          CALL collocate_ortho()
@@ -699,15 +732,24 @@ CONTAINS
 ! **************************************************************************************************
       SUBROUTINE collocate_ortho()
 
-!   *** properties of the grid ***
+         dr(1) = dh(1, 1)
+         dr(2) = dh(2, 2)
+         dr(3) = dh(3, 3)
 
-         ! notice we're in the ortho case
-         dr(1) = rsgrid%desc%dh(1, 1)
-         dr(2) = rsgrid%desc%dh(2, 2)
-         dr(3) = rsgrid%desc%dh(3, 3)
+         imr = MAX(1, CEILING(radius/drmin))
+         IF (imr .GT. max_radius) THEN
+               !
+               ! This is an important check. If the required radius for mapping the density is different
+               ! from the actual computed one, (significant) errors can occur.
+               ! This error can invariably be fixed by improving the computation of maxradius
+               ! in the call to init_cube_info
+               !
+            CPABORT("Called with too large radius.")
+         ENDIF
+         lb_cube(:) = glb_cube(:, imr)
+         ub_cube(:) = gub_cube(:, imr)
+         sphere_bounds(1:) => gsphere_bound(:, imr)
 
-!   *** get the sub grid properties for the given radius ***
-         CALL return_cube(cube_info, radius, lb_cube, ub_cube, sphere_bounds)
          cmax = MAXVAL(ub_cube)
 
 !   *** position of the gaussian product
@@ -719,11 +761,11 @@ CONTAINS
 !
 
          ALLOCATE (map(-cmax:cmax, 3))
-         CALL compute_cube_center(cubecenter, rsgrid%desc, zeta, zetb, ra, rab)
+         cubecenter(:) = FLOOR(MATMUL(dh_inv, rp))
          roffset(:) = rp(:)-REAL(cubecenter(:), dp)*dr(:)
 !   *** a mapping so that the ig corresponds to the right grid point
          DO i = 1, 3
-            IF (rsgrid%desc%perd(i) == 1) THEN
+            IF (perd(i) == 1) THEN
                start = lb_cube(i)
                DO
                   offset = MODULO(cubecenter(i)+start, ng(i))+1-start
@@ -736,7 +778,7 @@ CONTAINS
                END DO
             ELSE
                ! this takes partial grid + border regions into account
-               offset = MODULO(cubecenter(i)+lb_cube(i)+rsgrid%desc%lb(i)-rsgrid%lb_local(i), ng(i))+1-lb_cube(i)
+               offset = MODULO(cubecenter(i)+lb_cube(i)+lb_grid(i), ng(i))+1-lb_cube(i)
                ! check for out of bounds
                IF (ub_cube(i)+offset > UBOUND(grid, i) .OR. lb_cube(i)+offset < LBOUND(grid, i)) THEN
                   CPASSERT(.FALSE.)
@@ -871,7 +913,7 @@ CONTAINS
       REAL(KIND=dp)                                      :: a, b, c, d, di, dip, dj, djp, dk, dkp, &
                                                             exp0i, exp1i, exp2i, gp(3), &
                                                             hmatgrid(3, 3), pointj(3), pointk(3), &
-                                                            res, v(3)
+                                                            res, v(3), resc(3), point(3)
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:)           :: coef_ijk
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:, :, :)     :: hmatgridp
 
@@ -898,10 +940,10 @@ CONTAINS
          ENDDO
 
          ! cell hmat in grid points
-         hmatgrid = rsgrid%desc%dh
+         hmatgrid = dh
 
          ! center in grid coords
-         gp = MATMUL(rsgrid%desc%dh_inv, rp)
+         gp = MATMUL(dh_inv, rp)
          cubecenter(:) = FLOOR(gp)
 
          ! transform using multinomials
@@ -947,14 +989,43 @@ CONTAINS
          ENDDO
          ENDDO
 
-         CALL return_cube_nonortho(cube_info, radius, index_min, index_max, rp)
+         IF (radius > max_rad_ga) THEN
+            !
+            ! This is an important check. If the required radius for mapping the density is different
+            ! from the actual computed one, (significant) errors can occur.
+            ! This error can invariably be fixed by improving the computation of maxradius
+            ! in the call to init_cube_info
+            !
+            WRITE (*, *) max_rad_ga, radius
+            CPABORT("Called with too large radius.")
+         ENDIF
 
-         offset(:) = MODULO(index_min(:)+rsgrid%desc%lb(:)-rsgrid%lb_local(:), ng(:))+1
+         ! get the min max indices that contain at least the cube that contains a sphere around rp of radius radius
+         ! if the cell is very non-orthogonal this implies that many useless points are included
+         ! this estimate can be improved (i.e. not box but sphere should be used)
+         index_min = HUGE(index_min)
+         index_max = -HUGE(index_max)
+         DO i = -1, 1
+         DO j = -1, 1
+         DO k = -1, 1
+            point(1) = rp(1)+i*radius
+            point(2) = rp(2)+j*radius
+            point(3) = rp(3)+k*radius
+            resc(1) = dh_inv(1, 1)*point(1)+dh_inv(1, 2)*point(2)+dh_inv(1, 3)*point(3)
+            resc(2) = dh_inv(2, 1)*point(1)+dh_inv(2, 2)*point(2)+dh_inv(2, 3)*point(3)
+            resc(3) = dh_inv(3, 1)*point(1)+dh_inv(3, 2)*point(2)+dh_inv(3, 3)*point(3)
+            index_min = MIN(index_min, FLOOR(resc))
+            index_max = MAX(index_max, CEILING(resc))
+         ENDDO
+         ENDDO
+         ENDDO
+
+         offset(:) = MODULO(index_min(:)+lb_grid(:), ng(:))+1
 
          ALLOCATE (grid_map(index_min(1):index_max(1)))
          DO i = index_min(1), index_max(1)
             grid_map(i) = MODULO(i, ng(1))+1
-            IF (rsgrid%desc%perd(1) == 1) THEN
+            IF (perd(1) == 1) THEN
                grid_map(i) = MODULO(i, ng(1))+1
             ELSE
                grid_map(i) = i-index_min(1)+offset(1)
@@ -966,7 +1037,7 @@ CONTAINS
             dk = k-gp(3)
             pointk = hmatgrid(:, 3)*dk
 
-            IF (rsgrid%desc%perd(3) == 1) THEN
+            IF (perd(3) == 1) THEN
                k_index = MODULO(k, ng(3))+1
             ELSE
                k_index = k-index_min(3)+offset(3)
@@ -990,7 +1061,7 @@ CONTAINS
             DO j = index_min(2), index_max(2)
                dj = j-gp(2)
                pointj = pointk+hmatgrid(:, 2)*dj
-               IF (rsgrid%desc%perd(2) == 1) THEN
+               IF (perd(2) == 1) THEN
                   j_index = MODULO(j, ng(2))+1
                ELSE
                   j_index = j-index_min(2)+offset(2)

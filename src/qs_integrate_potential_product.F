@@ -358,12 +358,12 @@ CONTAINS
       code_base = 0
       SELECT CASE (code_base)
       CASE (0)
-         CALL grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, gridlevel_info, cell, &
+         CALL grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, cell, &
                                  eps_gvg_rspace, admm_scal_fac, &
                                  my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
                                  calculate_forces, force, use_virial, virial)
       CASE (1)
-         CALL grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, gridlevel_info, cell, &
+         CALL grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, cell, &
                                 eps_gvg_rspace, admm_scal_fac, &
                                 my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
                                 calculate_forces, force, use_virial, virial)
