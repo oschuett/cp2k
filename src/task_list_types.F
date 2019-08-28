@@ -63,7 +63,7 @@ MODULE task_list_types
       INTEGER                                       :: lmax_all = 0
       INTEGER                                       :: maxco = 0
       INTEGER                                       :: maxsgf_set = 0
-      REAL(KIND=dp)                                 :: eps_rho_rspace = 0.0_dp
+      REAL(KIND=dp)                                 :: eps_rho_rspace
       TYPE(basis_type), DIMENSION(:), POINTER       :: basis => Null()
       TYPE(rgrid_type), DIMENSION(:), POINTER       :: cinfo => Null()
    END TYPE task_list_type

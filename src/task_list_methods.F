@@ -227,7 +227,7 @@ CONTAINS
 
       ! construct a list of all tasks
       ALLOCATE (task_list%tasks(6, max_tasks))
-      ALLOCATE (task_list%dist_ab(3, max_tasks))
+      ALLOCATE (task_list%dist_ab(4, max_tasks))
       task_list%ntasks = 0
       curr_tasks = SIZE(task_list%tasks, 2)
 
@@ -321,8 +321,10 @@ CONTAINS
 
          CALL task_list_inner_loop(task_list%tasks, task_list%dist_ab, task_list%ntasks, curr_tasks, &
                                    rs_descs, dft_control, cube_info, gridlevel_info, cindex, &
-                                   iatom, jatom, rpgfa, rpgfb, zeta, zetb, kind_radius_b, set_radius_a, set_radius_b, ra, rab, &
-                                   la_max, la_min, lb_max, lb_min, npgfa, npgfb, maxpgf, maxset, natoms, nimages, nseta, nsetb)
+                                   iatom, jatom, rpgfa, rpgfb, zeta, zetb, &
+                                   kind_radius_b, set_radius_a, set_radius_b, ra, rab, &
+                                   la_max, la_min, lb_max, lb_min, npgfa, npgfb, &
+                                   maxpgf, maxset, natoms, nimages, nseta, nsetb)
 
       END DO
       CALL neighbor_list_iterator_release(nl_iterator)
@@ -579,7 +581,8 @@ CONTAINS
                                               ra, rab, rab2, dft_control%qs_control%eps_rho_rspace)
 
                   CALL pgf_to_tasks(tasks, dist_ab, ntasks, curr_tasks, &
-                                    rab, cindex, iatom, jatom, iset, jset, ipgf, jpgf, nimages, natoms, maxset, maxpgf, &
+                                    rab, radius, cindex, iatom, jatom, iset, jset, ipgf, jpgf, &
+                                    nimages, natoms, maxset, maxpgf, &
                                     la_max(iset), lb_max(jset), rs_descs(igrid_level)%rs_desc, &
                                     igrid_level, gridlevel_info%ngrid_levels, cube_center, &
                                     lb_cube, ub_cube)
@@ -734,6 +737,7 @@ CONTAINS
 !> \param ntasks ...
 !> \param curr_tasks ...
 !> \param rab ...
+!> \param radius ...
 !> \param cindex ...
 !> \param iatom ...
 !> \param jatom ...
@@ -757,13 +761,15 @@ CONTAINS
 !>      10.2008 Refactored based on earlier routines by MattW [Joost VandeVondele]
 ! **************************************************************************************************
    SUBROUTINE pgf_to_tasks(tasks, dist_ab, ntasks, curr_tasks, &
-                           rab, cindex, iatom, jatom, iset, jset, ipgf, jpgf, nimages, natoms, maxset, maxpgf, &
+                           rab, radius, cindex, iatom, jatom, iset, jset, ipgf, jpgf, &
+                           nimages, natoms, maxset, maxpgf, &
                            la_max, lb_max, rs_desc, igrid_level, n_levels, cube_center, lb_cube, ub_cube)
 
       INTEGER(KIND=int_8), DIMENSION(:, :), POINTER      :: tasks
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab
       INTEGER, INTENT(INOUT)                             :: ntasks, curr_tasks
       REAL(KIND=dp), DIMENSION(3), INTENT(IN)            :: rab
+      REAL(KIND=dp), INTENT(IN)                          :: radius
       INTEGER, INTENT(IN)                                :: cindex, iatom, jatom, iset, jset, ipgf, &
                                                             jpgf, nimages, natoms, maxset, maxpgf, &
                                                             la_max, lb_max
@@ -774,7 +780,7 @@ CONTAINS
       INTEGER, PARAMETER                                 :: add_tasks = 1000
       REAL(kind=dp), PARAMETER                           :: mult_tasks = 2.0_dp
 
-      INTEGER                                            :: added_tasks, cost, j, lmax
+      INTEGER                                            :: added_tasks, cost, j, lmax, n
       LOGICAL                                            :: is_ortho
       REAL(KIND=dp)                                      :: tfraction
 
@@ -798,14 +804,13 @@ CONTAINS
          added_tasks = 1
       ENDIF
 
-!deb
       IF (.NOT. rs_desc%orthorhombic) THEN
          tasks(4, ntasks) = 2
       END IF
-!deb
 
       IF (SIZE(dist_ab, 2) .NE. SIZE(tasks, 2)) THEN
-         CALL reallocate(dist_ab, 1, 3, 1, SIZE(tasks, 2))
+         n = SIZE(dist_ab, 1)
+         CALL reallocate(dist_ab, 1, n, 1, SIZE(tasks, 2))
       ENDIF
 
       lmax = la_max+lb_max
@@ -828,6 +833,8 @@ CONTAINS
          dist_ab(1, ntasks-added_tasks+j) = rab(1)
          dist_ab(2, ntasks-added_tasks+j) = rab(2)
          dist_ab(3, ntasks-added_tasks+j) = rab(3)
+
+         dist_ab(4, ntasks-added_tasks+j) = radius
 
       ENDDO
 

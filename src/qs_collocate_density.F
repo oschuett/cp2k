@@ -59,8 +59,8 @@ MODULE qs_collocate_density
                                               gridlevel_info_type
    USE grid_base_mp,                    ONLY: collocate_pgf_product_rspace,&
                                               grid_collocate_mp
-   USE grid_base_ref,                   ONLY: grid_collocate_ref, &
-                                              grid_base_type
+   USE grid_base_ref,                   ONLY: grid_base_type,&
+                                              grid_collocate_ref
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
                                               int_8
@@ -1621,8 +1621,9 @@ CONTAINS
 
       CHARACTER(LEN=default_string_length)               :: my_basis_type
       INTEGER                                            :: code_base, ga_gb_function, handle, &
-                                                            iatom, igrid_level, img, lmax_global, &
-                                                            my_der_type, my_idir, natoms, nimages, n1, n2, im
+                                                            iatom, igrid_level, im, img, &
+                                                            lmax_global, my_der_type, my_idir, n1, &
+                                                            n2, natoms, nimages
       INTEGER(kind=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
       INTEGER, DIMENSION(:), POINTER                     :: kind_of
       LOGICAL                                            :: distributed_rs_grids, do_kp, &
@@ -1633,10 +1634,10 @@ CONTAINS
       TYPE(cube_info_type), DIMENSION(:), POINTER        :: cube_info
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: deltap
       TYPE(dft_control_type), POINTER                    :: dft_control
+      TYPE(grid_base_type), DIMENSION(:), POINTER        :: rs_rho_base
       TYPE(gridlevel_info_type), POINTER                 :: gridlevel_info
       TYPE(particle_type), DIMENSION(:), POINTER         :: particle_set
       TYPE(pw_env_type), POINTER                         :: pw_env
-      TYPE(grid_base_type), DIMENSION(:), POINTER        :: rs_rho_base
       TYPE(qs_kind_type), DIMENSION(:), POINTER          :: qs_kind_set
       TYPE(realspace_grid_desc_p_type), DIMENSION(:), &
          POINTER                                         :: rs_descs
@@ -1813,57 +1814,58 @@ CONTAINS
       ! load grid info to task_list
       CPASSERT(gridlevel_info%ngrid_levels == task_list%ngrid_levels)
       DO igrid_level = 1, gridlevel_info%ngrid_levels
-         task_list%cinfo(igrid_level)%dh(1:3,1:3) = cube_info(igrid_level)%dh(1:3,1:3)
-         task_list%cinfo(igrid_level)%dh_inv(1:3,1:3) = cube_info(igrid_level)%dh_inv(1:3,1:3)
+         task_list%cinfo(igrid_level)%dh(1:3, 1:3) = cube_info(igrid_level)%dh(1:3, 1:3)
+         task_list%cinfo(igrid_level)%dh_inv(1:3, 1:3) = cube_info(igrid_level)%dh_inv(1:3, 1:3)
          task_list%cinfo(igrid_level)%npts(1:3) = rs_rho(igrid_level)%rs_grid%desc%npts(1:3)
-         task_list%cinfo(igrid_level)%lb_grid(1:3) = rs_rho(igrid_level)%rs_grid%desc%lb(1:3) - &
+         task_list%cinfo(igrid_level)%lb_grid(1:3) = rs_rho(igrid_level)%rs_grid%desc%lb(1:3)- &
                                                      rs_rho(igrid_level)%rs_grid%lb_local(1:3)
          task_list%cinfo(igrid_level)%perd(1:3) = rs_rho(igrid_level)%rs_grid%desc%perd(1:3)
          task_list%cinfo(igrid_level)%drmin = cube_info(igrid_level)%drmin
          task_list%cinfo(igrid_level)%max_radius = cube_info(igrid_level)%max_radius
          task_list%cinfo(igrid_level)%max_rad_ga = cube_info(igrid_level)%max_rad_ga
-         IF(ASSOCIATED(task_list%cinfo(igrid_level)%lb_cube)) &
-            DEALLOCATE(task_list%cinfo(igrid_level)%lb_cube)
-         IF(ASSOCIATED(task_list%cinfo(igrid_level)%ub_cube)) &
-            DEALLOCATE(task_list%cinfo(igrid_level)%ub_cube)
-         IF(ASSOCIATED(task_list%cinfo(igrid_level)%sphere_bounds)) &
-            DEALLOCATE(task_list%cinfo(igrid_level)%sphere_bounds)
-         IF(ASSOCIATED(cube_info(igrid_level)%lb_cube)) THEN
-            n1 = SIZE(cube_info(igrid_level)%lb_cube,1)
-            n2 = SIZE(cube_info(igrid_level)%lb_cube,2)
-            ALLOCATE(task_list%cinfo(igrid_level)%lb_cube(n1,n2))
-            task_list%cinfo(igrid_level)%lb_cube(:,:) = cube_info(igrid_level)%lb_cube(:,:)
+         IF (ASSOCIATED(task_list%cinfo(igrid_level)%lb_cube)) &
+            DEALLOCATE (task_list%cinfo(igrid_level)%lb_cube)
+         IF (ASSOCIATED(task_list%cinfo(igrid_level)%ub_cube)) &
+            DEALLOCATE (task_list%cinfo(igrid_level)%ub_cube)
+         IF (ASSOCIATED(task_list%cinfo(igrid_level)%sphere_bounds)) &
+            DEALLOCATE (task_list%cinfo(igrid_level)%sphere_bounds)
+         IF (ASSOCIATED(cube_info(igrid_level)%lb_cube)) THEN
+            n1 = SIZE(cube_info(igrid_level)%lb_cube, 1)
+            n2 = SIZE(cube_info(igrid_level)%lb_cube, 2)
+            ALLOCATE (task_list%cinfo(igrid_level)%lb_cube(n1, n2))
+            task_list%cinfo(igrid_level)%lb_cube(:, :) = cube_info(igrid_level)%lb_cube(:, :)
          END IF
-         IF(ASSOCIATED(cube_info(igrid_level)%ub_cube)) THEN
-            n1 = SIZE(cube_info(igrid_level)%ub_cube,1)
-            n2 = SIZE(cube_info(igrid_level)%ub_cube,2)
-            ALLOCATE(task_list%cinfo(igrid_level)%ub_cube(n1,n2))
-            task_list%cinfo(igrid_level)%ub_cube(:,:) = cube_info(igrid_level)%ub_cube(:,:)
+         IF (ASSOCIATED(cube_info(igrid_level)%ub_cube)) THEN
+            n1 = SIZE(cube_info(igrid_level)%ub_cube, 1)
+            n2 = SIZE(cube_info(igrid_level)%ub_cube, 2)
+            ALLOCATE (task_list%cinfo(igrid_level)%ub_cube(n1, n2))
+            task_list%cinfo(igrid_level)%ub_cube(:, :) = cube_info(igrid_level)%ub_cube(:, :)
          END IF
-         IF(ASSOCIATED(cube_info(igrid_level)%sphere_bounds)) THEN
+         IF (ASSOCIATED(cube_info(igrid_level)%sphere_bounds)) THEN
             n1 = MAXVAL(cube_info(igrid_level)%sphere_bounds_count)
-            n2 = SIZE(cube_info(igrid_level)%sphere_bounds,1)
-            ALLOCATE(task_list%cinfo(igrid_level)%sphere_bounds(n1,n2))
+            n2 = SIZE(cube_info(igrid_level)%sphere_bounds, 1)
+            ALLOCATE (task_list%cinfo(igrid_level)%sphere_bounds(n1, n2))
             task_list%cinfo(igrid_level)%sphere_bounds = 0
-            DO im=1,n2
+            DO im = 1, n2
                n1 = cube_info(igrid_level)%sphere_bounds_count(im)
-               task_list%cinfo(igrid_level)%sphere_bounds(1:n1,im) = cube_info(igrid_level)%sphere_bounds(im)%p(1:n1)
+               task_list%cinfo(igrid_level)%sphere_bounds(1:n1, im) = cube_info(igrid_level)%sphere_bounds(im)%p(1:n1)
             END DO
          END IF
       END DO
 
       code_base = 0
-      IF(.NOT.map_consistent) code_base = 1
+      IF (.NOT. map_consistent) code_base = 1
+      IF (.NOT. (ga_gb_function == FUNC_AB .OR. ga_gb_function == FUNC_DADB)) code_base = 1
       SELECT CASE (code_base)
       CASE (0)
-         ALLOCATE(rs_rho_base(gridlevel_info%ngrid_levels))
+         ALLOCATE (rs_rho_base(gridlevel_info%ngrid_levels))
          DO igrid_level = 1, gridlevel_info%ngrid_levels
-            rs_rho_base(igrid_level)%grid => rs_rho(igrid_level)%rs_grid%r(:,:,:)
+            rs_rho_base(igrid_level)%grid => rs_rho(igrid_level)%rs_grid%r(:, :, :)
          END DO
          CALL grid_collocate_ref(rs_rho_base, deltap, task_list, &
-                                 ga_gb_function, my_idir, map_consistent, kind_of, posat, &
+                                 my_compute_tau, kind_of, posat, &
                                  lmax_global)
-         DEALLOCATE(rs_rho_base)
+         DEALLOCATE (rs_rho_base)
       CASE (1)
          CALL grid_collocate_mp(rs_rho, deltap, task_list, cube_info, cell, &
                                 ga_gb_function, my_idir, map_consistent, kind_of, posat, &
