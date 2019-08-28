@@ -23,22 +23,24 @@ MODULE grid_base_ref
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER       :: grid => NULL()
    END TYPE grid_base_type
 
+!&<
    INTEGER, PARAMETER :: maxfac = 30
    REAL(KIND=dp), PARAMETER, DIMENSION(0:maxfac) :: fac = (/ &
-                                      0.10000000000000000000E+01_dp, 0.10000000000000000000E+01_dp, 0.20000000000000000000E+01_dp, &
-                                      0.60000000000000000000E+01_dp, 0.24000000000000000000E+02_dp, 0.12000000000000000000E+03_dp, &
-                                      0.72000000000000000000E+03_dp, 0.50400000000000000000E+04_dp, 0.40320000000000000000E+05_dp, &
-                                      0.36288000000000000000E+06_dp, 0.36288000000000000000E+07_dp, 0.39916800000000000000E+08_dp, &
-                                      0.47900160000000000000E+09_dp, 0.62270208000000000000E+10_dp, 0.87178291200000000000E+11_dp, &
-                                      0.13076743680000000000E+13_dp, 0.20922789888000000000E+14_dp, 0.35568742809600000000E+15_dp, &
-                                      0.64023737057280000000E+16_dp, 0.12164510040883200000E+18_dp, 0.24329020081766400000E+19_dp, &
-                                      0.51090942171709440000E+20_dp, 0.11240007277776076800E+22_dp, 0.25852016738884976640E+23_dp, &
-                                      0.62044840173323943936E+24_dp, 0.15511210043330985984E+26_dp, 0.40329146112660563558E+27_dp, &
-                                      0.10888869450418352161E+29_dp, 0.30488834461171386050E+30_dp, 0.88417619937397019545E+31_dp, &
-                                                    0.26525285981219105864E+33_dp/)
+        0.10000000000000000000E+01_dp, 0.10000000000000000000E+01_dp, 0.20000000000000000000E+01_dp, &
+        0.60000000000000000000E+01_dp, 0.24000000000000000000E+02_dp, 0.12000000000000000000E+03_dp, &
+        0.72000000000000000000E+03_dp, 0.50400000000000000000E+04_dp, 0.40320000000000000000E+05_dp, &
+        0.36288000000000000000E+06_dp, 0.36288000000000000000E+07_dp, 0.39916800000000000000E+08_dp, &
+        0.47900160000000000000E+09_dp, 0.62270208000000000000E+10_dp, 0.87178291200000000000E+11_dp, &
+        0.13076743680000000000E+13_dp, 0.20922789888000000000E+14_dp, 0.35568742809600000000E+15_dp, &
+        0.64023737057280000000E+16_dp, 0.12164510040883200000E+18_dp, 0.24329020081766400000E+19_dp, &
+        0.51090942171709440000E+20_dp, 0.11240007277776076800E+22_dp, 0.25852016738884976640E+23_dp, &
+        0.62044840173323943936E+24_dp, 0.15511210043330985984E+26_dp, 0.40329146112660563558E+27_dp, &
+        0.10888869450418352161E+29_dp, 0.30488834461171386050E+30_dp, 0.88417619937397019545E+31_dp, &
+        0.26525285981219105864E+33_dp/)
    INTEGER, PARAMETER :: maxl = 18
    INTEGER, PARAMETER, DIMENSION(-1:maxl) :: ncoset = (/ &
-                                         0, 1, 4, 10, 20, 35, 56, 84, 120, 165, 220, 286, 364, 455, 560, 680, 816, 969, 1140, 1330/)
+        0, 1, 4, 10, 20, 35, 56, 84, 120, 165, 220, 286, 364, 455, 560, 680, 816, 969, 1140, 1330/)
+!&>
 
    PUBLIC :: grid_collocate_ref
    PUBLIC :: grid_base_type
@@ -72,8 +74,8 @@ CONTAINS
 
       INTEGER :: bcol, brow, iatom, iatom_old, igrid_level, igrid_level_dummy, ikind, img, &
          img_old, ipair, ipgf, iset, iset_old, itask, jatom, jatom_old, jkind, jpgf, jset, &
-         jset_old, max_radius, maxco, maxpgf, maxset, maxsgf_set, na1, na2, natoms, nb1, nb2, &
-         ncoa, ncob, nimages, ntasks, sgfa, sgfb
+         jset_old, max_radius, maxco, maxpgf, maxset, maxsgf_set, n1, n2, na1, natoms, nb1, ncoa, &
+         ncob, nimages, ntasks, sgfa, sgfb
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, DIMENSION(3)                              :: lb_grid(3), npts(3), perd(3)
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
@@ -81,12 +83,12 @@ CONTAINS
                                                             nsgfb
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gsphere_bound, gub_cube
       LOGICAL                                            :: atom_pair_changed, found, use_subpatch
-      REAL(KIND=dp)                                      :: drmin, max_rad_ga, rab2, radius, rscale, &
-                                                            zetp
-      REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rab_inv, rb
+      REAL(KIND=dp)                                      :: adh, drmin, max_rad_ga, rab2, radius, &
+                                                            rscale, zetp
+      REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rb
       REAL(KIND=dp), DIMENSION(3, 3)                     :: dh, dh_inv
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, p_block, pab, sphi_a, sphi_b, &
-                                                            work, zeta, zetb
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, p_block, pab, pin, sphi_a, &
+                                                            sphi_b, work, zeta, zetb
 
       ! map all tasks on the grids
       tasks => task_list%tasks
@@ -101,6 +103,7 @@ CONTAINS
       maxsgf_set = task_list%maxsgf_set
 
       ALLOCATE (pab(maxco, maxco), work(maxco, maxsgf_set))
+      ALLOCATE (pin(1, 1))
 
       iatom_old = -1; jatom_old = -1; iset_old = -1; jset_old = -1; img_old = -1
 
@@ -108,6 +111,7 @@ CONTAINS
       loop_gridlevels: DO igrid_level = 1, task_list%ngrid_levels
 
          dh(1:3, 1:3) = task_list%cinfo(igrid_level)%dh(1:3, 1:3)
+         adh = MAXVAL(ABS(dh))
          dh_inv(1:3, 1:3) = task_list%cinfo(igrid_level)%dh_inv(1:3, 1:3)
 
          perd(1:3) = task_list%cinfo(igrid_level)%perd(1:3)
@@ -162,6 +166,16 @@ CONTAINS
                CALL dbcsr_get_block_p(matrix=deltap(img)%matrix, &
                                       row=brow, col=bcol, BLOCK=p_block, found=found)
                CPASSERT(found)
+               DEALLOCATE (pin)
+               n1 = SIZE(p_block, 1)
+               n2 = SIZE(p_block, 2)
+               IF (iatom <= jatom) THEN
+                  ALLOCATE (pin(n1, n2))
+                  pin(1:n1, 1:n2) = p_block(1:n1, 1:n2)
+               ELSE
+                  ALLOCATE (pin(n2, n1))
+                  pin(1:n2, 1:n1) = TRANSPOSE(p_block(1:n1, 1:n2))
+               END IF
 
                iatom_old = iatom
                jatom_old = jatom
@@ -180,25 +194,12 @@ CONTAINS
                ncob = npgfb(jset)*ncoset(lb_max(jset))
                sgfb = first_sgfb(jset)
 
-               IF (iatom <= jatom) THEN
-                  CALL dgemm("N", "N", ncoa, nsgfb(jset), nsgfa(iset), &
-                             1.0_dp, sphi_a(1, sgfa), SIZE(sphi_a, 1), &
-                             p_block(sgfa, sgfb), SIZE(p_block, 1), &
-                             0.0_dp, work(1, 1), maxco)
-                  CALL dgemm("N", "T", ncoa, ncob, nsgfb(jset), &
-                             1.0_dp, work(1, 1), maxco, &
-                             sphi_b(1, sgfb), SIZE(sphi_b, 1), &
-                             0.0_dp, pab(1, 1), maxco)
-               ELSE
-                  CALL dgemm("N", "N", ncob, nsgfa(iset), nsgfb(jset), &
-                             1.0_dp, sphi_b(1, sgfb), SIZE(sphi_b, 1), &
-                             p_block(sgfb, sgfa), SIZE(p_block, 1), &
-                             0.0_dp, work(1, 1), maxco)
-                  CALL dgemm("N", "T", ncob, ncoa, nsgfa(iset), &
-                             1.0_dp, work(1, 1), maxco, &
-                             sphi_a(1, sgfa), SIZE(sphi_a, 1), &
-                             0.0_dp, pab(1, 1), maxco)
-               END IF
+               CALL dgemm("N", "N", ncoa, nsgfb(jset), nsgfa(iset), &
+                          1.0_dp, sphi_a(1, sgfa), SIZE(sphi_a, 1), &
+                          pin(sgfa, sgfb), SIZE(pin, 1), 0.0_dp, work(1, 1), maxco)
+               CALL dgemm("N", "T", ncoa, ncob, nsgfb(jset), &
+                          1.0_dp, work(1, 1), maxco, &
+                          sphi_b(1, sgfb), SIZE(sphi_b, 1), 0.0_dp, pab(1, 1), maxco)
 
                iset_old = iset
                jset_old = jset
@@ -210,11 +211,10 @@ CONTAINS
             zetp = zeta(ipgf, iset)+zetb(jpgf, jset)
 
             radius = dist_ab(4, itask)
+            IF (2.0_dp*radius < adh) CYCLE
 
             na1 = (ipgf-1)*ncoset(la_max(iset))+1
-            na2 = ipgf*ncoset(la_max(iset))
             nb1 = (jpgf-1)*ncoset(lb_max(jset))+1
-            nb2 = jpgf*ncoset(lb_max(jset))
 
             ! takes the density matrix symmetry in account
             IF (iatom == jatom) THEN
@@ -230,38 +230,22 @@ CONTAINS
                use_subpatch = .FALSE.
             ENDIF
 
-            IF (iatom <= jatom) THEN
-               CALL collocate_pgf_product_rspace( &
-                  la_max(iset), zeta(ipgf, iset), la_min(iset), &
-                  lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
-                  ra, rab, rab2, radius, rscale, pab, na1-1, nb1-1, &
-                  rs_rho(igrid_level)%grid, &
-                  dh, dh_inv, &
-                  perd, npts, lb_grid, &
-                  drmin, max_radius, max_rad_ga, &
-                  glb_cube, gub_cube, gsphere_bound, &
-                  compute_tau, &
-                  use_subpatch, lmax_global)
-            ELSE
-               rab_inv = -rab
-               CALL collocate_pgf_product_rspace( &
-                  lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
-                  la_max(iset), zeta(ipgf, iset), la_min(iset), &
-                  rb, rab_inv, rab2, radius, rscale, pab, nb1-1, na1-1, &
-                  rs_rho(igrid_level)%grid, &
-                  dh, dh_inv, &
-                  perd, npts, lb_grid, &
-                  drmin, max_radius, max_rad_ga, &
-                  glb_cube, gub_cube, gsphere_bound, &
-                  compute_tau, &
-                  use_subpatch, lmax_global)
-            END IF
+            CALL collocate_pgf_product_rspace( &
+               la_max(iset), zeta(ipgf, iset), la_min(iset), &
+               lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
+               ra, rab, rab2, radius, rscale, pab, na1-1, nb1-1, &
+               rs_rho(igrid_level)%grid, &
+               dh, dh_inv, perd, npts, lb_grid, &
+               drmin, max_radius, max_rad_ga, &
+               glb_cube, gub_cube, gsphere_bound, &
+               compute_tau, use_subpatch, lmax_global)
+
          END DO loop_tasks
          END DO loop_pairs
 
       END DO loop_gridlevels
 
-      DEALLOCATE (pab, work)
+      DEALLOCATE (pab, pin, work)
 
    END SUBROUTINE grid_collocate_ref
 
@@ -276,7 +260,7 @@ CONTAINS
 !> \param ra ...
 !> \param rab ...
 !> \param rab2 ...
-!> \param radius_task ...
+!> \param radius ...
 !> \param rscale ...
 !> \param pab ...
 !> \param o1 ...
@@ -299,14 +283,12 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE collocate_pgf_product_rspace(la_max, zeta, la_min, &
                                            lb_max, zetb, lb_min, &
-                                           ra, rab, rab2, radius_task, rscale, pab, o1, o2, &
+                                           ra, rab, rab2, radius, rscale, pab, o1, o2, &
                                            grid, &
-                                           dh, dh_inv, &
-                                           perd, npts, lb_grid, &
+                                           dh, dh_inv, perd, npts, lb_grid, &
                                            drmin, max_radius, max_rad_ga, &
                                            glb_cube, gub_cube, gsphere_bound, &
-                                           compute_tau, &
-                                           use_subpatch, lmax_global)
+                                           compute_tau, use_subpatch, lmax_global)
 
       INTEGER, INTENT(IN)                      :: la_max
       REAL(KIND=dp), INTENT(IN)                :: zeta
@@ -314,7 +296,7 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                :: zetb
       INTEGER, INTENT(IN)                      :: lb_min
       REAL(KIND=dp), DIMENSION(3), INTENT(IN)  :: ra, rab
-      REAL(KIND=dp), INTENT(IN)                :: rab2, radius_task, rscale
+      REAL(KIND=dp), INTENT(IN)                :: rab2, radius, rscale
       REAL(KIND=dp), DIMENSION(:, :), POINTER  :: pab
       INTEGER, INTENT(IN)                      :: o1, o2
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER  :: grid
@@ -341,7 +323,7 @@ CONTAINS
                                                   ub_cube
       INTEGER, DIMENSION(:), POINTER           :: sphere_bounds
       REAL(KIND=dp) :: a, b, binomial_k_lxa, binomial_l_lxb, f, pg, &
-                       prefactor, radius, rpg, zetp
+                       prefactor, rpg, zetp
       REAL(KIND=dp), DIMENSION(3)              :: dr, roffset, rp
       REAL(KIND=dp), DIMENSION(:, :), POINTER  :: pab_local
 
@@ -361,14 +343,7 @@ CONTAINS
       zetp = zeta+zetb
       f = zetb/zetp
       rp(:) = ra(:)+f*rab(:)
-
-      radius = radius_task
       prefactor = rscale*EXP(-zeta*f*rab2)
-
-      a = MAXVAL(ABS(dh))
-      IF (radius .LT. a/2.0_dp) THEN
-         RETURN
-      END IF
 
       IF (compute_tau) THEN
          la_max_local = la_max+1
@@ -508,9 +483,6 @@ CONTAINS
          CALL collocate_ortho()
       END IF
 
-!     IF (compute_tau) THEN
-!        DEALLOCATE (pab_local)
-!     END IF
       DEALLOCATE (pab_local)
 
    CONTAINS
@@ -583,13 +555,12 @@ CONTAINS
          ALLOCATE (pol_y(1:2, 0:lp, -cmax:0))
          ALLOCATE (pol_x(0:lp, -cmax:cmax))
 
-!        prep.f90
 !
 !   compute the values of all (x-xp)**lp*exp(..)
 !
-! still requires the old trick:
+!  still requires the old trick:
 !  new trick to avoid to many exps (reuse the result from the previous gridpoint):
-!  exp( -a*(x+d)**2)=exp(-a*x**2)*(-2*a*x*d)*exp(-a*d**2)
+!  exp( -a*(x+d)**2)=exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
 !  exp(-2*a*(x+d)*d)=exp(-2*a*x*d)*exp(-2*a*d**2)
 
          iaxis = 3
@@ -1080,7 +1051,6 @@ CONTAINS
       ! create a new pab_tau so that mapping pab_tau with pgf_a pgf_b
       ! is equivalent to mapping pab with 0.5 * (nabla pgf_a) . (nabla pgf_b)
       ! (ddx pgf_a ) (ddx pgf_b) = (lax pgf_{a-1x} - 2*zeta*pgf_{a+1x})*(lbx pgf_{b-1x} - 2*zetb*pgf_{b+1x})
-      ! cleaner would possibly be to touch pzyx directly (avoiding the following allocate)
       nla = ncoset(la_max+1)
       nlb = ncoset(lb_max+1)
       ALLOCATE (pab_tau(nla, nlb))
