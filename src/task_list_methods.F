@@ -63,7 +63,10 @@ MODULE task_list_methods
                                               rs_grid_locate_rank,&
                                               rs_grid_release,&
                                               rs_grid_reorder_ranks
+   USE spmat_types,                     ONLY: spmat_p_type,&
+                                              spmat_type
    USE task_list_types,                 ONLY: clear_task_list,&
+                                              grid_base_type,&
                                               task_list_type
    USE util,                            ONLY: sort
 
@@ -80,7 +83,7 @@ MODULE task_list_methods
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'task_list_methods'
 
    PUBLIC :: generate_qs_task_list, &
-             task_list_inner_loop
+             task_list_inner_loop, write_task_file
    PUBLIC :: distribute_tasks, &
              int2pair, &
              rs_distribute_matrix
@@ -2812,5 +2815,190 @@ CONTAINS
       grid_level = INT(MODULO(encoded_int, n_levels8))+1
 
    END FUNCTION decode_level
+! **************************************************************************************************
+!> \brief ...
+!> \param task_list ...
+!> \param spmats ...
+!> \param rs_rho ...
+!> \param mp ...
+! **************************************************************************************************
+   SUBROUTINE write_task_file(task_list, spmats, rs_rho, mp)
+      TYPE(task_list_type), POINTER                      :: task_list
+      TYPE(spmat_p_type), DIMENSION(:), INTENT(IN), &
+         TARGET                                          :: spmats
+      TYPE(grid_base_type), DIMENSION(:), INTENT(IN)     :: rs_rho
+      INTEGER, INTENT(IN)                                :: mp
+
+      CHARACTER(LEN=default_string_length)               :: fname, proc
+      INTEGER                                            :: ig, ir, iu, ng, n1, n2, nset
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: irs
+      INTEGER, DIMENSION(2, 3)                           :: gridbounds
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: mat
+      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
+      TYPE(spmat_type), POINTER                          :: spmat
+
+      WRITE (proc, FMT="(I10)") mp
+      fname = "tasklist_"//TRIM(ADJUSTL(proc))//".data"
+      iu = 999
+      OPEN (unit=iu, file=fname, position="rewind")
+      !
+      WRITE (iu, *) "S> TASK GENERAL"
+      WRITE (iu, *) task_list%ntasks
+      WRITE (iu, *) task_list%ngrid_levels
+      WRITE (iu, *) task_list%nimages
+      WRITE (iu, *) task_list%natoms
+      WRITE (iu, *) task_list%maxset
+      WRITE (iu, *) task_list%maxpgf
+      WRITE (iu, *) task_list%lmax_all
+      WRITE (iu, *) task_list%maxco
+      WRITE (iu, *) task_list%maxsgf_set
+      WRITE (iu, *) task_list%eps_rho_rspace
+      WRITE (iu, *) "E> TASK GENERAL"
+      !
+      WRITE (iu, *) "S> TASK GRID"
+      ng = SIZE(task_list%cinfo)
+      WRITE (iu, *) ng
+      DO ig=1,ng
+         WRITE(iu, *) task_list%cinfo(ig)%dh
+         WRITE(iu, *) task_list%cinfo(ig)%dh_inv
+         WRITE(iu, *) task_list%cinfo(ig)%perd
+         WRITE(iu, *) task_list%cinfo(ig)%npts
+         WRITE(iu, *) task_list%cinfo(ig)%lb_grid
+         WRITE(iu, *) task_list%cinfo(ig)%drmin
+         WRITE(iu, *) task_list%cinfo(ig)%max_radius
+         WRITE(iu, *) task_list%cinfo(ig)%max_rad_ga
+         IF(ASSOCIATED(task_list%cinfo(ig)%lb_cube)) THEN
+            n1 = SIZE(task_list%cinfo(ig)%lb_cube,1)
+            n2 = SIZE(task_list%cinfo(ig)%lb_cube,2)
+            WRITE(iu, *) n1, n2
+            WRITE(iu, *) task_list%cinfo(ig)%lb_cube
+         ELSE
+            n1 = 0
+            n2 = 0
+            WRITE(iu, *) n1, n2
+         END IF
+         IF(ASSOCIATED(task_list%cinfo(ig)%ub_cube)) THEN
+            n1 = SIZE(task_list%cinfo(ig)%ub_cube,1)
+            n2 = SIZE(task_list%cinfo(ig)%ub_cube,2)
+            WRITE(iu, *) n1, n2
+            WRITE(iu, *) task_list%cinfo(ig)%ub_cube
+         ELSE
+            n1 = 0
+            n2 = 0
+            WRITE(iu, *) n1, n2
+         END IF
+         IF(ASSOCIATED(task_list%cinfo(ig)%sphere_bounds)) THEN
+            n1 = SIZE(task_list%cinfo(ig)%sphere_bounds,1)
+            n2 = SIZE(task_list%cinfo(ig)%sphere_bounds,2)
+            WRITE(iu, *) n1, n2
+            WRITE(iu, *) task_list%cinfo(ig)%sphere_bounds
+         ELSE
+            n1 = 0
+            n2 = 0
+            WRITE(iu, *) n1, n2
+         END IF
+      END DO
+      WRITE (iu, *) "E> TASK GRID"
+      !
+      WRITE (iu, *) "S> TASK BASIS"
+      ng = SIZE(task_list%basis)
+      WRITE (iu, *) ng
+      DO ig=1,ng
+         IF(ASSOCIATED(task_list%basis(ig)%lmax)) THEN
+            nset = SIZE(task_list%basis(ig)%lmax)
+            WRITE (iu, *) nset
+            WRITE (iu, *) task_list%basis(ig)%first_sgf
+            WRITE (iu, *) task_list%basis(ig)%lmax
+            WRITE (iu, *) task_list%basis(ig)%lmin
+            WRITE (iu, *) task_list%basis(ig)%npgf
+            WRITE (iu, *) task_list%basis(ig)%nsgf
+            n1 = SIZE(task_list%basis(ig)%sphi,1)
+            n2 = SIZE(task_list%basis(ig)%sphi,2)
+            WRITE(iu, *) n1, n2
+            WRITE(iu, *) task_list%basis(ig)%sphi
+            n1 = SIZE(task_list%basis(ig)%zet,1)
+            n2 = SIZE(task_list%basis(ig)%zet,2)
+            WRITE(iu, *) n1, n2
+            WRITE(iu, *) task_list%basis(ig)%zet
+         ELSE
+            nset = 0
+            WRITE (iu, *) nset
+         END IF
+      END DO
+      WRITE (iu, *) "E> TASK BASIS"
+      !
+      WRITE (iu, *) "S> TASK DIST"
+      n1 = SIZE(task_list%dist_ab,1)
+      n2 = SIZE(task_list%dist_ab,2)
+      WRITE(iu, *) n1, n2
+      WRITE(iu, *) task_list%dist_ab
+      n1 = SIZE(task_list%taskstart,1)
+      n2 = SIZE(task_list%taskstart,2)
+      WRITE(iu, *) n1, n2
+      WRITE(iu, *) task_list%taskstart
+      WRITE(iu, *) task_list%taskstop
+      n1 = SIZE(task_list%npairs,1)
+      WRITE(iu, *) n1
+      WRITE(iu, *) task_list%npairs
+      WRITE (iu, *) "E> TASK DIST"
+      !
+      WRITE (iu, *) "S> TASK LIST"
+      n1 = SIZE(task_list%tasks,1)
+      n2 = SIZE(task_list%tasks,2)
+      WRITE(iu, *) n1, n2
+      WRITE(iu, *) task_list%tasks
+      WRITE (iu, *) "E> TASK LIST"
+      !
+      ng = SIZE(spmats)
+      WRITE (iu, *) "S> SPMAT"
+      WRITE (iu, *) ng
+      DO ig = 1, ng
+         spmat => spmats(ig)%spmat
+         WRITE (iu, *) spmat%nrow, spmat%ncol, spmat%nnz
+         ALLOCATE (irs(spmat%nrow))
+         irs = 0
+         DO ir = 1, spmat%nrow
+            IF (ALLOCATED(spmat%rind(ir)%col)) THEN
+               irs(ir) = SIZE(spmat%rind(ir)%col)
+            END IF
+         END DO
+         DO ir = 1, spmat%nrow
+            WRITE (iu, *) irs(ir)
+            IF (irs(ir) > 0) THEN
+               WRITE (iu, *) spmat%rind(ir)%col(1:irs(ir))
+               WRITE (iu, *) spmat%rind(ir)%blk(1:irs(ir))
+            ELSE
+               WRITE (iu, *)
+               WRITE (iu, *)
+            END IF
+         END DO
+         DEALLOCATE (irs)
+         !data
+         DO ir = 1, spmat%nnz
+            mat => spmat%spdata(ir)%mat
+            WRITE (iu, *) SIZE(mat, 1), SIZE(mat, 2)
+            WRITE (iu, *) mat
+         END DO
+      END DO
+      WRITE (iu, *) "E> SPMAT"
+      !
+      ng = SIZE(rs_rho)
+      WRITE (iu, *) "S> RS GRID"
+      WRITE (iu, *) ng
+      DO ig = 1, ng
+         grid => rs_rho(ig)%grid(:, :, :)
+         gridbounds(1, 1) = LBOUND(grid, 1)
+         gridbounds(2, 1) = UBOUND(grid, 1)
+         gridbounds(1, 2) = LBOUND(grid, 2)
+         gridbounds(2, 2) = UBOUND(grid, 2)
+         gridbounds(1, 3) = LBOUND(grid, 3)
+         gridbounds(2, 3) = UBOUND(grid, 3)
+         WRITE (iu, *) gridbounds
+      END DO
+      WRITE (iu, *) "E> RS GRID"
+      !
+      CLOSE (unit=iu)
+
+   END SUBROUTINE write_task_file
 
 END MODULE task_list_methods

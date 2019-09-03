@@ -68,10 +68,15 @@ MODULE task_list_types
       TYPE(rgrid_type), DIMENSION(:), POINTER       :: cinfo => Null()
    END TYPE task_list_type
 
+   TYPE grid_base_type
+      REAL(KIND=dp), DIMENSION(:, :, :), POINTER       :: grid => NULL()
+   END TYPE grid_base_type
+
 ! **************************************************************************************************
 
    PUBLIC :: task_list_type, allocate_task_list, &
-             deallocate_task_list, clear_task_list
+             deallocate_task_list, clear_task_list, &
+             grid_base_type
 
 ! **************************************************************************************************
 

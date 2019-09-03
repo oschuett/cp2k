@@ -59,8 +59,7 @@ MODULE qs_collocate_density
                                               gridlevel_info_type
    USE grid_base_mp,                    ONLY: collocate_pgf_product_rspace,&
                                               grid_collocate_mp
-   USE grid_base_ref,                   ONLY: grid_base_type,&
-                                              grid_collocate_ref
+   USE grid_base_ref,                   ONLY: grid_collocate_ref
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
                                               int_8
@@ -114,8 +113,10 @@ MODULE qs_collocate_density
                                               spmat_put,&
                                               spmat_release,&
                                               spmat_type
-   USE task_list_methods,               ONLY: rs_distribute_matrix
-   USE task_list_types,                 ONLY: task_list_type
+   USE task_list_methods,               ONLY: rs_distribute_matrix,&
+                                              write_task_file
+   USE task_list_types,                 ONLY: grid_base_type,&
+                                              task_list_type
 
 !$ USE OMP_LIB, ONLY: omp_get_max_threads, omp_get_thread_num, omp_get_num_threads
 
@@ -1626,7 +1627,7 @@ CONTAINS
 
       CHARACTER(LEN=default_string_length)               :: my_basis_type
       INTEGER :: code_base, ga_gb_function, handle, iatom, igrid_level, im, img, lmax_global, &
-         my_der_type, my_idir, n1, n2, natoms, nimages, nrow
+         my_der_type, my_idir, my_pos, n1, n2, natoms, nimages, nrow
       INTEGER(kind=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
       INTEGER, DIMENSION(:), POINTER                     :: kind_of
       LOGICAL                                            :: distributed_rs_grids, do_kp, &
@@ -1872,6 +1873,11 @@ CONTAINS
             CALL spmat_allocate(spmats(img)%spmat, nrow, nrow)
             CALL spmat_get_dbcsr(spmats(img)%spmat, deltap(img)%matrix)
          END DO
+         my_pos = rs_rho(1)%rs_grid%desc%my_pos
+         !
+         IF (0 == 1) THEN
+            CALL write_task_file(task_list, spmats, rs_rho_base, my_pos)
+         END IF
          !
          CALL grid_collocate_ref(rs_rho_base, spmats, task_list, &
                                  my_compute_tau, kind_of, posat, &

@@ -10,19 +10,12 @@ MODULE grid_base_ref
    USE spmat_types,                     ONLY: spmat_get,&
                                               spmat_p_type
    USE task_list_methods,               ONLY: int2pair
-   USE task_list_types,                 ONLY: task_list_type
+   USE task_list_types,                 ONLY: grid_base_type,&
+                                              task_list_type
 
    IMPLICIT NONE
 
    PRIVATE
-
-   TYPE pmat_base_type
-      REAL(KIND=dp), DIMENSION(:, :), POINTER          :: mat => NULL()
-   END TYPE pmat_base_type
-
-   TYPE grid_base_type
-      REAL(KIND=dp), DIMENSION(:, :, :), POINTER       :: grid => NULL()
-   END TYPE grid_base_type
 
 !&<
    INTEGER, PARAMETER :: maxfac = 30
@@ -44,8 +37,6 @@ MODULE grid_base_ref
 !&>
 
    PUBLIC :: grid_collocate_ref
-   PUBLIC :: grid_base_type
-   PUBLIC :: pmat_base_type
 
 ! **************************************************************************************************
 
