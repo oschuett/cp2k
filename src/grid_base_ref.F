@@ -5,16 +5,20 @@
 
 ! **************************************************************************************************
 MODULE grid_base_ref
-   USE dbcsr_api,                       ONLY: dbcsr_get_block_p,&
-                                              dbcsr_p_type
    USE kinds,                           ONLY: dp,&
                                               int_8
+   USE spmat_types,                     ONLY: spmat_get,&
+                                              spmat_p_type
    USE task_list_methods,               ONLY: int2pair
    USE task_list_types,                 ONLY: task_list_type
 
    IMPLICIT NONE
 
    PRIVATE
+
+   TYPE pmat_base_type
+      REAL(KIND=dp), DIMENSION(:, :), POINTER          :: mat => NULL()
+   END TYPE pmat_base_type
 
    TYPE grid_base_type
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER       :: grid => NULL()
@@ -41,6 +45,7 @@ MODULE grid_base_ref
 
    PUBLIC :: grid_collocate_ref
    PUBLIC :: grid_base_type
+   PUBLIC :: pmat_base_type
 
 ! **************************************************************************************************
 
@@ -49,17 +54,17 @@ CONTAINS
 ! **************************************************************************************************
 !> \brief ...
 !> \param rs_rho Input/Output
-!> \param deltap input
+!> \param spmats input
 !> \param task_list input
 !> \param compute_tau ...
 !> \param kind_of input
 !> \param posat input
 !> \param lmax_global input
 ! **************************************************************************************************
-   SUBROUTINE grid_collocate_ref(rs_rho, deltap, task_list, compute_tau, kind_of, posat, lmax_global)
+   SUBROUTINE grid_collocate_ref(rs_rho, spmats, task_list, compute_tau, kind_of, posat, lmax_global)
 
       TYPE(grid_base_type), DIMENSION(:)                 :: rs_rho
-      TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: deltap
+      TYPE(spmat_p_type), DIMENSION(:), INTENT(IN)       :: spmats
       TYPE(task_list_type), POINTER                      :: task_list
       LOGICAL, INTENT(IN)                                :: compute_tau
       INTEGER, DIMENSION(:), INTENT(IN)                  :: kind_of
@@ -76,7 +81,7 @@ CONTAINS
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gsphere_bound, gub_cube
-      LOGICAL                                            :: atom_pair_changed, found, use_subpatch
+      LOGICAL                                            :: atom_pair_changed, use_subpatch
       REAL(KIND=dp)                                      :: adh, drmin, max_rad_ga, rab2, radius, &
                                                             rscale, zetp
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rb
@@ -146,9 +151,7 @@ CONTAINS
             zetb => task_list%basis(jkind)%zet
 
             IF (iatom .NE. iatom_old .OR. jatom .NE. jatom_old .OR. img .NE. img_old) THEN
-
                IF (iatom .NE. iatom_old) ra(:) = posat(:, iatom)
-
                IF (iatom <= jatom) THEN
                   brow = iatom
                   bcol = jatom
@@ -156,10 +159,7 @@ CONTAINS
                   brow = jatom
                   bcol = iatom
                END IF
-
-               CALL dbcsr_get_block_p(matrix=deltap(img)%matrix, &
-                                      row=brow, col=bcol, BLOCK=p_block, found=found)
-               IF (.NOT. found) STOP
+               CALL spmat_get(spmats(img)%spmat, brow, bcol, p_block)
                DEALLOCATE (pin)
                n1 = SIZE(p_block, 1)
                n2 = SIZE(p_block, 2)
@@ -170,16 +170,12 @@ CONTAINS
                   ALLOCATE (pin(n2, n1))
                   pin(1:n2, 1:n1) = TRANSPOSE(p_block(1:n1, 1:n2))
                END IF
-
                iatom_old = iatom
                jatom_old = jatom
                img_old = img
                atom_pair_changed = .TRUE.
-
             ELSE
-
                atom_pair_changed = .FALSE.
-
             ENDIF
 
             IF (atom_pair_changed .OR. iset_old .NE. iset .OR. jset_old .NE. jset) THEN

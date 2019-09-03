@@ -48,10 +48,10 @@ MODULE qs_collocate_density
                                               cp_fm_type
    USE cube_utils,                      ONLY: cube_info_type
    USE d3_poly,                         ONLY: poly_cp2k2d3
-   USE dbcsr_api,                       ONLY: dbcsr_copy,&
-                                              dbcsr_get_block_p,&
-                                              dbcsr_p_type,&
-                                              dbcsr_type
+   USE dbcsr_api,                       ONLY: &
+        dbcsr_copy, dbcsr_get_block_p, dbcsr_get_info, dbcsr_iterator_blocks_left, &
+        dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, &
+        dbcsr_p_type, dbcsr_type
    USE external_potential_types,        ONLY: get_potential,&
                                               gth_potential_type
    USE gauss_colloc,                    ONLY: collocGauss
@@ -109,6 +109,11 @@ MODULE qs_collocate_density
                                               rs_grid_zero,&
                                               rs_pw_transfer
    USE rs_pw_interface,                 ONLY: density_rs2pw
+   USE spmat_types,                     ONLY: spmat_allocate,&
+                                              spmat_p_type,&
+                                              spmat_put,&
+                                              spmat_release,&
+                                              spmat_type
    USE task_list_methods,               ONLY: rs_distribute_matrix
    USE task_list_types,                 ONLY: task_list_type
 
@@ -1620,10 +1625,8 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       CHARACTER(LEN=default_string_length)               :: my_basis_type
-      INTEGER                                            :: code_base, ga_gb_function, handle, &
-                                                            iatom, igrid_level, im, img, &
-                                                            lmax_global, my_der_type, my_idir, n1, &
-                                                            n2, natoms, nimages
+      INTEGER :: code_base, ga_gb_function, handle, iatom, igrid_level, im, img, lmax_global, &
+         my_der_type, my_idir, n1, n2, natoms, nimages, nrow
       INTEGER(kind=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
       INTEGER, DIMENSION(:), POINTER                     :: kind_of
       LOGICAL                                            :: distributed_rs_grids, do_kp, &
@@ -1642,6 +1645,7 @@ CONTAINS
       TYPE(realspace_grid_desc_p_type), DIMENSION(:), &
          POINTER                                         :: rs_descs
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_rho
+      TYPE(spmat_p_type), ALLOCATABLE, DIMENSION(:)      :: spmats
       TYPE(task_list_type), POINTER                      :: task_list, task_list_soft
 
       CALL timeset(routineN, handle)
@@ -1862,9 +1866,21 @@ CONTAINS
          DO igrid_level = 1, gridlevel_info%ngrid_levels
             rs_rho_base(igrid_level)%grid => rs_rho(igrid_level)%rs_grid%r(:, :, :)
          END DO
-         CALL grid_collocate_ref(rs_rho_base, deltap, task_list, &
+         CALL dbcsr_get_info(deltap(1)%matrix, nblkrows_total=nrow)
+         ALLOCATE (spmats(nimages))
+         DO img = 1, nimages
+            CALL spmat_allocate(spmats(img)%spmat, nrow, nrow)
+            CALL spmat_get_dbcsr(spmats(img)%spmat, deltap(img)%matrix)
+         END DO
+         !
+         CALL grid_collocate_ref(rs_rho_base, spmats, task_list, &
                                  my_compute_tau, kind_of, posat, &
                                  lmax_global)
+         !
+         DO img = 1, nimages
+            CALL spmat_release(spmats(img)%spmat)
+         END DO
+         DEALLOCATE (spmats)
          DEALLOCATE (rs_rho_base)
       CASE (1)
          CALL grid_collocate_mp(rs_rho, deltap, task_list, cube_info, cell, &
@@ -1893,6 +1909,28 @@ CONTAINS
       CALL timestop(handle)
 
    END SUBROUTINE calculate_rho_elec
+
+! **************************************************************************************************
+!> \brief ...
+!> \param spmat ...
+!> \param dbmat ...
+! **************************************************************************************************
+   SUBROUTINE spmat_get_dbcsr(spmat, dbmat)
+      TYPE(spmat_type), INTENT(INOUT)                    :: spmat
+      TYPE(dbcsr_type), INTENT(IN)                       :: dbmat
+
+      INTEGER                                            :: blk, icol, irow
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dblock
+      TYPE(dbcsr_iterator_type)                          :: iter
+
+      CALL dbcsr_iterator_start(iter, dbmat)
+      DO WHILE (dbcsr_iterator_blocks_left(iter))
+         CALL dbcsr_iterator_next_block(iter, irow, icol, dblock, blk)
+         CALL spmat_put(spmat, irow, icol, dblock)
+      ENDDO
+      CALL dbcsr_iterator_stop(iter)
+
+   END SUBROUTINE spmat_get_dbcsr
 
 ! **************************************************************************************************
 !> \brief low level collocation of primitive gaussian functions in g-space
