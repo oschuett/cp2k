@@ -2820,17 +2820,21 @@ CONTAINS
 !> \param task_list ...
 !> \param spmats ...
 !> \param rs_rho ...
+!> \param kind_of ...
+!> \param posat ...
 !> \param mp ...
 ! **************************************************************************************************
-   SUBROUTINE write_task_file(task_list, spmats, rs_rho, mp)
+   SUBROUTINE write_task_file(task_list, spmats, rs_rho, kind_of, posat, mp)
       TYPE(task_list_type), POINTER                      :: task_list
       TYPE(spmat_p_type), DIMENSION(:), INTENT(IN), &
          TARGET                                          :: spmats
       TYPE(grid_base_type), DIMENSION(:), INTENT(IN)     :: rs_rho
+      INTEGER, DIMENSION(:), INTENT(IN)                  :: kind_of
+      REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: posat
       INTEGER, INTENT(IN)                                :: mp
 
       CHARACTER(LEN=default_string_length)               :: fname, proc
-      INTEGER                                            :: ig, ir, iu, ng, n1, n2, nset
+      INTEGER                                            :: ig, ir, iu, n1, n2, ng, nset
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: irs
       INTEGER, DIMENSION(2, 3)                           :: gridbounds
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: mat
@@ -2858,44 +2862,44 @@ CONTAINS
       WRITE (iu, *) "S> TASK GRID"
       ng = SIZE(task_list%cinfo)
       WRITE (iu, *) ng
-      DO ig=1,ng
-         WRITE(iu, *) task_list%cinfo(ig)%dh
-         WRITE(iu, *) task_list%cinfo(ig)%dh_inv
-         WRITE(iu, *) task_list%cinfo(ig)%perd
-         WRITE(iu, *) task_list%cinfo(ig)%npts
-         WRITE(iu, *) task_list%cinfo(ig)%lb_grid
-         WRITE(iu, *) task_list%cinfo(ig)%drmin
-         WRITE(iu, *) task_list%cinfo(ig)%max_radius
-         WRITE(iu, *) task_list%cinfo(ig)%max_rad_ga
-         IF(ASSOCIATED(task_list%cinfo(ig)%lb_cube)) THEN
-            n1 = SIZE(task_list%cinfo(ig)%lb_cube,1)
-            n2 = SIZE(task_list%cinfo(ig)%lb_cube,2)
-            WRITE(iu, *) n1, n2
-            WRITE(iu, *) task_list%cinfo(ig)%lb_cube
+      DO ig = 1, ng
+         WRITE (iu, *) task_list%cinfo(ig)%dh
+         WRITE (iu, *) task_list%cinfo(ig)%dh_inv
+         WRITE (iu, *) task_list%cinfo(ig)%perd
+         WRITE (iu, *) task_list%cinfo(ig)%npts
+         WRITE (iu, *) task_list%cinfo(ig)%lb_grid
+         WRITE (iu, *) task_list%cinfo(ig)%drmin
+         WRITE (iu, *) task_list%cinfo(ig)%max_radius
+         WRITE (iu, *) task_list%cinfo(ig)%max_rad_ga
+         IF (ASSOCIATED(task_list%cinfo(ig)%lb_cube)) THEN
+            n1 = SIZE(task_list%cinfo(ig)%lb_cube, 1)
+            n2 = SIZE(task_list%cinfo(ig)%lb_cube, 2)
+            WRITE (iu, *) n1, n2
+            WRITE (iu, *) task_list%cinfo(ig)%lb_cube
          ELSE
             n1 = 0
             n2 = 0
-            WRITE(iu, *) n1, n2
+            WRITE (iu, *) n1, n2
          END IF
-         IF(ASSOCIATED(task_list%cinfo(ig)%ub_cube)) THEN
-            n1 = SIZE(task_list%cinfo(ig)%ub_cube,1)
-            n2 = SIZE(task_list%cinfo(ig)%ub_cube,2)
-            WRITE(iu, *) n1, n2
-            WRITE(iu, *) task_list%cinfo(ig)%ub_cube
+         IF (ASSOCIATED(task_list%cinfo(ig)%ub_cube)) THEN
+            n1 = SIZE(task_list%cinfo(ig)%ub_cube, 1)
+            n2 = SIZE(task_list%cinfo(ig)%ub_cube, 2)
+            WRITE (iu, *) n1, n2
+            WRITE (iu, *) task_list%cinfo(ig)%ub_cube
          ELSE
             n1 = 0
             n2 = 0
-            WRITE(iu, *) n1, n2
+            WRITE (iu, *) n1, n2
          END IF
-         IF(ASSOCIATED(task_list%cinfo(ig)%sphere_bounds)) THEN
-            n1 = SIZE(task_list%cinfo(ig)%sphere_bounds,1)
-            n2 = SIZE(task_list%cinfo(ig)%sphere_bounds,2)
-            WRITE(iu, *) n1, n2
-            WRITE(iu, *) task_list%cinfo(ig)%sphere_bounds
+         IF (ASSOCIATED(task_list%cinfo(ig)%sphere_bounds)) THEN
+            n1 = SIZE(task_list%cinfo(ig)%sphere_bounds, 1)
+            n2 = SIZE(task_list%cinfo(ig)%sphere_bounds, 2)
+            WRITE (iu, *) n1, n2
+            WRITE (iu, *) task_list%cinfo(ig)%sphere_bounds
          ELSE
             n1 = 0
             n2 = 0
-            WRITE(iu, *) n1, n2
+            WRITE (iu, *) n1, n2
          END IF
       END DO
       WRITE (iu, *) "E> TASK GRID"
@@ -2903,8 +2907,8 @@ CONTAINS
       WRITE (iu, *) "S> TASK BASIS"
       ng = SIZE(task_list%basis)
       WRITE (iu, *) ng
-      DO ig=1,ng
-         IF(ASSOCIATED(task_list%basis(ig)%lmax)) THEN
+      DO ig = 1, ng
+         IF (ASSOCIATED(task_list%basis(ig)%lmax)) THEN
             nset = SIZE(task_list%basis(ig)%lmax)
             WRITE (iu, *) nset
             WRITE (iu, *) task_list%basis(ig)%first_sgf
@@ -2912,14 +2916,14 @@ CONTAINS
             WRITE (iu, *) task_list%basis(ig)%lmin
             WRITE (iu, *) task_list%basis(ig)%npgf
             WRITE (iu, *) task_list%basis(ig)%nsgf
-            n1 = SIZE(task_list%basis(ig)%sphi,1)
-            n2 = SIZE(task_list%basis(ig)%sphi,2)
-            WRITE(iu, *) n1, n2
-            WRITE(iu, *) task_list%basis(ig)%sphi
-            n1 = SIZE(task_list%basis(ig)%zet,1)
-            n2 = SIZE(task_list%basis(ig)%zet,2)
-            WRITE(iu, *) n1, n2
-            WRITE(iu, *) task_list%basis(ig)%zet
+            n1 = SIZE(task_list%basis(ig)%sphi, 1)
+            n2 = SIZE(task_list%basis(ig)%sphi, 2)
+            WRITE (iu, *) n1, n2
+            WRITE (iu, *) task_list%basis(ig)%sphi
+            n1 = SIZE(task_list%basis(ig)%zet, 1)
+            n2 = SIZE(task_list%basis(ig)%zet, 2)
+            WRITE (iu, *) n1, n2
+            WRITE (iu, *) task_list%basis(ig)%zet
          ELSE
             nset = 0
             WRITE (iu, *) nset
@@ -2928,25 +2932,25 @@ CONTAINS
       WRITE (iu, *) "E> TASK BASIS"
       !
       WRITE (iu, *) "S> TASK DIST"
-      n1 = SIZE(task_list%dist_ab,1)
-      n2 = SIZE(task_list%dist_ab,2)
-      WRITE(iu, *) n1, n2
-      WRITE(iu, *) task_list%dist_ab
-      n1 = SIZE(task_list%taskstart,1)
-      n2 = SIZE(task_list%taskstart,2)
-      WRITE(iu, *) n1, n2
-      WRITE(iu, *) task_list%taskstart
-      WRITE(iu, *) task_list%taskstop
-      n1 = SIZE(task_list%npairs,1)
-      WRITE(iu, *) n1
-      WRITE(iu, *) task_list%npairs
+      n1 = SIZE(task_list%dist_ab, 1)
+      n2 = SIZE(task_list%dist_ab, 2)
+      WRITE (iu, *) n1, n2
+      WRITE (iu, *) task_list%dist_ab
+      n1 = SIZE(task_list%taskstart, 1)
+      n2 = SIZE(task_list%taskstart, 2)
+      WRITE (iu, *) n1, n2
+      WRITE (iu, *) task_list%taskstart
+      WRITE (iu, *) task_list%taskstop
+      n1 = SIZE(task_list%npairs, 1)
+      WRITE (iu, *) n1
+      WRITE (iu, *) task_list%npairs
       WRITE (iu, *) "E> TASK DIST"
       !
       WRITE (iu, *) "S> TASK LIST"
-      n1 = SIZE(task_list%tasks,1)
-      n2 = SIZE(task_list%tasks,2)
-      WRITE(iu, *) n1, n2
-      WRITE(iu, *) task_list%tasks
+      n1 = SIZE(task_list%tasks, 1)
+      n2 = SIZE(task_list%tasks, 2)
+      WRITE (iu, *) n1, n2
+      WRITE (iu, *) task_list%tasks
       WRITE (iu, *) "E> TASK LIST"
       !
       ng = SIZE(spmats)
@@ -2981,6 +2985,13 @@ CONTAINS
          END DO
       END DO
       WRITE (iu, *) "E> SPMAT"
+      !
+      ng = SIZE(kind_of)
+      WRITE (iu, *) "S> ATOMS"
+      WRITE (iu, *) ng
+      WRITE (iu, *) kind_of
+      WRITE (iu, *) posat
+      WRITE (iu, *) "E> ATOMS"
       !
       ng = SIZE(rs_rho)
       WRITE (iu, *) "S> RS GRID"

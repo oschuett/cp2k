@@ -1875,8 +1875,8 @@ CONTAINS
          END DO
          my_pos = rs_rho(1)%rs_grid%desc%my_pos
          !
-         IF (0 == 1) THEN
-            CALL write_task_file(task_list, spmats, rs_rho_base, my_pos)
+         IF (0 == 0) THEN
+            CALL write_task_file(task_list, spmats, rs_rho_base, kind_of, posat, my_pos)
          END IF
          !
          CALL grid_collocate_ref(rs_rho_base, spmats, task_list, &
