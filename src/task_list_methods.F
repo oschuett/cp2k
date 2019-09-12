@@ -837,7 +837,9 @@ CONTAINS
          dist_ab(2, ntasks-added_tasks+j) = rab(2)
          dist_ab(3, ntasks-added_tasks+j) = rab(3)
 
-         dist_ab(4, ntasks-added_tasks+j) = radius
+         IF (SIZE(dist_ab, 1) > 3) THEN
+            dist_ab(4, ntasks-added_tasks+j) = radius
+         ENDIF
 
       ENDDO
 
