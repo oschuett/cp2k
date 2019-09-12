@@ -232,7 +232,7 @@ CONTAINS
                jset_old = jset
             ENDIF
 
-            rab(:) = dist_ab(:, itask)
+            rab(1:3) = dist_ab(1:3, itask)
             rab2 = rab(1)*rab(1)+rab(2)*rab(2)+rab(3)*rab(3)
             rb(:) = ra(:)+rab(:)
             zetp = zeta(ipgf, iset)+zetb(jpgf, jset)
