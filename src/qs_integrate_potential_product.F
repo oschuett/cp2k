@@ -40,8 +40,7 @@ MODULE qs_integrate_potential_product
                                               dbcsr_p_type,&
                                               dbcsr_type
    USE gaussian_gridlevels,             ONLY: gridlevel_info_type
-   USE grid_ibase_mp,                   ONLY: grid_integrate_mp
-   USE grid_ibase_ref,                  ONLY: grid_integrate_ref
+   USE grid_api,                        ONLY: grid_integrate
    USE input_constants,                 ONLY: do_admm_exch_scaling_merlot
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
@@ -141,9 +140,8 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       CHARACTER(len=default_string_length)               :: my_basis_type
-      INTEGER                                            :: code_base, handle, i, iatom, &
-                                                            igrid_level, img, natom, nimages, &
-                                                            offs_dv
+      INTEGER                                            :: handle, i, iatom, igrid_level, img, &
+                                                            natom, nimages, offs_dv
       INTEGER(KIND=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind, kind_of
       LOGICAL :: distributed_grids, do_kp, h_duplicated, map_consistent, my_compute_tau, &
@@ -355,21 +353,9 @@ CONTAINS
                                    natom, nimages, scatter=.TRUE.)
       ENDIF
 
-      code_base = 0
-      SELECT CASE (code_base)
-      CASE (0)
-         CALL grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, cell, &
-                                 eps_gvg_rspace, admm_scal_fac, &
-                                 my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
-                                 calculate_forces, force, use_virial, virial)
-      CASE (1)
-         CALL grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, cell, &
-                                eps_gvg_rspace, admm_scal_fac, &
-                                my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
-                                calculate_forces, force, use_virial, virial)
-      CASE DEFAULT
-         CPABORT("NA")
-      END SELECT
+      CALL grid_integrate(rs_v, dhmat, deltap, task_list, cube_info, cell, eps_gvg_rspace, &
+                          admm_scal_fac, my_compute_tau, pab_required, map_consistent, atom_of_kind, &
+                          kind_of, posat, calculate_forces, force, use_virial, virial)
 
       IF (h_duplicated) THEN
          ! Reconstruct H matrix if using distributed RS grids
