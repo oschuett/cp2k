@@ -9,8 +9,8 @@ MODULE grid_base_ref
                                               int_8
    USE spmat_types,                     ONLY: spmat_get,&
                                               spmat_p_type
-   USE task_list_methods,               ONLY: int2pair
    USE task_list_types,                 ONLY: grid_base_type,&
+                                              int2pair,&
                                               task_list_type
 
    IMPLICIT NONE

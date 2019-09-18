@@ -119,9 +119,9 @@ MODULE qs_linres_current
         rs_grid_retain, rs_grid_zero
    USE rs_pw_interface,                 ONLY: density_rs2pw
    USE task_list_methods,               ONLY: distribute_tasks,&
-                                              int2pair,&
                                               rs_distribute_matrix,&
                                               task_list_inner_loop
+   USE task_list_types,                 ONLY: int2pair
 #include "./base/base_uses.f90"
 
    IMPLICIT NONE

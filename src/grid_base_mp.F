@@ -27,8 +27,8 @@ MODULE grid_base_mp
         prepare_diadib, prepare_diiadiib, prepare_dijadijb
    USE realspace_grid_types,            ONLY: realspace_grid_p_type,&
                                               realspace_grid_type
-   USE task_list_methods,               ONLY: int2pair
-   USE task_list_types,                 ONLY: task_list_type
+   USE task_list_types,                 ONLY: int2pair,&
+                                              task_list_type
 
 !$ USE OMP_LIB, ONLY: omp_get_max_threads, omp_get_thread_num, omp_get_num_threads
 

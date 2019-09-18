@@ -18,8 +18,8 @@ MODULE grid_ibase_ref
    USE orbital_pointers,                ONLY: ncoset
    USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace
    USE realspace_grid_types,            ONLY: realspace_grid_p_type
-   USE task_list_methods,               ONLY: int2pair
-   USE task_list_types,                 ONLY: task_list_type
+   USE task_list_types,                 ONLY: int2pair,&
+                                              task_list_type
    USE virial_types,                    ONLY: virial_type
 #include "./base/base_uses.f90"
 
