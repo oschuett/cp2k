@@ -54,11 +54,12 @@ MODULE qs_collocate_density
                                               dbcsr_type
    USE external_potential_types,        ONLY: get_potential,&
                                               gth_potential_type
-   USE gauss_colloc,                    ONLY: collocGauss
    USE gaussian_gridlevels,             ONLY: gaussian_gridlevel,&
                                               gridlevel_info_type
-   USE grid_api,                        ONLY: grid_collocate
-   USE grid_base_mp,                    ONLY: collocate_pgf_product_rspace
+   USE grid_api,                        ONLY: &
+        FUNC_AB, FUNC_ADBmDAB, FUNC_ARB, FUNC_ARDBmDARB, FUNC_DABpADB, FUNC_DADB, FUNC_DER, &
+        FUNC_DX, FUNC_DXDX, FUNC_DXDY, FUNC_DY, FUNC_DYDY, FUNC_DYDZ, FUNC_DZ, FUNC_DZDX, &
+        FUNC_DZDZ, collocGauss, collocate_pgf_product_rspace, grid_collocate
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
                                               int_8
@@ -95,9 +96,6 @@ MODULE qs_collocate_density
                                               qs_kind_type
    USE qs_ks_types,                     ONLY: get_ks_env,&
                                               qs_ks_env_type
-   USE qs_modify_pab_block,             ONLY: &
-        FUNC_AB, FUNC_ADBmDAB, FUNC_ARB, FUNC_ARDBmDARB, FUNC_DABpADB, FUNC_DADB, FUNC_DER, &
-        FUNC_DX, FUNC_DXDX, FUNC_DXDY, FUNC_DY, FUNC_DYDY, FUNC_DYDZ, FUNC_DZ, FUNC_DZDX, FUNC_DZDZ
    USE realspace_grid_types,            ONLY: realspace_grid_desc_p_type,&
                                               realspace_grid_p_type,&
                                               realspace_grid_type,&

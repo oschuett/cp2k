@@ -17,14 +17,19 @@ MODULE grid_api
                                               dbcsr_iterator_type,&
                                               dbcsr_p_type,&
                                               dbcsr_type
-   USE grid_base_mp,                    ONLY: grid_collocate_mp
+   USE gauss_colloc,                    ONLY: collocGauss
+   USE grid_base_mp,                    ONLY: collocate_pgf_product_rspace,&
+                                              grid_collocate_mp
    USE grid_base_ref,                   ONLY: grid_collocate_ref
    USE grid_ibase_mp,                   ONLY: grid_integrate_mp
    USE grid_ibase_ref,                  ONLY: grid_integrate_ref
    USE kinds,                           ONLY: default_string_length,&
                                               dp
-   USE qs_modify_pab_block,             ONLY: FUNC_AB,&
-                                              FUNC_DADB
+   USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace,&
+                                              integrate_pgf_rspace
+   USE qs_modify_pab_block,             ONLY: &
+        FUNC_AB, FUNC_ADBmDAB, FUNC_ARB, FUNC_ARDBmDARB, FUNC_DABpADB, FUNC_DADB, FUNC_DER, &
+        FUNC_DX, FUNC_DXDX, FUNC_DXDY, FUNC_DY, FUNC_DYDY, FUNC_DYDZ, FUNC_DZ, FUNC_DZDX, FUNC_DZDZ
    USE realspace_grid_types,            ONLY: realspace_grid_p_type
    USE spmat_types,                     ONLY: spmat_allocate,&
                                               spmat_p_type,&
@@ -46,6 +51,19 @@ MODULE grid_api
 
    PUBLIC :: grid_driver_openmp, grid_driver_reference
    PUBLIC :: grid_collocate, grid_integrate
+
+   ! from gauss_colloc
+   PUBLIC :: collocGauss
+
+   ! from grid_base_mp
+   PUBLIC :: collocate_pgf_product_rspace
+
+   ! from qs_integrate_potential_low
+   PUBLIC :: integrate_pgf_product_rspace, integrate_pgf_rspace
+
+   ! from qs_modify_pab_block
+   PUBLIC :: FUNC_AB, FUNC_ADBmDAB, FUNC_ARB, FUNC_ARDBmDARB, FUNC_DABpADB, FUNC_DADB, FUNC_DER, &
+             FUNC_DX, FUNC_DXDX, FUNC_DXDY, FUNC_DY, FUNC_DYDY, FUNC_DYDZ, FUNC_DZ, FUNC_DZDX, FUNC_DZDZ
 
 ! TODO: This is just to conveniently test both backend via the CI.
 #if defined(_OPENMP)

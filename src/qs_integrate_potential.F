@@ -18,7 +18,7 @@
 !
 ! **************************************************************************************************
 MODULE qs_integrate_potential
-   USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace,&
+   USE grid_api,                        ONLY: integrate_pgf_product_rspace,&
                                               integrate_pgf_rspace
    USE qs_integrate_potential_product,  ONLY: integrate_v_rspace
    USE qs_integrate_potential_single,   ONLY: integrate_ppl_rspace,&
