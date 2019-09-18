@@ -18,7 +18,6 @@ MODULE grid_ibase_mp
    USE kinds,                           ONLY: dp,&
                                               int_8
    USE orbital_pointers,                ONLY: ncoset
-   USE qs_force_types,                  ONLY: qs_force_type
    USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace
    USE realspace_grid_types,            ONLY: realspace_grid_p_type
    USE task_list_methods,               ONLY: int2pair
@@ -54,7 +53,6 @@ CONTAINS
 !> \param my_compute_tau ...
 !> \param pab_required ...
 !> \param map_consistent ...
-!> \param atom_of_kind ...
 !> \param kind_of ...
 !> \param posat ...
 !> \param calculate_forces ...
@@ -64,7 +62,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, cell, &
                                 eps_gvg_rspace, admm_scal_fac, &
-                                my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
+                                my_compute_tau, pab_required, map_consistent, kind_of, posat, &
                                 calculate_forces, force, use_virial, virial)
 
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_v
@@ -75,20 +73,20 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                          :: eps_gvg_rspace, admm_scal_fac
       LOGICAL, INTENT(IN)                                :: my_compute_tau, pab_required, &
                                                             map_consistent
-      INTEGER, DIMENSION(:), INTENT(IN)                  :: atom_of_kind, kind_of
+      INTEGER, DIMENSION(:), INTENT(IN)                  :: kind_of
       REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: posat
       LOGICAL, INTENT(IN)                                :: calculate_forces
-      TYPE(qs_force_type), DIMENSION(:), POINTER         :: force
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: force
       LOGICAL, INTENT(IN)                                :: use_virial
       TYPE(virial_type), POINTER                         :: virial
 
       CHARACTER(len=*), PARAMETER :: routineN = 'grid_integrate_mp', &
          routineP = moduleN//':'//routineN
 
-      INTEGER :: atom_a, atom_b, bcol, brow, iatom, igrid_level, ikind, ilevel, img, ipair, ipgf, &
-         ipgf_new, iset, iset_new, iset_old, itask, ithread, jatom, jkind, jpgf, jpgf_new, jset, &
-         jset_new, jset_old, maxco, maxpgf, maxset, maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, &
-         ncob, nimages, nthread, sgfa, sgfb
+      INTEGER :: bcol, brow, iatom, igrid_level, ikind, ilevel, img, ipair, ipgf, ipgf_new, iset, &
+         iset_new, iset_old, itask, ithread, jatom, jkind, jpgf, jpgf_new, jset, jset_new, &
+         jset_old, maxco, maxpgf, maxset, maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, ncob, &
+         nimages, nthread, sgfa, sgfb
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
@@ -120,13 +118,13 @@ CONTAINS
 !$OMP SHARED(tasks,natom,maxset), &
 !$OMP SHARED(maxco,maxsgf_set,maxpgf,dhmat,deltap,use_virial,admm_scal_fac), &
 !$OMP SHARED(pab_required,calculate_forces,ncoset,rs_v,cube_info,my_compute_tau), &
-!$OMP SHARED(map_consistent,eps_gvg_rspace,force,virial,cell,posat,kind_of,atom_of_kind,dist_ab), &
+!$OMP SHARED(map_consistent,eps_gvg_rspace,force,virial,cell,posat,kind_of,dist_ab), &
 !$OMP SHARED(task_list,nthread,nimages), &
 !$OMP PRIVATE(ithread,work,hab,pab,iset_old,jset_old), &
 !$OMP PRIVATE(iatom,jatom,iset,jset,ikind,jkind,ilevel,ipgf,jpgf), &
 !$OMP PRIVATE(img,brow,bcol,first_sgfa,la_max,la_min,npgfa,nsgfa), &
 !$OMP PRIVATE(sphi_a,zeta,first_sgfb,lb_max,lb_min,npgfb), &
-!$OMP PRIVATE(nsgfb,sphi_b,zetb,found,atom_a,atom_b), &
+!$OMP PRIVATE(nsgfb,sphi_b,zetb,found), &
 !$OMP PRIVATE(force_a,force_b,my_virial_a,my_virial_b,atom_pair_changed,h_block), &
 !$OMP PRIVATE(p_block,ncoa,sgfa,ncob,sgfb,rab,rab2,ra,rb,zetp,dab,igrid_level), &
 !$OMP PRIVATE(na1,na2,nb1,nb2,use_subpatch,rab_inv,new_set_pair_coming,atom_pair_done), &
@@ -210,23 +208,14 @@ CONTAINS
                   CPASSERT(found)
                END IF
 
-               IF (calculate_forces) THEN
-                  atom_a = atom_of_kind(iatom)
-                  atom_b = atom_of_kind(jatom)
-                  force_a(:) = 0.0_dp
-                  force_b(:) = 0.0_dp
-               ENDIF
-               IF (use_virial) THEN
-                  my_virial_a = 0.0_dp
-                  my_virial_b = 0.0_dp
-               ENDIF
-
+               force_a(:) = 0.0_dp
+               force_b(:) = 0.0_dp
+               my_virial_a = 0.0_dp
+               my_virial_b = 0.0_dp
                atom_pair_changed = .TRUE.
-
             ELSE
 
                atom_pair_changed = .FALSE.
-
             ENDIF
 
             IF (atom_pair_changed .OR. iset_old .NE. iset .OR. jset_old .NE. jset) THEN
@@ -398,13 +387,9 @@ CONTAINS
                   scalef = 2.0_dp
                END IF
                IF (calculate_forces) THEN
-                  force(ikind)%rho_elec(:, atom_a) = &
-                     force(ikind)%rho_elec(:, atom_a)+scalef*admm_scal_fac*force_a(:)
-                  force(jkind)%rho_elec(:, atom_b) = &
-                     force(jkind)%rho_elec(:, atom_b)+scalef*admm_scal_fac*force_b(:)
-               ENDIF
-               IF (use_virial) THEN
-                  IF (use_virial .AND. calculate_forces) THEN
+                  force(:, iatom) = force(:, iatom)+scalef*admm_scal_fac*force_a(:)
+                  force(:, jatom) = force(:, jatom)+scalef*admm_scal_fac*force_b(:)
+                  IF (use_virial) THEN
                      virial%pv_virial = virial%pv_virial+scalef*admm_scal_fac*my_virial_a
                      virial%pv_virial = virial%pv_virial+scalef*admm_scal_fac*my_virial_b
                   END IF

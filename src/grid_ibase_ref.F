@@ -16,7 +16,6 @@ MODULE grid_ibase_ref
    USE kinds,                           ONLY: dp,&
                                               int_8
    USE orbital_pointers,                ONLY: ncoset
-   USE qs_force_types,                  ONLY: qs_force_type
    USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace
    USE realspace_grid_types,            ONLY: realspace_grid_p_type
    USE task_list_methods,               ONLY: int2pair
@@ -49,7 +48,6 @@ CONTAINS
 !> \param my_compute_tau ...
 !> \param pab_required ...
 !> \param map_consistent ...
-!> \param atom_of_kind ...
 !> \param kind_of ...
 !> \param posat ...
 !> \param calculate_forces ...
@@ -59,7 +57,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, cell, &
                                  eps_gvg_rspace, admm_scal_fac, &
-                                 my_compute_tau, pab_required, map_consistent, atom_of_kind, kind_of, posat, &
+                                 my_compute_tau, pab_required, map_consistent, kind_of, posat, &
                                  calculate_forces, force, use_virial, virial)
 
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_v
@@ -70,20 +68,19 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                          :: eps_gvg_rspace, admm_scal_fac
       LOGICAL, INTENT(IN)                                :: my_compute_tau, pab_required, &
                                                             map_consistent
-      INTEGER, DIMENSION(:), INTENT(IN)                  :: atom_of_kind, kind_of
+      INTEGER, DIMENSION(:), INTENT(IN)                  :: kind_of
       REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: posat
       LOGICAL, INTENT(IN)                                :: calculate_forces
-      TYPE(qs_force_type), DIMENSION(:), POINTER         :: force
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: force
       LOGICAL, INTENT(IN)                                :: use_virial
       TYPE(virial_type), POINTER                         :: virial
 
       CHARACTER(len=*), PARAMETER :: routineN = 'grid_integrate_ref', &
          routineP = moduleN//':'//routineN
 
-      INTEGER :: atom_a, atom_b, bcol, brow, iatom, igrid_level, ikind, ilevel, img, ipair, ipgf, &
-         ipgf_new, iset, iset_new, iset_old, itask, jatom, jkind, jpgf, jpgf_new, jset, jset_new, &
-         jset_old, maxco, maxpgf, maxset, maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, ncob, &
-         nimages, sgfa, sgfb
+      INTEGER :: bcol, brow, iatom, igrid_level, ikind, ilevel, img, ipair, ipgf, ipgf_new, iset, &
+         iset_new, iset_old, itask, jatom, jkind, jpgf, jpgf_new, jset, jset_new, jset_old, maxco, &
+         maxpgf, maxset, maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, ncob, nimages, sgfa, sgfb
       INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
@@ -175,23 +172,14 @@ CONTAINS
                   CPASSERT(found)
                END IF
 
-               IF (calculate_forces) THEN
-                  atom_a = atom_of_kind(iatom)
-                  atom_b = atom_of_kind(jatom)
-                  force_a(:) = 0.0_dp
-                  force_b(:) = 0.0_dp
-               ENDIF
-               IF (use_virial) THEN
-                  my_virial_a = 0.0_dp
-                  my_virial_b = 0.0_dp
-               ENDIF
-
+               force_a(:) = 0.0_dp
+               force_b(:) = 0.0_dp
+               my_virial_a = 0.0_dp
+               my_virial_b = 0.0_dp
                atom_pair_changed = .TRUE.
-
             ELSE
 
                atom_pair_changed = .FALSE.
-
             ENDIF
 
             IF (atom_pair_changed .OR. iset_old .NE. iset .OR. jset_old .NE. jset) THEN
@@ -356,13 +344,9 @@ CONTAINS
                   scalef = 2.0_dp
                END IF
                IF (calculate_forces) THEN
-                  force(ikind)%rho_elec(:, atom_a) = &
-                     force(ikind)%rho_elec(:, atom_a)+scalef*admm_scal_fac*force_a(:)
-                  force(jkind)%rho_elec(:, atom_b) = &
-                     force(jkind)%rho_elec(:, atom_b)+scalef*admm_scal_fac*force_b(:)
-               ENDIF
-               IF (use_virial) THEN
-                  IF (use_virial .AND. calculate_forces) THEN
+                  force(:, iatom) = force(:, iatom)+scalef*admm_scal_fac*force_a(:)
+                  force(:, jatom) = force(:, jatom)+scalef*admm_scal_fac*force_b(:)
+                  IF (use_virial) THEN
                      virial%pv_virial = virial%pv_virial+scalef*admm_scal_fac*my_virial_a
                      virial%pv_virial = virial%pv_virial+scalef*admm_scal_fac*my_virial_b
                   END IF

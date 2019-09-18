@@ -28,8 +28,7 @@
 ! **************************************************************************************************
 MODULE qs_integrate_potential_product
    USE admm_types,                      ONLY: admm_type
-   USE atomic_kind_types,               ONLY: atomic_kind_type,&
-                                              get_atomic_kind_set
+   USE atomic_kind_types,               ONLY: atomic_kind_type
    USE cell_types,                      ONLY: cell_type,&
                                               pbc
    USE cp_control_types,                ONLY: dft_control_type
@@ -51,7 +50,8 @@ MODULE qs_integrate_potential_product
    USE pw_types,                        ONLY: pw_p_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
-   USE qs_force_types,                  ONLY: qs_force_type
+   USE qs_force_types,                  ONLY: add_qs_force,&
+                                              qs_force_type
    USE realspace_grid_types,            ONLY: realspace_grid_desc_p_type,&
                                               realspace_grid_p_type,&
                                               rs_grid_release,&
@@ -143,11 +143,12 @@ CONTAINS
       INTEGER                                            :: handle, i, iatom, igrid_level, img, &
                                                             natom, nimages, offs_dv
       INTEGER(KIND=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
-      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind, kind_of
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: kind_of
       LOGICAL :: distributed_grids, do_kp, h_duplicated, map_consistent, my_compute_tau, &
          my_force_adm, my_gapw, p_duplicated, pab_required, scatter, use_virial
       REAL(KIND=dp)                                      :: admm_scal_fac, eps_gvg_rspace
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:, :)        :: posat
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: force_rho_elec
       TYPE(admm_type), POINTER                           :: admm_env
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(cell_type), POINTER                           :: cell
@@ -177,7 +178,7 @@ CONTAINS
          CPASSERT(PRESENT(hmat_kp))
       END IF
 
-      NULLIFY (pw_env, rs_descs, admm_env)
+      NULLIFY (pw_env, rs_descs, admm_env, force_rho_elec)
 
       offs_dv = 0
 
@@ -277,8 +278,8 @@ CONTAINS
          posat(:, iatom) = pbc(particle_set(iatom)%r, cell)
       END DO
       IF (calculate_forces) THEN
-         ALLOCATE (atom_of_kind(natom))
-         CALL get_atomic_kind_set(atomic_kind_set, atom_of_kind=atom_of_kind)
+         ALLOCATE (force_rho_elec(3, natom))
+         force_rho_elec(:, :) = 0.0_dp
       END IF
 
       map_consistent = dft_control%qs_control%map_consistent
@@ -354,8 +355,8 @@ CONTAINS
       ENDIF
 
       CALL grid_integrate(rs_v, dhmat, deltap, task_list, cube_info, cell, eps_gvg_rspace, &
-                          admm_scal_fac, my_compute_tau, pab_required, map_consistent, atom_of_kind, &
-                          kind_of, posat, calculate_forces, force, use_virial, virial)
+                          admm_scal_fac, my_compute_tau, pab_required, map_consistent, &
+                          kind_of, posat, calculate_forces, force_rho_elec, use_virial, virial)
 
       IF (h_duplicated) THEN
          ! Reconstruct H matrix if using distributed RS grids
@@ -402,7 +403,8 @@ CONTAINS
 
       DEALLOCATE (kind_of, posat)
       IF (calculate_forces) THEN
-         DEALLOCATE (atom_of_kind)
+         CALL add_qs_force(force_rho_elec, force, "rho_elec", atomic_kind_set)
+         DEALLOCATE (force_rho_elec)
       END IF
 
       CALL timestop(handle)

@@ -22,7 +22,6 @@ MODULE grid_api
    USE grid_ibase_mp,                   ONLY: grid_integrate_mp
    USE grid_ibase_ref,                  ONLY: grid_integrate_ref
    USE kinds,                           ONLY: dp
-   USE qs_force_types,                  ONLY: qs_force_type
    USE qs_modify_pab_block,             ONLY: FUNC_AB,&
                                               FUNC_DADB
    USE realspace_grid_types,            ONLY: realspace_grid_p_type
@@ -50,7 +49,7 @@ MODULE grid_api
 
 ! TODO: This is just to conveniently test both backend via the CI.
 #if defined(_OPENMP)
-   INTEGER, PARAMETER :: grid_driver_default = gpw_driver_openmp
+   INTEGER, PARAMETER :: grid_driver_default = grid_driver_openmp
 #else
    INTEGER, PARAMETER :: grid_driver_default = grid_driver_reference
 #endif
@@ -174,7 +173,6 @@ CONTAINS
 !> \param compute_tau ...
 !> \param pab_required ...
 !> \param map_consistent ...
-!> \param atom_of_kind ...
 !> \param kind_of ...
 !> \param posat ...
 !> \param calculate_forces ...
@@ -183,7 +181,7 @@ CONTAINS
 !> \param virial ...
 ! **************************************************************************************************
    SUBROUTINE grid_integrate(rs_v, dhmat, deltap, task_list, cube_info, cell, eps_gvg_rspace, &
-                             admm_scal_fac, compute_tau, pab_required, map_consistent, atom_of_kind, &
+                             admm_scal_fac, compute_tau, pab_required, map_consistent, &
                              kind_of, posat, calculate_forces, force, use_virial, virial)
 
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_v
@@ -193,10 +191,10 @@ CONTAINS
       TYPE(cell_type), POINTER                           :: cell
       REAL(KIND=dp), INTENT(IN)                          :: eps_gvg_rspace, admm_scal_fac
       LOGICAL, INTENT(IN)                                :: compute_tau, pab_required, map_consistent
-      INTEGER, DIMENSION(:), INTENT(IN)                  :: atom_of_kind, kind_of
+      INTEGER, DIMENSION(:), INTENT(IN)                  :: kind_of
       REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: posat
       LOGICAL, INTENT(IN)                                :: calculate_forces
-      TYPE(qs_force_type), DIMENSION(:), POINTER         :: force
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: force
       LOGICAL, INTENT(IN)                                :: use_virial
       TYPE(virial_type), POINTER                         :: virial
 
@@ -210,12 +208,12 @@ CONTAINS
       CASE (grid_driver_reference)
          CALL grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, cell, eps_gvg_rspace, &
                                  admm_scal_fac, compute_tau, pab_required, map_consistent, &
-                                 atom_of_kind, kind_of, posat, calculate_forces, force, use_virial, virial)
+                                 kind_of, posat, calculate_forces, force, use_virial, virial)
 
       CASE (grid_driver_openmp)
          CALL grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, cell, eps_gvg_rspace, &
                                 admm_scal_fac, compute_tau, pab_required, map_consistent, &
-                                atom_of_kind, kind_of, posat, calculate_forces, force, use_virial, virial)
+                                kind_of, posat, calculate_forces, force, use_virial, virial)
       CASE DEFAULT
          CPABORT("Unknown grid driver.")
       END SELECT
