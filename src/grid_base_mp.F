@@ -28,7 +28,8 @@ MODULE grid_base_mp
    USE realspace_grid_types,            ONLY: realspace_grid_p_type,&
                                               realspace_grid_type
    USE task_list_types,                 ONLY: int2pair,&
-                                              task_list_type
+                                              task_list_type,&
+                                              task_type
 
 !$ USE OMP_LIB, ONLY: omp_get_max_threads, omp_get_thread_num, omp_get_num_threads
 
@@ -84,7 +85,6 @@ CONTAINS
          jset, jset_old, lb, lbr, lbw, maxco, maxpgf, maxset, maxsgf_set, n, na1, na2, natoms, &
          nb1, nb2, nblock, ncoa, ncob, nimages, nr, nrlevel, ntasks, nthread, nw, nxy, nz, nzsize, &
          sgfa, sgfb, ub
-      INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
@@ -94,6 +94,7 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rab_inv, rb
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, p_block, pab, sphi_a, sphi_b, &
                                                             work, zeta, zetb
+      TYPE(task_type), DIMENSION(:), POINTER             :: tasks
 
       ! Allocate work storage
       nthread = 1
@@ -154,7 +155,7 @@ CONTAINS
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
             !decode the atom pair and basis info (igrid_level_dummy equals do loop variable by construction).
-            CALL int2pair(tasks(3, itask), igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
+            CALL int2pair(tasks(itask)%pair, igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
                           nimages, natoms, maxset, maxpgf)
             ikind = kind_of(iatom)
             jkind = kind_of(jatom)
@@ -252,7 +253,7 @@ CONTAINS
             ! check whether we need to use fawzi's generalised collocation scheme
             IF (rs_rho(igrid_level)%rs_grid%desc%distributed) THEN
                !tasks(4,:) is 0 for replicated, 1 for distributed 2 for exceptional distributed tasks
-               IF (tasks(4, itask) .EQ. 2) THEN
+               IF (tasks(itask)%dist_type .EQ. 2) THEN
                   use_subpatch = .TRUE.
                ELSE
                   use_subpatch = .FALSE.
@@ -273,7 +274,7 @@ CONTAINS
                      idir=my_idir, &
                      lgridr=lgridr(:, ithread), &
                      map_consistent=map_consistent, use_subpatch=use_subpatch, &
-                     subpatch_pattern=tasks(6, itask), lmax_global=lmax_global)
+                     subpatch_pattern=tasks(itask)%subpatch_pattern, lmax_global=lmax_global)
                ELSE
                   rab_inv = -rab
                   CALL collocate_pgf_product_rspace( &
@@ -286,7 +287,7 @@ CONTAINS
                      idir=my_idir, &
                      lgridr=lgridr(:, ithread), &
                      map_consistent=map_consistent, use_subpatch=use_subpatch, &
-                     subpatch_pattern=tasks(6, itask), lmax_global=lmax_global)
+                     subpatch_pattern=tasks(itask)%subpatch_pattern, lmax_global=lmax_global)
                END IF
             ELSE
                IF (iatom <= jatom) THEN
@@ -299,7 +300,7 @@ CONTAINS
                      ga_gb_function=ga_gb_function, &
                      idir=my_idir, &
                      map_consistent=map_consistent, use_subpatch=use_subpatch, &
-                     subpatch_pattern=tasks(6, itask), lmax_global=lmax_global)
+                     subpatch_pattern=tasks(itask)%subpatch_pattern, lmax_global=lmax_global)
                ELSE
                   rab_inv = -rab
                   CALL collocate_pgf_product_rspace( &
@@ -311,7 +312,7 @@ CONTAINS
                      ga_gb_function=ga_gb_function, &
                      idir=my_idir, &
                      map_consistent=map_consistent, use_subpatch=use_subpatch, &
-                     subpatch_pattern=tasks(6, itask), lmax_global=lmax_global)
+                     subpatch_pattern=tasks(itask)%subpatch_pattern, lmax_global=lmax_global)
                END IF
             END IF
          END DO loop_tasks

@@ -5,13 +5,13 @@
 
 ! **************************************************************************************************
 MODULE grid_base_ref
-   USE kinds,                           ONLY: dp,&
-                                              int_8
+   USE kinds,                           ONLY: dp
    USE spmat_types,                     ONLY: spmat_get,&
                                               spmat_p_type
    USE task_list_types,                 ONLY: grid_base_type,&
                                               int2pair,&
-                                              task_list_type
+                                              task_list_type,&
+                                              task_type
 
    IMPLICIT NONE
 
@@ -66,7 +66,6 @@ CONTAINS
          img_old, ipair, ipgf, iset, iset_old, itask, jatom, jatom_old, jkind, jpgf, jset, &
          jset_old, max_radius, maxco, maxpgf, maxset, maxsgf_set, n1, n2, na1, natoms, nb1, ncoa, &
          ncob, nimages, ntasks, sgfa, sgfb
-      INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, DIMENSION(3)                              :: lb_grid(3), npts(3), perd(3)
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
@@ -79,6 +78,7 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(3, 3)                     :: dh, dh_inv
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, p_block, pab, pin, sphi_a, &
                                                             sphi_b, work, zeta, zetb
+      TYPE(task_type), DIMENSION(:), POINTER             :: tasks
 
       ! map all tasks on the grids
       tasks => task_list%tasks
@@ -120,7 +120,7 @@ CONTAINS
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
             !decode the atom pair and basis info (igrid_level_dummy equals do loop variable by construction).
-            CALL int2pair(tasks(3, itask), igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
+            CALL int2pair(tasks(itask)%pair, igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
                           nimages, natoms, maxset, maxpgf)
             ikind = kind_of(iatom)
             jkind = kind_of(jatom)
@@ -205,7 +205,7 @@ CONTAINS
             END IF
 
             ! check whether we need to use the generalised collocation scheme
-            IF (tasks(4, itask) == 2) THEN
+            IF (tasks(itask)%dist_type == 2) THEN
                use_subpatch = .TRUE.
             ELSE
                use_subpatch = .FALSE.

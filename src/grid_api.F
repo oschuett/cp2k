@@ -132,7 +132,7 @@ CONTAINS
          END DO
          my_pos = rs_rho(1)%rs_grid%desc%my_pos
 
-         IF (.TRUE.) THEN
+         IF (.FALSE.) THEN
             CALL write_task_file(task_list, spmats, rs_rho_base, kind_of, posat, my_pos)
          END IF
 
@@ -371,12 +371,13 @@ CONTAINS
       WRITE (iu, *) task_list%npairs
       WRITE (iu, *) "E> TASK DIST"
       !
-      WRITE (iu, *) "S> TASK LIST"
-      n1 = SIZE(task_list%tasks, 1)
-      n2 = SIZE(task_list%tasks, 2)
-      WRITE (iu, *) n1, n2
-      WRITE (iu, *) task_list%tasks
-      WRITE (iu, *) "E> TASK LIST"
+      CPABORT("TODO: serialize task_type routine not yet implemented")
+      !WRITE (iu, *) "S> TASK LIST"
+      !n1 = SIZE(task_list%tasks, 1)
+      !n2 = SIZE(task_list%tasks, 2)
+      !WRITE (iu, *) n1, n2
+      !WRITE (iu, *) task_list%tasks
+      !WRITE (iu, *) "E> TASK LIST"
       !
       ng = SIZE(spmats)
       WRITE (iu, *) "S> SPMAT"
