@@ -870,7 +870,7 @@ CONTAINS
          CALL task_list_inner_loop(tasks, dist_ab, ntasks, curr_tasks, rs_descs, &
                                    dft_control, cube_info, gridlevel_info, cindex, &
                                    iatom, jatom, rpgfa, rpgfb, zeta, zetb, kind_radius_b, set_radius_a, set_radius_b, ra, rab, &
-                                   la_max, la_min, lb_max, lb_min, npgfa, npgfb, maxpgf, maxset, natom, nimages, nseta, nsetb)
+                                   la_max, la_min, lb_max, lb_min, npgfa, npgfb, nseta, nsetb)
 
       END DO
       CALL neighbor_list_iterator_release(nl_iterator)
@@ -976,8 +976,7 @@ CONTAINS
       ikind_old = -1; jkind_old = -1
 
       loop_tasks: DO itask = 1, ntasks
-
-         CALL int2pair(tasks(itask)%pair, igrid_level, cindex, iatom, jatom, iset, jset, ipgf, jpgf, &
+         CALL int2pair(tasks(itask), igrid_level, cindex, iatom, jatom, iset, jset, ipgf, jpgf, &
                        nimages, natom, maxset, maxpgf)
 
          ! apparently generalised collocation not implemented correctly yet

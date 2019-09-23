@@ -56,10 +56,18 @@ MODULE task_list_types
    TYPE task_type
       INTEGER(kind=int_8)                           :: destination = 0 ! index 1
       INTEGER(kind=int_8)                           :: source = 0 ! index 2
-      INTEGER(kind=int_8)                           :: pair = 0 ! index 3
       INTEGER(kind=int_8)                           :: dist_type = 0 ! index 4
       INTEGER(kind=int_8)                           :: cost = 0 ! index 5
       INTEGER(kind=int_8)                           :: subpatch_pattern = 0 ! index 6
+
+      INTEGER                                       :: grid_level = 0
+      INTEGER                                       :: image = 0
+      INTEGER                                       :: iatom = 0
+      INTEGER                                       :: jatom = 0
+      INTEGER                                       :: iset = 0
+      INTEGER                                       :: jset = 0
+      INTEGER                                       :: ipgf = 0
+      INTEGER                                       :: jpgf = 0
    END TYPE task_type
 
    TYPE task_list_type
@@ -88,11 +96,14 @@ MODULE task_list_types
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER       :: grid => NULL()
    END TYPE grid_base_type
 
+   INTEGER, PARAMETER                               :: task_size_in_int8 = 13
+
 ! **************************************************************************************************
 
    PUBLIC :: task_list_type, task_type, &
              allocate_task_list, deallocate_task_list, clear_task_list, reallocate_tasks, &
-             grid_base_type, pair2int, int2pair
+             grid_base_type, int2pair, &
+             serialize_task, deserialize_task, task_size_in_int8
 
 ! **************************************************************************************************
 
@@ -215,63 +226,8 @@ CONTAINS
    END SUBROUTINE reallocate_tasks
 
 ! **************************************************************************************************
-!> \brief converts a pgf index pair (ipgf,iset,iatom),(jpgf,jset,jatom)
-!>      to a unique integer.
-!>      a list of integers can be sorted, and will result in a list of pgf pairs
-!>      for which all atom pairs are grouped, and for each atom pair all set pairs are grouped
-!>      and for each set pair, all pgfs are grouped
-!> \param res ...
-!> \param ilevel ...
-!> \param image ...
-!> \param iatom ...
-!> \param jatom ...
-!> \param iset ...
-!> \param jset ...
-!> \param ipgf ...
-!> \param jpgf ...
-!> \param nimages ...
-!> \param natom ...
-!> \param maxset ...
-!> \param maxpgf ...
-!> \par History
-!>      11.2007 created [Joost]
-!> \note
-!>      will hopefully not overflow any more
-! **************************************************************************************************
-   SUBROUTINE pair2int(res, ilevel, image, iatom, jatom, iset, jset, ipgf, jpgf, &
-                       nimages, natom, maxset, maxpgf)
-      INTEGER(KIND=int_8), INTENT(OUT)                   :: res
-      INTEGER, INTENT(IN)                                :: ilevel, image, iatom, jatom, iset, jset, &
-                                                            ipgf, jpgf, nimages, natom, maxset, &
-                                                            maxpgf
-
-      INTEGER(KIND=int_8)                                :: maxpgf8, maxset8, natom8, nimages8, &
-                                                            nlev1, nlev2, nlev3, nlev4
-
-      natom8 = natom; maxset8 = maxset; maxpgf8 = maxpgf; nimages8 = nimages
-      !
-      ! this encoding yields the right order of the tasks for collocation after the sort
-      ! in distribute_tasks. E.g. for a atom pair, all sets and pgfs are computed in one go.
-      ! The exception is the gridlevel. Tasks are first ordered wrt to grid_level. This implies
-      ! that a given density matrix block will be decontracted several times, but cache effects on the
-      ! grid make up for this.
-      !
-      nlev1 = maxpgf8**2
-      nlev2 = maxset8**2*nlev1
-      nlev3 = natom8**2*nlev2
-      nlev4 = nimages8*nlev3
-      !
-      res = ilevel*nlev4+ &
-            (image-1)*nlev3+ &
-            ((iatom-1)*natom8+jatom-1)*nlev2+ &
-            ((iset-1)*maxset8+jset-1)*nlev1+ &
-            (ipgf-1)*maxpgf8+jpgf-1
-
-   END SUBROUTINE pair2int
-
-! **************************************************************************************************
 !> \brief ...
-!> \param res ...
+!> \param task ...
 !> \param ilevel ...
 !> \param image ...
 !> \param iatom ...
@@ -285,42 +241,78 @@ CONTAINS
 !> \param maxset ...
 !> \param maxpgf ...
 ! **************************************************************************************************
-   SUBROUTINE int2pair(res, ilevel, image, iatom, jatom, iset, jset, ipgf, jpgf, &
+   SUBROUTINE int2pair(task, ilevel, image, iatom, jatom, iset, jset, ipgf, jpgf, &
                        nimages, natom, maxset, maxpgf)
-      INTEGER(KIND=int_8), INTENT(IN)                    :: res
+      TYPE(task_type)                                    :: task
       INTEGER, INTENT(OUT)                               :: ilevel, image, iatom, jatom, iset, jset, &
                                                             ipgf, jpgf
       INTEGER, INTENT(IN)                                :: nimages, natom, maxset, maxpgf
 
-      INTEGER(KIND=int_8) :: iatom8, ijatom, ijset, img, ipgf8, iset8, jatom8, jpgf8, jset8, &
-         maxpgf8, maxset8, natom8, nimages8, nlev1, nlev2, nlev3, nlev4, tmp
+      MARK_USED(nimages)
+      MARK_USED(natom)
+      MARK_USED(maxset)
+      MARK_USED(maxpgf)
 
-      natom8 = natom; maxset8 = maxset; maxpgf8 = maxpgf; nimages8 = nimages
-      !
-      nlev1 = maxpgf8**2
-      nlev2 = maxset8**2*nlev1
-      nlev3 = natom8**2*nlev2
-      nlev4 = nimages8*nlev3
-      !
-      ilevel = INT(res/nlev4)
-      tmp = MOD(res, nlev4)
-      img = tmp/nlev3+1
-      tmp = MOD(tmp, nlev3)
-      ijatom = tmp/nlev2
-      iatom8 = ijatom/natom8+1
-      jatom8 = MOD(ijatom, natom8)+1
-      tmp = MOD(tmp, nlev2)
-      ijset = tmp/nlev1
-      iset8 = ijset/maxset8+1
-      jset8 = MOD(ijset, maxset8)+1
-      tmp = MOD(tmp, nlev1)
-      ipgf8 = tmp/maxpgf8+1
-      jpgf8 = MOD(tmp, maxpgf8)+1
-      !
-      image = INT(img)
-      iatom = INT(iatom8); jatom = INT(jatom8); iset = INT(iset8); jset = INT(jset8)
-      ipgf = INT(ipgf8); jpgf = INT(jpgf8)
-
+      ilevel = task%grid_level
+      image = task%image
+      iatom = task%iatom
+      jatom = task%jatom
+      iset = task%iset
+      jset = task%jset
+      ipgf = task%ipgf
+      jpgf = task%jpgf
    END SUBROUTINE int2pair
+!
+! **************************************************************************************************
+!> \brief ...
+!> \param task ...
+!> \param serialized_task ...
+! **************************************************************************************************
+   SUBROUTINE serialize_task(task, serialized_task)
+      TYPE(task_type), INTENT(IN)                        :: task
+      INTEGER(KIND=int_8), &
+         DIMENSION(task_size_in_int8), INTENT(OUT)       :: serialized_task
+
+      serialized_task(1) = task%destination
+      serialized_task(2) = task%source
+      serialized_task(3) = task%dist_type
+      serialized_task(4) = task%cost
+      serialized_task(5) = task%subpatch_pattern
+
+      serialized_task(6) = task%grid_level
+      serialized_task(7) = task%image
+      serialized_task(8) = task%iatom
+      serialized_task(9) = task%jatom
+      serialized_task(10) = task%iset
+      serialized_task(11) = task%jset
+      serialized_task(12) = task%ipgf
+      serialized_task(13) = task%jpgf
+   END SUBROUTINE serialize_task
+
+! **************************************************************************************************
+!> \brief ...
+!> \param task ...
+!> \param serialized_task ...
+! **************************************************************************************************
+   SUBROUTINE deserialize_task(task, serialized_task)
+      TYPE(task_type), INTENT(OUT)                       :: task
+      INTEGER(KIND=int_8), &
+         DIMENSION(task_size_in_int8), INTENT(IN)        :: serialized_task
+
+      task%destination = serialized_task(1)
+      task%source = serialized_task(2)
+      task%dist_type = serialized_task(3)
+      task%cost = serialized_task(4)
+      task%subpatch_pattern = serialized_task(5)
+
+      task%grid_level = INT(serialized_task(6))
+      task%image = INT(serialized_task(7))
+      task%iatom = INT(serialized_task(8))
+      task%jatom = INT(serialized_task(9))
+      task%iset = INT(serialized_task(10))
+      task%jset = INT(serialized_task(11))
+      task%ipgf = INT(serialized_task(12))
+      task%jpgf = INT(serialized_task(13))
+   END SUBROUTINE deserialize_task
 
 END MODULE task_list_types

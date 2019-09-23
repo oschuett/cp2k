@@ -125,7 +125,7 @@ CONTAINS
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
 
-            CALL int2pair(tasks(itask)%pair, ilevel, img, iatom, jatom, iset, jset, ipgf, jpgf, &
+            CALL int2pair(tasks(itask), ilevel, img, iatom, jatom, iset, jset, ipgf, jpgf, &
                           nimages, natom, maxset, maxpgf)
 
             ! At the start of a block of tasks, get atom data (and kind data, if needed)
@@ -303,7 +303,7 @@ CONTAINS
             new_set_pair_coming = .FALSE.
             atom_pair_done = .FALSE.
             IF (itask < task_list%taskstop(ipair, igrid_level)) THEN
-               CALL int2pair(tasks(itask+1)%pair, ilevel, img, iatom, jatom, iset_new, jset_new, ipgf_new, jpgf_new, &
+               CALL int2pair(tasks(itask+1), ilevel, img, iatom, jatom, iset_new, jset_new, ipgf_new, jpgf_new, &
                              nimages, natom, maxset, maxpgf)
                IF (iset_new .NE. iset .OR. jset_new .NE. jset) THEN
                   new_set_pair_coming = .TRUE.

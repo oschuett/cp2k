@@ -280,9 +280,6 @@ CONTAINS
       END DO
       CPASSERT(ALL(l_bounds(2, :) < ndim .OR. period(:) == 1))
       CPASSERT(ALL(l_bounds(1, :) >= 0 .OR. period(:) == 1))
-      WRITE(*,*) "lbounds(1, :) ", l_bounds(1, :)
-      WRITE(*,*) "lbounds(2, :) ", l_bounds(2, :)
-      WRITE(*,*) "ndim ", ndim
       CPASSERT(ALL(l_bounds(2, :)-l_bounds(1, :) < ndim))
       rPos = 0.0_dp
       DO j = 0, 2

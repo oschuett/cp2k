@@ -155,7 +155,7 @@ CONTAINS
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
             !decode the atom pair and basis info (igrid_level_dummy equals do loop variable by construction).
-            CALL int2pair(tasks(itask)%pair, igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
+            CALL int2pair(tasks(itask), igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
                           nimages, natoms, maxset, maxpgf)
             ikind = kind_of(iatom)
             jkind = kind_of(jatom)
