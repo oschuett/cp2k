@@ -121,8 +121,7 @@ MODULE qs_linres_current
    USE task_list_methods,               ONLY: distribute_tasks,&
                                               rs_distribute_matrix,&
                                               task_list_inner_loop
-   USE task_list_types,                 ONLY: int2pair,&
-                                              reallocate_tasks,&
+   USE task_list_types,                 ONLY: reallocate_tasks,&
                                               task_type
 #include "./base/base_uses.f90"
 
@@ -885,7 +884,7 @@ CONTAINS
       ENDIF
 
       ! sorts / redistributes the task list
-      CALL distribute_tasks(rs_descs, ntasks, natom, maxset, maxpgf, nimages, &
+      CALL distribute_tasks(rs_descs, ntasks, natom, nimages, &
                             tasks, dist_ab, atom_pair_send, atom_pair_recv, &
                             symmetric=.FALSE., reorder_rs_grid_ranks=.TRUE., &
                             skip_load_balance_distributed=.FALSE.)
@@ -976,8 +975,14 @@ CONTAINS
       ikind_old = -1; jkind_old = -1
 
       loop_tasks: DO itask = 1, ntasks
-         CALL int2pair(tasks(itask), igrid_level, cindex, iatom, jatom, iset, jset, ipgf, jpgf, &
-                       nimages, natom, maxset, maxpgf)
+         igrid_level = tasks(itask)%grid_level
+         cindex = tasks(itask)%image
+         iatom = tasks(itask)%iatom
+         jatom = tasks(itask)%jatom
+         iset = tasks(itask)%iset
+         jset = tasks(itask)%jset
+         ipgf = tasks(itask)%ipgf
+         jpgf = tasks(itask)%jpgf
 
          ! apparently generalised collocation not implemented correctly yet
          CPASSERT(tasks(itask)%dist_type .NE. 2)

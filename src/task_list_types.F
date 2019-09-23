@@ -102,7 +102,7 @@ MODULE task_list_types
 
    PUBLIC :: task_list_type, task_type, &
              allocate_task_list, deallocate_task_list, clear_task_list, reallocate_tasks, &
-             grid_base_type, int2pair, &
+             grid_base_type, &
              serialize_task, deserialize_task, task_size_in_int8
 
 ! **************************************************************************************************
@@ -225,44 +225,6 @@ CONTAINS
       DEALLOCATE (old_tasks)
    END SUBROUTINE reallocate_tasks
 
-! **************************************************************************************************
-!> \brief ...
-!> \param task ...
-!> \param ilevel ...
-!> \param image ...
-!> \param iatom ...
-!> \param jatom ...
-!> \param iset ...
-!> \param jset ...
-!> \param ipgf ...
-!> \param jpgf ...
-!> \param nimages ...
-!> \param natom ...
-!> \param maxset ...
-!> \param maxpgf ...
-! **************************************************************************************************
-   SUBROUTINE int2pair(task, ilevel, image, iatom, jatom, iset, jset, ipgf, jpgf, &
-                       nimages, natom, maxset, maxpgf)
-      TYPE(task_type)                                    :: task
-      INTEGER, INTENT(OUT)                               :: ilevel, image, iatom, jatom, iset, jset, &
-                                                            ipgf, jpgf
-      INTEGER, INTENT(IN)                                :: nimages, natom, maxset, maxpgf
-
-      MARK_USED(nimages)
-      MARK_USED(natom)
-      MARK_USED(maxset)
-      MARK_USED(maxpgf)
-
-      ilevel = task%grid_level
-      image = task%image
-      iatom = task%iatom
-      jatom = task%jatom
-      iset = task%iset
-      jset = task%jset
-      ipgf = task%ipgf
-      jpgf = task%jpgf
-   END SUBROUTINE int2pair
-!
 ! **************************************************************************************************
 !> \brief ...
 !> \param task ...

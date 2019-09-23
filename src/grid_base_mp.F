@@ -27,8 +27,7 @@ MODULE grid_base_mp
         prepare_diadib, prepare_diiadiib, prepare_dijadijb
    USE realspace_grid_types,            ONLY: realspace_grid_p_type,&
                                               realspace_grid_type
-   USE task_list_types,                 ONLY: int2pair,&
-                                              task_list_type,&
+   USE task_list_types,                 ONLY: task_list_type,&
                                               task_type
 
 !$ USE OMP_LIB, ONLY: omp_get_max_threads, omp_get_thread_num, omp_get_num_threads
@@ -80,11 +79,10 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'grid_collocate_mp', &
          routineP = moduleN//':'//routineN
 
-      INTEGER :: bcol, brow, iatom, iatom_old, igrid_level, igrid_level_dummy, ikind, img, &
-         img_old, ipair, ipgf, iset, iset_old, itask, ithread, jatom, jatom_old, jkind, jpgf, &
-         jset, jset_old, lb, lbr, lbw, maxco, maxpgf, maxset, maxsgf_set, n, na1, na2, natoms, &
-         nb1, nb2, nblock, ncoa, ncob, nimages, nr, nrlevel, ntasks, nthread, nw, nxy, nz, nzsize, &
-         sgfa, sgfb, ub
+      INTEGER :: bcol, brow, iatom, iatom_old, igrid_level, ikind, img, img_old, ipair, ipgf, &
+         iset, iset_old, itask, ithread, jatom, jatom_old, jkind, jpgf, jset, jset_old, lb, lbr, &
+         lbw, maxco, maxpgf, maxset, maxsgf_set, n, na1, na2, natoms, nb1, nb2, nblock, ncoa, &
+         ncob, nimages, nr, nrlevel, ntasks, nthread, nw, nxy, nz, nzsize, sgfa, sgfb, ub
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
@@ -133,7 +131,7 @@ CONTAINS
 !$OMP          PRIVATE(nsgfb,sphi_b,zetb,p_block,found), &
 !$OMP          PRIVATE(atom_pair_changed,ncoa,sgfa,ncob,sgfb,rab,rab2,ra,rb,zetp), &
 !$OMP          PRIVATE(na1,na2,nb1,nb2,scale,use_subpatch,rab_inv,ithread,lb,ub,n,nw), &
-!$OMP          PRIVATE(itask,nz,nxy,nzsize,nrlevel,nblock,lbw,lbr,nr,igrid_level_dummy)
+!$OMP          PRIVATE(itask,nz,nxy,nzsize,nrlevel,nblock,lbw,lbr,nr)
 
       ithread = 0
 !$    ithread = omp_get_thread_num()
@@ -154,9 +152,13 @@ CONTAINS
 !$OMP DO schedule(dynamic, MAX(1,task_list%npairs(igrid_level)/(nthread*50)))
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
-            !decode the atom pair and basis info (igrid_level_dummy equals do loop variable by construction).
-            CALL int2pair(tasks(itask), igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
-                          nimages, natoms, maxset, maxpgf)
+            img = tasks(itask)%image
+            iatom = tasks(itask)%iatom
+            jatom = tasks(itask)%jatom
+            iset = tasks(itask)%iset
+            jset = tasks(itask)%jset
+            ipgf = tasks(itask)%ipgf
+            jpgf = tasks(itask)%jpgf
             ikind = kind_of(iatom)
             jkind = kind_of(jatom)
 

@@ -9,7 +9,6 @@ MODULE grid_base_ref
    USE spmat_types,                     ONLY: spmat_get,&
                                               spmat_p_type
    USE task_list_types,                 ONLY: grid_base_type,&
-                                              int2pair,&
                                               task_list_type,&
                                               task_type
 
@@ -62,10 +61,10 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: posat
       INTEGER, INTENT(IN)                                :: lmax_global
 
-      INTEGER :: bcol, brow, iatom, iatom_old, igrid_level, igrid_level_dummy, ikind, img, &
-         img_old, ipair, ipgf, iset, iset_old, itask, jatom, jatom_old, jkind, jpgf, jset, &
-         jset_old, max_radius, maxco, maxpgf, maxset, maxsgf_set, n1, n2, na1, natoms, nb1, ncoa, &
-         ncob, nimages, ntasks, sgfa, sgfb
+      INTEGER :: bcol, brow, iatom, iatom_old, igrid_level, ikind, img, img_old, ipair, ipgf, &
+         iset, iset_old, itask, jatom, jatom_old, jkind, jpgf, jset, jset_old, max_radius, maxco, &
+         maxpgf, maxset, maxsgf_set, n1, n2, na1, natoms, nb1, ncoa, ncob, nimages, ntasks, sgfa, &
+         sgfb
       INTEGER, DIMENSION(3)                              :: lb_grid(3), npts(3), perd(3)
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
@@ -119,9 +118,13 @@ CONTAINS
 
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
-            !decode the atom pair and basis info (igrid_level_dummy equals do loop variable by construction).
-            CALL int2pair(tasks(itask), igrid_level_dummy, img, iatom, jatom, iset, jset, ipgf, jpgf, &
-                          nimages, natoms, maxset, maxpgf)
+            img = tasks(itask)%image
+            iatom = tasks(itask)%iatom
+            jatom = tasks(itask)%jatom
+            iset = tasks(itask)%iset
+            jset = tasks(itask)%jset
+            ipgf = tasks(itask)%ipgf
+            jpgf = tasks(itask)%jpgf
             ikind = kind_of(iatom)
             jkind = kind_of(jatom)
 
