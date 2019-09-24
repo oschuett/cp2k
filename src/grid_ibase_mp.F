@@ -95,14 +95,13 @@ CONTAINS
       REAL(KIND=dp)                                      :: dab, rab2, scalef, zetp
       REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra, rab, rab_inv, rb
       REAL(KIND=dp), DIMENSION(3, 3)                     :: my_virial_a, my_virial_b
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, h_block, hab, p_block, pab, &
-                                                            sphi_a, sphi_b, work, zeta, zetb
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: h_block, hab, p_block, pab, sphi_a, &
+                                                            sphi_b, work, zeta, zetb
       TYPE(dbcsr_distribution_type)                      :: dist
       TYPE(task_type), DIMENSION(:), POINTER             :: tasks
 
       ! short cuts to task list variables
       tasks => task_list%tasks
-      dist_ab => task_list%dist_ab
       maxco = task_list%maxco
       maxsgf_set = task_list%maxsgf_set
       maxset = task_list%maxset
@@ -117,7 +116,7 @@ CONTAINS
 !$OMP SHARED(tasks,natom,maxset), &
 !$OMP SHARED(maxco,maxsgf_set,maxpgf,dhmat,deltap,use_virial,admm_scal_fac), &
 !$OMP SHARED(pab_required,calculate_forces,ncoset,rs_v,cube_info,my_compute_tau), &
-!$OMP SHARED(map_consistent,eps_gvg_rspace,force,virial,cell,posat,kind_of,dist_ab), &
+!$OMP SHARED(map_consistent,eps_gvg_rspace,force,virial,cell,posat,kind_of), &
 !$OMP SHARED(task_list,nthread,nimages), &
 !$OMP PRIVATE(ithread,work,hab,pab,iset_old,jset_old), &
 !$OMP PRIVATE(iatom,jatom,iset,jset,ikind,jkind,ilevel,ipgf,jpgf), &
@@ -168,6 +167,7 @@ CONTAINS
             jset = tasks(itask)%jset
             ipgf = tasks(itask)%ipgf
             jpgf = tasks(itask)%jpgf
+            rab = tasks(itask)%rab
 
             ! At the start of a block of tasks, get atom data (and kind data, if needed)
             IF (itask .EQ. task_list%taskstart(ipair, igrid_level)) THEN
@@ -262,9 +262,6 @@ CONTAINS
 
             ENDIF
 
-            rab(1) = dist_ab(1, itask)
-            rab(2) = dist_ab(2, itask)
-            rab(3) = dist_ab(3, itask)
             rab2 = DOT_PRODUCT(rab, rab)
             rb(1) = ra(1)+rab(1)
             rb(2) = ra(2)+rab(2)

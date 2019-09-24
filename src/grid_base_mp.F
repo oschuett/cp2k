@@ -90,8 +90,8 @@ CONTAINS
       REAL(KIND=dp)                                      :: eps_rho_rspace, rab2, scale, zetp
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:, :)        :: lgridr
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rab_inv, rb
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, p_block, pab, sphi_a, sphi_b, &
-                                                            work, zeta, zetb
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: p_block, pab, sphi_a, sphi_b, work, &
+                                                            zeta, zetb
       TYPE(task_type), DIMENSION(:), POINTER             :: tasks
 
       ! Allocate work storage
@@ -107,7 +107,6 @@ CONTAINS
 
       ! map all tasks on the grids
       tasks => task_list%tasks
-      dist_ab => task_list%dist_ab
       ntasks = task_list%ntasks
 
       nimages = task_list%nimages
@@ -121,7 +120,7 @@ CONTAINS
 
 !$OMP PARALLEL DEFAULT(NONE), &
 !$OMP          SHARED(ntasks,tasks,nimages,natoms,maxset,maxsgf_set,maxpgf,kind_of,posat), &
-!$OMP          SHARED(deltap,maxco,dist_ab,ncoset,coset,nthread), &
+!$OMP          SHARED(deltap,maxco,ncoset,coset,nthread), &
 !$OMP          SHARED(cell,cube_info,eps_rho_rspace,ga_gb_function,my_idir,map_consistent), &
 !$OMP          SHARED(rs_rho,lgridr,task_list,lmax_global), &
 !$OMP          PRIVATE(igrid_level,iatom,jatom,iset,jset,ipgf,jpgf,ikind,jkind,pab,work), &
@@ -159,6 +158,8 @@ CONTAINS
             jset = tasks(itask)%jset
             ipgf = tasks(itask)%ipgf
             jpgf = tasks(itask)%jpgf
+            rab = tasks(itask)%rab
+
             ikind = kind_of(iatom)
             jkind = kind_of(jatom)
 
@@ -235,7 +236,6 @@ CONTAINS
                jset_old = jset
             ENDIF
 
-            rab(1:3) = dist_ab(1:3, itask)
             rab2 = rab(1)*rab(1)+rab(2)*rab(2)+rab(3)*rab(3)
             rb(:) = ra(:)+rab(:)
             zetp = zeta(ipgf, iset)+zetb(jpgf, jset)

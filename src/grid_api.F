@@ -356,11 +356,12 @@ CONTAINS
       END DO
       WRITE (iu, *) "E> TASK BASIS"
       !
-      WRITE (iu, *) "S> TASK DIST"
-      n1 = SIZE(task_list%dist_ab, 1)
-      n2 = SIZE(task_list%dist_ab, 2)
-      WRITE (iu, *) n1, n2
-      WRITE (iu, *) task_list%dist_ab
+      CPABORT("TODO: serialize task_type routine not yet implemented")
+      !WRITE (iu, *) "S> TASK DIST"
+      !n1 = SIZE(task_list%dist_ab, 1)
+      !n2 = SIZE(task_list%dist_ab, 2)
+      !WRITE (iu, *) n1, n2
+      !WRITE (iu, *) task_list%dist_ab
       n1 = SIZE(task_list%taskstart, 1)
       n2 = SIZE(task_list%taskstart, 2)
       WRITE (iu, *) n1, n2

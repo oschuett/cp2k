@@ -75,13 +75,12 @@ CONTAINS
                                                             rscale, zetp
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rb
       REAL(KIND=dp), DIMENSION(3, 3)                     :: dh, dh_inv
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dist_ab, p_block, pab, pin, sphi_a, &
-                                                            sphi_b, work, zeta, zetb
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: p_block, pab, pin, sphi_a, sphi_b, work, &
+                                                            zeta, zetb
       TYPE(task_type), DIMENSION(:), POINTER             :: tasks
 
       ! map all tasks on the grids
       tasks => task_list%tasks
-      dist_ab => task_list%dist_ab
       ntasks = task_list%ntasks
 
       nimages = task_list%nimages
@@ -125,6 +124,9 @@ CONTAINS
             jset = tasks(itask)%jset
             ipgf = tasks(itask)%ipgf
             jpgf = tasks(itask)%jpgf
+            rab = tasks(itask)%rab
+            radius = tasks(itask)%radius
+
             ikind = kind_of(iatom)
             jkind = kind_of(jatom)
 
@@ -189,12 +191,10 @@ CONTAINS
                jset_old = jset
             ENDIF
 
-            rab(1:3) = dist_ab(1:3, itask)
             rab2 = rab(1)*rab(1)+rab(2)*rab(2)+rab(3)*rab(3)
             rb(:) = ra(:)+rab(:)
             zetp = zeta(ipgf, iset)+zetb(jpgf, jset)
 
-            radius = dist_ab(4, itask)
             IF (2.0_dp*radius < adh) CYCLE
 
             na1 = (ipgf-1)*ncoset(la_max(iset))+1
