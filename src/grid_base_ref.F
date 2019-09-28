@@ -5,12 +5,16 @@
 
 ! **************************************************************************************************
 MODULE grid_base_ref
+   USE ISO_C_BINDING,                   ONLY: C_INT,&
+                                              C_LOC,&
+                                              C_PTR
    USE kinds,                           ONLY: dp
    USE spmat_types,                     ONLY: spmat_get,&
                                               spmat_p_type
    USE task_list_types,                 ONLY: grid_base_type,&
                                               task_list_type,&
                                               task_type
+#include "./base/base_uses.f90"
 
    IMPLICIT NONE
 
@@ -901,88 +905,61 @@ CONTAINS
 !> \param gridbounds ...
 ! **************************************************************************************************
    SUBROUTINE collocate_core(grid, coef_xyz, pol_x, pol_y, pol_z, map, sphere_bounds, lp, cmax, gridbounds)
-      INTEGER, INTENT(IN)                                :: sphere_bounds(:), lp
-      REAL(dp), INTENT(IN) :: coef_xyz(((lp+1)*(lp+2)*(lp+3))/6)
+      INTEGER, INTENT(IN), TARGET                        :: sphere_bounds(:), lp
+      REAL(dp), INTENT(IN), TARGET :: coef_xyz(((lp+1)*(lp+2)*(lp+3))/6)
       INTEGER, INTENT(IN)                                :: cmax
-      REAL(dp), INTENT(IN)                               :: pol_x(0:lp, -cmax:cmax), &
+      REAL(dp), INTENT(IN), TARGET                       :: pol_x(0:lp, -cmax:cmax), &
                                                             pol_y(1:2, 0:lp, -cmax:0), &
                                                             pol_z(1:2, 0:lp, -cmax:0)
-      INTEGER, INTENT(IN)                                :: map(-cmax:cmax, 1:3), gridbounds(2, 3)
-      REAL(dp), INTENT(INOUT) :: grid(gridbounds(1, 1):gridbounds(2, 1), gridbounds(1, 2): &
+      INTEGER, INTENT(IN), TARGET                        :: map(-cmax:cmax, 1:3), gridbounds(2, 3)
+      REAL(dp), INTENT(INOUT), TARGET :: grid(gridbounds(1, 1):gridbounds(2, 1), gridbounds(1, 2): &
          gridbounds(2, 2), gridbounds(1, 3):gridbounds(2, 3))
 
-      INTEGER                                            :: i, ig, igmax, igmin, j, j2, jg, jg2, &
-                                                            jgmin, k, k2, kg, kg2, kgmin, lxp, &
-                                                            lxy, lxyz, lyp, lzp, sci
-      REAL(dp)                                           :: coef_x(4, 0:lp), &
-                                                            coef_xy(2, (lp+1)*(lp+2)/2), s01, s02, &
-                                                            s03, s04
+      INTEGER                                            :: istat
+      INTERFACE
+         FUNCTION grid_collocate_core(grid_size_x, grid_size_y, grid_size_z, &
+                                      grid_lbound_x, grid_lbound_y, grid_lbound_z, &
+                                      lp, cmax, &
+                                      coef_xyz, pol_x, pol_y, pol_z, map, sphere_bounds, grid) &
+            RESULT(istat) BIND(C, name="grid_collocate_core")
+            IMPORT :: C_PTR, C_INT
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_x
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_y
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_z
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_x
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_y
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_z
+            INTEGER(KIND=C_INT), VALUE                :: lp
+            INTEGER(KIND=C_INT), VALUE                :: cmax
+            TYPE(C_PTR), VALUE                        :: coef_xyz
+            TYPE(C_PTR), VALUE                        :: pol_x
+            TYPE(C_PTR), VALUE                        :: pol_y
+            TYPE(C_PTR), VALUE                        :: pol_z
+            TYPE(C_PTR), VALUE                        :: map
+            TYPE(C_PTR), VALUE                        :: sphere_bounds
+            TYPE(C_PTR), VALUE                        :: grid
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_collocate_core
+      END INTERFACE
 
-      sci = 1
+      ! TODO: Are LBOUND(grid, :) always 1 ???
+      istat = grid_collocate_core(grid_size_x=SIZE(grid, 1), &
+                                  grid_size_y=SIZE(grid, 2), &
+                                  grid_size_z=SIZE(grid, 3), &
+                                  grid_lbound_x=LBOUND(grid, 1), &
+                                  grid_lbound_y=LBOUND(grid, 2), &
+                                  grid_lbound_z=LBOUND(grid, 3), &
+                                  lp=lp, &
+                                  cmax=cmax, &
+                                  coef_xyz=C_LOC(coef_xyz(1)), &
+                                  pol_x=C_LOC(pol_x(0, -cmax)), &
+                                  pol_y=C_LOC(pol_y(1, 0, -cmax)), &
+                                  pol_z=C_LOC(pol_z(1, 0, -cmax)), &
+                                  map=C_LOC(map(-cmax, 1)), &
+                                  sphere_bounds=C_LOC(sphere_bounds(1)), &
+                                  grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
 
-      kgmin = sphere_bounds(sci)
-      sci = sci+1
-      DO kg = kgmin, 0
-         kg2 = 1-kg
-         k = map(kg, 3)
-         k2 = map(kg2, 3)
-
-         coef_xy = 0.0_dp
-         lxyz = 0
-         DO lzp = 0, lp
-            lxy = 0
-            DO lyp = 0, lp-lzp
-               DO lxp = 0, lp-lzp-lyp
-                  lxyz = lxyz+1; lxy = lxy+1
-                  coef_xy(1, lxy) = coef_xy(1, lxy)+coef_xyz(lxyz)*pol_z(1, lzp, kg)
-                  coef_xy(2, lxy) = coef_xy(2, lxy)+coef_xyz(lxyz)*pol_z(2, lzp, kg)
-               ENDDO
-               lxy = lxy+lzp
-            ENDDO
-         ENDDO
-
-         jgmin = sphere_bounds(sci)
-         sci = sci+1
-         DO jg = jgmin, 0
-            jg2 = 1-jg
-            j = map(jg, 2)
-            j2 = map(jg2, 2)
-            igmin = sphere_bounds(sci)
-            sci = sci+1
-            igmax = 1-igmin
-
-            coef_x = 0.0_dp
-            lxy = 0
-            DO lyp = 0, lp
-            DO lxp = 0, lp-lyp
-               lxy = lxy+1
-               coef_x(1, lxp) = coef_x(1, lxp)+coef_xy(1, lxy)*pol_y(1, lyp, jg)
-               coef_x(2, lxp) = coef_x(2, lxp)+coef_xy(2, lxy)*pol_y(1, lyp, jg)
-               coef_x(3, lxp) = coef_x(3, lxp)+coef_xy(1, lxy)*pol_y(2, lyp, jg)
-               coef_x(4, lxp) = coef_x(4, lxp)+coef_xy(2, lxy)*pol_y(2, lyp, jg)
-            ENDDO
-            ENDDO
-
-            DO ig = igmin, igmax
-               i = map(ig, 1)
-               s01 = 0.0_dp
-               s02 = 0.0_dp
-               s03 = 0.0_dp
-               s04 = 0.0_dp
-               DO lxp = 0, lp
-                  s01 = s01+coef_x(1, lxp)*pol_x(lxp, ig)
-                  s02 = s02+coef_x(2, lxp)*pol_x(lxp, ig)
-                  s03 = s03+coef_x(3, lxp)*pol_x(lxp, ig)
-                  s04 = s04+coef_x(4, lxp)*pol_x(lxp, ig)
-               ENDDO
-               grid(i, j, k) = grid(i, j, k)+s01
-               grid(i, j2, k) = grid(i, j2, k)+s03
-               grid(i, j, k2) = grid(i, j, k2)+s02
-               grid(i, j2, k2) = grid(i, j2, k2)+s04
-            END DO
-
-         END DO
-      END DO
+      CPASSERT(istat == 0)
 
    END SUBROUTINE collocate_core
 
