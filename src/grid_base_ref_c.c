@@ -4,6 +4,58 @@
  *****************************************************************************/
 
 #include <stdio.h>
+#include <math.h>
+
+int grid_fill_pol(
+                  const double dr,
+                  const double roffset,
+                  const int lb_cube,
+                  const int lp,
+                  const int cmax,
+                  const double zetp,
+                  double pol[cmax+1][lp+1][2]
+                  ) {
+//
+//   compute the values of all (x-xp)**lp*exp(..)
+//
+//  still requires the old trick:
+//  new trick to avoid to many exps (reuse the result from the previous gridpoint):
+//  exp( -a*(x+d)**2)=exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
+//  exp(-2*a*(x+d)*d)=exp(-2*a*x*d)*exp(-2*a*d**2)
+//
+      const double t_exp_1 = exp(-zetp * pow(dr, 2));
+      const double t_exp_2 = pow(t_exp_1, 2);
+
+      double t_exp_min_1 = exp(-zetp * pow(+dr - roffset, 2));
+      double t_exp_min_2 = exp(-2 * zetp * (+dr - roffset) * (-dr));
+      for (int ig=0; ig >= lb_cube; ig--) {
+          const double rpg = ig * dr - roffset;
+          t_exp_min_1 *= t_exp_min_2 * t_exp_1;
+          t_exp_min_2 *= t_exp_2;
+          double pg = t_exp_min_1;
+          // pg  = EXP(-zetp*rpg**2)
+          for (int icoef=0; icoef<=lp; icoef++) {
+              pol[ig+cmax][icoef][0] = pg;
+              pg *= rpg;
+          }
+      }
+
+      double t_exp_plus_1 = exp(-zetp * pow(-roffset,2));
+      double t_exp_plus_2 = exp(-2 * zetp * (-roffset) * (+dr));
+      for (int ig=0; ig >= lb_cube; ig--) {
+          const double rpg = (1-ig) * dr - roffset;
+          t_exp_plus_1 *= t_exp_plus_2 * t_exp_1;
+          t_exp_plus_2 *= t_exp_2;
+          double pg = t_exp_plus_1;
+          // pg  = EXP(-zetp*rpg**2)
+          for (int icoef=0; icoef<=lp; icoef++) {
+              pol[ig+cmax][icoef][1] = pg;
+              pg *= rpg;
+          }
+      }
+
+    return 0;
+}
 
 int grid_collocate_core(
                         const int grid_size_x,
@@ -57,9 +109,6 @@ int grid_collocate_core(
             const int j = map[1][jg + cmax];
             const int j2 = map[1][jg2 + cmax];
 
-            const int igmin = sphere_bounds[sci++];
-            const int igmax = 1 - igmin;
-
             // initialize coef_x
             double coef_x[lp+1][4];
             for (int i=0; i < lp+1; i++) {
@@ -79,6 +128,7 @@ int grid_collocate_core(
                 }
             }
 
+            const int igmin = sphere_bounds[sci++];
             for (int ig=igmin; ig<=0; ig++) {
                 const int ig2 = 1 - ig;
                 const int i = map[0][ig + cmax];

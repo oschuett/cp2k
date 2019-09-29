@@ -5,7 +5,8 @@
 
 ! **************************************************************************************************
 MODULE grid_base_ref
-   USE ISO_C_BINDING,                   ONLY: C_INT,&
+   USE ISO_C_BINDING,                   ONLY: C_DOUBLE,&
+                                              C_INT,&
                                               C_LOC,&
                                               C_PTR
    USE kinds,                           ONLY: dp
@@ -777,14 +778,6 @@ CONTAINS
       ENDDO
       ALLOCATE (pol(1:2, 0:lp, -cmax:0, 1:3))
 
-!
-!   compute the values of all (x-xp)**lp*exp(..)
-!
-!  still requires the old trick:
-!  new trick to avoid to many exps (reuse the result from the previous gridpoint):
-!  exp( -a*(x+d)**2)=exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
-!  exp(-2*a*(x+d)*d)=exp(-2*a*x*d)*exp(-2*a*d**2)
-
       DO i = 1, 3
          CALL fill_pol(dr(i), roffset(i), lb_cube(i), lp, cmax, zetp, pol(:, :, :, i))
       END DO
@@ -811,41 +804,27 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                          :: dr, roffset
       INTEGER, INTENT(IN)                                :: lb_cube, lp, cmax
       REAL(KIND=dp), INTENT(IN)                          :: zetp
-      REAL(kind=dp), DIMENSION(1:2, 0:lp, -cmax:0), &
-         INTENT(OUT)                                     :: pol
+      REAL(kind=dp), DIMENSION(:, :, :), INTENT(OUT), &
+         TARGET                                          :: pol
 
-      INTEGER                                            :: icoef, ig
-      REAL(KIND=dp)                                      :: pg, rpg, t_exp_1, t_exp_2, t_exp_min_1, &
-                                                            t_exp_min_2, t_exp_plus_1, t_exp_plus_2
+      INTEGER                                            :: istat
+      INTERFACE
+         FUNCTION grid_fill_pol(dr, roffset, lb_cube, lp, cmax, zetp, pol) &
+            RESULT(istat) BIND(C, name="grid_fill_pol")
+            IMPORT :: C_PTR, C_INT, C_DOUBLE
+            REAL(KIND=C_DOUBLE), VALUE                :: dr
+            REAL(KIND=C_DOUBLE), VALUE                :: roffset
+            INTEGER(KIND=C_INT), VALUE                :: lb_cube
+            INTEGER(KIND=C_INT), VALUE                :: lp
+            INTEGER(KIND=C_INT), VALUE                :: cmax
+            REAL(KIND=C_DOUBLE), VALUE                :: zetp
+            TYPE(C_PTR), VALUE                        :: pol
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_fill_pol
+      END INTERFACE
 
-      t_exp_1 = EXP(-zetp*dr**2)
-      t_exp_2 = t_exp_1**2
-      t_exp_min_1 = EXP(-zetp*(+dr-roffset)**2)
-      t_exp_min_2 = EXP(-2*zetp*(+dr-roffset)*(-dr))
-      t_exp_plus_1 = EXP(-zetp*(-roffset)**2)
-      t_exp_plus_2 = EXP(-2*zetp*(-roffset)*(+dr))
-      DO ig = 0, lb_cube, -1
-
-         rpg = REAL(ig, dp)*dr-roffset
-         t_exp_min_1 = t_exp_min_1*t_exp_min_2*t_exp_1
-         t_exp_min_2 = t_exp_min_2*t_exp_2
-         pg = t_exp_min_1
-         !pg  = EXP(-zetp*rpg**2)
-         DO icoef = 0, lp
-            pol(1, icoef, ig) = pg
-            pg = pg*(rpg)
-         ENDDO
-
-         rpg = REAL(1-ig, dp)*dr-roffset
-         t_exp_plus_1 = t_exp_plus_1*t_exp_plus_2*t_exp_1
-         t_exp_plus_2 = t_exp_plus_2*t_exp_2
-         pg = t_exp_plus_1
-         ! pg  = EXP(-zetp*rpg**2)
-         DO icoef = 0, lp
-            pol(2, icoef, ig) = pg
-            pg = pg*(rpg)
-         ENDDO
-      ENDDO
+      istat = grid_fill_pol(dr, roffset, lb_cube, lp, cmax, zetp, C_LOC(pol(1, 1, 1)))
+      CPASSERT(istat == 0)
 
    END SUBROUTINE fill_pol
 
