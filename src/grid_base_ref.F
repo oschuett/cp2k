@@ -719,8 +719,7 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER                     :: sphere_bounds
       REAL(KIND=dp)                                      :: pg, rpg, t_exp_1, t_exp_2, t_exp_min_1, &
                                                             t_exp_min_2, t_exp_plus_1, t_exp_plus_2
-      REAL(kind=dp), ALLOCATABLE, DIMENSION(:, :)        :: pol_x
-      REAL(kind=dp), ALLOCATABLE, DIMENSION(:, :, :)     :: pol_y, pol_z
+      REAL(kind=dp), ALLOCATABLE, DIMENSION(:, :, :)     :: pol_x, pol_y, pol_z
       REAL(KIND=dp), DIMENSION(3)                        :: dr, roffset
 
       dr(1) = dh(1, 1)
@@ -781,7 +780,7 @@ CONTAINS
       ENDDO
       ALLOCATE (pol_z(1:2, 0:lp, -cmax:0))
       ALLOCATE (pol_y(1:2, 0:lp, -cmax:0))
-      ALLOCATE (pol_x(0:lp, -cmax:cmax))
+      ALLOCATE (pol_x(1:2, 0:lp, -cmax:0))
 
 !
 !   compute the values of all (x-xp)**lp*exp(..)
@@ -856,7 +855,7 @@ CONTAINS
       t_exp_min_2 = EXP(-2*zetp*(+dr(iaxis)-roffset(iaxis))*(-dr(iaxis)))
       t_exp_plus_1 = EXP(-zetp*(-roffset(iaxis))**2)
       t_exp_plus_2 = EXP(-2*zetp*(-roffset(iaxis))*(+dr(iaxis)))
-      DO ig = 0, lb_cube(1), -1
+      DO ig = 0, lb_cube(iaxis), -1
 
          rpg = REAL(ig, dp)*dr(1)-roffset(1)
          t_exp_min_1 = t_exp_min_1*t_exp_min_2*t_exp_1
@@ -864,7 +863,7 @@ CONTAINS
          pg = t_exp_min_1
          !pg  = EXP(-zetp*rpg**2)
          DO icoef = 0, lp
-            pol_x(icoef, ig) = pg
+            pol_x(1, icoef, ig) = pg
             pg = pg*(rpg)
          ENDDO
 
@@ -874,12 +873,12 @@ CONTAINS
          pg = t_exp_plus_1
          ! pg  = EXP(-zetp*rpg**2)
          DO icoef = 0, lp
-            pol_x(icoef, 1-ig) = pg
+            pol_x(2, icoef, ig) = pg
             pg = pg*(rpg)
          ENDDO
       ENDDO
 
-      CALL collocate_core(grid, coef_xyz, pol_x(0:, -cmax:), pol_y(1:, 0:, -cmax:), &
+      CALL collocate_core(grid, coef_xyz, pol_x(1:, 0:, -cmax:), pol_y(1:, 0:, -cmax:), &
                           pol_z(1:, 0:, -cmax:), &
                           map(-cmax:, 1:), sphere_bounds, lp, cmax, gridbounds)
 
@@ -908,7 +907,7 @@ CONTAINS
       INTEGER, INTENT(IN), TARGET                        :: sphere_bounds(:), lp
       REAL(dp), INTENT(IN), TARGET :: coef_xyz(((lp+1)*(lp+2)*(lp+3))/6)
       INTEGER, INTENT(IN)                                :: cmax
-      REAL(dp), INTENT(IN), TARGET                       :: pol_x(0:lp, -cmax:cmax), &
+      REAL(dp), INTENT(IN), TARGET                       :: pol_x(1:2, 0:lp, -cmax:0), &
                                                             pol_y(1:2, 0:lp, -cmax:0), &
                                                             pol_z(1:2, 0:lp, -cmax:0)
       INTEGER, INTENT(IN), TARGET                        :: map(-cmax:cmax, 1:3), gridbounds(2, 3)
@@ -952,7 +951,7 @@ CONTAINS
                                   lp=lp, &
                                   cmax=cmax, &
                                   coef_xyz=C_LOC(coef_xyz(1)), &
-                                  pol_x=C_LOC(pol_x(0, -cmax)), &
+                                  pol_x=C_LOC(pol_x(1, 0, -cmax)), &
                                   pol_y=C_LOC(pol_y(1, 0, -cmax)), &
                                   pol_z=C_LOC(pol_z(1, 0, -cmax)), &
                                   map=C_LOC(map(-cmax, 1)), &
