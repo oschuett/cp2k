@@ -15,9 +15,7 @@ int grid_collocate_core(
                         const int lp,
                         const int cmax,
                         const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
-                        const double pol_x[cmax+1][lp+1][2],
-                        const double pol_y[cmax+1][lp+1][2],
-                        const double pol_z[cmax+1][lp+1][2],
+                        const double pol[3][cmax+1][lp+1][2],
                         const int map[3][2*cmax+1],
                         const int *sphere_bounds,
                         double grid[grid_size_z][grid_size_y][grid_size_x]
@@ -44,8 +42,8 @@ int grid_collocate_core(
             int lxy = 0;
             for (int lyp=0; lyp <= lp-lzp; lyp++) {
                 for (int lxp=0; lxp <= lp-lzp-lyp; lxp++) {
-                    coef_xy[lxy][0] += coef_xyz[lxyz] * pol_z[kg+cmax][lzp][0];
-                    coef_xy[lxy][1] += coef_xyz[lxyz] * pol_z[kg+cmax][lzp][1];
+                    coef_xy[lxy][0] += coef_xyz[lxyz] * pol[2][kg+cmax][lzp][0];
+                    coef_xy[lxy][1] += coef_xyz[lxyz] * pol[2][kg+cmax][lzp][1];
                     lxyz++;
                     lxy++;
                 }
@@ -73,10 +71,10 @@ int grid_collocate_core(
             int lxy = 0;
             for (int lyp=0; lyp <= lp; lyp++) {
                 for (int lxp=0; lxp <= lp-lyp; lxp++) {
-                    coef_x[lxp][0] += coef_xy[lxy][0]*pol_y[jg+cmax][lyp][0];
-                    coef_x[lxp][1] += coef_xy[lxy][1]*pol_y[jg+cmax][lyp][0];
-                    coef_x[lxp][2] += coef_xy[lxy][0]*pol_y[jg+cmax][lyp][1];
-                    coef_x[lxp][3] += coef_xy[lxy][1]*pol_y[jg+cmax][lyp][1];
+                    coef_x[lxp][0] += coef_xy[lxy][0]*pol[1][jg+cmax][lyp][0];
+                    coef_x[lxp][1] += coef_xy[lxy][1]*pol[1][jg+cmax][lyp][0];
+                    coef_x[lxp][2] += coef_xy[lxy][0]*pol[1][jg+cmax][lyp][1];
+                    coef_x[lxp][3] += coef_xy[lxy][1]*pol[1][jg+cmax][lyp][1];
                     lxy++;
                 }
             }
@@ -96,14 +94,14 @@ int grid_collocate_core(
                 double s08 = 0.0;
 
                 for (int lxp=0; lxp <= lp; lxp++) {
-                    s01 += coef_x[lxp][0]*pol_x[ig+cmax][lxp][0];
-                    s02 += coef_x[lxp][1]*pol_x[ig+cmax][lxp][0];
-                    s03 += coef_x[lxp][2]*pol_x[ig+cmax][lxp][0];
-                    s04 += coef_x[lxp][3]*pol_x[ig+cmax][lxp][0];
-                    s05 += coef_x[lxp][0]*pol_x[ig+cmax][lxp][1];
-                    s06 += coef_x[lxp][1]*pol_x[ig+cmax][lxp][1];
-                    s07 += coef_x[lxp][2]*pol_x[ig+cmax][lxp][1];
-                    s08 += coef_x[lxp][3]*pol_x[ig+cmax][lxp][1];
+                    s01 += coef_x[lxp][0]*pol[0][ig+cmax][lxp][0];
+                    s02 += coef_x[lxp][1]*pol[0][ig+cmax][lxp][0];
+                    s03 += coef_x[lxp][2]*pol[0][ig+cmax][lxp][0];
+                    s04 += coef_x[lxp][3]*pol[0][ig+cmax][lxp][0];
+                    s05 += coef_x[lxp][0]*pol[0][ig+cmax][lxp][1];
+                    s06 += coef_x[lxp][1]*pol[0][ig+cmax][lxp][1];
+                    s07 += coef_x[lxp][2]*pol[0][ig+cmax][lxp][1];
+                    s08 += coef_x[lxp][3]*pol[0][ig+cmax][lxp][1];
                 }
 
                 grid[k-grid_lbound_z][j-grid_lbound_y][i-grid_lbound_x] += s01;

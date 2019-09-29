@@ -716,7 +716,7 @@ CONTAINS
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: map
       INTEGER, DIMENSION(3)                              :: cubecenter, lb_cube, ub_cube
       INTEGER, DIMENSION(:), POINTER                     :: sphere_bounds
-      REAL(kind=dp), ALLOCATABLE, DIMENSION(:, :, :)     :: pol_x, pol_y, pol_z
+      REAL(kind=dp), ALLOCATABLE, DIMENSION(:, :, :, :)  :: pol
       REAL(KIND=dp), DIMENSION(3)                        :: dr, roffset
 
       dr(1) = dh(1, 1)
@@ -775,9 +775,7 @@ CONTAINS
             END DO
          END IF
       ENDDO
-      ALLOCATE (pol_z(1:2, 0:lp, -cmax:0))
-      ALLOCATE (pol_y(1:2, 0:lp, -cmax:0))
-      ALLOCATE (pol_x(1:2, 0:lp, -cmax:0))
+      ALLOCATE (pol(1:2, 0:lp, -cmax:0, 1:3))
 
 !
 !   compute the values of all (x-xp)**lp*exp(..)
@@ -787,18 +785,14 @@ CONTAINS
 !  exp( -a*(x+d)**2)=exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
 !  exp(-2*a*(x+d)*d)=exp(-2*a*x*d)*exp(-2*a*d**2)
 
-      CALL fill_pol(dr(1), roffset(1), lb_cube(1), lp, cmax, zetp, pol_x)
-      CALL fill_pol(dr(2), roffset(2), lb_cube(2), lp, cmax, zetp, pol_y)
-      CALL fill_pol(dr(3), roffset(3), lb_cube(3), lp, cmax, zetp, pol_z)
+      DO i = 1, 3
+         CALL fill_pol(dr(i), roffset(i), lb_cube(i), lp, cmax, zetp, pol(:, :, :, i))
+      END DO
 
-      CALL collocate_core(grid, coef_xyz, pol_x(1:, 0:, -cmax:), pol_y(1:, 0:, -cmax:), &
-                          pol_z(1:, 0:, -cmax:), &
-                          map(-cmax:, 1:), sphere_bounds, lp, cmax, gridbounds)
+      CALL collocate_core(grid, coef_xyz, pol, map, sphere_bounds, lp, cmax, gridbounds)
 
       ! deallocation needed to pass around a pgi bug..
-      DEALLOCATE (pol_z)
-      DEALLOCATE (pol_y)
-      DEALLOCATE (pol_x)
+      DEALLOCATE (pol)
       DEALLOCATE (map)
 
    END SUBROUTINE collocate_ortho
@@ -859,23 +853,19 @@ CONTAINS
 !> \brief ...
 !> \param grid ...
 !> \param coef_xyz ...
-!> \param pol_x ...
-!> \param pol_y ...
-!> \param pol_z ...
+!> \param pol ...
 !> \param map ...
 !> \param sphere_bounds ...
 !> \param lp ...
 !> \param cmax ...
 !> \param gridbounds ...
 ! **************************************************************************************************
-   SUBROUTINE collocate_core(grid, coef_xyz, pol_x, pol_y, pol_z, map, sphere_bounds, lp, cmax, gridbounds)
-      INTEGER, INTENT(IN), TARGET                        :: sphere_bounds(:), lp
+   SUBROUTINE collocate_core(grid, coef_xyz, pol, map, sphere_bounds, lp, cmax, gridbounds)
+      REAL(dp), INTENT(IN), TARGET                       :: pol(:, :, :, :)
+      INTEGER, INTENT(IN), TARGET                        :: map(:, :), sphere_bounds(:), lp
       REAL(dp), INTENT(IN), TARGET :: coef_xyz(((lp+1)*(lp+2)*(lp+3))/6)
       INTEGER, INTENT(IN)                                :: cmax
-      REAL(dp), INTENT(IN), TARGET                       :: pol_x(1:2, 0:lp, -cmax:0), &
-                                                            pol_y(1:2, 0:lp, -cmax:0), &
-                                                            pol_z(1:2, 0:lp, -cmax:0)
-      INTEGER, INTENT(IN), TARGET                        :: map(-cmax:cmax, 1:3), gridbounds(2, 3)
+      INTEGER, INTENT(IN), TARGET                        :: gridbounds(2, 3)
       REAL(dp), INTENT(INOUT), TARGET :: grid(gridbounds(1, 1):gridbounds(2, 1), gridbounds(1, 2): &
          gridbounds(2, 2), gridbounds(1, 3):gridbounds(2, 3))
 
@@ -884,7 +874,7 @@ CONTAINS
          FUNCTION grid_collocate_core(grid_size_x, grid_size_y, grid_size_z, &
                                       grid_lbound_x, grid_lbound_y, grid_lbound_z, &
                                       lp, cmax, &
-                                      coef_xyz, pol_x, pol_y, pol_z, map, sphere_bounds, grid) &
+                                      coef_xyz, pol, map, sphere_bounds, grid) &
             RESULT(istat) BIND(C, name="grid_collocate_core")
             IMPORT :: C_PTR, C_INT
             INTEGER(KIND=C_INT), VALUE                :: grid_size_x
@@ -896,9 +886,7 @@ CONTAINS
             INTEGER(KIND=C_INT), VALUE                :: lp
             INTEGER(KIND=C_INT), VALUE                :: cmax
             TYPE(C_PTR), VALUE                        :: coef_xyz
-            TYPE(C_PTR), VALUE                        :: pol_x
-            TYPE(C_PTR), VALUE                        :: pol_y
-            TYPE(C_PTR), VALUE                        :: pol_z
+            TYPE(C_PTR), VALUE                        :: pol
             TYPE(C_PTR), VALUE                        :: map
             TYPE(C_PTR), VALUE                        :: sphere_bounds
             TYPE(C_PTR), VALUE                        :: grid
@@ -916,10 +904,8 @@ CONTAINS
                                   lp=lp, &
                                   cmax=cmax, &
                                   coef_xyz=C_LOC(coef_xyz(1)), &
-                                  pol_x=C_LOC(pol_x(1, 0, -cmax)), &
-                                  pol_y=C_LOC(pol_y(1, 0, -cmax)), &
-                                  pol_z=C_LOC(pol_z(1, 0, -cmax)), &
-                                  map=C_LOC(map(-cmax, 1)), &
+                                  pol=C_LOC(pol(1, 1, 1, 1)), &
+                                  map=C_LOC(map(1, 1)), &
                                   sphere_bounds=C_LOC(sphere_bounds(1)), &
                                   grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
 
