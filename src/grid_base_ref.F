@@ -713,7 +713,7 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                          :: drmin
       REAL(KIND=dp), DIMENSION(:), INTENT(IN)            :: coef_xyz
 
-      INTEGER                                            :: cmax, i, ig, imr, length, offset, start
+      INTEGER                                            :: cmax, i, imr
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: map
       INTEGER, DIMENSION(3)                              :: cubecenter, lb_cube, ub_cube
       INTEGER, DIMENSION(:), POINTER                     :: sphere_bounds
@@ -748,36 +748,17 @@ CONTAINS
 !   hence (0.0,0.0,0.0) in real space is rsgrid%lb on the rsgrid ((1,1,1) on grid)
 !
 
-      ALLOCATE (map(-cmax:cmax, 3))
       cubecenter(:) = FLOOR(MATMUL(dh_inv, rp))
       roffset(:) = rp(:)-REAL(cubecenter(:), dp)*dr(:)
-!   *** a mapping so that the ig corresponds to the right grid point
-      DO i = 1, 3
-         IF (perd(i) == 1) THEN
-            start = lb_cube(i)
-            DO
-               offset = MODULO(cubecenter(i)+start, ng(i))+1-start
-               length = MIN(ub_cube(i), ng(i)-offset)-start
-               DO ig = start, start+length
-                  map(ig, i) = ig+offset
-               END DO
-               IF (start+length .GE. ub_cube(i)) EXIT
-               start = start+length+1
-            END DO
-         ELSE
-            ! this takes partial grid + border regions into account
-            offset = MODULO(cubecenter(i)+lb_cube(i)+lb_grid(i), ng(i))+1-lb_cube(i)
-            ! check for out of bounds
-            IF (ub_cube(i)+offset > UBOUND(grid, i) .OR. lb_cube(i)+offset < LBOUND(grid, i)) THEN
-               STOP
-            ENDIF
-            DO ig = lb_cube(i), ub_cube(i)
-               map(ig, i) = ig+offset
-            END DO
-         END IF
-      ENDDO
-      ALLOCATE (pol(1:2, 0:lp, -cmax:0, 1:3))
 
+      !   *** a mapping so that the ig corresponds to the right grid point
+      ALLOCATE (map(-cmax:cmax, 3))
+      DO i = 1, 3
+         CALL fill_map(perd(i) == 1, lb_cube(i), ub_cube(i), cubecenter(i), &
+                       lb_grid(i), LBOUND(grid, i), UBOUND(grid, i), ng(i), cmax, map(:, i))
+      ENDDO
+
+      ALLOCATE (pol(1:2, 0:lp, -cmax:0, 1:3))
       DO i = 1, 3
          CALL fill_pol(dr(i), roffset(i), lb_cube(i), lp, cmax, zetp, pol(:, :, :, i))
       END DO
@@ -789,6 +770,52 @@ CONTAINS
       DEALLOCATE (map)
 
    END SUBROUTINE collocate_ortho
+
+! **************************************************************************************************
+!> \brief Fill mapping so that the ig corresponds to the right grid point
+!> \param periodic ...
+!> \param lb_cube ...
+!> \param ub_cube ...
+!> \param cubecenter ...
+!> \param lb_grid ...
+!> \param grid_lbound ...
+!> \param grid_ubound ...
+!> \param ng ...
+!> \param cmax ...
+!> \param map ...
+! **************************************************************************************************
+   SUBROUTINE fill_map(periodic, lb_cube, ub_cube, cubecenter, lb_grid, grid_lbound, grid_ubound, ng, cmax, map)
+      LOGICAL, INTENT(IN)                                :: periodic
+      INTEGER, INTENT(IN)                                :: lb_cube, ub_cube, cubecenter, lb_grid, &
+                                                            grid_lbound, grid_ubound, ng, cmax
+      INTEGER, DIMENSION(-cmax:cmax), INTENT(OUT)        :: map
+
+      INTEGER                                            :: ig, length, offset, start
+
+      IF (periodic) THEN
+         start = lb_cube
+         DO
+            offset = MODULO(cubecenter+start, ng)+1-start
+            length = MIN(ub_cube, ng-offset)-start
+            DO ig = start, start+length
+               map(ig) = ig+offset
+            END DO
+            IF (start+length .GE. ub_cube) EXIT
+            start = start+length+1
+         END DO
+      ELSE
+         ! this takes partial grid + border regions into account
+         offset = MODULO(cubecenter+lb_cube+lb_grid, ng)+1-lb_cube
+         ! check for out of bounds
+         IF (ub_cube+offset > grid_ubound .OR. lb_cube+offset < grid_lbound) THEN
+            STOP
+         ENDIF
+         DO ig = lb_cube, ub_cube
+            map(ig) = ig+offset
+         END DO
+      END IF
+
+   END SUBROUTINE fill_map
 
 ! **************************************************************************************************
 !> \brief ...
