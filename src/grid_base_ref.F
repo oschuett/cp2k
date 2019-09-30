@@ -5,7 +5,8 @@
 
 ! **************************************************************************************************
 MODULE grid_base_ref
-   USE ISO_C_BINDING,                   ONLY: C_DOUBLE,&
+   USE ISO_C_BINDING,                   ONLY: C_BOOL,&
+                                              C_DOUBLE,&
                                               C_INT,&
                                               C_LOC,&
                                               C_PTR
@@ -788,32 +789,31 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: periodic
       INTEGER, INTENT(IN)                                :: lb_cube, ub_cube, cubecenter, lb_grid, &
                                                             grid_lbound, grid_ubound, ng, cmax
-      INTEGER, DIMENSION(-cmax:cmax), INTENT(OUT)        :: map
+      INTEGER, DIMENSION(:), INTENT(OUT), TARGET         :: map
 
-      INTEGER                                            :: ig, length, offset, start
+      INTEGER                                            :: istat
+      INTERFACE
+         FUNCTION grid_fill_map(periodic, lb_cube, ub_cube, cubecenter, lb_grid, &
+                                grid_lbound, grid_ubound, ng, cmax, map) &
+            RESULT(istat) BIND(C, name="grid_fill_map")
+            IMPORT :: C_PTR, C_INT, C_BOOL
+            LOGICAL(KIND=C_BOOL), VALUE               :: periodic
+            INTEGER(KIND=C_INT), VALUE                :: lb_cube
+            INTEGER(KIND=C_INT), VALUE                :: ub_cube
+            INTEGER(KIND=C_INT), VALUE                :: cubecenter
+            INTEGER(KIND=C_INT), VALUE                :: lb_grid
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound
+            INTEGER(KIND=C_INT), VALUE                :: grid_ubound
+            INTEGER(KIND=C_INT), VALUE                :: ng
+            INTEGER(KIND=C_INT), VALUE                :: cmax
+            TYPE(C_PTR), VALUE                        :: map
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_fill_map
+      END INTERFACE
 
-      IF (periodic) THEN
-         start = lb_cube
-         DO
-            offset = MODULO(cubecenter+start, ng)+1-start
-            length = MIN(ub_cube, ng-offset)-start
-            DO ig = start, start+length
-               map(ig) = ig+offset
-            END DO
-            IF (start+length .GE. ub_cube) EXIT
-            start = start+length+1
-         END DO
-      ELSE
-         ! this takes partial grid + border regions into account
-         offset = MODULO(cubecenter+lb_cube+lb_grid, ng)+1-lb_cube
-         ! check for out of bounds
-         IF (ub_cube+offset > grid_ubound .OR. lb_cube+offset < grid_lbound) THEN
-            STOP
-         ENDIF
-         DO ig = lb_cube, ub_cube
-            map(ig) = ig+offset
-         END DO
-      END IF
+      istat = grid_fill_map(LOGICAL(periodic, KIND=C_BOOL), lb_cube, ub_cube, cubecenter, lb_grid, &
+                            grid_lbound, grid_ubound, ng, cmax, C_LOC(map(1)))
+      CPASSERT(istat == 0)
 
    END SUBROUTINE fill_map
 

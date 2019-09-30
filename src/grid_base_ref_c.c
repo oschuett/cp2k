@@ -5,7 +5,61 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <stdbool.h>
 
+// *****************************************************************************
+static int min(int x, int y) {
+    return (x < y) ? x : y;
+}
+
+// *****************************************************************************
+static int mod(int a, int m)
+{
+    return (a%m + m) % m;
+}
+
+// *****************************************************************************
+int grid_fill_map(const bool periodic,
+                  const int lb_cube,
+                  const int ub_cube,
+                  const int cubecenter,
+                  const int lb_grid,
+                  const int grid_lbound,
+                  const int grid_ubound,
+                  const int ng,
+                  const int cmax,
+                  int map[2*cmax + 1]) {
+
+    if (periodic) {
+         int start = lb_cube;
+         while (true) {
+            const int offset = mod(cubecenter + start, ng)  + 1 - start;
+            const int length = min(ub_cube, ng - offset) - start;
+            for (int ig=start; ig<=start+length; ig++) {
+               map[ig + cmax] = ig + offset;
+            }
+            if (start + length >= ub_cube){
+                break;
+            }
+            start += length + 1;
+         }
+    } else {
+         // this takes partial grid + border regions into account
+         const int offset = mod(cubecenter + lb_cube + lb_grid, ng) + 1 - lb_cube;
+         // check for out of bounds
+         if (ub_cube + offset > grid_ubound || lb_cube + offset < grid_lbound){
+             return -1;
+         }
+         for (int ig=lb_cube; ig <= ub_cube; ig++) {
+            map[ig + cmax] = ig + offset;
+         }
+    }
+
+    return 0;
+}
+
+
+// *****************************************************************************
 int grid_fill_pol(
                   const double dr,
                   const double roffset,
@@ -57,6 +111,7 @@ int grid_fill_pol(
     return 0;
 }
 
+// *****************************************************************************
 int grid_collocate_core(
                         const int grid_size_x,
                         const int grid_size_y,
