@@ -598,83 +598,40 @@ CONTAINS
 !> \param lmax ...
 ! **************************************************************************************************
    SUBROUTINE prepare_coef(coef_xyz, alpha, pab, prefactor, la_max, la_min, lb_max, lb_min, lmax)
-      REAL(KIND=dp), DIMENSION(:), INTENT(INOUT)         :: coef_xyz
-      REAL(KIND=dp), DIMENSION(0:, 0:, 0:, :), &
-         INTENT(IN)                                      :: alpha
-      REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: pab
+      REAL(KIND=dp), DIMENSION(:), INTENT(INOUT), TARGET :: coef_xyz
+      REAL(KIND=dp), DIMENSION(:, :, :, :), INTENT(IN), &
+         TARGET                                          :: alpha
+      REAL(KIND=dp), DIMENSION(:, :), INTENT(IN), TARGET :: pab
       REAL(KIND=dp), INTENT(IN)                          :: prefactor
-      INTEGER, INTENT(in)                                :: la_max, la_min, lb_max, lb_min, lmax
+      INTEGER, INTENT(IN)                                :: la_max, la_min, lb_max, lb_min, lmax
 
-      INTEGER                                            :: ico, jco, lp, lxa, lxb, lxp, lxpm, lxy, &
-                                                            lxyz, lya, lyb, lyp, lza, lzb, lzp
-      REAL(KIND=dp)                                      :: p_ele
-      REAL(kind=dp), &
-         DIMENSION(((lmax*2+1)*(lmax*2+2))/2)            :: coef_xyt
-      REAL(kind=dp), DIMENSION(0:lmax*2)                 :: coef_xtt
+      INTEGER                                            :: istat
+      INTERFACE
+         FUNCTION grid_prepare_coef(la_max, la_min, lb_max, lb_min, lmax, prefactor, &
+                                    alpha, pab, coef_xyz) &
+            RESULT(istat) BIND(C, name="grid_prepare_coef")
+            IMPORT :: C_PTR, C_INT, C_DOUBLE
+            INTEGER(KIND=C_INT), VALUE                :: la_max
+            INTEGER(KIND=C_INT), VALUE                :: la_min
+            INTEGER(KIND=C_INT), VALUE                :: lb_max
+            INTEGER(KIND=C_INT), VALUE                :: lb_min
+            INTEGER(KIND=C_INT), VALUE                :: lmax
+            REAL(KIND=C_DOUBLE), VALUE                :: prefactor
+            TYPE(C_PTR), VALUE                        :: alpha
+            TYPE(C_PTR), VALUE                        :: pab
+            TYPE(C_PTR), VALUE                        :: coef_xyz
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_prepare_coef
+      END INTERFACE
 
-      lp = la_max+lb_max
-
-      lxyz = 0
-      DO lzp = 0, lp
-      DO lyp = 0, lp-lzp
-      DO lxp = 0, lp-lzp-lyp
-         lxyz = lxyz+1
-         coef_xyz(lxyz) = 0.0_dp
-      ENDDO
-      ENDDO
-      ENDDO
-      DO lzb = 0, lb_max
-      DO lza = 0, la_max
-         lxy = 0
-         DO lyp = 0, lp-lza-lzb
-            DO lxp = 0, lp-lza-lzb-lyp
-               lxy = lxy+1
-               coef_xyt(lxy) = 0.0_dp
-            ENDDO
-            lxy = lxy+lza+lzb
-         ENDDO
-         DO lyb = 0, lb_max-lzb
-         DO lya = 0, la_max-lza
-            lxpm = (lb_max-lzb-lyb)+(la_max-lza-lya)
-            coef_xtt(0:lxpm) = 0.0_dp
-            DO lxb = MAX(lb_min-lzb-lyb, 0), lb_max-lzb-lyb
-            DO lxa = MAX(la_min-lza-lya, 0), la_max-lza-lya
-               ico = coset(lxa, lya, lza)
-               jco = coset(lxb, lyb, lzb)
-               p_ele = prefactor*pab(ico, jco)
-               DO lxp = 0, lxa+lxb
-                  coef_xtt(lxp) = coef_xtt(lxp)+p_ele*alpha(lxp, lxa, lxb, 1)
-               ENDDO
-            ENDDO
-            ENDDO
-            lxy = 0
-            DO lyp = 0, lya+lyb
-               DO lxp = 0, lp-lza-lzb-lya-lyb
-                  lxy = lxy+1
-                  coef_xyt(lxy) = coef_xyt(lxy)+alpha(lyp, lya, lyb, 2)*coef_xtt(lxp)
-               ENDDO
-               lxy = lxy+lza+lzb+lya+lyb-lyp
-            ENDDO
-         ENDDO
-         ENDDO
-         lxyz = 0
-         DO lzp = 0, lza+lzb
-            lxy = 0
-            DO lyp = 0, lp-lza-lzb
-               DO lxp = 0, lp-lza-lzb-lyp
-                  lxy = lxy+1; lxyz = lxyz+1
-                  coef_xyz(lxyz) = coef_xyz(lxyz)+alpha(lzp, lza, lzb, 3)*coef_xyt(lxy)
-               ENDDO
-               lxy = lxy+lza+lzb; lxyz = lxyz+lza+lzb-lzp
-            ENDDO
-            DO lyp = lp-lza-lzb+1, lp-lzp
-               DO lxp = 0, lp-lyp-lzp
-                  lxyz = lxyz+1
-               ENDDO
-            ENDDO
-         ENDDO
-      ENDDO
-      ENDDO
+      istat = grid_prepare_coef(la_max, la_min, &
+                                lb_max, lb_min, &
+                                lmax, &
+                                prefactor, &
+                                C_LOC(alpha(1, 1, 1, 1)), &
+                                C_LOC(pab(1, 1)), &
+                                C_LOC(coef_xyz(1)))
+      CPASSERT(istat == 0)
 
    END SUBROUTINE prepare_coef
 

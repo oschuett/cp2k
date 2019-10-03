@@ -7,15 +7,119 @@
 #include <math.h>
 #include <stdbool.h>
 
+const int ncoset[] = {1,  // l=0
+                      4,  // l=1
+                      10, // l=2 ...
+                      20, 35, 56, 84, 120, 165, 220, 286, 364,
+                      455, 560, 680, 816, 969, 1140, 1330};
+
+// *****************************************************************************
+static int coset(int lx, int ly, int lz) {
+    const int l = lx + ly + lz;
+    if (l==0) {
+        return 1;
+    } else {
+        return ncoset[l-1] + 1 + ((l-lx) * (l-lx+1)) /2 + lz;
+    }
+}
+
 // *****************************************************************************
 static int min(int x, int y) {
     return (x < y) ? x : y;
 }
 
 // *****************************************************************************
+static int max(int x, int y) {
+    return (x > y) ? x : y;
+}
+
+// *****************************************************************************
 static int mod(int a, int m)
 {
     return (a%m + m) % m;
+}
+
+// *****************************************************************************
+int grid_prepare_coef(const int la_max,
+                      const int la_min,
+                      const int lb_max,
+                      const int lb_min,
+                      const int lmax,
+                      const double prefactor,
+                      const double alpha[3][lmax+1][lmax+1][2*lmax+1],
+                      const double pab[ncoset[lb_max]][ncoset[la_max]],
+                      double coef_xyz[]) {
+
+
+    const int lp = la_max + lb_max;
+
+    const int n = ((lmax*2+1)*(lmax*2+2))/2;
+    double coef_xyt[n];
+    double coef_xtt[lmax*2 + 1];
+
+    int lxyz = 0;
+    for (int lzp = 0; lzp<=lp; lzp++) {
+    for (int lyp = 0; lyp<=lp-lzp; lyp++) {
+    for (int lxp = 0; lxp<=lp-lzp-lyp; lxp++) {
+       coef_xyz[lxyz++] = 0.0;
+    }
+    }
+    }
+
+    for (int lzb = 0; lzb<=lb_max; lzb++) {
+    for (int lza = 0; lza<=la_max; lza++) {
+       int lxy = 0;
+       for (int lyp = 0; lyp<=lp-lza-lzb; lyp++) {
+          for (int lxp = 0; lxp<=lp-lza-lzb-lyp; lxp++) {
+             coef_xyt[lxy++] = 0.0;
+          }
+          lxy = lxy + lza + lzb;
+       }
+       for (int lyb = 0; lyb<=lb_max-lzb; lyb++) {
+       for (int lya = 0; lya<=la_max-lza; lya++) {
+          const int lxpm = (lb_max-lzb-lyb) + (la_max-lza-lya);
+          for (int i=0; i<=lxpm; i++) {
+              coef_xtt[i] = 0.0;
+          }
+          for (int lxb = max(lb_min-lzb-lyb, 0); lxb<=lb_max-lzb-lyb; lxb++) {
+          for (int lxa = max(la_min-lza-lya, 0); lxa<=la_max-lza-lya; lxa++) {
+             const int ico = coset(lxa, lya, lza);
+             const int jco = coset(lxb, lyb, lzb);
+             const double p_ele = prefactor * pab[jco-1][ico-1];
+             for (int lxp = 0; lxp<=lxa+lxb; lxp++) {
+                coef_xtt[lxp] += p_ele * alpha[0][lxb][lxa][lxp];
+             }
+          }
+          }
+          int lxy = 0;
+          for (int lyp = 0; lyp<=lya+lyb; lyp++) {
+             for (int lxp = 0; lxp<=lp-lza-lzb-lya-lyb; lxp++) {
+                coef_xyt[lxy++] += alpha[1][lyb][lya][lyp] * coef_xtt[lxp];
+             }
+             lxy += lza + lzb + lya + lyb - lyp;
+          }
+       }
+       }
+       lxyz = 0;
+       for (int lzp = 0; lzp<=lza+lzb; lzp++) {
+          int lxy = 0;
+          for (int lyp = 0; lyp<=lp-lza-lzb; lyp++) {
+             for (int lxp = 0; lxp<=lp-lza-lzb-lyp; lxp++) {
+                coef_xyz[lxyz++] += alpha[2][lzb][lza][lzp] * coef_xyt[lxy++];
+             }
+             lxy += lza + lzb;
+             lxyz += lza + lzb - lzp;
+          }
+          for (int lyp = lp-lza-lzb+1; lyp<=lp-lzp; lyp++) {
+             for (int lxp = 0; lxp<=lp-lyp-lzp; lxp++) {
+                lxyz++;
+             }
+          }
+       }
+    }
+    }
+
+    return 0;
 }
 
 // *****************************************************************************
