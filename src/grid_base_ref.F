@@ -354,7 +354,7 @@ CONTAINS
 !   where p is center of the product gaussian, and lp = la_max + lb_max
 !   (current implementation is l**7)
 !
-      CALL prepare_alpha(alpha, ra, rb, rp, la_max_local, lb_max_local)
+      CALL prepare_alpha(alpha, ra, rb, rp, la_max_local, lb_max_local, lmax_global)
 !
 !   compute P_{lxp,lyp,lzp} given P_{lxa,lya,lza,lxb,lyb,lzb} and alpha(ls,lxa,lxb,1)
 !   use a three step procedure
@@ -545,43 +545,38 @@ CONTAINS
 !> \param rp ...
 !> \param la_max ...
 !> \param lb_max ...
+!> \param lmax ...
 ! **************************************************************************************************
-   SUBROUTINE prepare_alpha(alpha, ra, rb, rp, la_max, lb_max)
-      REAL(KIND=dp), DIMENSION(0:, 0:, 0:, :), &
-         INTENT(OUT)                                     :: alpha
-      REAL(KIND=dp), DIMENSION(3), INTENT(IN)            :: ra, rb, rp
-      INTEGER, INTENT(in)                                :: la_max, lb_max
+   SUBROUTINE prepare_alpha(alpha, ra, rb, rp, la_max, lb_max, lmax)
+      REAL(KIND=dp), DIMENSION(:, :, :, :), &
+         INTENT(OUT), TARGET                             :: alpha
+      REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: ra, rb, rp
+      INTEGER, INTENT(IN)                                :: la_max, lb_max, lmax
 
-      INTEGER                                            :: iaxis, k, l, lxa, lxb
-      REAL(KIND=dp)                                      :: a, b, binomial_k_lxa, binomial_l_lxb, &
-                                                            drpa, drpb
+      INTEGER                                            :: istat
+      INTERFACE
+         FUNCTION grid_prepare_alpha(ra, rb, rp, la_max, lb_max, lmax, alpha) &
+            RESULT(istat) BIND(C, name="grid_prepare_alpha")
+            IMPORT :: C_PTR, C_INT, C_DOUBLE
+            TYPE(C_PTR), VALUE                        :: ra
+            TYPE(C_PTR), VALUE                        :: rb
+            TYPE(C_PTR), VALUE                        :: rp
+            INTEGER(KIND=C_INT), VALUE                :: la_max
+            INTEGER(KIND=C_INT), VALUE                :: lb_max
+            INTEGER(KIND=C_INT), VALUE                :: lmax
+            TYPE(C_PTR), VALUE                        :: alpha
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_prepare_alpha
+      END INTERFACE
 
-!
-!   compute polynomial expansion coefs -> (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
-!
-      alpha(:, :, :, :) = 0.0_dp
-      DO iaxis = 1, 3
-         drpa = rp(iaxis)-ra(iaxis)
-         drpb = rp(iaxis)-rb(iaxis)
-         DO lxa = 0, la_max
-         DO lxb = 0, lb_max
-            binomial_k_lxa = 1.0_dp
-            a = 1.0_dp
-            DO k = 0, lxa
-               binomial_l_lxb = 1.0_dp
-               b = 1.0_dp
-               DO l = 0, lxb
-                  alpha(lxa-l+lxb-k, lxa, lxb, iaxis) = alpha(lxa-l+lxb-k, lxa, lxb, iaxis)+ &
-                                                        binomial_k_lxa*binomial_l_lxb*a*b
-                  binomial_l_lxb = binomial_l_lxb*REAL(lxb-l, dp)/REAL(l+1, dp)
-                  b = b*drpb
-               ENDDO
-               binomial_k_lxa = binomial_k_lxa*REAL(lxa-k, dp)/REAL(k+1, dp)
-               a = a*drpa
-            ENDDO
-         ENDDO
-         ENDDO
-      ENDDO
+      istat = grid_prepare_alpha(C_LOC(ra(1)), &
+                                 C_LOC(rb(1)), &
+                                 C_LOC(rp(1)), &
+                                 la_max, &
+                                 lb_max, &
+                                 lmax, &
+                                 C_LOC(alpha(1, 1, 1, 1)))
+      CPASSERT(istat == 0)
 
    END SUBROUTINE prepare_alpha
 

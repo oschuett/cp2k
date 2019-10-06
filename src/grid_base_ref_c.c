@@ -39,6 +39,56 @@ static int mod(int a, int m)
     return (a%m + m) % m;
 }
 
+
+// *****************************************************************************
+int grid_prepare_alpha(const double ra[3],
+                       const double rb[3],
+                       const double rp[3],
+                       const int la_max,
+                       const int lb_max,
+                       const int lmax,
+                       double alpha[3][lmax+1][lmax+1][2*lmax+1]) {
+
+    // Initialize with zeros.
+    for (int iaxis=0; iaxis<3; iaxis++) {
+    for (int lxb=0; lxb<=lmax; lxb++) {
+    for (int lxa=0; lxa<=lmax; lxa++) {
+    for (int lxp=0; lxp<=2*lmax; lxp++) {
+        alpha[iaxis][lxb][lxa][lxp] = 0.0;
+    }
+    }
+    }
+    }
+
+    //
+    //   compute polynomial expansion coefs -> (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
+    //
+
+    for (int iaxis=0; iaxis<3; iaxis++) {
+       const double drpa = rp[iaxis] - ra[iaxis];
+       const double drpb = rp[iaxis] - rb[iaxis];
+       for (int lxa=0; lxa<=la_max; lxa++) {
+       for (int lxb=0; lxb<=lb_max; lxb++) {
+          double binomial_k_lxa = 1.0;
+          double a = 1.0;
+          for (int k=0; k<=lxa; k++) {
+             double binomial_l_lxb = 1.0;
+             double b = 1.0;
+             for (int l=0; l<=lxb; l++) {
+                alpha[iaxis][lxb][lxa][lxa-l+lxb-k] += binomial_k_lxa * binomial_l_lxb * a * b;
+                binomial_l_lxb *= ((double)(lxb - l)) / ((double)(l + 1));
+                b *= drpb;
+             }
+             binomial_k_lxa *= ((double)(lxa-k)) / ((double)(k+1));
+             a *= drpa;
+          }
+       }
+       }
+    }
+
+    return 0;
+}
+
 // *****************************************************************************
 int grid_prepare_coef(const int la_max,
                       const int la_min,
