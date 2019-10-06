@@ -14,6 +14,7 @@ const int ncoset[] = {1,  // l=0
                       455, 560, 680, 816, 969, 1140, 1330};
 
 // *****************************************************************************
+//TODO maybe shift by -1 due to zero-based arrays in C. Should use differnt name during transition though.
 static int coset(int lx, int ly, int lz) {
     const int l = lx + ly + lz;
     if (l==0) {
@@ -37,6 +38,106 @@ static int max(int x, int y) {
 static int mod(int a, int m)
 {
     return (a%m + m) % m;
+}
+
+// *****************************************************************************
+int grid_prepare_pab_tau(const int o1,
+                         const int o2,
+                         const int la_max,
+                         const int la_min,
+                         const int lb_max,
+                         const int lb_min,
+                         const int maxco,
+                         const double zeta,
+                         const double zetb,
+                         const double pab[maxco][maxco],
+                         double pab_tau[ncoset[lb_max+1]][ncoset[la_max+1]]) {
+
+    // create a new pab_tau so that mapping pab_tau with pgf_a pgf_b
+    // is equivalent to mapping pab with 0.5 * (nabla pgf_a) . (nabla pgf_b)
+    // (ddx pgf_a ) (ddx pgf_b) = (lax pgf_{a-1x} - 2*zeta*pgf_{a+1x})*(lbx pgf_{b-1x} - 2*zetb*pgf_{b+1x})
+
+    const int nla = ncoset[la_max+1];
+    const int nlb = ncoset[lb_max+1];
+    // ALLOCATE (pab_tau(nla, nlb)) //TODO: Move from Fortran
+
+    // Initialize with zeros.
+    for (int ico=0; ico<nla; ico++) {
+    for (int jco=0; jco<nlb; jco++) {
+        pab_tau[jco][ico] = 0.0;
+    }
+    }
+
+    for (int lxa=0; lxa<=la_max; lxa++) {
+    for (int lxb=0; lxb<=lb_max; lxb++) {
+       for (int lya=0; lya<=la_max-lxa; lya++) {
+       for (int lyb=0; lyb<=lb_max-lxb; lyb++) {
+          for (int lza=max(la_min-lxa-lya, 0); lza<=la_max-lxa-lya; lza++) {
+          for (int lzb=max(lb_min-lxb-lyb, 0); lzb<=lb_max-lxb-lyb; lzb++) {
+             const int ico = coset(lxa, lya, lza);
+             const int jco = coset(lxb, lyb, lzb);
+
+             int ico_l, jco_l;
+             // x  (all safe if lxa = 0, as the spurious added terms have zero prefactor)
+
+             ico_l = coset(max(lxa-1, 0), lya, lza);
+             jco_l = coset(max(lxb-1, 0), lyb, lzb);
+             pab_tau[jco_l-1][ico_l-1] += lxa * lxb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset(max(lxa-1, 0), lya, lza);
+             jco_l = coset((lxb+1), lyb, lzb);
+             pab_tau[jco_l-1][ico_l-1] += -2.0 * lxa * zetb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset((lxa+1), lya, lza);
+             jco_l = coset(max(lxb-1, 0), lyb, lzb);
+             pab_tau[jco_l-1][ico_l-1] += -2.0 * zeta * lxb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset((lxa+1), lya, lza);
+             jco_l = coset((lxb+1), lyb, lzb);
+             pab_tau[jco_l-1][ico_l-1] += 4.0 * zeta * zetb * pab[o2+jco-1][o1+ico-1];
+
+             // y
+
+             ico_l = coset(lxa, max(lya-1, 0), lza);
+             jco_l = coset(lxb, max(lyb-1, 0), lzb);
+             pab_tau[jco_l-1][ico_l-1] += lya * lyb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset(lxa, max(lya-1, 0), lza);
+             jco_l = coset(lxb, (lyb+1), lzb);
+             pab_tau[jco_l-1][ico_l-1] += -2.0 * lya * zetb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset(lxa, (lya+1), lza);
+             jco_l = coset(lxb, max(lyb-1, 0), lzb);
+             pab_tau[jco_l-1][ico_l-1] += -2.0 * zeta * lyb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset(lxa, (lya+1), lza);
+             jco_l = coset(lxb, (lyb+1), lzb);
+             pab_tau[jco_l-1][ico_l-1] += 4.0 * zeta * zetb * pab[o2+jco-1][o1+ico-1];
+
+             // z
+
+             ico_l = coset(lxa, lya, max(lza-1, 0));
+             jco_l = coset(lxb, lyb, max(lzb-1, 0));
+             pab_tau[jco_l-1][ico_l-1] += lza * lzb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset(lxa, lya, max(lza-1, 0));
+             jco_l = coset(lxb, lyb, (lzb+1));
+             pab_tau[jco_l-1][ico_l-1] += -2.0 * lza * zetb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset(lxa, lya, (lza+1));
+             jco_l = coset(lxb, lyb, max(lzb-1, 0));
+             pab_tau[jco_l-1][ico_l-1] += -2.0 * zeta * lzb * pab[o2+jco-1][o1+ico-1];
+             ico_l = coset(lxa, lya, (lza+1));
+             jco_l = coset(lxb, lyb, (lzb+1));
+             pab_tau[jco_l-1][ico_l-1] += 4.0 * zeta * zetb * pab[o2+jco-1][o1+ico-1];
+          }
+          }
+       }
+       }
+    }
+    }
+
+    // Divide by two.
+    //TODO Maybe divide all prefactors above instead.
+    for (int ico=0; ico<nla; ico++) {
+    for (int jco=0; jco<nlb; jco++) {
+        pab_tau[jco][ico] *= 0.5;
+    }
+    }
+
+    return 0;
 }
 
 // *****************************************************************************

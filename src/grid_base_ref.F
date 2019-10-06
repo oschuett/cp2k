@@ -325,7 +325,7 @@ CONTAINS
          lb_min_local = MAX(lb_min-1, 0)
          NULLIFY (pab_local)
          CALL prepare_pab_tau(pab_local, pab, o1, o2, &
-                              la_max, la_min, lb_max, lb_min, zeta, zetb)
+                              la_max, la_min, lb_max, lb_min, maxco, zeta, zetb)
       ELSE
          la_max_local = la_max
          la_min_local = la_min
@@ -381,26 +381,6 @@ CONTAINS
 
 ! **************************************************************************************************
 !> \brief ...
-!> \param lx ...
-!> \param ly ...
-!> \param lz ...
-!> \return ...
-! **************************************************************************************************
-   FUNCTION coset(lx, ly, lz) RESULT(cval)
-      INTEGER, INTENT(IN)                                :: lx, ly, lz
-      INTEGER                                            :: cval
-
-      INTEGER                                            :: l
-
-      l = lx+ly+lz
-      cval = ncoset(l-1)+1+((l-lx)*(l-lx+1))/2+lz
-
-   END FUNCTION coset
-
-! **************************************************************************************************
-
-! **************************************************************************************************
-!> \brief ...
 !> \param pab_tau ...
 !> \param pab ...
 !> \param o1 ...
@@ -409,89 +389,55 @@ CONTAINS
 !> \param la_min ...
 !> \param lb_max ...
 !> \param lb_min ...
+!> \param maxco ...
 !> \param zeta ...
 !> \param zetb ...
 ! **************************************************************************************************
    SUBROUTINE prepare_pab_tau(pab_tau, pab, o1, o2, &
-                              la_max, la_min, lb_max, lb_min, zeta, zetb)
+                              la_max, la_min, lb_max, lb_min, maxco, zeta, zetb)
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab_tau
-      REAL(dp), DIMENSION(:, :), INTENT(in)              :: pab
-      INTEGER, INTENT(in)                                :: o1, o2, la_max, la_min, lb_max, lb_min
+      REAL(dp), DIMENSION(:, :), INTENT(IN), TARGET      :: pab
+      INTEGER, INTENT(in)                                :: o1, o2, la_max, la_min, lb_max, lb_min, &
+                                                            maxco
       REAL(KIND=dp), INTENT(in)                          :: zeta, zetb
 
-      INTEGER                                            :: ico, ico_l, jco, jco_l, lxa, lxb, lya, &
-                                                            lyb, lza, lzb, nla, nlb
+      INTEGER                                            :: istat, nla, nlb
+      INTERFACE
+         FUNCTION grid_prepare_pab_tau(o1, o2, la_max, la_min, lb_max, lb_min, maxco, &
+                                       zeta, zetb, pab, pab_tau) &
+            RESULT(istat) BIND(C, name="grid_prepare_pab_tau")
+            IMPORT :: C_PTR, C_INT, C_DOUBLE
+            INTEGER(KIND=C_INT), VALUE                :: o1
+            INTEGER(KIND=C_INT), VALUE                :: o2
+            INTEGER(KIND=C_INT), VALUE                :: la_max
+            INTEGER(KIND=C_INT), VALUE                :: la_min
+            INTEGER(KIND=C_INT), VALUE                :: lb_max
+            INTEGER(KIND=C_INT), VALUE                :: lb_min
+            INTEGER(KIND=C_INT), VALUE                :: maxco
+            REAL(KIND=C_DOUBLE), VALUE                :: zeta
+            REAL(KIND=C_DOUBLE), VALUE                :: zetb
+            TYPE(C_PTR), VALUE                        :: pab
+            TYPE(C_PTR), VALUE                        :: pab_tau
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_prepare_pab_tau
+      END INTERFACE
 
-      ! create a new pab_tau so that mapping pab_tau with pgf_a pgf_b
-      ! is equivalent to mapping pab with 0.5 * (nabla pgf_a) . (nabla pgf_b)
-      ! (ddx pgf_a ) (ddx pgf_b) = (lax pgf_{a-1x} - 2*zeta*pgf_{a+1x})*(lbx pgf_{b-1x} - 2*zetb*pgf_{b+1x})
       nla = ncoset(la_max+1)
       nlb = ncoset(lb_max+1)
       ALLOCATE (pab_tau(nla, nlb))
-      pab_tau = 0.0_dp
-      DO lxa = 0, la_max
-      DO lxb = 0, lb_max
-         DO lya = 0, la_max-lxa
-         DO lyb = 0, lb_max-lxb
-            DO lza = MAX(la_min-lxa-lya, 0), la_max-lxa-lya
-            DO lzb = MAX(lb_min-lxb-lyb, 0), lb_max-lxb-lyb
 
-               ico = coset(lxa, lya, lza)
-               jco = coset(lxb, lyb, lzb)
-
-               ! x  (all safe if lxa = 0, as the spurious added terms have zero prefactor)
-
-               ico_l = coset(MAX(lxa-1, 0), lya, lza)
-               jco_l = coset(MAX(lxb-1, 0), lyb, lzb)
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)+lxa*lxb*pab(o1+ico, o2+jco)
-               ico_l = coset(MAX(lxa-1, 0), lya, lza)
-               jco_l = coset((lxb+1), lyb, lzb)
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)-2.0_dp*lxa*zetb*pab(o1+ico, o2+jco)
-               ico_l = coset((lxa+1), lya, lza)
-               jco_l = coset(MAX(lxb-1, 0), lyb, lzb)
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)-2.0_dp*zeta*lxb*pab(o1+ico, o2+jco)
-               ico_l = coset((lxa+1), lya, lza)
-               jco_l = coset((lxb+1), lyb, lzb)
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)+4.0_dp*zeta*zetb*pab(o1+ico, o2+jco)
-
-               ! y
-
-               ico_l = coset(lxa, MAX(lya-1, 0), lza)
-               jco_l = coset(lxb, MAX(lyb-1, 0), lzb)
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)+lya*lyb*pab(o1+ico, o2+jco)
-               ico_l = coset(lxa, MAX(lya-1, 0), lza)
-               jco_l = coset(lxb, (lyb+1), lzb)
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)-2.0_dp*lya*zetb*pab(o1+ico, o2+jco)
-               ico_l = coset(lxa, (lya+1), lza)
-               jco_l = coset(lxb, MAX(lyb-1, 0), lzb)
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)-2.0_dp*zeta*lyb*pab(o1+ico, o2+jco)
-               ico_l = coset(lxa, (lya+1), lza)
-               jco_l = coset(lxb, (lyb+1), lzb)
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)+4.0_dp*zeta*zetb*pab(o1+ico, o2+jco)
-
-               ! z
-
-               ico_l = coset(lxa, lya, MAX(lza-1, 0))
-               jco_l = coset(lxb, lyb, MAX(lzb-1, 0))
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)+lza*lzb*pab(o1+ico, o2+jco)
-               ico_l = coset(lxa, lya, MAX(lza-1, 0))
-               jco_l = coset(lxb, lyb, (lzb+1))
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)-2.0_dp*lza*zetb*pab(o1+ico, o2+jco)
-               ico_l = coset(lxa, lya, (lza+1))
-               jco_l = coset(lxb, lyb, MAX(lzb-1, 0))
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)-2.0_dp*zeta*lzb*pab(o1+ico, o2+jco)
-               ico_l = coset(lxa, lya, (lza+1))
-               jco_l = coset(lxb, lyb, (lzb+1))
-               pab_tau(ico_l, jco_l) = pab_tau(ico_l, jco_l)+4.0_dp*zeta*zetb*pab(o1+ico, o2+jco)
-
-            ENDDO
-            ENDDO
-         ENDDO
-         ENDDO
-      ENDDO
-      ENDDO
-
-      pab_tau = 0.5_dp*pab_tau
+      istat = grid_prepare_pab_tau(o1, &
+                                   o2, &
+                                   la_max, &
+                                   la_min, &
+                                   lb_max, &
+                                   lb_min, &
+                                   maxco, &
+                                   zeta, &
+                                   zetb, &
+                                   C_LOC(pab(1, 1)), &
+                                   C_LOC(pab_tau(1, 1)))
+      CPASSERT(istat == 0)
 
    END SUBROUTINE prepare_pab_tau
 
@@ -517,7 +463,7 @@ CONTAINS
       INTERFACE
          FUNCTION grid_prepare_pab_rho(o1, o2, la_max, la_min, lb_max, lb_min, maxco, pab, pab_rho) &
             RESULT(istat) BIND(C, name="grid_prepare_pab_rho")
-            IMPORT :: C_PTR, C_INT, C_DOUBLE
+            IMPORT :: C_PTR, C_INT
             INTEGER(KIND=C_INT), VALUE                :: o1
             INTEGER(KIND=C_INT), VALUE                :: o2
             INTEGER(KIND=C_INT), VALUE                :: la_max
@@ -568,7 +514,7 @@ CONTAINS
       INTERFACE
          FUNCTION grid_prepare_alpha(ra, rb, rp, la_max, lb_max, lmax, alpha) &
             RESULT(istat) BIND(C, name="grid_prepare_alpha")
-            IMPORT :: C_PTR, C_INT, C_DOUBLE
+            IMPORT :: C_PTR, C_INT
             TYPE(C_PTR), VALUE                        :: ra
             TYPE(C_PTR), VALUE                        :: rb
             TYPE(C_PTR), VALUE                        :: rp
