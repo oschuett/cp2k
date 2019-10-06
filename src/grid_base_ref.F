@@ -228,7 +228,7 @@ CONTAINS
                dh, dh_inv, perd, npts, lb_grid, &
                drmin, max_radius, max_rad_ga, &
                glb_cube, gub_cube, gsphere_bound, &
-               compute_tau, use_subpatch, lmax_global)
+               compute_tau, use_subpatch, lmax_global, maxco)
 
          END DO loop_tasks
          END DO loop_pairs
@@ -270,6 +270,7 @@ CONTAINS
 !> \param compute_tau ...
 !> \param use_subpatch ...
 !> \param lmax_global Maximum possible value of lmax used to dimension arrays
+!> \param maxco ...
 ! **************************************************************************************************
    SUBROUTINE collocate_pgf_product_rspace(la_max, zeta, la_min, &
                                            lb_max, zetb, lb_min, &
@@ -278,7 +279,7 @@ CONTAINS
                                            dh, dh_inv, perd, npts, lb_grid, &
                                            drmin, max_radius, max_rad_ga, &
                                            glb_cube, gub_cube, gsphere_bound, &
-                                           compute_tau, use_subpatch, lmax_global)
+                                           compute_tau, use_subpatch, lmax_global, maxco)
 
       INTEGER, INTENT(IN)                                :: la_max
       REAL(KIND=dp), INTENT(IN)                          :: zeta
@@ -297,7 +298,7 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                          :: max_rad_ga
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bound
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
-      INTEGER, INTENT(IN)                                :: lmax_global
+      INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
       INTEGER                                            :: gridbounds(2, 3), la_max_local, &
                                                             la_min_local, lb_max_local, &
@@ -331,7 +332,7 @@ CONTAINS
          lb_max_local = lb_max
          lb_min_local = lb_min
          NULLIFY (pab_local)
-         CALL prepare_pab_rho(pab_local, pab, o1, o2, la_max, la_min, lb_max, lb_min)
+         CALL prepare_pab_rho(pab_local, pab, o1, o2, la_max, la_min, lb_max, lb_min, maxco)
       END IF
 
       ng(:) = npts(:)
@@ -495,8 +496,6 @@ CONTAINS
    END SUBROUTINE prepare_pab_tau
 
 ! **************************************************************************************************
-
-! **************************************************************************************************
 !> \brief ...
 !> \param pab_rho ...
 !> \param pab ...
@@ -506,34 +505,46 @@ CONTAINS
 !> \param la_min ...
 !> \param lb_max ...
 !> \param lb_min ...
+!> \param maxco ...
 ! **************************************************************************************************
-   SUBROUTINE prepare_pab_rho(pab_rho, pab, o1, o2, la_max, la_min, lb_max, lb_min)
+   SUBROUTINE prepare_pab_rho(pab_rho, pab, o1, o2, la_max, la_min, lb_max, lb_min, maxco)
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab_rho
-      REAL(dp), DIMENSION(:, :), INTENT(in)              :: pab
-      INTEGER, INTENT(in)                                :: o1, o2, la_max, la_min, lb_max, lb_min
+      REAL(dp), DIMENSION(:, :), INTENT(IN), TARGET      :: pab
+      INTEGER, INTENT(in)                                :: o1, o2, la_max, la_min, lb_max, lb_min, &
+                                                            maxco
 
-      INTEGER                                            :: ico, jco, lxa, lxb, lya, lyb, lza, lzb, &
-                                                            nla, nlb
+      INTEGER                                            :: istat, nla, nlb
+      INTERFACE
+         FUNCTION grid_prepare_pab_rho(o1, o2, la_max, la_min, lb_max, lb_min, maxco, pab, pab_rho) &
+            RESULT(istat) BIND(C, name="grid_prepare_pab_rho")
+            IMPORT :: C_PTR, C_INT, C_DOUBLE
+            INTEGER(KIND=C_INT), VALUE                :: o1
+            INTEGER(KIND=C_INT), VALUE                :: o2
+            INTEGER(KIND=C_INT), VALUE                :: la_max
+            INTEGER(KIND=C_INT), VALUE                :: la_min
+            INTEGER(KIND=C_INT), VALUE                :: lb_max
+            INTEGER(KIND=C_INT), VALUE                :: lb_min
+            INTEGER(KIND=C_INT), VALUE                :: maxco
+            TYPE(C_PTR), VALUE                        :: pab
+            TYPE(C_PTR), VALUE                        :: pab_rho
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_prepare_pab_rho
+      END INTERFACE
 
       nla = ncoset(la_max)
       nlb = ncoset(lb_max)
       ALLOCATE (pab_rho(nla, nlb))
-      pab_rho = 0.0_dp
-      DO lxa = 0, la_max
-      DO lxb = 0, lb_max
-         DO lya = 0, la_max-lxa
-         DO lyb = 0, lb_max-lxb
-            DO lza = MAX(la_min-lxa-lya, 0), la_max-lxa-lya
-            DO lzb = MAX(lb_min-lxb-lyb, 0), lb_max-lxb-lyb
-               ico = coset(lxa, lya, lza)
-               jco = coset(lxb, lyb, lzb)
-               pab_rho(ico, jco) = pab(o1+ico, o2+jco)
-            ENDDO
-            ENDDO
-         ENDDO
-         ENDDO
-      ENDDO
-      ENDDO
+
+      istat = grid_prepare_pab_rho(o1, &
+                                   o2, &
+                                   la_max, &
+                                   la_min, &
+                                   lb_max, &
+                                   lb_min, &
+                                   maxco, &
+                                   C_LOC(pab(1, 1)), &
+                                   C_LOC(pab_rho(1, 1)))
+      CPASSERT(istat == 0)
 
    END SUBROUTINE prepare_pab_rho
 

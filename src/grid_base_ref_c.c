@@ -39,6 +39,45 @@ static int mod(int a, int m)
     return (a%m + m) % m;
 }
 
+// *****************************************************************************
+int grid_prepare_pab_rho(const int o1,
+                         const int o2,
+                         const int la_max,
+                         const int la_min,
+                         const int lb_max,
+                         const int lb_min,
+                         const int maxco,
+                         const double pab[maxco][maxco],
+                         double pab_rho[ncoset[lb_max]][ncoset[la_max]]) {
+
+    const int nla = ncoset[la_max];
+    const int nlb = ncoset[lb_max];
+    //   ALLOCATE (pab_rho(nla, nlb)) // TODO move from Fortran.
+
+    // Initialize with zeros.
+    for (int ico=0; ico<nla; ico++) {
+    for (int jco=0; jco<nlb; jco++) {
+        pab_rho[jco][ico] = 0.0;
+    }
+    }
+    for (int lxa=0; lxa<=la_max; lxa++) {
+    for (int lxb=0; lxb<=lb_max; lxb++) {
+       for (int lya=0; lya<=la_max-lxa; lya++) {
+       for (int lyb=0; lyb<=lb_max-lxb; lyb++) {
+          for (int lza=max(la_min-lxa-lya, 0); lza<=la_max-lxa-lya; lza++) {
+          for (int lzb=max(lb_min-lxb-lyb, 0); lzb<=lb_max-lxb-lyb; lzb++) {
+             const int ico = coset(lxa, lya, lza);
+             const int jco = coset(lxb, lyb, lzb);
+             pab_rho[jco-1][ico-1] = pab[o2+jco-1][o1+ico-1];
+          }
+          }
+       }
+       }
+    }
+    }
+
+    return 0;
+}
 
 // *****************************************************************************
 int grid_prepare_alpha(const double ra[3],
