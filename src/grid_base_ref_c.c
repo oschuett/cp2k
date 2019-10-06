@@ -14,13 +14,13 @@ const int ncoset[] = {1,  // l=0
                       455, 560, 680, 816, 969, 1140, 1330};
 
 // *****************************************************************************
-//TODO maybe shift by -1 due to zero-based arrays in C. Should use differnt name during transition though.
+// Returns zero based indices.
 static int coset(int lx, int ly, int lz) {
     const int l = lx + ly + lz;
     if (l==0) {
-        return 1;
+        return 0;
     } else {
-        return ncoset[l-1] + 1 + ((l-lx) * (l-lx+1)) /2 + lz;
+        return ncoset[l-1] + ((l-lx) * (l-lx+1)) /2 + lz;
     }
 }
 
@@ -82,46 +82,46 @@ int grid_prepare_pab_tau(const int o1,
 
              ico_l = coset(max(lxa-1, 0), lya, lza);
              jco_l = coset(max(lxb-1, 0), lyb, lzb);
-             pab_tau[jco_l-1][ico_l-1] += lxa * lxb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += lxa * lxb * pab[o2+jco][o1+ico];
              ico_l = coset(max(lxa-1, 0), lya, lza);
              jco_l = coset((lxb+1), lyb, lzb);
-             pab_tau[jco_l-1][ico_l-1] += -2.0 * lxa * zetb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += -2.0 * lxa * zetb * pab[o2+jco][o1+ico];
              ico_l = coset((lxa+1), lya, lza);
              jco_l = coset(max(lxb-1, 0), lyb, lzb);
-             pab_tau[jco_l-1][ico_l-1] += -2.0 * zeta * lxb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += -2.0 * zeta * lxb * pab[o2+jco][o1+ico];
              ico_l = coset((lxa+1), lya, lza);
              jco_l = coset((lxb+1), lyb, lzb);
-             pab_tau[jco_l-1][ico_l-1] += 4.0 * zeta * zetb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += 4.0 * zeta * zetb * pab[o2+jco][o1+ico];
 
              // y
 
              ico_l = coset(lxa, max(lya-1, 0), lza);
              jco_l = coset(lxb, max(lyb-1, 0), lzb);
-             pab_tau[jco_l-1][ico_l-1] += lya * lyb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += lya * lyb * pab[o2+jco][o1+ico];
              ico_l = coset(lxa, max(lya-1, 0), lza);
              jco_l = coset(lxb, (lyb+1), lzb);
-             pab_tau[jco_l-1][ico_l-1] += -2.0 * lya * zetb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += -2.0 * lya * zetb * pab[o2+jco][o1+ico];
              ico_l = coset(lxa, (lya+1), lza);
              jco_l = coset(lxb, max(lyb-1, 0), lzb);
-             pab_tau[jco_l-1][ico_l-1] += -2.0 * zeta * lyb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += -2.0 * zeta * lyb * pab[o2+jco][o1+ico];
              ico_l = coset(lxa, (lya+1), lza);
              jco_l = coset(lxb, (lyb+1), lzb);
-             pab_tau[jco_l-1][ico_l-1] += 4.0 * zeta * zetb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += 4.0 * zeta * zetb * pab[o2+jco][o1+ico];
 
              // z
 
              ico_l = coset(lxa, lya, max(lza-1, 0));
              jco_l = coset(lxb, lyb, max(lzb-1, 0));
-             pab_tau[jco_l-1][ico_l-1] += lza * lzb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += lza * lzb * pab[o2+jco][o1+ico];
              ico_l = coset(lxa, lya, max(lza-1, 0));
              jco_l = coset(lxb, lyb, (lzb+1));
-             pab_tau[jco_l-1][ico_l-1] += -2.0 * lza * zetb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += -2.0 * lza * zetb * pab[o2+jco][o1+ico];
              ico_l = coset(lxa, lya, (lza+1));
              jco_l = coset(lxb, lyb, max(lzb-1, 0));
-             pab_tau[jco_l-1][ico_l-1] += -2.0 * zeta * lzb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += -2.0 * zeta * lzb * pab[o2+jco][o1+ico];
              ico_l = coset(lxa, lya, (lza+1));
              jco_l = coset(lxb, lyb, (lzb+1));
-             pab_tau[jco_l-1][ico_l-1] += 4.0 * zeta * zetb * pab[o2+jco-1][o1+ico-1];
+             pab_tau[jco_l][ico_l] += 4.0 * zeta * zetb * pab[o2+jco][o1+ico];
           }
           }
        }
@@ -169,7 +169,7 @@ int grid_prepare_pab_rho(const int o1,
           for (int lzb=max(lb_min-lxb-lyb, 0); lzb<=lb_max-lxb-lyb; lzb++) {
              const int ico = coset(lxa, lya, lza);
              const int jco = coset(lxb, lyb, lzb);
-             pab_rho[jco-1][ico-1] = pab[o2+jco-1][o1+ico-1];
+             pab_rho[jco][ico] = pab[o2+jco][o1+ico];
           }
           }
        }
@@ -275,7 +275,7 @@ int grid_prepare_coef(const int la_max,
           for (int lxa = max(la_min-lza-lya, 0); lxa<=la_max-lza-lya; lxa++) {
              const int ico = coset(lxa, lya, lza);
              const int jco = coset(lxb, lyb, lzb);
-             const double p_ele = prefactor * pab[jco-1][ico-1];
+             const double p_ele = prefactor * pab[jco][ico];
              for (int lxp = 0; lxp<=lxa+lxb; lxp++) {
                 coef_xtt[lxp] += p_ele * alpha[0][lxb][lxa][lxp];
              }
