@@ -6,12 +6,26 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdbool.h>
+#include <limits.h>
 
 const int ncoset[] = {1,  // l=0
                       4,  // l=1
                       10, // l=2 ...
                       20, 35, 56, 84, 120, 165, 220, 286, 364,
                       455, 560, 680, 816, 969, 1140, 1330};
+
+const double fac[] = {
+        0.10000000000000000000E+01, 0.10000000000000000000E+01, 0.20000000000000000000E+01,
+        0.60000000000000000000E+01, 0.24000000000000000000E+02, 0.12000000000000000000E+03,
+        0.72000000000000000000E+03, 0.50400000000000000000E+04, 0.40320000000000000000E+05,
+        0.36288000000000000000E+06, 0.36288000000000000000E+07, 0.39916800000000000000E+08,
+        0.47900160000000000000E+09, 0.62270208000000000000E+10, 0.87178291200000000000E+11,
+        0.13076743680000000000E+13, 0.20922789888000000000E+14, 0.35568742809600000000E+15,
+        0.64023737057280000000E+16, 0.12164510040883200000E+18, 0.24329020081766400000E+19,
+        0.51090942171709440000E+20, 0.11240007277776076800E+22, 0.25852016738884976640E+23,
+        0.62044840173323943936E+24, 0.15511210043330985984E+26, 0.40329146112660563558E+27,
+        0.10888869450418352161E+29, 0.30488834461171386050E+30, 0.88417619937397019545E+31,
+        0.26525285981219105864E+33 };
 
 // *****************************************************************************
 // Returns zero based indices.
@@ -514,6 +528,114 @@ int grid_collocate_core(
             }
         }
     }
+    return 0;
+}
+
+// *****************************************************************************
+int grid_collocate_general(int const lp,
+                           const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                           double coef_ijk[((lp+1)*(lp+2)*(lp+3))/6],
+                           const double dh[3][3],
+                           const double dh_inv[3][3],
+                           const double rp[3],
+                           double gp[3],
+                           int cubecenter[3]) {
+
+//
+// transform P_{lxp,lyp,lzp} into a P_{lip,ljp,lkp} such that
+// sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-x_p)**lxp (y-y_p)**lyp (z-z_p)**lzp =
+// sum_{lip,ljp,lkp} P_{lip,ljp,lkp} (i-i_p)**lip (j-j_p)**ljp (k-k_p)**lkp
+//
+
+    //ALLOCATE (coef_ijk(((lp+1)*(lp+2)*(lp+3))/6))
+
+    // aux mapping array to simplify life
+    int coef_map[lp+1][lp+1][lp+1];
+
+    //TODO really needed?
+    //coef_map = HUGE(coef_map)
+    for (int lzp=0; lzp<=lp; lzp++) {
+        for (int lyp=0; lyp<=lp; lyp++) {
+            for (int lxp=0; lxp<=lp; lxp++) {
+                coef_map[lzp][lyp][lxp] = INT_MAX;
+            }
+        }
+    }
+
+    int lxyz = 0;
+    for (int lzp=0; lzp<=lp; lzp++) {
+        for (int lyp=0; lyp<=lp-lzp; lyp++) {
+            for (int lxp=0; lxp<=lp-lzp-lyp; lxp++) {
+                coef_ijk[lxyz++] = 0.0;
+                coef_map[lzp][lyp][lxp] = lxyz;
+            }
+        }
+    }
+
+    // center in grid coords
+    // gp = MATMUL(dh_inv, rp)
+    for (int i=0; i<3; i++) {
+        gp[i] = 0.0;
+        for (int j=0; j<3; j++) {
+            gp[i] += dh_inv[j][i] * rp[j];
+        }
+    }
+
+    // cubecenter(:) = FLOOR(gp)
+    for (int i=0; i<3; i++) {
+        cubecenter[i] = (int) floor(gp[i]);
+    }
+
+    // transform using multinomials
+    double hmatgridp[lp+1][3][3];
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<3; j++) {
+            hmatgridp[0][j][i] = 1.0;
+            for (int k=1; k<=lp; k++) {
+                hmatgridp[k][j][i] = hmatgridp[k-1][j][i] * dh[j][i];
+            }
+        }
+    }
+
+    const int lpx = lp;
+    for (int klx=0; klx<=lpx; klx++) {
+    for (int jlx=0; jlx<=lpx-klx; jlx++) {
+    for (int ilx=0; ilx<=lpx-klx-jlx; ilx++) {
+        const int lx = ilx + jlx + klx;
+        const int lpy = lp - lx;
+        for (int kly=0; kly<=lpy; kly++) {
+        for (int jly=0; jly<=lpy-kly; jly++) {
+        for (int ily=0; ily<=lpy-kly-jly; ily++) {
+            const int ly = ily + jly + kly;
+            const int lpz = lp - lx - ly;
+            for (int klz=0; klz<=lpz; klz++) {
+            for (int jlz=0; jlz<=lpz-klz; jlz++) {
+            for (int ilz=0; ilz<=lpz-klz-jlz; ilz++) {
+                const int lz = ilz + jlz + klz;
+                const int il = ilx + ily + ilz;
+                const int jl = jlx + jly + jlz;
+                const int kl = klx + kly + klz;
+                const int lijk= coef_map[kl][jl][il];
+                const int lxyz = coef_map[lz][ly][lx];
+                coef_ijk[lijk-1] += coef_xyz[lxyz-1] *
+                   hmatgridp[ilx][0][0] * hmatgridp[jlx][1][0] * hmatgridp[klx][2][0] *
+                   hmatgridp[ily][0][1] * hmatgridp[jly][1][1] * hmatgridp[kly][2][1] *
+                   hmatgridp[ilz][0][2] * hmatgridp[jlz][1][2] * hmatgridp[klz][2][2] *
+                   fac[lx] * fac[ly] * fac[lz] /
+                   (fac[ilx] * fac[ily] * fac[ilz] * fac[jlx] * fac[jly] * fac[jlz] * fac[klx] * fac[kly] * fac[klz]);
+            }
+            }
+            }
+        }
+        }
+        }
+    }
+    }
+    }
+
+
+    //printf("%e", dh[0][0]);
+//    printf("%i", cubecenter[0]);
     return 0;
 }
 

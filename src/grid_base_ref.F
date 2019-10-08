@@ -844,8 +844,8 @@ CONTAINS
 !> \param max_rad_ga ...
 !> \param coef_xyz ...
 ! **************************************************************************************************
-   SUBROUTINE collocate_general(grid, dh, dh_inv, lp, lmax, ng, lb_grid, perd, rp, zetp, radius, &
-                                max_rad_ga, coef_xyz)
+   SUBROUTINE collocate_general_orig(grid, dh, dh_inv, lp, lmax, ng, lb_grid, perd, rp, zetp, radius, &
+                                     max_rad_ga, coef_xyz)
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: dh, dh_inv
       INTEGER, INTENT(in)                                :: lp, lmax
@@ -1088,8 +1088,225 @@ CONTAINS
       DEALLOCATE (hmatgridp)
       DEALLOCATE (grid_map)
 
-   END SUBROUTINE collocate_general
+   END SUBROUTINE collocate_general_orig
 
 ! **************************************************************************************************
+!> \brief ...
+!> \param grid ...
+!> \param dh ...
+!> \param dh_inv ...
+!> \param lp ...
+!> \param lmax ...
+!> \param ng ...
+!> \param lb_grid ...
+!> \param perd ...
+!> \param rp ...
+!> \param zetp ...
+!> \param radius ...
+!> \param max_rad_ga ...
+!> \param coef_xyz ...
+! **************************************************************************************************
+   SUBROUTINE collocate_general(grid, dh, dh_inv, lp, lmax, ng, lb_grid, perd, rp, zetp, radius, &
+                                max_rad_ga, coef_xyz)
+      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
+      REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
+      INTEGER, INTENT(in)                                :: lp, lmax
+      INTEGER, DIMENSION(3), INTENT(in)                  :: ng, lb_grid, perd
+      REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: rp
+      REAL(KIND=dp), INTENT(IN)                          :: zetp, radius, max_rad_ga
+      REAL(KIND=dp), DIMENSION(:), INTENT(in), TARGET    :: coef_xyz
+
+      INTEGER                                            :: i, i_index, il, index_max(3), &
+                                                            index_min(3), ismax, ismin, istat, j, &
+                                                            j_index, jl, k, k_index, kl, lxy, &
+                                                            lxyz, offset(3)
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: grid_map
+      INTEGER, DIMENSION(3), TARGET                      :: cubecenter
+      REAL(KIND=dp), ALLOCATABLE, DIMENSION(:), TARGET   :: coef_ijk
+      REAL(kind=dp), &
+         DIMENSION(((lmax*2+1)*(lmax*2+2))/2)            :: coef_xyt
+      REAL(kind=dp), DIMENSION(0:lmax*2)                 :: coef_xtt
+      REAL(KIND=dp), TARGET                              :: a, b, c, d, di, dip, dj, djp, dk, dkp, &
+                                                            exp0i, exp1i, exp2i, gp(3), &
+                                                            hmatgrid(3, 3), point(3), pointj(3), &
+                                                            pointk(3), res, resc(3), v(3)
+      INTERFACE
+         FUNCTION grid_collocate_general(lp, coef_xyz, coef_ijk, dh, dh_inv, &
+                                         rp, gp, cubecenter) &
+            RESULT(istat) BIND(C, name="grid_collocate_general")
+            IMPORT :: C_PTR, C_INT
+            INTEGER(KIND=C_INT), VALUE                :: lp
+            TYPE(C_PTR), VALUE                        :: coef_xyz
+            TYPE(C_PTR), VALUE                        :: coef_ijk
+            TYPE(C_PTR), VALUE                        :: dh
+            TYPE(C_PTR), VALUE                        :: dh_inv
+            TYPE(C_PTR), VALUE                        :: rp
+            TYPE(C_PTR), VALUE                        :: gp
+            TYPE(C_PTR), VALUE                        :: cubecenter
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_collocate_general
+      END INTERFACE
+
+      ALLOCATE (coef_ijk(((lp+1)*(lp+2)*(lp+3))/6))
+
+      istat = grid_collocate_general(lp=lp, &
+                                     coef_xyz=C_LOC(coef_xyz(1)), &
+                                     coef_ijk=C_LOC(coef_ijk(1)), &
+                                     dh=C_LOC(dh(1, 1)), &
+                                     dh_inv=C_LOC(dh_inv(1, 1)), &
+                                     rp=C_LOC(rp(1)), &
+                                     gp=C_LOC(gp(1)), &
+                                     cubecenter=C_LOC(cubecenter(1)))
+
+      CPASSERT(istat == 0)
+
+      ! cell hmat in grid points
+      hmatgrid = dh
+
+      IF (radius > max_rad_ga) THEN
+         !
+         ! This is an important check. If the required radius for mapping the density is different
+         ! from the actual computed one, (significant) errors can occur.
+         ! This error can invariably be fixed by improving the computation of maxradius
+         ! in the call to init_cube_info
+         !
+         STOP
+      ENDIF
+
+      ! get the min max indices that contain at least the cube that contains a sphere around rp of radius radius
+      ! if the cell is very non-orthogonal this implies that many useless points are included
+      ! this estimate can be improved (i.e. not box but sphere should be used)
+      index_min = HUGE(index_min)
+      index_max = -HUGE(index_max)
+      DO i = -1, 1
+      DO j = -1, 1
+      DO k = -1, 1
+         point(1) = rp(1)+i*radius
+         point(2) = rp(2)+j*radius
+         point(3) = rp(3)+k*radius
+         resc(1) = dh_inv(1, 1)*point(1)+dh_inv(1, 2)*point(2)+dh_inv(1, 3)*point(3)
+         resc(2) = dh_inv(2, 1)*point(1)+dh_inv(2, 2)*point(2)+dh_inv(2, 3)*point(3)
+         resc(3) = dh_inv(3, 1)*point(1)+dh_inv(3, 2)*point(2)+dh_inv(3, 3)*point(3)
+         index_min = MIN(index_min, FLOOR(resc))
+         index_max = MAX(index_max, CEILING(resc))
+      ENDDO
+      ENDDO
+      ENDDO
+
+      offset(:) = MODULO(index_min(:)+lb_grid(:), ng(:))+1
+
+      ALLOCATE (grid_map(index_min(1):index_max(1)))
+      DO i = index_min(1), index_max(1)
+         grid_map(i) = MODULO(i, ng(1))+1
+         IF (perd(1) == 1) THEN
+            grid_map(i) = MODULO(i, ng(1))+1
+         ELSE
+            grid_map(i) = i-index_min(1)+offset(1)
+         ENDIF
+      ENDDO
+
+      ! go over the grid, but cycle if the point is not within the radius
+      DO k = index_min(3), index_max(3)
+         dk = k-gp(3)
+         pointk = hmatgrid(:, 3)*dk
+
+         IF (perd(3) == 1) THEN
+            k_index = MODULO(k, ng(3))+1
+         ELSE
+            k_index = k-index_min(3)+offset(3)
+         ENDIF
+
+         coef_xyt = 0.0_dp
+         lxyz = 0
+         dkp = 1.0_dp
+         DO kl = 0, lp
+            lxy = 0
+            DO jl = 0, lp-kl
+               DO il = 0, lp-kl-jl
+                  lxyz = lxyz+1; lxy = lxy+1
+                  coef_xyt(lxy) = coef_xyt(lxy)+coef_ijk(lxyz)*dkp
+               ENDDO
+               lxy = lxy+kl
+            ENDDO
+            dkp = dkp*dk
+         ENDDO
+
+         DO j = index_min(2), index_max(2)
+            dj = j-gp(2)
+            pointj = pointk+hmatgrid(:, 2)*dj
+            IF (perd(2) == 1) THEN
+               j_index = MODULO(j, ng(2))+1
+            ELSE
+               j_index = j-index_min(2)+offset(2)
+            ENDIF
+
+            coef_xtt = 0.0_dp
+            lxy = 0
+            djp = 1.0_dp
+            DO jl = 0, lp
+               DO il = 0, lp-jl
+                  lxy = lxy+1
+                  coef_xtt(il) = coef_xtt(il)+coef_xyt(lxy)*djp
+               ENDDO
+               djp = djp*dj
+            ENDDO
+
+            ! find bounds for the inner loop
+            ! based on a quadratic equation in i
+            ! a*i**2+b*i+c=radius**2
+            v = pointj-gp(1)*hmatgrid(:, 1)
+            a = DOT_PRODUCT(hmatgrid(:, 1), hmatgrid(:, 1))
+            b = 2*DOT_PRODUCT(v, hmatgrid(:, 1))
+            c = DOT_PRODUCT(v, v)
+            d = b*b-4*a*(c-radius**2)
+
+            IF (d < 0) THEN
+               CYCLE
+            ELSE
+               d = SQRT(d)
+               ismin = CEILING((-b-d)/(2*a))
+               ismax = FLOOR((-b+d)/(2*a))
+            ENDIF
+            ! prepare for computing -zetp*rsq
+            a = -zetp*a
+            b = -zetp*b
+            c = -zetp*c
+            i = ismin-1
+
+            ! the recursion relation might have to be done
+            ! from the center of the gaussian (in both directions)
+            ! instead as the current implementation from an edge
+            exp2i = EXP((a*i+b)*i+c)
+            exp1i = EXP(2*a*i+a+b)
+            exp0i = EXP(2*a)
+
+            DO i = ismin, ismax
+               di = i-gp(1)
+
+               ! polynomial terms
+               res = 0.0_dp
+               dip = 1.0_dp
+               DO il = 0, lp
+                  res = res+coef_xtt(il)*dip
+                  dip = dip*di
+               ENDDO
+
+               ! the exponential recursion
+               exp2i = exp2i*exp1i
+               exp1i = exp1i*exp0i
+               res = res*exp2i
+
+               i_index = grid_map(i)
+               grid(i_index, j_index, k_index) = grid(i_index, j_index, k_index)+res
+            ENDDO
+         ENDDO
+      ENDDO
+      !t2=nanotime_ia32()
+      !write(*,*) t2-t1
+      ! deallocation needed to pass around a pgi bug..
+      DEALLOCATE (coef_ijk)
+      DEALLOCATE (grid_map)
+
+   END SUBROUTINE collocate_general
 
 END MODULE grid_base_ref
