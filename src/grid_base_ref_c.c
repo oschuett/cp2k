@@ -532,25 +532,31 @@ int grid_collocate_core(
 }
 
 // *****************************************************************************
-int grid_collocate_general(const int lp,
+int grid_collocate_general(
+                           const int grid_size_x,
+                           const int grid_size_y,
+                           const int grid_size_z,
+                           const int grid_lbound_x,
+                           const int grid_lbound_y,
+                           const int grid_lbound_z,
+                           const int lp,
+                           const int lmax,
                            const double radius,
+                           const double zetp,
                            const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
-                           double coef_ijk[((lp+1)*(lp+2)*(lp+3))/6],
                            const double dh[3][3],
                            const double dh_inv[3][3],
                            const double rp[3],
-                           double gp[3],
-                           int cubecenter[3],
                            const int ng[3],
-                           const int lb_grid[3]) {
-
+                           const int lb_grid[3],
+                           const int perd[3],
+                           double grid[grid_size_z][grid_size_y][grid_size_x]
+                           ) {
 //
 // transform P_{lxp,lyp,lzp} into a P_{lip,ljp,lkp} such that
 // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-x_p)**lxp (y-y_p)**lyp (z-z_p)**lzp =
 // sum_{lip,ljp,lkp} P_{lip,ljp,lkp} (i-i_p)**lip (j-j_p)**ljp (k-k_p)**lkp
 //
-
-    //ALLOCATE (coef_ijk(((lp+1)*(lp+2)*(lp+3))/6))
 
     // aux mapping array to simplify life
     int coef_map[lp+1][lp+1][lp+1];
@@ -569,24 +575,19 @@ int grid_collocate_general(const int lp,
     for (int lzp=0; lzp<=lp; lzp++) {
         for (int lyp=0; lyp<=lp-lzp; lyp++) {
             for (int lxp=0; lxp<=lp-lzp-lyp; lxp++) {
-                coef_ijk[lxyz++] = 0.0;
-                coef_map[lzp][lyp][lxp] = lxyz;
+                coef_map[lzp][lyp][lxp] = ++lxyz;
             }
         }
     }
 
     // center in grid coords
     // gp = MATMUL(dh_inv, rp)
+    double gp[3];
     for (int i=0; i<3; i++) {
         gp[i] = 0.0;
         for (int j=0; j<3; j++) {
             gp[i] += dh_inv[j][i] * rp[j];
         }
-    }
-
-    // cubecenter(:) = FLOOR(gp)
-    for (int i=0; i<3; i++) {
-        cubecenter[i] = (int) floor(gp[i]);
     }
 
     // transform using multinomials
@@ -598,6 +599,13 @@ int grid_collocate_general(const int lp,
                 hmatgridp[k][j][i] = hmatgridp[k-1][j][i] * dh[j][i];
             }
         }
+    }
+
+    // zero coef_ijk
+    const int n_coef_ijk = ((lp+1)*(lp+2)*(lp+3))/6;
+    double coef_ijk[n_coef_ijk];
+    for (int i=0; i<n_coef_ijk; i++) {
+        coef_ijk[i] = 0.0;
     }
 
     const int lpx = lp;
@@ -639,8 +647,7 @@ int grid_collocate_general(const int lp,
     // get the min max indices that contain at least the cube that contains a sphere around rp of radius radius
     // if the cell is very non-orthogonal this implies that many useless points are included
     // this estimate can be improved (i.e. not box but sphere should be used)
-    int index_min[3];
-    int index_max[3];
+    int index_min[3], index_max[3];
     for (int idir=0; idir<3; idir++) {
         index_min[idir] = +INT_MAX;
         index_max[idir] = -INT_MAX;
@@ -663,12 +670,127 @@ int grid_collocate_general(const int lp,
     int offset[3];
     for (int idir=0; idir<3; idir++) {
         offset[idir] = mod(index_min[idir] + lb_grid[idir], ng[idir]) + 1;
-     }
+    }
 
-     printf("C offset: %i %i %i\n", offset[0], offset[1], offset[2]);
-    //printf("C index_min: %i %i %i\n", index_min[0],index_min[1],index_min[2]);
-    //printf("C index_max: %i %i %i\n", index_max[0],index_max[1],index_max[2]);
-//    printf("%i", cubecenter[0]);
+    // go over the grid, but cycle if the point is not within the radius
+    for (int k=index_min[2]; k<=index_max[2]; k++) {
+       const double dk = k - gp[2];
+       int k_index;
+       if (perd[2] == 1) {
+          k_index = mod(k, ng[2]) + 1;
+       } else {
+          k_index = k - index_min[2] + offset[2];
+       }
+
+       // zero coef_xyt
+       const int n_coef_xyt = ((lmax*2+1)*(lmax*2+2))/2;
+       double coef_xyt[n_coef_xyt];
+       for (int i=0; i<n_coef_xyt; i++) {
+           coef_xyt[i] = 0.0;
+       }
+
+       int lxyz = 0;
+       double dkp = 1.0;
+       for (int kl=0; kl<=lp; kl++) {
+          int lxy = 0;
+          for (int jl=0; jl<=lp-kl; jl++) {
+             for (int il=0; il<=lp-kl-jl; il++) {
+                coef_xyt[lxy++] += coef_ijk[lxyz++] * dkp;
+             }
+             lxy += kl;
+          }
+          dkp *= dk;
+       }
+
+
+       for (int j=index_min[1]; j<=index_max[1]; j++) {
+          const double dj = j - gp[1];
+          int j_index;
+          if (perd[1] == 1) {
+             j_index = mod(j, ng[1]) + 1;
+          } else {
+             j_index = j - index_min[1] + offset[1];
+          }
+
+          double coef_xtt[lmax*2 +1];
+          for (int i=0; i<=lmax*2; i++) {
+              coef_xtt[i] = 0.0;
+          }
+          int lxy = 0;
+          double djp = 1.0;
+          for (int jl=0; jl<=lp; jl++) {
+             for (int il=0; il<=lp-jl; il++) {
+                coef_xtt[il] += coef_xyt[lxy++] * djp;
+             }
+             djp *= dj;
+          }
+
+          // find bounds for the inner loop
+          // based on a quadratic equation in i
+          // a*i**2+b*i+c=radius**2
+
+          // v = pointj-gp(1)*hmatgrid(:, 1)
+          // a = DOT_PRODUCT(hmatgrid(:, 1), hmatgrid(:, 1))
+          // b = 2*DOT_PRODUCT(v, hmatgrid(:, 1))
+          // c = DOT_PRODUCT(v, v)
+          // d = b*b-4*a*(c-radius**2)
+          double a=0.0, b=0.0, c=0.0;
+          for (int i=0; i<3; i++) {
+             const double pointk = dh[2][i] * dk;
+             const double pointj = pointk + dh[1][i] * dj;
+             const double v = pointj - gp[0] * dh[0][i];
+             a += dh[0][i] * dh[0][i];
+             b += 2.0 * v * dh[0][i];
+             c += v * v;
+          }
+          double d = b * b -4 * a * (c - radius * radius);
+          if (d < 0.0) {
+             continue;
+          }
+
+          // prepare for computing -zetp*rsq
+          d = sqrt(d);
+          const int ismin = ceill((-b-d)/(2.0*a));
+          const int ismax = floor((-b+d)/(2.0*a));
+          a *= -zetp;
+          b *= -zetp;
+          c *= -zetp;
+          const int i = ismin - 1;
+
+          // the recursion relation might have to be done
+          // from the center of the gaussian (in both directions)
+          // instead as the current implementation from an edge
+          double exp2i = exp((a * i + b) * i + c);
+          double exp1i = exp(2.0 * a * i + a + b);
+          const double exp0i = exp(2.0 * a);
+
+          for (int i=ismin; i<=ismax; i++) {
+             const double di = i - gp[0];
+
+             // polynomial terms
+             double res = 0.0;
+             double dip = 1.0;
+             for (int il=0; il<=lp; il++) {
+                res += coef_xtt[il] * dip;
+                dip *= di;
+             }
+
+             // the exponential recursion
+             exp2i *= exp1i;
+             exp1i *= exp0i;
+             res *= exp2i;
+
+             int i_index;
+             if (perd[0] == 1) {
+                i_index = mod(i, ng[0]) + 1;
+             } else {
+                i_index = i - index_min[0] + offset[0];
+             }
+             grid[k_index-grid_lbound_z][j_index-grid_lbound_y][i_index-grid_lbound_x] += res;
+          }
+       }
+    }
+
     return 0;
 }
 
