@@ -532,14 +532,17 @@ int grid_collocate_core(
 }
 
 // *****************************************************************************
-int grid_collocate_general(int const lp,
+int grid_collocate_general(const int lp,
+                           const double radius,
                            const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
                            double coef_ijk[((lp+1)*(lp+2)*(lp+3))/6],
                            const double dh[3][3],
                            const double dh_inv[3][3],
                            const double rp[3],
                            double gp[3],
-                           int cubecenter[3]) {
+                           int cubecenter[3],
+                           const int ng[3],
+                           const int lb_grid[3]) {
 
 //
 // transform P_{lxp,lyp,lzp} into a P_{lip,ljp,lkp} such that
@@ -633,8 +636,38 @@ int grid_collocate_general(int const lp,
     }
     }
 
+    // get the min max indices that contain at least the cube that contains a sphere around rp of radius radius
+    // if the cell is very non-orthogonal this implies that many useless points are included
+    // this estimate can be improved (i.e. not box but sphere should be used)
+    int index_min[3];
+    int index_max[3];
+    for (int idir=0; idir<3; idir++) {
+        index_min[idir] = +INT_MAX;
+        index_max[idir] = -INT_MAX;
+    }
+    for (int i=-1; i<=1; i++) {
+    for (int j=-1; j<=1; j++) {
+    for (int k=-1; k<=1; k++) {
+       const double x = rp[0] + i * radius;
+       const double y = rp[1] + j * radius;
+       const double z = rp[2] + k * radius;
+       for (int idir=0; idir<3; idir++) {
+          const double resc = dh_inv[0][idir] * x + dh_inv[1][idir] * y + dh_inv[2][idir] * z;
+          index_min[idir] = min(index_min[idir], floor(resc));
+          index_max[idir] = max(index_max[idir], ceil(resc));
+       }
+    }
+    }
+    }
 
-    //printf("%e", dh[0][0]);
+    int offset[3];
+    for (int idir=0; idir<3; idir++) {
+        offset[idir] = mod(index_min[idir] + lb_grid[idir], ng[idir]) + 1;
+     }
+
+     printf("C offset: %i %i %i\n", offset[0], offset[1], offset[2]);
+    //printf("C index_min: %i %i %i\n", index_min[0],index_min[1],index_min[2]);
+    //printf("C index_max: %i %i %i\n", index_max[0],index_max[1],index_max[2]);
 //    printf("%i", cubecenter[0]);
     return 0;
 }

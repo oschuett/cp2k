@@ -1111,7 +1111,7 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
       INTEGER, INTENT(in)                                :: lp, lmax
-      INTEGER, DIMENSION(3), INTENT(in)                  :: ng, lb_grid, perd
+      INTEGER, DIMENSION(3), INTENT(in), TARGET          :: ng, lb_grid, perd
       REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: rp
       REAL(KIND=dp), INTENT(IN)                          :: zetp, radius, max_rad_ga
       REAL(KIND=dp), DIMENSION(:), INTENT(in), TARGET    :: coef_xyz
@@ -1120,7 +1120,6 @@ CONTAINS
                                                             index_min(3), ismax, ismin, istat, j, &
                                                             j_index, jl, k, k_index, kl, lxy, &
                                                             lxyz, offset(3)
-      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: grid_map
       INTEGER, DIMENSION(3), TARGET                      :: cubecenter
       REAL(KIND=dp), ALLOCATABLE, DIMENSION(:), TARGET   :: coef_ijk
       REAL(kind=dp), &
@@ -1131,11 +1130,12 @@ CONTAINS
                                                             hmatgrid(3, 3), point(3), pointj(3), &
                                                             pointk(3), res, resc(3), v(3)
       INTERFACE
-         FUNCTION grid_collocate_general(lp, coef_xyz, coef_ijk, dh, dh_inv, &
-                                         rp, gp, cubecenter) &
+         FUNCTION grid_collocate_general(lp, radius, coef_xyz, coef_ijk, dh, dh_inv, &
+                                         rp, gp, cubecenter, ng, lb_grid) &
             RESULT(istat) BIND(C, name="grid_collocate_general")
-            IMPORT :: C_PTR, C_INT
+            IMPORT :: C_PTR, C_INT, C_DOUBLE
             INTEGER(KIND=C_INT), VALUE                :: lp
+            REAL(KIND=C_DOUBLE), VALUE                :: radius
             TYPE(C_PTR), VALUE                        :: coef_xyz
             TYPE(C_PTR), VALUE                        :: coef_ijk
             TYPE(C_PTR), VALUE                        :: dh
@@ -1143,6 +1143,8 @@ CONTAINS
             TYPE(C_PTR), VALUE                        :: rp
             TYPE(C_PTR), VALUE                        :: gp
             TYPE(C_PTR), VALUE                        :: cubecenter
+            TYPE(C_PTR), VALUE                        :: ng
+            TYPE(C_PTR), VALUE                        :: lb_grid
             INTEGER(KIND=C_INT)                       :: istat
          END FUNCTION grid_collocate_general
       END INTERFACE
@@ -1150,13 +1152,16 @@ CONTAINS
       ALLOCATE (coef_ijk(((lp+1)*(lp+2)*(lp+3))/6))
 
       istat = grid_collocate_general(lp=lp, &
+                                     radius=radius, &
                                      coef_xyz=C_LOC(coef_xyz(1)), &
                                      coef_ijk=C_LOC(coef_ijk(1)), &
                                      dh=C_LOC(dh(1, 1)), &
                                      dh_inv=C_LOC(dh_inv(1, 1)), &
                                      rp=C_LOC(rp(1)), &
                                      gp=C_LOC(gp(1)), &
-                                     cubecenter=C_LOC(cubecenter(1)))
+                                     cubecenter=C_LOC(cubecenter(1)), &
+                                     ng=C_LOC(ng(1)), &
+                                     lb_grid=C_LOC(lb_grid(1)))
 
       CPASSERT(istat == 0)
 
@@ -1193,17 +1198,12 @@ CONTAINS
       ENDDO
       ENDDO
 
+      !WRITE (*,*) "FORT: index_min: ", index_min
+      !WRITE (*,*) "FORT: index_max: ", index_max
+
       offset(:) = MODULO(index_min(:)+lb_grid(:), ng(:))+1
 
-      ALLOCATE (grid_map(index_min(1):index_max(1)))
-      DO i = index_min(1), index_max(1)
-         grid_map(i) = MODULO(i, ng(1))+1
-         IF (perd(1) == 1) THEN
-            grid_map(i) = MODULO(i, ng(1))+1
-         ELSE
-            grid_map(i) = i-index_min(1)+offset(1)
-         ENDIF
-      ENDDO
+      WRITE (*,*) "FORT: offset: ", offset
 
       ! go over the grid, but cycle if the point is not within the radius
       DO k = index_min(3), index_max(3)
@@ -1296,7 +1296,12 @@ CONTAINS
                exp1i = exp1i*exp0i
                res = res*exp2i
 
-               i_index = grid_map(i)
+               IF (perd(1) == 1) THEN
+                  i_index = MODULO(i, ng(1))+1
+               ELSE
+                  i_index = i-index_min(1)+offset(1)
+               ENDIF
+
                grid(i_index, j_index, k_index) = grid(i_index, j_index, k_index)+res
             ENDDO
          ENDDO
@@ -1305,7 +1310,6 @@ CONTAINS
       !write(*,*) t2-t1
       ! deallocation needed to pass around a pgi bug..
       DEALLOCATE (coef_ijk)
-      DEALLOCATE (grid_map)
 
    END SUBROUTINE collocate_general
 
