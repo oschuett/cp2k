@@ -8,13 +8,13 @@
 #include <stdbool.h>
 #include <limits.h>
 
-const int ncoset[] = {1,  // l=0
+static const int ncoset[] = {1,  // l=0
                       4,  // l=1
                       10, // l=2 ...
                       20, 35, 56, 84, 120, 165, 220, 286, 364,
                       455, 560, 680, 816, 969, 1140, 1330};
 
-const double fac[] = {
+static const double fac[] = {
         0.10000000000000000000E+01, 0.10000000000000000000E+01, 0.20000000000000000000E+01,
         0.60000000000000000000E+01, 0.24000000000000000000E+02, 0.12000000000000000000E+03,
         0.72000000000000000000E+03, 0.50400000000000000000E+04, 0.40320000000000000000E+05,
@@ -326,16 +326,16 @@ int grid_prepare_coef(const int la_max,
 }
 
 // *****************************************************************************
-int grid_fill_map(const bool periodic,
-              const int lb_cube,
-              const int ub_cube,
-              const int cubecenter,
-              const int lb_grid,
-              const int grid_lbound,
-              const int grid_ubound,
-              const int ng,
-              const int cmax,
-              int map[2*cmax + 1]) {
+static int grid_fill_map(const bool periodic,
+                         const int lb_cube,
+                         const int ub_cube,
+                         const int cubecenter,
+                         const int lb_grid,
+                         const int grid_lbound,
+                         const int grid_ubound,
+                         const int ng,
+                         const int cmax,
+                         int map[2*cmax + 1]) {
 
     if (periodic) {
          int start = lb_cube;
@@ -366,13 +366,13 @@ int grid_fill_map(const bool periodic,
 
 
 // *****************************************************************************
-void grid_fill_pol(const double dr,
-                   const double roffset,
-                   const int lb_cube,
-                   const int lp,
-                   const int cmax,
-                   const double zetp,
-                   double pol[cmax+1][lp+1][2]) {
+static void grid_fill_pol(const double dr,
+                          const double roffset,
+                          const int lb_cube,
+                          const int lp,
+                          const int cmax,
+                          const double zetp,
+                          double pol[cmax+1][lp+1][2]) {
 //
 //   compute the values of all (x-xp)**lp*exp(..)
 //
@@ -414,19 +414,19 @@ void grid_fill_pol(const double dr,
 }
 
 // *****************************************************************************
-void grid_collocate_core(const int grid_size_x,
-                        const int grid_size_y,
-                        const int grid_size_z,
-                        const int grid_lbound_x,
-                        const int grid_lbound_y,
-                        const int grid_lbound_z,
-                        const int lp,
-                        const int cmax,
-                        const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
-                        const double pol[3][cmax+1][lp+1][2],
-                        const int map[3][2*cmax+1],
-                        const int *sphere_bounds,
-                        double grid[grid_size_z][grid_size_y][grid_size_x]) {
+static void grid_collocate_core(const int grid_size_x,
+                                const int grid_size_y,
+                                const int grid_size_z,
+                                const int grid_lbound_x,
+                                const int grid_lbound_y,
+                                const int grid_lbound_z,
+                                const int lp,
+                                const int cmax,
+                                const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                                const double pol[3][cmax+1][lp+1][2],
+                                const int map[3][2*cmax+1],
+                                const int *sphere_bounds,
+                                double grid[grid_size_z][grid_size_y][grid_size_x]) {
 
     int sci = 0;
 
@@ -523,25 +523,25 @@ void grid_collocate_core(const int grid_size_x,
 }
 
 // *****************************************************************************
-int grid_collocate_ortho(const int grid_size_x,
-                         const int grid_size_y,
-                         const int grid_size_z,
-                         const int grid_lbound_x,
-                         const int grid_lbound_y,
-                         const int grid_lbound_z,
-                         const int lp,
-                         const double zetp,
-                         const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
-                         const int lb_cube[3],
-                         const int ub_cube[3],
-                         const double dh[3][3],
-                         const double dh_inv[3][3],
-                         const double rp[3],
-                         const int ng[3],
-                         const int lb_grid[3],
-                         const int perd[3],
-                         const int *sphere_bounds,
-                         double grid[grid_size_z][grid_size_y][grid_size_x]) {
+static int grid_collocate_ortho(const int grid_size_x,
+                                const int grid_size_y,
+                                const int grid_size_z,
+                                const int grid_lbound_x,
+                                const int grid_lbound_y,
+                                const int grid_lbound_z,
+                                const int lp,
+                                const double zetp,
+                                const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                                const double dh[3][3],
+                                const double dh_inv[3][3],
+                                const double rp[3],
+                                const int ng[3],
+                                const int lb_grid[3],
+                                const int perd[3],
+                                const int lb_cube[3],
+                                const int ub_cube[3],
+                                const int *sphere_bounds,
+                                double grid[grid_size_z][grid_size_y][grid_size_x]) {
 
    // *** position of the gaussian product
    //
@@ -614,26 +614,25 @@ int grid_collocate_ortho(const int grid_size_x,
 }
 
 // *****************************************************************************
-int grid_collocate_general(
-                           const int grid_size_x,
-                           const int grid_size_y,
-                           const int grid_size_z,
-                           const int grid_lbound_x,
-                           const int grid_lbound_y,
-                           const int grid_lbound_z,
-                           const int lp,
-                           const int lmax,
-                           const double radius,
-                           const double zetp,
-                           const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
-                           const double dh[3][3],
-                           const double dh_inv[3][3],
-                           const double rp[3],
-                           const int ng[3],
-                           const int lb_grid[3],
-                           const int perd[3],
-                           double grid[grid_size_z][grid_size_y][grid_size_x]
-                           ) {
+static void grid_collocate_general(const int grid_size_x,
+                                   const int grid_size_y,
+                                   const int grid_size_z,
+                                   const int grid_lbound_x,
+                                   const int grid_lbound_y,
+                                   const int grid_lbound_z,
+                                   const int lp,
+                                   const double zetp,
+                                   const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                                   const double dh[3][3],
+                                   const double dh_inv[3][3],
+                                   const double rp[3],
+                                   const int ng[3],
+                                   const int lb_grid[3],
+                                   const int perd[3],
+                                   const int lmax,
+                                   const double radius,
+                                   double grid[grid_size_z][grid_size_y][grid_size_x]) {
+
 //
 // transform P_{lxp,lyp,lzp} into a P_{lip,ljp,lkp} such that
 // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-x_p)**lxp (y-y_p)**lyp (z-z_p)**lzp =
@@ -872,8 +871,74 @@ int grid_collocate_general(
           }
        }
     }
+}
 
-    return 0;
+// *****************************************************************************
+int grid_collocate_pgf_product_rspace(const int grid_size_x,
+                                      const int grid_size_y,
+                                      const int grid_size_z,
+                                      const int grid_lbound_x,
+                                      const int grid_lbound_y,
+                                      const int grid_lbound_z,
+                                      const bool use_subpatch,
+                                      const int lp,
+                                      const double zetp,
+                                      const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                                      const double dh[3][3],
+                                      const double dh_inv[3][3],
+                                      const double rp[3],
+                                      const int ng[3],
+                                      const int lb_grid[3],
+                                      const int perd[3],
+                                      const int lmax,           // only for general
+                                      const double radius,      // only for general
+                                      const int lb_cube[3],     // only for by ortho
+                                      const int ub_cube[3],     // only for by ortho
+                                      const int *sphere_bounds, // only for by ortho
+                                      double grid[grid_size_z][grid_size_y][grid_size_x]) {
+
+
+    if (use_subpatch) {
+        grid_collocate_general(grid_size_x,
+                               grid_size_y,
+                               grid_size_z,
+                               grid_lbound_x,
+                               grid_lbound_y,
+                               grid_lbound_z,
+                               lp,
+                               zetp,
+                               coef_xyz,
+                               dh,
+                               dh_inv,
+                               rp,
+                               ng,
+                               lb_grid,
+                               perd,
+                               lmax,
+                               radius,
+                               grid);
+        return 0;
+    } else {
+        return grid_collocate_ortho(grid_size_x,
+                                    grid_size_y,
+                                    grid_size_z,
+                                    grid_lbound_x,
+                                    grid_lbound_y,
+                                    grid_lbound_z,
+                                    lp,
+                                    zetp,
+                                    coef_xyz,
+                                    dh,
+                                    dh_inv,
+                                    rp,
+                                    ng,
+                                    lb_grid,
+                                    perd,
+                                    lb_cube,
+                                    ub_cube,
+                                    sphere_bounds,
+                                    grid);
+    }
 }
 
 //EOF

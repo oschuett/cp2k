@@ -5,7 +5,8 @@
 
 ! **************************************************************************************************
 MODULE grid_base_ref
-   USE ISO_C_BINDING,                   ONLY: C_DOUBLE,&
+   USE ISO_C_BINDING,                   ONLY: C_BOOL,&
+                                              C_DOUBLE,&
                                               C_INT,&
                                               C_LOC,&
                                               C_PTR
@@ -49,7 +50,7 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: posat
       INTEGER, INTENT(IN)                                :: lmax_global
 
-      INTEGER :: bcol, brow, iatom, iatom_old, igrid_level, ikind, img, img_old, ipair, ipgf, &
+      INTEGER :: bcol, brow, iatom, iatom_old, igrid_level, ikind, img, img_old, imr, ipair, ipgf, &
          iset, iset_old, itask, jatom, jatom_old, jkind, jpgf, jset, jset_old, max_radius, maxco, &
          maxpgf, maxset, maxsgf_set, n1, n2, na1, natoms, nb1, ncoa, ncob, nimages, ntasks, sgfa, &
          sgfb
@@ -183,6 +184,7 @@ CONTAINS
             rab2 = rab(1)*rab(1)+rab(2)*rab(2)+rab(3)*rab(3)
             rb(:) = ra(:)+rab(:)
             zetp = zeta(ipgf, iset)+zetb(jpgf, jset)
+            imr = MAX(1, CEILING(radius/drmin))
 
             IF (2.0_dp*radius < adh) CYCLE
 
@@ -202,7 +204,7 @@ CONTAINS
                radius_inconsistent = radius > max_rad_ga
             ELSE
                use_subpatch = .FALSE.
-               radius_inconsistent = MAX(1, CEILING(radius/drmin)) > max_radius
+               radius_inconsistent = imr > max_radius
             ENDIF
 
             IF (radius_inconsistent) THEN
@@ -235,10 +237,9 @@ CONTAINS
                                               perd=perd, &
                                               npts=npts, &
                                               lb_grid=lb_grid, &
-                                              drmin=drmin, &
-                                              glb_cube=glb_cube, &
-                                              gub_cube=gub_cube, &
-                                              gsphere_bound=gsphere_bound, &
+                                              lb_cube=glb_cube(:, imr), &
+                                              ub_cube=gub_cube(:, imr), &
+                                              sphere_bounds=gsphere_bound(:, imr), &
                                               compute_tau=compute_tau, &
                                               use_subpatch=use_subpatch, &
                                               lmax_global=lmax_global, &
@@ -275,10 +276,9 @@ CONTAINS
 !> \param perd ...
 !> \param npts ...
 !> \param lb_grid ...
-!> \param drmin ...
-!> \param glb_cube ...
-!> \param gub_cube ...
-!> \param gsphere_bound ...
+!> \param lb_cube ...
+!> \param ub_cube ...
+!> \param sphere_bounds ...
 !> \param compute_tau ...
 !> \param use_subpatch ...
 !> \param lmax_global Maximum possible value of lmax used to dimension arrays
@@ -289,8 +289,7 @@ CONTAINS
                                            ra, rab, rab2, radius, rscale, pab, o1, o2, &
                                            grid, &
                                            dh, dh_inv, perd, npts, lb_grid, &
-                                           drmin, &
-                                           glb_cube, gub_cube, gsphere_bound, &
+                                           lb_cube, ub_cube, sphere_bounds, &
                                            compute_tau, use_subpatch, lmax_global, maxco)
 
       INTEGER, INTENT(IN)                                :: la_max
@@ -303,23 +302,59 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
       INTEGER, INTENT(IN)                                :: o1, o2
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
-      REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: dh, dh_inv
-      INTEGER, DIMENSION(3), INTENT(IN)                  :: perd, npts, lb_grid
-      REAL(KIND=dp), INTENT(IN)                          :: drmin
-      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bound
+      REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
+      INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: perd, npts, lb_grid
+      INTEGER, DIMENSION(3), TARGET                      :: lb_cube, ub_cube
+      INTEGER, DIMENSION(:), TARGET                      :: sphere_bounds
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
-      INTEGER                                            :: imr, la_max_local, la_min_local, &
+      INTEGER                                            :: istat, la_max_local, la_min_local, &
                                                             lb_max_local, lb_min_local, lp
-      INTEGER, DIMENSION(3)                              :: ng
+      INTEGER, DIMENSION(3), TARGET                      :: ng
       REAL(KIND=dp)                                      :: f, prefactor, zetp
       REAL(kind=dp), DIMENSION(((lmax_global*2+1)*(&
-         lmax_global*2+2)*(lmax_global*2+3))/6)          :: coef_xyz
+         lmax_global*2+2)*(lmax_global*2+3))/6), TARGET  :: coef_xyz
       REAL(kind=dp), DIMENSION(0:lmax_global*2, 0:&
          lmax_global, 0:lmax_global, 3)                  :: alpha
-      REAL(KIND=dp), DIMENSION(3)                        :: rb, rp
+      REAL(KIND=dp), DIMENSION(3), TARGET                :: rb, rp
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab_local
+      INTERFACE
+         FUNCTION grid_collocate_pgf_product_rspace(grid_size_x, grid_size_y, grid_size_z, &
+                                                    grid_lbound_x, grid_lbound_y, grid_lbound_z, &
+                                                    use_subpatch, &
+                                                    lp, zetp, coef_xyz, &
+                                                    dh, dh_inv, rp, ng, lb_grid, perd, &
+                                                    lmax, radius, & ! only for general
+                                                    lb_cube, ub_cube, sphere_bounds, & ! only for ortho
+                                                    grid) &
+            RESULT(istat) BIND(C, name="grid_collocate_pgf_product_rspace")
+            IMPORT :: C_PTR, C_INT, C_DOUBLE, C_BOOL
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_x
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_y
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_z
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_x
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_y
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_z
+            LOGICAL(KIND=C_BOOL), VALUE               :: use_subpatch
+            INTEGER(KIND=C_INT), VALUE                :: lp
+            REAL(KIND=C_DOUBLE), VALUE                :: zetp
+            TYPE(C_PTR), VALUE                        :: coef_xyz
+            TYPE(C_PTR), VALUE                        :: dh
+            TYPE(C_PTR), VALUE                        :: dh_inv
+            TYPE(C_PTR), VALUE                        :: rp
+            TYPE(C_PTR), VALUE                        :: ng
+            TYPE(C_PTR), VALUE                        :: lb_grid
+            TYPE(C_PTR), VALUE                        :: perd
+            INTEGER(KIND=C_INT), VALUE                :: lmax
+            REAL(KIND=C_DOUBLE), VALUE                :: radius
+            TYPE(C_PTR), VALUE                        :: lb_cube
+            TYPE(C_PTR), VALUE                        :: ub_cube
+            TYPE(C_PTR), VALUE                        :: sphere_bounds
+            TYPE(C_PTR), VALUE                        :: grid
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_collocate_pgf_product_rspace
+      END INTERFACE
 
       zetp = zeta+zetb
       f = zetb/zetp
@@ -370,35 +405,31 @@ CONTAINS
 
       lp = la_max_local+lb_max_local
 
-      IF (use_subpatch) THEN
-         CALL collocate_general(grid=grid, &
-                                dh=dh, &
-                                dh_inv=dh_inv, &
-                                lp=lp, &
-                                lmax=lmax_global, &
-                                ng=ng, &
-                                lb_grid=lb_grid, &
-                                perd=perd, &
-                                rp=rp, &
-                                zetp=zetp, &
-                                radius=radius, &
-                                coef_xyz=coef_xyz)
-      ELSE
-         imr = MAX(1, CEILING(radius/drmin))
-         CALL collocate_ortho(grid=grid, &
-                              dh=dh, &
-                              dh_inv=dh_inv, &
-                              ng=ng, &
-                              perd=perd, &
-                              lb_cube=glb_cube(:, imr), &
-                              ub_cube=gub_cube(:, imr), &
-                              sphere_bounds=gsphere_bound(:, imr), &
-                              lb_grid=lb_grid, &
-                              lp=lp, &
-                              zetp=zetp, &
-                              rp=rp, &
-                              coef_xyz=coef_xyz)
-      END IF
+      ! TODO: Are LBOUND(grid, :) always 1 ???
+      istat = grid_collocate_pgf_product_rspace(grid_size_x=SIZE(grid, 1), &
+                                                grid_size_y=SIZE(grid, 2), &
+                                                grid_size_z=SIZE(grid, 3), &
+                                                grid_lbound_x=LBOUND(grid, 1), &
+                                                grid_lbound_y=LBOUND(grid, 2), &
+                                                grid_lbound_z=LBOUND(grid, 3), &
+                                                use_subpatch=LOGICAL(use_subpatch, KIND=C_BOOL), &
+                                                lp=lp, &
+                                                zetp=zetp, &
+                                                coef_xyz=C_LOC(coef_xyz(1)), &
+                                                dh=C_LOC(dh(1, 1)), &
+                                                dh_inv=C_LOC(dh_inv(1, 1)), &
+                                                rp=C_LOC(rp(1)), &
+                                                ng=C_LOC(ng(1)), &
+                                                lb_grid=C_LOC(lb_grid(1)), &
+                                                perd=C_LOC(perd(1)), &
+                                                lmax=lmax_global, &
+                                                radius=radius, &
+                                                lb_cube=C_LOC(lb_cube(1)), &
+                                                ub_cube=C_LOC(ub_cube(1)), &
+                                                sphere_bounds=C_LOC(sphere_bounds(1)), &
+                                                grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
+
+      CPASSERT(istat == 0)
 
       DEALLOCATE (pab_local)
 
@@ -611,170 +642,5 @@ CONTAINS
       CPASSERT(istat == 0)
 
    END SUBROUTINE prepare_coef
-
-! **************************************************************************************************
-!> \brief ...
-!> \param grid ...
-!> \param dh ...
-!> \param dh_inv ...
-!> \param ng ...
-!> \param perd ...
-!> \param lb_cube ...
-!> \param ub_cube ...
-!> \param sphere_bounds ...
-!> \param lb_grid ...
-!> \param lp ...
-!> \param zetp ...
-!> \param rp ...
-!> \param coef_xyz ...
-! **************************************************************************************************
-   SUBROUTINE collocate_ortho(grid, dh, dh_inv, ng, perd, lb_cube, ub_cube, sphere_bounds, lb_grid, &
-                              lp, zetp, rp, coef_xyz)
-      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
-      REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
-      INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: ng, perd
-      INTEGER, DIMENSION(3), TARGET                      :: lb_cube, ub_cube
-      INTEGER, DIMENSION(:), TARGET                      :: sphere_bounds
-      INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: lb_grid
-      INTEGER, INTENT(IN)                                :: lp
-      REAL(KIND=dp), INTENT(IN)                          :: zetp
-      REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: rp
-      REAL(KIND=dp), DIMENSION(:), INTENT(IN), TARGET    :: coef_xyz
-
-      INTEGER                                            :: istat
-      INTERFACE
-         FUNCTION grid_collocate_ortho(grid_size_x, grid_size_y, grid_size_z, &
-                                       grid_lbound_x, grid_lbound_y, grid_lbound_z, &
-                                       lp, zetp, coef_xyz, &
-                                       lb_cube, ub_cube, &
-                                       dh, dh_inv, rp, ng, lb_grid, perd, &
-                                       sphere_bounds, grid) &
-            RESULT(istat) BIND(C, name="grid_collocate_ortho")
-            IMPORT :: C_PTR, C_INT, C_DOUBLE
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_x
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_y
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_z
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_x
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_y
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_z
-            INTEGER(KIND=C_INT), VALUE                :: lp
-            REAL(KIND=C_DOUBLE), VALUE                :: zetp
-            TYPE(C_PTR), VALUE                        :: coef_xyz
-            TYPE(C_PTR), VALUE                        :: lb_cube
-            TYPE(C_PTR), VALUE                        :: ub_cube
-            TYPE(C_PTR), VALUE                        :: dh
-            TYPE(C_PTR), VALUE                        :: dh_inv
-            TYPE(C_PTR), VALUE                        :: rp
-            TYPE(C_PTR), VALUE                        :: ng
-            TYPE(C_PTR), VALUE                        :: lb_grid
-            TYPE(C_PTR), VALUE                        :: perd
-            TYPE(C_PTR), VALUE                        :: sphere_bounds
-            TYPE(C_PTR), VALUE                        :: grid
-            INTEGER(KIND=C_INT)                       :: istat
-         END FUNCTION grid_collocate_ortho
-      END INTERFACE
-
-      ! TODO: Are LBOUND(grid, :) always 1 ???
-      istat = grid_collocate_ortho(grid_size_x=SIZE(grid, 1), &
-                                   grid_size_y=SIZE(grid, 2), &
-                                   grid_size_z=SIZE(grid, 3), &
-                                   grid_lbound_x=LBOUND(grid, 1), &
-                                   grid_lbound_y=LBOUND(grid, 2), &
-                                   grid_lbound_z=LBOUND(grid, 3), &
-                                   lp=lp, &
-                                   zetp=zetp, &
-                                   coef_xyz=C_LOC(coef_xyz(1)), &
-                                   lb_cube=C_LOC(lb_cube(1)), &
-                                   ub_cube=C_LOC(ub_cube(1)), &
-                                   dh=C_LOC(dh(1, 1)), &
-                                   dh_inv=C_LOC(dh_inv(1, 1)), &
-                                   rp=C_LOC(rp(1)), &
-                                   ng=C_LOC(ng(1)), &
-                                   lb_grid=C_LOC(lb_grid(1)), &
-                                   perd=C_LOC(perd(1)), &
-                                   sphere_bounds=C_LOC(sphere_bounds(1)), &
-                                   grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
-
-      CPASSERT(istat == 0)
-
-   END SUBROUTINE collocate_ortho
-
-! **************************************************************************************************
-!> \brief ...
-!> \param grid ...
-!> \param dh ...
-!> \param dh_inv ...
-!> \param lp ...
-!> \param lmax ...
-!> \param ng ...
-!> \param lb_grid ...
-!> \param perd ...
-!> \param rp ...
-!> \param zetp ...
-!> \param radius ...
-!> \param coef_xyz ...
-! **************************************************************************************************
-   SUBROUTINE collocate_general(grid, dh, dh_inv, lp, lmax, ng, lb_grid, perd, rp, zetp, radius, coef_xyz)
-      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
-      REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
-      INTEGER, INTENT(in)                                :: lp, lmax
-      INTEGER, DIMENSION(3), INTENT(in), TARGET          :: ng, lb_grid, perd
-      REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: rp
-      REAL(KIND=dp), INTENT(IN)                          :: zetp, radius
-      REAL(KIND=dp), DIMENSION(:), INTENT(in), TARGET    :: coef_xyz
-
-      INTEGER                                            :: istat
-      INTERFACE
-         FUNCTION grid_collocate_general(grid_size_x, grid_size_y, grid_size_z, &
-                                         grid_lbound_x, grid_lbound_y, grid_lbound_z, &
-                                         lp, lmax, radius, zetp, coef_xyz, dh, dh_inv, &
-                                         rp, ng, lb_grid, perd, grid) &
-            RESULT(istat) BIND(C, name="grid_collocate_general")
-            IMPORT :: C_PTR, C_INT, C_DOUBLE
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_x
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_y
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_z
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_x
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_y
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_z
-            INTEGER(KIND=C_INT), VALUE                :: lp
-            INTEGER(KIND=C_INT), VALUE                :: lmax
-            REAL(KIND=C_DOUBLE), VALUE                :: radius
-            REAL(KIND=C_DOUBLE), VALUE                :: zetp
-            TYPE(C_PTR), VALUE                        :: coef_xyz
-            TYPE(C_PTR), VALUE                        :: dh
-            TYPE(C_PTR), VALUE                        :: dh_inv
-            TYPE(C_PTR), VALUE                        :: rp
-            TYPE(C_PTR), VALUE                        :: ng
-            TYPE(C_PTR), VALUE                        :: lb_grid
-            TYPE(C_PTR), VALUE                        :: perd
-            TYPE(C_PTR), VALUE                        :: grid
-            INTEGER(KIND=C_INT)                       :: istat
-         END FUNCTION grid_collocate_general
-      END INTERFACE
-
-      ! TODO: Are LBOUND(grid, :) always 1 ???
-      istat = grid_collocate_general(grid_size_x=SIZE(grid, 1), &
-                                     grid_size_y=SIZE(grid, 2), &
-                                     grid_size_z=SIZE(grid, 3), &
-                                     grid_lbound_x=LBOUND(grid, 1), &
-                                     grid_lbound_y=LBOUND(grid, 2), &
-                                     grid_lbound_z=LBOUND(grid, 3), &
-                                     lp=lp, &
-                                     lmax=lmax, &
-                                     radius=radius, &
-                                     zetp=zetp, &
-                                     coef_xyz=C_LOC(coef_xyz(1)), &
-                                     dh=C_LOC(dh(1, 1)), &
-                                     dh_inv=C_LOC(dh_inv(1, 1)), &
-                                     rp=C_LOC(rp(1)), &
-                                     ng=C_LOC(ng(1)), &
-                                     lb_grid=C_LOC(lb_grid(1)), &
-                                     perd=C_LOC(perd(1)), &
-                                     grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
-
-      CPASSERT(istat == 0)
-
-   END SUBROUTINE collocate_general
 
 END MODULE grid_base_ref
