@@ -297,7 +297,7 @@ CONTAINS
       INTEGER, INTENT(IN)                                :: la_min, lb_max
       REAL(KIND=dp), INTENT(IN)                          :: zetb
       INTEGER, INTENT(IN)                                :: lb_min
-      REAL(KIND=dp), DIMENSION(3), INTENT(IN)            :: ra, rab
+      REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: ra, rab
       REAL(KIND=dp), INTENT(IN)                          :: rab2, radius, rscale
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
       INTEGER, INTENT(IN)                                :: o1, o2
@@ -309,25 +309,18 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
-      INTEGER                                            :: istat, la_max_local, la_min_local, &
-                                                            lb_max_local, lb_min_local, lp
-      INTEGER, DIMENSION(3), TARGET                      :: ng
-      REAL(KIND=dp)                                      :: f, prefactor, zetp
-      REAL(kind=dp), DIMENSION(((lmax_global*2+1)*(&
-         lmax_global*2+2)*(lmax_global*2+3))/6), TARGET  :: coef_xyz
-      REAL(kind=dp), DIMENSION(0:lmax_global*2, 0:&
-         lmax_global, 0:lmax_global, 3)                  :: alpha
-      REAL(KIND=dp), DIMENSION(3), TARGET                :: rb, rp
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab_local
+      INTEGER                                            :: istat
       INTERFACE
          FUNCTION grid_collocate_pgf_product_rspace(grid_size_x, grid_size_y, grid_size_z, &
                                                     grid_lbound_x, grid_lbound_y, grid_lbound_z, &
-                                                    use_subpatch, &
-                                                    lp, zetp, coef_xyz, &
-                                                    dh, dh_inv, rp, ng, lb_grid, perd, &
+                                                    compute_tau, use_subpatch, &
+                                                    la_max, la_min, lb_max, lb_min, &
+                                                    zeta, zetb, rscale, rab2, &
+                                                    dh, dh_inv, ra, rab, ng, lb_grid, perd, &
                                                     lmax, radius, & ! only for general
                                                     lb_cube, ub_cube, sphere_bounds, & ! only for ortho
-                                                    grid) &
+                                                    maxco, o1, o2, &
+                                                    pab, grid) &
             RESULT(istat) BIND(C, name="grid_collocate_pgf_product_rspace")
             IMPORT :: C_PTR, C_INT, C_DOUBLE, C_BOOL
             INTEGER(KIND=C_INT), VALUE                :: grid_size_x
@@ -336,13 +329,20 @@ CONTAINS
             INTEGER(KIND=C_INT), VALUE                :: grid_lbound_x
             INTEGER(KIND=C_INT), VALUE                :: grid_lbound_y
             INTEGER(KIND=C_INT), VALUE                :: grid_lbound_z
+            LOGICAL(KIND=C_BOOL), VALUE               :: compute_tau
             LOGICAL(KIND=C_BOOL), VALUE               :: use_subpatch
-            INTEGER(KIND=C_INT), VALUE                :: lp
-            REAL(KIND=C_DOUBLE), VALUE                :: zetp
-            TYPE(C_PTR), VALUE                        :: coef_xyz
+            INTEGER(KIND=C_INT), VALUE                :: la_max
+            INTEGER(KIND=C_INT), VALUE                :: la_min
+            INTEGER(KIND=C_INT), VALUE                :: lb_max
+            INTEGER(KIND=C_INT), VALUE                :: lb_min
+            REAL(KIND=C_DOUBLE), VALUE                :: zeta
+            REAL(KIND=C_DOUBLE), VALUE                :: zetb
+            REAL(KIND=C_DOUBLE), VALUE                :: rscale
+            REAL(KIND=C_DOUBLE), VALUE                :: rab2
             TYPE(C_PTR), VALUE                        :: dh
             TYPE(C_PTR), VALUE                        :: dh_inv
-            TYPE(C_PTR), VALUE                        :: rp
+            TYPE(C_PTR), VALUE                        :: ra
+            TYPE(C_PTR), VALUE                        :: rab
             TYPE(C_PTR), VALUE                        :: ng
             TYPE(C_PTR), VALUE                        :: lb_grid
             TYPE(C_PTR), VALUE                        :: perd
@@ -351,59 +351,14 @@ CONTAINS
             TYPE(C_PTR), VALUE                        :: lb_cube
             TYPE(C_PTR), VALUE                        :: ub_cube
             TYPE(C_PTR), VALUE                        :: sphere_bounds
+            INTEGER(KIND=C_INT), VALUE                :: maxco
+            INTEGER(KIND=C_INT), VALUE                :: o1
+            INTEGER(KIND=C_INT), VALUE                :: o2
+            TYPE(C_PTR), VALUE                        :: pab
             TYPE(C_PTR), VALUE                        :: grid
             INTEGER(KIND=C_INT)                       :: istat
          END FUNCTION grid_collocate_pgf_product_rspace
       END INTERFACE
-
-      zetp = zeta+zetb
-      f = zetb/zetp
-      rp(:) = ra(:)+f*rab(:)
-      rb(:) = ra(:)+rab(:)
-      prefactor = rscale*EXP(-zeta*f*rab2)
-
-      IF (compute_tau) THEN
-         la_max_local = la_max+1
-         la_min_local = MAX(la_min-1, 0)
-         lb_max_local = lb_max+1
-         lb_min_local = MAX(lb_min-1, 0)
-         NULLIFY (pab_local)
-         CALL prepare_pab_tau(pab_local, pab, o1, o2, &
-                              la_max, la_min, lb_max, lb_min, maxco, zeta, zetb)
-      ELSE
-         la_max_local = la_max
-         la_min_local = la_min
-         lb_max_local = lb_max
-         lb_min_local = lb_min
-         NULLIFY (pab_local)
-         CALL prepare_pab_rho(pab_local, pab, o1, o2, la_max, la_min, lb_max, lb_min, maxco)
-      END IF
-
-      ng(:) = npts(:)
-
-!   *** initialise the coefficient matrix, we transform the sum
-!
-!   sum_{lxa,lya,lza,lxb,lyb,lzb} P_{lxa,lya,lza,lxb,lyb,lzb} *
-!           (x-a_x)**lxa (y-a_y)**lya (z-a_z)**lza (x-b_x)**lxb (y-a_y)**lya (z-a_z)**lza
-!
-!   into
-!
-!   sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-p_x)**lxp (y-p_y)**lyp (z-p_z)**lzp
-!
-!   where p is center of the product gaussian, and lp = la_max + lb_max
-!   (current implementation is l**7)
-!
-      CALL prepare_alpha(alpha, ra, rb, rp, la_max_local, lb_max_local, lmax_global)
-!
-!   compute P_{lxp,lyp,lzp} given P_{lxa,lya,lza,lxb,lyb,lzb} and alpha(ls,lxa,lxb,1)
-!   use a three step procedure
-!   we don't store zeros, so counting is done using lxyz,lxy in order to have
-!   contiguous memory access in collocate_fast.F
-!
-      CALL prepare_coef(coef_xyz, alpha, pab_local, prefactor, &
-                        la_max_local, la_min_local, lb_max_local, lb_min_local, lmax_global)
-
-      lp = la_max_local+lb_max_local
 
       ! TODO: Are LBOUND(grid, :) always 1 ???
       istat = grid_collocate_pgf_product_rspace(grid_size_x=SIZE(grid, 1), &
@@ -412,14 +367,21 @@ CONTAINS
                                                 grid_lbound_x=LBOUND(grid, 1), &
                                                 grid_lbound_y=LBOUND(grid, 2), &
                                                 grid_lbound_z=LBOUND(grid, 3), &
+                                                compute_tau=LOGICAL(compute_tau, KIND=C_BOOL), &
                                                 use_subpatch=LOGICAL(use_subpatch, KIND=C_BOOL), &
-                                                lp=lp, &
-                                                zetp=zetp, &
-                                                coef_xyz=C_LOC(coef_xyz(1)), &
+                                                la_max=la_max, &
+                                                la_min=la_min, &
+                                                lb_max=lb_max, &
+                                                lb_min=lb_min, &
+                                                zeta=zeta, &
+                                                zetb=zetb, &
+                                                rscale=rscale, &
+                                                rab2=rab2, &
                                                 dh=C_LOC(dh(1, 1)), &
                                                 dh_inv=C_LOC(dh_inv(1, 1)), &
-                                                rp=C_LOC(rp(1)), &
-                                                ng=C_LOC(ng(1)), &
+                                                ra=C_LOC(ra(1)), &
+                                                rab=C_LOC(rab(1)), &
+                                                ng=C_LOC(npts(1)), & !TODO: weired renaming
                                                 lb_grid=C_LOC(lb_grid(1)), &
                                                 perd=C_LOC(perd(1)), &
                                                 lmax=lmax_global, &
@@ -427,220 +389,16 @@ CONTAINS
                                                 lb_cube=C_LOC(lb_cube(1)), &
                                                 ub_cube=C_LOC(ub_cube(1)), &
                                                 sphere_bounds=C_LOC(sphere_bounds(1)), &
+                                                maxco=maxco, &
+                                                o1=o1, &
+                                                o2=o2, &
+                                                pab=C_LOC(pab(1, 1)), &
                                                 grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
 
       CPASSERT(istat == 0)
 
-      DEALLOCATE (pab_local)
+      ! DEALLOCATE (pab_local)
 
    END SUBROUTINE collocate_pgf_product_rspace
-
-! **************************************************************************************************
-!> \brief ...
-!> \param pab_tau ...
-!> \param pab ...
-!> \param o1 ...
-!> \param o2 ...
-!> \param la_max ...
-!> \param la_min ...
-!> \param lb_max ...
-!> \param lb_min ...
-!> \param maxco ...
-!> \param zeta ...
-!> \param zetb ...
-! **************************************************************************************************
-   SUBROUTINE prepare_pab_tau(pab_tau, pab, o1, o2, &
-                              la_max, la_min, lb_max, lb_min, maxco, zeta, zetb)
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab_tau
-      REAL(dp), DIMENSION(:, :), INTENT(IN), TARGET      :: pab
-      INTEGER, INTENT(in)                                :: o1, o2, la_max, la_min, lb_max, lb_min, &
-                                                            maxco
-      REAL(KIND=dp), INTENT(in)                          :: zeta, zetb
-
-      INTEGER                                            :: istat, nla, nlb
-      INTERFACE
-         FUNCTION grid_prepare_pab_tau(o1, o2, la_max, la_min, lb_max, lb_min, maxco, &
-                                       zeta, zetb, pab, pab_tau) &
-            RESULT(istat) BIND(C, name="grid_prepare_pab_tau")
-            IMPORT :: C_PTR, C_INT, C_DOUBLE
-            INTEGER(KIND=C_INT), VALUE                :: o1
-            INTEGER(KIND=C_INT), VALUE                :: o2
-            INTEGER(KIND=C_INT), VALUE                :: la_max
-            INTEGER(KIND=C_INT), VALUE                :: la_min
-            INTEGER(KIND=C_INT), VALUE                :: lb_max
-            INTEGER(KIND=C_INT), VALUE                :: lb_min
-            INTEGER(KIND=C_INT), VALUE                :: maxco
-            REAL(KIND=C_DOUBLE), VALUE                :: zeta
-            REAL(KIND=C_DOUBLE), VALUE                :: zetb
-            TYPE(C_PTR), VALUE                        :: pab
-            TYPE(C_PTR), VALUE                        :: pab_tau
-            INTEGER(KIND=C_INT)                       :: istat
-         END FUNCTION grid_prepare_pab_tau
-      END INTERFACE
-
-      nla = ncoset(la_max+1)
-      nlb = ncoset(lb_max+1)
-      ALLOCATE (pab_tau(nla, nlb))
-
-      istat = grid_prepare_pab_tau(o1, &
-                                   o2, &
-                                   la_max, &
-                                   la_min, &
-                                   lb_max, &
-                                   lb_min, &
-                                   maxco, &
-                                   zeta, &
-                                   zetb, &
-                                   C_LOC(pab(1, 1)), &
-                                   C_LOC(pab_tau(1, 1)))
-      CPASSERT(istat == 0)
-
-   END SUBROUTINE prepare_pab_tau
-
-! **************************************************************************************************
-!> \brief ...
-!> \param pab_rho ...
-!> \param pab ...
-!> \param o1 ...
-!> \param o2 ...
-!> \param la_max ...
-!> \param la_min ...
-!> \param lb_max ...
-!> \param lb_min ...
-!> \param maxco ...
-! **************************************************************************************************
-   SUBROUTINE prepare_pab_rho(pab_rho, pab, o1, o2, la_max, la_min, lb_max, lb_min, maxco)
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab_rho
-      REAL(dp), DIMENSION(:, :), INTENT(IN), TARGET      :: pab
-      INTEGER, INTENT(in)                                :: o1, o2, la_max, la_min, lb_max, lb_min, &
-                                                            maxco
-
-      INTEGER                                            :: istat, nla, nlb
-      INTERFACE
-         FUNCTION grid_prepare_pab_rho(o1, o2, la_max, la_min, lb_max, lb_min, maxco, pab, pab_rho) &
-            RESULT(istat) BIND(C, name="grid_prepare_pab_rho")
-            IMPORT :: C_PTR, C_INT
-            INTEGER(KIND=C_INT), VALUE                :: o1
-            INTEGER(KIND=C_INT), VALUE                :: o2
-            INTEGER(KIND=C_INT), VALUE                :: la_max
-            INTEGER(KIND=C_INT), VALUE                :: la_min
-            INTEGER(KIND=C_INT), VALUE                :: lb_max
-            INTEGER(KIND=C_INT), VALUE                :: lb_min
-            INTEGER(KIND=C_INT), VALUE                :: maxco
-            TYPE(C_PTR), VALUE                        :: pab
-            TYPE(C_PTR), VALUE                        :: pab_rho
-            INTEGER(KIND=C_INT)                       :: istat
-         END FUNCTION grid_prepare_pab_rho
-      END INTERFACE
-
-      nla = ncoset(la_max)
-      nlb = ncoset(lb_max)
-      ALLOCATE (pab_rho(nla, nlb))
-
-      istat = grid_prepare_pab_rho(o1, &
-                                   o2, &
-                                   la_max, &
-                                   la_min, &
-                                   lb_max, &
-                                   lb_min, &
-                                   maxco, &
-                                   C_LOC(pab(1, 1)), &
-                                   C_LOC(pab_rho(1, 1)))
-      CPASSERT(istat == 0)
-
-   END SUBROUTINE prepare_pab_rho
-
-! **************************************************************************************************
-!> \brief ...
-!> \param alpha ...
-!> \param ra ...
-!> \param rb ...
-!> \param rp ...
-!> \param la_max ...
-!> \param lb_max ...
-!> \param lmax ...
-! **************************************************************************************************
-   SUBROUTINE prepare_alpha(alpha, ra, rb, rp, la_max, lb_max, lmax)
-      REAL(KIND=dp), DIMENSION(:, :, :, :), &
-         INTENT(OUT), TARGET                             :: alpha
-      REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: ra, rb, rp
-      INTEGER, INTENT(IN)                                :: la_max, lb_max, lmax
-
-      INTEGER                                            :: istat
-      INTERFACE
-         FUNCTION grid_prepare_alpha(ra, rb, rp, la_max, lb_max, lmax, alpha) &
-            RESULT(istat) BIND(C, name="grid_prepare_alpha")
-            IMPORT :: C_PTR, C_INT
-            TYPE(C_PTR), VALUE                        :: ra
-            TYPE(C_PTR), VALUE                        :: rb
-            TYPE(C_PTR), VALUE                        :: rp
-            INTEGER(KIND=C_INT), VALUE                :: la_max
-            INTEGER(KIND=C_INT), VALUE                :: lb_max
-            INTEGER(KIND=C_INT), VALUE                :: lmax
-            TYPE(C_PTR), VALUE                        :: alpha
-            INTEGER(KIND=C_INT)                       :: istat
-         END FUNCTION grid_prepare_alpha
-      END INTERFACE
-
-      istat = grid_prepare_alpha(C_LOC(ra(1)), &
-                                 C_LOC(rb(1)), &
-                                 C_LOC(rp(1)), &
-                                 la_max, &
-                                 lb_max, &
-                                 lmax, &
-                                 C_LOC(alpha(1, 1, 1, 1)))
-      CPASSERT(istat == 0)
-
-   END SUBROUTINE prepare_alpha
-
-! **************************************************************************************************
-!> \brief ...
-!> \param coef_xyz ...
-!> \param alpha ...
-!> \param pab ...
-!> \param prefactor ...
-!> \param la_max ...
-!> \param la_min ...
-!> \param lb_max ...
-!> \param lb_min ...
-!> \param lmax ...
-! **************************************************************************************************
-   SUBROUTINE prepare_coef(coef_xyz, alpha, pab, prefactor, la_max, la_min, lb_max, lb_min, lmax)
-      REAL(KIND=dp), DIMENSION(:), INTENT(INOUT), TARGET :: coef_xyz
-      REAL(KIND=dp), DIMENSION(:, :, :, :), INTENT(IN), &
-         TARGET                                          :: alpha
-      REAL(KIND=dp), DIMENSION(:, :), INTENT(IN), TARGET :: pab
-      REAL(KIND=dp), INTENT(IN)                          :: prefactor
-      INTEGER, INTENT(IN)                                :: la_max, la_min, lb_max, lb_min, lmax
-
-      INTEGER                                            :: istat
-      INTERFACE
-         FUNCTION grid_prepare_coef(la_max, la_min, lb_max, lb_min, lmax, prefactor, &
-                                    alpha, pab, coef_xyz) &
-            RESULT(istat) BIND(C, name="grid_prepare_coef")
-            IMPORT :: C_PTR, C_INT, C_DOUBLE
-            INTEGER(KIND=C_INT), VALUE                :: la_max
-            INTEGER(KIND=C_INT), VALUE                :: la_min
-            INTEGER(KIND=C_INT), VALUE                :: lb_max
-            INTEGER(KIND=C_INT), VALUE                :: lb_min
-            INTEGER(KIND=C_INT), VALUE                :: lmax
-            REAL(KIND=C_DOUBLE), VALUE                :: prefactor
-            TYPE(C_PTR), VALUE                        :: alpha
-            TYPE(C_PTR), VALUE                        :: pab
-            TYPE(C_PTR), VALUE                        :: coef_xyz
-            INTEGER(KIND=C_INT)                       :: istat
-         END FUNCTION grid_prepare_coef
-      END INTERFACE
-
-      istat = grid_prepare_coef(la_max, la_min, &
-                                lb_max, lb_min, &
-                                lmax, &
-                                prefactor, &
-                                C_LOC(alpha(1, 1, 1, 1)), &
-                                C_LOC(pab(1, 1)), &
-                                C_LOC(coef_xyz(1)))
-      CPASSERT(istat == 0)
-
-   END SUBROUTINE prepare_coef
 
 END MODULE grid_base_ref

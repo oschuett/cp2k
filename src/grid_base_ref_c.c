@@ -9,10 +9,10 @@
 #include <limits.h>
 
 static const int ncoset[] = {1,  // l=0
-                      4,  // l=1
-                      10, // l=2 ...
-                      20, 35, 56, 84, 120, 165, 220, 286, 364,
-                      455, 560, 680, 816, 969, 1140, 1330};
+                             4,  // l=1
+                             10, // l=2 ...
+                             20, 35, 56, 84, 120, 165, 220, 286, 364,
+                             455, 560, 680, 816, 969, 1140, 1330};
 
 static const double fac[] = {
         0.10000000000000000000E+01, 0.10000000000000000000E+01, 0.20000000000000000000E+01,
@@ -55,17 +55,17 @@ static int mod(int a, int m)
 }
 
 // *****************************************************************************
-int grid_prepare_pab_tau(const int o1,
-                         const int o2,
-                         const int la_max,
-                         const int la_min,
-                         const int lb_max,
-                         const int lb_min,
-                         const int maxco,
-                         const double zeta,
-                         const double zetb,
-                         const double pab[maxco][maxco],
-                         double pab_tau[ncoset[lb_max+1]][ncoset[la_max+1]]) {
+static void grid_prepare_pab_tau(const int o1,
+                                 const int o2,
+                                 const int la_max,
+                                 const int la_min,
+                                 const int lb_max,
+                                 const int lb_min,
+                                 const int maxco,
+                                 const double zeta,
+                                 const double zetb,
+                                 const double pab[maxco][maxco],
+                                 double pab_tau[ncoset[lb_max+1]][ncoset[la_max+1]]) {
 
     // create a new pab_tau so that mapping pab_tau with pgf_a pgf_b
     // is equivalent to mapping pab with 0.5 * (nabla pgf_a) . (nabla pgf_b)
@@ -150,19 +150,18 @@ int grid_prepare_pab_tau(const int o1,
         pab_tau[jco][ico] *= 0.5;
     }
     }
-    return 0;
 }
 
 // *****************************************************************************
-int grid_prepare_pab_rho(const int o1,
-                         const int o2,
-                         const int la_max,
-                         const int la_min,
-                         const int lb_max,
-                         const int lb_min,
-                         const int maxco,
-                         const double pab[maxco][maxco],
-                         double pab_rho[ncoset[lb_max]][ncoset[la_max]]) {
+static void grid_prepare_pab_rho(const int o1,
+                                 const int o2,
+                                 const int la_max,
+                                 const int la_min,
+                                 const int lb_max,
+                                 const int lb_min,
+                                 const int maxco,
+                                 const double pab[maxco][maxco],
+                                 double pab_rho[ncoset[lb_max]][ncoset[la_max]]) {
 
     const int nla = ncoset[la_max];
     const int nlb = ncoset[lb_max];
@@ -189,18 +188,16 @@ int grid_prepare_pab_rho(const int o1,
        }
     }
     }
-
-    return 0;
 }
 
 // *****************************************************************************
-int grid_prepare_alpha(const double ra[3],
-                       const double rb[3],
-                       const double rp[3],
-                       const int la_max,
-                       const int lb_max,
-                       const int lmax,
-                       double alpha[3][lmax+1][lmax+1][2*lmax+1]) {
+static void grid_prepare_alpha(const double ra[3],
+                               const double rb[3],
+                               const double rp[3],
+                               const int la_max,
+                               const int lb_max,
+                               const int lmax,
+                               double alpha[3][lmax+1][lmax+1][2*lmax+1]) {
 
     // Initialize with zeros.
     for (int iaxis=0; iaxis<3; iaxis++) {
@@ -238,12 +235,10 @@ int grid_prepare_alpha(const double ra[3],
        }
        }
     }
-
-    return 0;
 }
 
 // *****************************************************************************
-int grid_prepare_coef(const int la_max,
+static void grid_prepare_coef(const int la_max,
                       const int la_min,
                       const int lb_max,
                       const int lb_min,
@@ -251,7 +246,7 @@ int grid_prepare_coef(const int la_max,
                       const double prefactor,
                       const double alpha[3][lmax+1][lmax+1][2*lmax+1],
                       const double pab[ncoset[lb_max]][ncoset[la_max]],
-                      double coef_xyz[]) {
+                      double coef_xyz[]) {  // TODO: add size of coef_xyz
 
 
     const int lp = la_max + lb_max;
@@ -321,8 +316,6 @@ int grid_prepare_coef(const int la_max,
        }
     }
     }
-
-    return 0;
 }
 
 // *****************************************************************************
@@ -880,23 +873,128 @@ int grid_collocate_pgf_product_rspace(const int grid_size_x,
                                       const int grid_lbound_x,
                                       const int grid_lbound_y,
                                       const int grid_lbound_z,
+                                      const bool compute_tau,
                                       const bool use_subpatch,
-                                      const int lp,
-                                      const double zetp,
-                                      const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                                      const int la_max,
+                                      const int la_min,
+                                      const int lb_max,
+                                      const int lb_min,
+                                      const double zeta,
+                                      const double zetb,
+                                      const double rscale,
+                                      const double rab2,
                                       const double dh[3][3],
                                       const double dh_inv[3][3],
-                                      const double rp[3],
+                                      const double ra[3],
+                                      const double rab[3], //TODO: pass in rb instead
                                       const int ng[3],
                                       const int lb_grid[3],
                                       const int perd[3],
-                                      const int lmax,           // only for general
-                                      const double radius,      // only for general
-                                      const int lb_cube[3],     // only for by ortho
-                                      const int ub_cube[3],     // only for by ortho
-                                      const int *sphere_bounds, // only for by ortho
+                                      const int lmax,  // lmax_global
+                                      const double radius,
+                                      const int lb_cube[3],
+                                      const int ub_cube[3],
+                                      const int *sphere_bounds,
+                                      const int maxco,
+                                      const int o1,
+                                      const int o2,
+                                      const double pab[maxco][maxco],
                                       double grid[grid_size_z][grid_size_y][grid_size_x]) {
 
+    const double zetp = zeta + zetb;
+    const double f = zetb / zetp;
+    const double prefactor = rscale * exp(-zeta * f * rab2);
+    double rp[3], rb[3];
+    for (int i=0; i<3; i++) {
+        rp[i] = ra[i] + f * rab[i];
+        rb[i] = ra[i] + rab[i];
+    }
+
+    //TODO: maybe move grid_prepare_alpha and grid_prepare_coef into if/else blocks.
+    int la_max_local, la_min_local, lb_max_local, lb_min_local;
+    if (compute_tau) {
+       la_max_local = la_max + 1;
+       la_min_local = max(la_min - 1, 0);
+       lb_max_local = lb_max + 1;
+       lb_min_local = max(lb_min - 1, 0);
+    } else {
+       la_max_local = la_max;
+       la_min_local = la_min;
+       lb_max_local = lb_max;
+       lb_min_local = lb_min;
+    }
+
+    double pab_local[ncoset[lb_max_local]][ncoset[la_max_local]];
+
+    if (compute_tau) {
+        grid_prepare_pab_tau(o1,
+                             o2,
+                             la_max,
+                             la_min,
+                             lb_max,
+                             lb_min,
+                             maxco,
+                             zeta,
+                             zetb,
+                             pab,
+                             pab_local);
+    } else {
+        grid_prepare_pab_rho(o1,
+                             o2,
+                             la_max,
+                             la_min,
+                             lb_max,
+                             lb_min,
+                             maxco,
+                             pab,
+                             pab_local);
+    }
+
+    //   *** initialise the coefficient matrix, we transform the sum
+    //
+    // sum_{lxa,lya,lza,lxb,lyb,lzb} P_{lxa,lya,lza,lxb,lyb,lzb} *
+    //         (x-a_x)**lxa (y-a_y)**lya (z-a_z)**lza (x-b_x)**lxb (y-a_y)**lya (z-a_z)**lza
+    //
+    // into
+    //
+    // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-p_x)**lxp (y-p_y)**lyp (z-p_z)**lzp
+    //
+    // where p is center of the product gaussian, and lp = la_max + lb_max
+    // (current implementation is l**7)
+    //
+
+    double alpha[3][lmax+1][lmax+1][2*lmax+1];
+    grid_prepare_alpha(ra,
+                       rb,
+                       rp,
+                       la_max_local,
+                       lb_max_local,
+                       lmax,
+                       alpha);
+
+    //
+    //   compute P_{lxp,lyp,lzp} given P_{lxa,lya,lza,lxb,lyb,lzb} and alpha(ls,lxa,lxb,1)
+    //   use a three step procedure
+    //   we don't store zeros, so counting is done using lxyz,lxy in order to have
+    //   contiguous memory access in collocate_fast.F
+    //
+
+     //TODO: original used 2*lmax_global instead of lp, but that was probably
+     //      because in Fortran stack variable can not be defined mid-routine and
+     //      lp depends on compute_tau.
+
+    const int lp = la_max_local + lb_max_local;
+    double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6];
+
+    grid_prepare_coef(la_max_local,
+                      la_min_local,
+                      lb_max_local,
+                      lb_min_local,
+                      lmax,
+                      prefactor,
+                      alpha,
+                      pab_local,
+                      coef_xyz);
 
     if (use_subpatch) {
         grid_collocate_general(grid_size_x,
