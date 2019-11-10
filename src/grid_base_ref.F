@@ -24,11 +24,9 @@ MODULE grid_base_ref
 
    INTEGER, PARAMETER :: maxl = 18
    INTEGER, PARAMETER, DIMENSION(-1:maxl) :: ncoset = (/ &
-        0, 1, 4, 10, 20, 35, 56, 84, 120, 165, 220, 286, 364, 455, 560, 680, 816, 969, 1140, 1330/)
+                                         0, 1, 4, 10, 20, 35, 56, 84, 120, 165, 220, 286, 364, 455, 560, 680, 816, 969, 1140, 1330/)
 
    PUBLIC :: grid_collocate_ref
-
-! **************************************************************************************************
 
 CONTAINS
 
@@ -285,9 +283,8 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
-      INTEGER                                            :: la_max_local, &
-                                                            la_min_local, lb_max_local, &
-                                                            lb_min_local, lp
+      INTEGER                                            :: la_max_local, la_min_local, &
+                                                            lb_max_local, lb_min_local, lp
       INTEGER, DIMENSION(3)                              :: ng
       REAL(KIND=dp)                                      :: f, prefactor, zetp
       REAL(kind=dp), DIMENSION(((lmax_global*2+1)*(&
@@ -588,28 +585,53 @@ CONTAINS
    SUBROUTINE collocate_ortho(grid, dh, dh_inv, ng, perd, glb_cube, gub_cube, gsphere_bound, lb_grid, &
                               lp, zetp, rp, radius, max_radius, drmin, coef_xyz)
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
-      REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: dh, dh_inv
-      INTEGER, DIMENSION(3), INTENT(IN)                  :: ng, perd
+      REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
+      INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: ng, perd
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bound
-      INTEGER, DIMENSION(3), INTENT(IN)                  :: lb_grid
+      INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: lb_grid
       INTEGER, INTENT(IN)                                :: lp
       REAL(KIND=dp), INTENT(IN)                          :: zetp
-      REAL(KIND=dp), DIMENSION(3), INTENT(IN)            :: rp
+      REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: rp
       REAL(KIND=dp), INTENT(IN)                          :: radius
       INTEGER, INTENT(IN)                                :: max_radius
       REAL(KIND=dp), INTENT(IN)                          :: drmin
-      REAL(KIND=dp), DIMENSION(:), INTENT(IN)            :: coef_xyz
+      REAL(KIND=dp), DIMENSION(:), INTENT(IN), TARGET    :: coef_xyz
 
-      INTEGER                                            :: cmax, i, imr
-      INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: map
-      INTEGER, DIMENSION(3)                              :: cubecenter, lb_cube, ub_cube
+      INTEGER                                            :: cmax, imr, istat
+      INTEGER, DIMENSION(3), TARGET                      :: lb_cube, ub_cube
       INTEGER, DIMENSION(:), POINTER                     :: sphere_bounds
-      REAL(kind=dp), ALLOCATABLE, DIMENSION(:, :, :, :)  :: pol
-      REAL(KIND=dp), DIMENSION(3)                        :: dr, roffset
-
-      dr(1) = dh(1, 1)
-      dr(2) = dh(2, 2)
-      dr(3) = dh(3, 3)
+      INTERFACE
+         FUNCTION grid_collocate_ortho(grid_size_x, grid_size_y, grid_size_z, &
+                                       grid_lbound_x, grid_lbound_y, grid_lbound_z, &
+                                       lp, cmax, zetp, coef_xyz, &
+                                       lb_cube, ub_cube, &
+                                       dh, dh_inv, rp, ng, lb_grid, perd, &
+                                       sphere_bounds, grid) &
+            RESULT(istat) BIND(C, name="grid_collocate_ortho")
+            IMPORT :: C_PTR, C_INT, C_DOUBLE
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_x
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_y
+            INTEGER(KIND=C_INT), VALUE                :: grid_size_z
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_x
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_y
+            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_z
+            INTEGER(KIND=C_INT), VALUE                :: lp
+            INTEGER(KIND=C_INT), VALUE                :: cmax
+            REAL(KIND=C_DOUBLE), VALUE                :: zetp
+            TYPE(C_PTR), VALUE                        :: coef_xyz
+            TYPE(C_PTR), VALUE                        :: lb_cube
+            TYPE(C_PTR), VALUE                        :: ub_cube
+            TYPE(C_PTR), VALUE                        :: dh
+            TYPE(C_PTR), VALUE                        :: dh_inv
+            TYPE(C_PTR), VALUE                        :: rp
+            TYPE(C_PTR), VALUE                        :: ng
+            TYPE(C_PTR), VALUE                        :: lb_grid
+            TYPE(C_PTR), VALUE                        :: perd
+            TYPE(C_PTR), VALUE                        :: sphere_bounds
+            TYPE(C_PTR), VALUE                        :: grid
+            INTEGER(KIND=C_INT)                       :: istat
+         END FUNCTION grid_collocate_ortho
+      END INTERFACE
 
       imr = MAX(1, CEILING(radius/drmin))
       IF (imr .GT. max_radius) THEN
@@ -627,34 +649,29 @@ CONTAINS
 
       cmax = MAXVAL(ub_cube)
 
-!   *** position of the gaussian product
-!
-!   this is the actual definition of the position on the grid
-!   i.e. a point rp(:) gets here grid coordinates
-!   MODULO(rp(:)/dr(:),ng(:))+1
-!   hence (0.0,0.0,0.0) in real space is rsgrid%lb on the rsgrid ((1,1,1) on grid)
-!
+      ! TODO: Are LBOUND(grid, :) always 1 ???
+      istat = grid_collocate_ortho(grid_size_x=SIZE(grid, 1), &
+                                   grid_size_y=SIZE(grid, 2), &
+                                   grid_size_z=SIZE(grid, 3), &
+                                   grid_lbound_x=LBOUND(grid, 1), &
+                                   grid_lbound_y=LBOUND(grid, 2), &
+                                   grid_lbound_z=LBOUND(grid, 3), &
+                                   lp=lp, &
+                                   cmax=cmax, &
+                                   zetp=zetp, &
+                                   coef_xyz=C_LOC(coef_xyz(1)), &
+                                   lb_cube=C_LOC(lb_cube(1)), &
+                                   ub_cube=C_LOC(ub_cube(1)), &
+                                   dh=C_LOC(dh(1, 1)), &
+                                   dh_inv=C_LOC(dh_inv(1, 1)), &
+                                   rp=C_LOC(rp(1)), &
+                                   ng=C_LOC(ng(1)), &
+                                   lb_grid=C_LOC(lb_grid(1)), &
+                                   perd=C_LOC(perd(1)), &
+                                   sphere_bounds=C_LOC(sphere_bounds(1)), &
+                                   grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
 
-      cubecenter(:) = FLOOR(MATMUL(dh_inv, rp))
-      roffset(:) = rp(:)-REAL(cubecenter(:), dp)*dr(:)
-
-      !   *** a mapping so that the ig corresponds to the right grid point
-      ALLOCATE (map(-cmax:cmax, 3))
-      DO i = 1, 3
-         CALL fill_map(perd(i) == 1, lb_cube(i), ub_cube(i), cubecenter(i), &
-                       lb_grid(i), LBOUND(grid, i), UBOUND(grid, i), ng(i), cmax, map(:, i))
-      ENDDO
-
-      ALLOCATE (pol(1:2, 0:lp, -cmax:0, 1:3))
-      DO i = 1, 3
-         CALL fill_pol(dr(i), roffset(i), lb_cube(i), lp, cmax, zetp, pol(:, :, :, i))
-      END DO
-
-      CALL collocate_core(grid, coef_xyz, pol, map, sphere_bounds, lp, cmax)
-
-      ! deallocation needed to pass around a pgi bug..
-      DEALLOCATE (pol)
-      DEALLOCATE (map)
+      CPASSERT(istat == 0)
 
    END SUBROUTINE collocate_ortho
 
@@ -757,6 +774,7 @@ CONTAINS
       INTEGER, INTENT(IN), TARGET                        :: map(:, :), sphere_bounds(:), lp
       REAL(dp), INTENT(IN), TARGET :: coef_xyz(((lp+1)*(lp+2)*(lp+3))/6)
       INTEGER, INTENT(IN)                                :: cmax
+
       INTEGER                                            :: istat
       INTERFACE
          FUNCTION grid_collocate_core(grid_size_x, grid_size_y, grid_size_z, &

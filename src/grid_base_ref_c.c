@@ -532,6 +532,83 @@ int grid_collocate_core(
 }
 
 // *****************************************************************************
+int grid_collocate_ortho(const int grid_size_x,
+                         const int grid_size_y,
+                         const int grid_size_z,
+                         const int grid_lbound_x,
+                         const int grid_lbound_y,
+                         const int grid_lbound_z,
+                         const int lp,
+                         const int cmax,
+                         const double zetp,
+                         const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                         const int lb_cube[3],
+                         const int ub_cube[3],
+                         const double dh[3][3],
+                         const double dh_inv[3][3],
+                         const double rp[3],
+                         const int ng[3],
+                         const int lb_grid[3],
+                         const int perd[3],
+                         const int *sphere_bounds,
+                         double grid[grid_size_z][grid_size_y][grid_size_x]) {
+
+   // *** position of the gaussian product
+   //
+   // this is the actual definition of the position on the grid
+   // i.e. a point rp(:) gets here grid coordinates
+   // MODULO(rp(:)/dr(:),ng(:))+1
+   // hence (0.0,0.0,0.0) in real space is rsgrid%lb on the rsgrid ((1,1,1) on grid)
+
+    // cubecenter(:) = FLOOR(MATMUL(dh_inv, rp))
+    int cubecenter[3];
+    for (int i=0; i<3; i++) {
+        double dh_inv_rp = 0.0;
+        for (int j=0; j<3; j++) {
+            dh_inv_rp += dh_inv[j][i] * rp[j];
+        }
+        cubecenter[i] = floor(dh_inv_rp);
+    }
+
+    double roffset[3];
+    for (int i=0; i<3; i++) {
+        roffset[i] = rp[i] - ((double) cubecenter[i]) * dh[i][i];
+    }
+
+    // a mapping so that the ig corresponds to the right grid point
+    int map[3][2*cmax+1];
+    const int grid_lbound[3] = {grid_lbound_x, grid_lbound_y, grid_lbound_z};
+    const int grid_ubound[3] = {grid_lbound_x + grid_size_x,
+                                grid_lbound_y + grid_size_y,
+                                grid_lbound_z + grid_size_z};
+    for (int i=0; i<3; i++) {
+        grid_fill_map(perd[i] == 1, lb_cube[i], ub_cube[i], cubecenter[i],
+                      lb_grid[i], grid_lbound[i], grid_ubound[i], ng[i], cmax, map[i]);
+    }
+
+    double pol[3][cmax+1][lp+1][2];
+    for (int i=0; i<3; i++) {
+        grid_fill_pol(dh[i][i], roffset[i], lb_cube[i], lp, cmax, zetp, pol[i]);
+    }
+
+    grid_collocate_core(grid_size_x,
+                        grid_size_y,
+                        grid_size_z,
+                        grid_lbound_x,
+                        grid_lbound_y,
+                        grid_lbound_z,
+                        lp,
+                        cmax,
+                        coef_xyz,
+                        pol,
+                        map,
+                        sphere_bounds,
+                        grid);
+
+    return 0;
+}
+
+// *****************************************************************************
 int grid_collocate_general(
                            const int grid_size_x,
                            const int grid_size_y,
@@ -649,8 +726,8 @@ int grid_collocate_general(
     // this estimate can be improved (i.e. not box but sphere should be used)
     int index_min[3], index_max[3];
     for (int idir=0; idir<3; idir++) {
-        index_min[idir] = +INT_MAX;
-        index_max[idir] = -INT_MAX;
+        index_min[idir] = INT_MAX;
+        index_max[idir] = INT_MIN;
     }
     for (int i=-1; i<=1; i++) {
     for (int j=-1; j<=1; j++) {
