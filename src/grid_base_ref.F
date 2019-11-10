@@ -58,7 +58,8 @@ CONTAINS
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gsphere_bound, gub_cube
-      LOGICAL                                            :: atom_pair_changed, use_subpatch
+      LOGICAL                                            :: atom_pair_changed, radius_inconsistent, &
+                                                            use_subpatch
       REAL(KIND=dp)                                      :: adh, drmin, max_rad_ga, rab2, radius, &
                                                             rscale, zetp
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rb
@@ -198,19 +199,50 @@ CONTAINS
             ! check whether we need to use the generalised collocation scheme
             IF (tasks(itask)%dist_type == 2) THEN
                use_subpatch = .TRUE.
+               radius_inconsistent = radius > max_rad_ga
             ELSE
                use_subpatch = .FALSE.
+               radius_inconsistent = MAX(1, CEILING(radius/drmin)) > max_radius
             ENDIF
 
-            CALL collocate_pgf_product_rspace( &
-               la_max(iset), zeta(ipgf, iset), la_min(iset), &
-               lb_max(jset), zetb(jpgf, jset), lb_min(jset), &
-               ra, rab, rab2, radius, rscale, pab, na1-1, nb1-1, &
-               rs_rho(igrid_level)%grid, &
-               dh, dh_inv, perd, npts, lb_grid, &
-               drmin, max_radius, max_rad_ga, &
-               glb_cube, gub_cube, gsphere_bound, &
-               compute_tau, use_subpatch, lmax_global, maxco)
+            IF (radius_inconsistent) THEN
+               !
+               ! This is an important check. If the required radius for mapping the density is different
+               ! from the actual computed one, (significant) errors can occur.
+               ! This error can invariably be fixed by improving the computation of maxradius
+               ! in the call to init_cube_info
+               !
+               CPABORT("Radius consistency check failed.")
+            ENDIF
+
+            CALL collocate_pgf_product_rspace(la_max=la_max(iset), &
+                                              zeta=zeta(ipgf, iset), &
+                                              la_min=la_min(iset), &
+                                              lb_max=lb_max(jset), &
+                                              zetb=zetb(jpgf, jset), &
+                                              lb_min=lb_min(jset), &
+                                              ra=ra, &
+                                              rab=rab, &
+                                              rab2=rab2, &
+                                              radius=radius, &
+                                              rscale=rscale, &
+                                              pab=pab, &
+                                              o1=na1-1, &
+                                              o2=nb1-1, &
+                                              grid=rs_rho(igrid_level)%grid, &
+                                              dh=dh, &
+                                              dh_inv=dh_inv, &
+                                              perd=perd, &
+                                              npts=npts, &
+                                              lb_grid=lb_grid, &
+                                              drmin=drmin, &
+                                              glb_cube=glb_cube, &
+                                              gub_cube=gub_cube, &
+                                              gsphere_bound=gsphere_bound, &
+                                              compute_tau=compute_tau, &
+                                              use_subpatch=use_subpatch, &
+                                              lmax_global=lmax_global, &
+                                              maxco=maxco)
 
          END DO loop_tasks
          END DO loop_pairs
@@ -244,8 +276,6 @@ CONTAINS
 !> \param npts ...
 !> \param lb_grid ...
 !> \param drmin ...
-!> \param max_radius ...
-!> \param max_rad_ga ...
 !> \param glb_cube ...
 !> \param gub_cube ...
 !> \param gsphere_bound ...
@@ -259,7 +289,7 @@ CONTAINS
                                            ra, rab, rab2, radius, rscale, pab, o1, o2, &
                                            grid, &
                                            dh, dh_inv, perd, npts, lb_grid, &
-                                           drmin, max_radius, max_rad_ga, &
+                                           drmin, &
                                            glb_cube, gub_cube, gsphere_bound, &
                                            compute_tau, use_subpatch, lmax_global, maxco)
 
@@ -276,8 +306,6 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: dh, dh_inv
       INTEGER, DIMENSION(3), INTENT(IN)                  :: perd, npts, lb_grid
       REAL(KIND=dp), INTENT(IN)                          :: drmin
-      INTEGER, INTENT(IN)                                :: max_radius
-      REAL(KIND=dp), INTENT(IN)                          :: max_rad_ga
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bound
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
@@ -343,16 +371,6 @@ CONTAINS
       lp = la_max_local+lb_max_local
 
       IF (use_subpatch) THEN
-         IF (radius > max_rad_ga) THEN
-            !
-            ! This is an important check. If the required radius for mapping the density is different
-            ! from the actual computed one, (significant) errors can occur.
-            ! This error can invariably be fixed by improving the computation of maxradius
-            ! in the call to init_cube_info
-            !
-            STOP
-         ENDIF
-
          CALL collocate_general(grid=grid, &
                                 dh=dh, &
                                 dh_inv=dh_inv, &
@@ -367,15 +385,6 @@ CONTAINS
                                 coef_xyz=coef_xyz)
       ELSE
          imr = MAX(1, CEILING(radius/drmin))
-         IF (imr > max_radius) THEN
-            !
-            ! This is an important check. If the required radius for mapping the density is different
-            ! from the actual computed one, (significant) errors can occur.
-            ! This error can invariably be fixed by improving the computation of maxradius
-            ! in the call to init_cube_info
-            !
-            STOP
-         ENDIF
          CALL collocate_ortho(grid=grid, &
                               dh=dh, &
                               dh_inv=dh_inv, &
