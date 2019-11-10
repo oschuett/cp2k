@@ -150,7 +150,6 @@ int grid_prepare_pab_tau(const int o1,
         pab_tau[jco][ico] *= 0.5;
     }
     }
-
     return 0;
 }
 
@@ -328,15 +327,15 @@ int grid_prepare_coef(const int la_max,
 
 // *****************************************************************************
 int grid_fill_map(const bool periodic,
-                  const int lb_cube,
-                  const int ub_cube,
-                  const int cubecenter,
-                  const int lb_grid,
-                  const int grid_lbound,
-                  const int grid_ubound,
-                  const int ng,
-                  const int cmax,
-                  int map[2*cmax + 1]) {
+              const int lb_cube,
+              const int ub_cube,
+              const int cubecenter,
+              const int lb_grid,
+              const int grid_lbound,
+              const int grid_ubound,
+              const int ng,
+              const int cmax,
+              int map[2*cmax + 1]) {
 
     if (periodic) {
          int start = lb_cube;
@@ -362,21 +361,18 @@ int grid_fill_map(const bool periodic,
             map[ig + cmax] = ig + offset;
          }
     }
-
     return 0;
 }
 
 
 // *****************************************************************************
-int grid_fill_pol(
-                  const double dr,
-                  const double roffset,
-                  const int lb_cube,
-                  const int lp,
-                  const int cmax,
-                  const double zetp,
-                  double pol[cmax+1][lp+1][2]
-                  ) {
+void grid_fill_pol(const double dr,
+                   const double roffset,
+                   const int lb_cube,
+                   const int lp,
+                   const int cmax,
+                   const double zetp,
+                   double pol[cmax+1][lp+1][2]) {
 //
 //   compute the values of all (x-xp)**lp*exp(..)
 //
@@ -415,13 +411,10 @@ int grid_fill_pol(
               pg *= rpg;
           }
       }
-
-    return 0;
 }
 
 // *****************************************************************************
-int grid_collocate_core(
-                        const int grid_size_x,
+void grid_collocate_core(const int grid_size_x,
                         const int grid_size_y,
                         const int grid_size_z,
                         const int grid_lbound_x,
@@ -433,8 +426,7 @@ int grid_collocate_core(
                         const double pol[3][cmax+1][lp+1][2],
                         const int map[3][2*cmax+1],
                         const int *sphere_bounds,
-                        double grid[grid_size_z][grid_size_y][grid_size_x]
-                        ) {
+                        double grid[grid_size_z][grid_size_y][grid_size_x]) {
 
     int sci = 0;
 
@@ -528,7 +520,6 @@ int grid_collocate_core(
             }
         }
     }
-    return 0;
 }
 
 // *****************************************************************************
@@ -582,8 +573,17 @@ int grid_collocate_ortho(const int grid_size_x,
                                 grid_lbound_y + grid_size_y,
                                 grid_lbound_z + grid_size_z};
     for (int i=0; i<3; i++) {
-        grid_fill_map(perd[i] == 1, lb_cube[i], ub_cube[i], cubecenter[i],
-                      lb_grid[i], grid_lbound[i], grid_ubound[i], ng[i], cmax, map[i]);
+        const int istat = grid_fill_map(perd[i] == 1,
+                                        lb_cube[i],
+                                        ub_cube[i],
+                                        cubecenter[i],
+                                        lb_grid[i],
+                                        grid_lbound[i],
+                                        grid_ubound[i],
+                                        ng[i],
+                                        cmax,
+                                        map[i]);
+        if (istat !=0) return istat;
     }
 
     double pol[3][cmax+1][lp+1][2];
