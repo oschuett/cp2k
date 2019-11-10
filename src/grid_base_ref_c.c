@@ -530,7 +530,6 @@ int grid_collocate_ortho(const int grid_size_x,
                          const int grid_lbound_y,
                          const int grid_lbound_z,
                          const int lp,
-                         const int cmax,
                          const double zetp,
                          const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
                          const int lb_cube[3],
@@ -564,6 +563,12 @@ int grid_collocate_ortho(const int grid_size_x,
     double roffset[3];
     for (int i=0; i<3; i++) {
         roffset[i] = rp[i] - ((double) cubecenter[i]) * dh[i][i];
+    }
+
+    //cmax = MAXVAL(ub_cube)
+    int cmax = INT_MIN;
+    for (int i=0; i<3; i++) {
+        cmax = max(cmax, ub_cube[i]);
     }
 
     // a mapping so that the ig corresponds to the right grid point

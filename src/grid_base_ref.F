@@ -5,8 +5,7 @@
 
 ! **************************************************************************************************
 MODULE grid_base_ref
-   USE ISO_C_BINDING,                   ONLY: C_BOOL,&
-                                              C_DOUBLE,&
+   USE ISO_C_BINDING,                   ONLY: C_DOUBLE,&
                                               C_INT,&
                                               C_LOC,&
                                               C_PTR
@@ -283,7 +282,7 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
-      INTEGER                                            :: la_max_local, la_min_local, &
+      INTEGER                                            :: imr, la_max_local, la_min_local, &
                                                             lb_max_local, lb_min_local, lp
       INTEGER, DIMENSION(3)                              :: ng
       REAL(KIND=dp)                                      :: f, prefactor, zetp
@@ -344,11 +343,52 @@ CONTAINS
       lp = la_max_local+lb_max_local
 
       IF (use_subpatch) THEN
-         CALL collocate_general(grid, dh, dh_inv, lp, lmax_global, ng, lb_grid, perd, &
-                                rp, zetp, radius, max_rad_ga, coef_xyz)
+         IF (radius > max_rad_ga) THEN
+            !
+            ! This is an important check. If the required radius for mapping the density is different
+            ! from the actual computed one, (significant) errors can occur.
+            ! This error can invariably be fixed by improving the computation of maxradius
+            ! in the call to init_cube_info
+            !
+            STOP
+         ENDIF
+
+         CALL collocate_general(grid=grid, &
+                                dh=dh, &
+                                dh_inv=dh_inv, &
+                                lp=lp, &
+                                lmax=lmax_global, &
+                                ng=ng, &
+                                lb_grid=lb_grid, &
+                                perd=perd, &
+                                rp=rp, &
+                                zetp=zetp, &
+                                radius=radius, &
+                                coef_xyz=coef_xyz)
       ELSE
-         CALL collocate_ortho(grid, dh, dh_inv, ng, perd, glb_cube, gub_cube, gsphere_bound, lb_grid, &
-                              lp, zetp, rp, radius, max_radius, drmin, coef_xyz)
+         imr = MAX(1, CEILING(radius/drmin))
+         IF (imr > max_radius) THEN
+            !
+            ! This is an important check. If the required radius for mapping the density is different
+            ! from the actual computed one, (significant) errors can occur.
+            ! This error can invariably be fixed by improving the computation of maxradius
+            ! in the call to init_cube_info
+            !
+            STOP
+         ENDIF
+         CALL collocate_ortho(grid=grid, &
+                              dh=dh, &
+                              dh_inv=dh_inv, &
+                              ng=ng, &
+                              perd=perd, &
+                              lb_cube=glb_cube(:, imr), &
+                              ub_cube=gub_cube(:, imr), &
+                              sphere_bounds=gsphere_bound(:, imr), &
+                              lb_grid=lb_grid, &
+                              lp=lp, &
+                              zetp=zetp, &
+                              rp=rp, &
+                              coef_xyz=coef_xyz)
       END IF
 
       DEALLOCATE (pab_local)
@@ -570,40 +610,33 @@ CONTAINS
 !> \param dh_inv ...
 !> \param ng ...
 !> \param perd ...
-!> \param glb_cube ...
-!> \param gub_cube ...
-!> \param gsphere_bound ...
+!> \param lb_cube ...
+!> \param ub_cube ...
+!> \param sphere_bounds ...
 !> \param lb_grid ...
 !> \param lp ...
 !> \param zetp ...
 !> \param rp ...
-!> \param radius ...
-!> \param max_radius ...
-!> \param drmin ...
 !> \param coef_xyz ...
 ! **************************************************************************************************
-   SUBROUTINE collocate_ortho(grid, dh, dh_inv, ng, perd, glb_cube, gub_cube, gsphere_bound, lb_grid, &
-                              lp, zetp, rp, radius, max_radius, drmin, coef_xyz)
+   SUBROUTINE collocate_ortho(grid, dh, dh_inv, ng, perd, lb_cube, ub_cube, sphere_bounds, lb_grid, &
+                              lp, zetp, rp, coef_xyz)
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
       INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: ng, perd
-      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bound
+      INTEGER, DIMENSION(3), TARGET                      :: lb_cube, ub_cube
+      INTEGER, DIMENSION(:), TARGET                      :: sphere_bounds
       INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: lb_grid
       INTEGER, INTENT(IN)                                :: lp
       REAL(KIND=dp), INTENT(IN)                          :: zetp
       REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: rp
-      REAL(KIND=dp), INTENT(IN)                          :: radius
-      INTEGER, INTENT(IN)                                :: max_radius
-      REAL(KIND=dp), INTENT(IN)                          :: drmin
       REAL(KIND=dp), DIMENSION(:), INTENT(IN), TARGET    :: coef_xyz
 
-      INTEGER                                            :: cmax, imr, istat
-      INTEGER, DIMENSION(3), TARGET                      :: lb_cube, ub_cube
-      INTEGER, DIMENSION(:), POINTER                     :: sphere_bounds
+      INTEGER                                            :: istat
       INTERFACE
          FUNCTION grid_collocate_ortho(grid_size_x, grid_size_y, grid_size_z, &
                                        grid_lbound_x, grid_lbound_y, grid_lbound_z, &
-                                       lp, cmax, zetp, coef_xyz, &
+                                       lp, zetp, coef_xyz, &
                                        lb_cube, ub_cube, &
                                        dh, dh_inv, rp, ng, lb_grid, perd, &
                                        sphere_bounds, grid) &
@@ -616,7 +649,6 @@ CONTAINS
             INTEGER(KIND=C_INT), VALUE                :: grid_lbound_y
             INTEGER(KIND=C_INT), VALUE                :: grid_lbound_z
             INTEGER(KIND=C_INT), VALUE                :: lp
-            INTEGER(KIND=C_INT), VALUE                :: cmax
             REAL(KIND=C_DOUBLE), VALUE                :: zetp
             TYPE(C_PTR), VALUE                        :: coef_xyz
             TYPE(C_PTR), VALUE                        :: lb_cube
@@ -633,22 +665,6 @@ CONTAINS
          END FUNCTION grid_collocate_ortho
       END INTERFACE
 
-      imr = MAX(1, CEILING(radius/drmin))
-      IF (imr .GT. max_radius) THEN
-         !
-         ! This is an important check. If the required radius for mapping the density is different
-         ! from the actual computed one, (significant) errors can occur.
-         ! This error can invariably be fixed by improving the computation of maxradius
-         ! in the call to init_cube_info
-         !
-         STOP
-      ENDIF
-      lb_cube(:) = glb_cube(:, imr)
-      ub_cube(:) = gub_cube(:, imr)
-      sphere_bounds(1:) => gsphere_bound(:, imr)
-
-      cmax = MAXVAL(ub_cube)
-
       ! TODO: Are LBOUND(grid, :) always 1 ???
       istat = grid_collocate_ortho(grid_size_x=SIZE(grid, 1), &
                                    grid_size_y=SIZE(grid, 2), &
@@ -657,7 +673,6 @@ CONTAINS
                                    grid_lbound_y=LBOUND(grid, 2), &
                                    grid_lbound_z=LBOUND(grid, 3), &
                                    lp=lp, &
-                                   cmax=cmax, &
                                    zetp=zetp, &
                                    coef_xyz=C_LOC(coef_xyz(1)), &
                                    lb_cube=C_LOC(lb_cube(1)), &
@@ -688,17 +703,15 @@ CONTAINS
 !> \param rp ...
 !> \param zetp ...
 !> \param radius ...
-!> \param max_rad_ga ...
 !> \param coef_xyz ...
 ! **************************************************************************************************
-   SUBROUTINE collocate_general(grid, dh, dh_inv, lp, lmax, ng, lb_grid, perd, rp, zetp, radius, &
-                                max_rad_ga, coef_xyz)
+   SUBROUTINE collocate_general(grid, dh, dh_inv, lp, lmax, ng, lb_grid, perd, rp, zetp, radius, coef_xyz)
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
       INTEGER, INTENT(in)                                :: lp, lmax
       INTEGER, DIMENSION(3), INTENT(in), TARGET          :: ng, lb_grid, perd
       REAL(KIND=dp), DIMENSION(3), INTENT(IN), TARGET    :: rp
-      REAL(KIND=dp), INTENT(IN)                          :: zetp, radius, max_rad_ga
+      REAL(KIND=dp), INTENT(IN)                          :: zetp, radius
       REAL(KIND=dp), DIMENSION(:), INTENT(in), TARGET    :: coef_xyz
 
       INTEGER                                            :: istat
@@ -730,16 +743,6 @@ CONTAINS
             INTEGER(KIND=C_INT)                       :: istat
          END FUNCTION grid_collocate_general
       END INTERFACE
-
-      IF (radius > max_rad_ga) THEN
-         !
-         ! This is an important check. If the required radius for mapping the density is different
-         ! from the actual computed one, (significant) errors can occur.
-         ! This error can invariably be fixed by improving the computation of maxradius
-         ! in the call to init_cube_info
-         !
-         STOP
-      ENDIF
 
       ! TODO: Are LBOUND(grid, :) always 1 ???
       istat = grid_collocate_general(grid_size_x=SIZE(grid, 1), &
