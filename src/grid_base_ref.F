@@ -22,24 +22,9 @@ MODULE grid_base_ref
 
    PRIVATE
 
-!&<
-   INTEGER, PARAMETER :: maxfac = 30
-   REAL(KIND=dp), PARAMETER, DIMENSION(0:maxfac) :: fac = (/ &
-        0.10000000000000000000E+01_dp, 0.10000000000000000000E+01_dp, 0.20000000000000000000E+01_dp, &
-        0.60000000000000000000E+01_dp, 0.24000000000000000000E+02_dp, 0.12000000000000000000E+03_dp, &
-        0.72000000000000000000E+03_dp, 0.50400000000000000000E+04_dp, 0.40320000000000000000E+05_dp, &
-        0.36288000000000000000E+06_dp, 0.36288000000000000000E+07_dp, 0.39916800000000000000E+08_dp, &
-        0.47900160000000000000E+09_dp, 0.62270208000000000000E+10_dp, 0.87178291200000000000E+11_dp, &
-        0.13076743680000000000E+13_dp, 0.20922789888000000000E+14_dp, 0.35568742809600000000E+15_dp, &
-        0.64023737057280000000E+16_dp, 0.12164510040883200000E+18_dp, 0.24329020081766400000E+19_dp, &
-        0.51090942171709440000E+20_dp, 0.11240007277776076800E+22_dp, 0.25852016738884976640E+23_dp, &
-        0.62044840173323943936E+24_dp, 0.15511210043330985984E+26_dp, 0.40329146112660563558E+27_dp, &
-        0.10888869450418352161E+29_dp, 0.30488834461171386050E+30_dp, 0.88417619937397019545E+31_dp, &
-        0.26525285981219105864E+33_dp/)
    INTEGER, PARAMETER :: maxl = 18
    INTEGER, PARAMETER, DIMENSION(-1:maxl) :: ncoset = (/ &
         0, 1, 4, 10, 20, 35, 56, 84, 120, 165, 220, 286, 364, 455, 560, 680, 816, 969, 1140, 1330/)
-!&>
 
    PUBLIC :: grid_collocate_ref
 
@@ -300,7 +285,7 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
-      INTEGER                                            :: gridbounds(2, 3), la_max_local, &
+      INTEGER                                            :: la_max_local, &
                                                             la_min_local, lb_max_local, &
                                                             lb_min_local, lp
       INTEGER, DIMENSION(3)                              :: ng
@@ -336,12 +321,6 @@ CONTAINS
       END IF
 
       ng(:) = npts(:)
-      gridbounds(1, 1) = LBOUND(GRID, 1)
-      gridbounds(2, 1) = UBOUND(GRID, 1)
-      gridbounds(1, 2) = LBOUND(GRID, 2)
-      gridbounds(2, 2) = UBOUND(GRID, 2)
-      gridbounds(1, 3) = LBOUND(GRID, 3)
-      gridbounds(2, 3) = UBOUND(GRID, 3)
 
 !   *** initialise the coefficient matrix, we transform the sum
 !
@@ -371,7 +350,7 @@ CONTAINS
          CALL collocate_general(grid, dh, dh_inv, lp, lmax_global, ng, lb_grid, perd, &
                                 rp, zetp, radius, max_rad_ga, coef_xyz)
       ELSE
-         CALL collocate_ortho(grid, dh, dh_inv, ng, perd, glb_cube, gub_cube, gsphere_bound, gridbounds, lb_grid, &
+         CALL collocate_ortho(grid, dh, dh_inv, ng, perd, glb_cube, gub_cube, gsphere_bound, lb_grid, &
                               lp, zetp, rp, radius, max_radius, drmin, coef_xyz)
       END IF
 
@@ -597,7 +576,6 @@ CONTAINS
 !> \param glb_cube ...
 !> \param gub_cube ...
 !> \param gsphere_bound ...
-!> \param gridbounds ...
 !> \param lb_grid ...
 !> \param lp ...
 !> \param zetp ...
@@ -607,13 +585,12 @@ CONTAINS
 !> \param drmin ...
 !> \param coef_xyz ...
 ! **************************************************************************************************
-   SUBROUTINE collocate_ortho(grid, dh, dh_inv, ng, perd, glb_cube, gub_cube, gsphere_bound, gridbounds, lb_grid, &
+   SUBROUTINE collocate_ortho(grid, dh, dh_inv, ng, perd, glb_cube, gub_cube, gsphere_bound, lb_grid, &
                               lp, zetp, rp, radius, max_radius, drmin, coef_xyz)
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN)         :: dh, dh_inv
       INTEGER, DIMENSION(3), INTENT(IN)                  :: ng, perd
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bound
-      INTEGER, DIMENSION(2, 3), INTENT(IN)               :: gridbounds
       INTEGER, DIMENSION(3), INTENT(IN)                  :: lb_grid
       INTEGER, INTENT(IN)                                :: lp
       REAL(KIND=dp), INTENT(IN)                          :: zetp
@@ -673,7 +650,7 @@ CONTAINS
          CALL fill_pol(dr(i), roffset(i), lb_cube(i), lp, cmax, zetp, pol(:, :, :, i))
       END DO
 
-      CALL collocate_core(grid, coef_xyz, pol, map, sphere_bounds, lp, cmax, gridbounds)
+      CALL collocate_core(grid, coef_xyz, pol, map, sphere_bounds, lp, cmax)
 
       ! deallocation needed to pass around a pgi bug..
       DEALLOCATE (pol)
@@ -773,17 +750,13 @@ CONTAINS
 !> \param sphere_bounds ...
 !> \param lp ...
 !> \param cmax ...
-!> \param gridbounds ...
 ! **************************************************************************************************
-   SUBROUTINE collocate_core(grid, coef_xyz, pol, map, sphere_bounds, lp, cmax, gridbounds)
+   SUBROUTINE collocate_core(grid, coef_xyz, pol, map, sphere_bounds, lp, cmax)
+      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       REAL(dp), INTENT(IN), TARGET                       :: pol(:, :, :, :)
       INTEGER, INTENT(IN), TARGET                        :: map(:, :), sphere_bounds(:), lp
       REAL(dp), INTENT(IN), TARGET :: coef_xyz(((lp+1)*(lp+2)*(lp+3))/6)
       INTEGER, INTENT(IN)                                :: cmax
-      INTEGER, INTENT(IN), TARGET                        :: gridbounds(2, 3)
-      REAL(dp), INTENT(INOUT), TARGET :: grid(gridbounds(1, 1):gridbounds(2, 1), gridbounds(1, 2): &
-         gridbounds(2, 2), gridbounds(1, 3):gridbounds(2, 3))
-
       INTEGER                                            :: istat
       INTERFACE
          FUNCTION grid_collocate_core(grid_size_x, grid_size_y, grid_size_z, &
