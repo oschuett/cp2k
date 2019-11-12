@@ -311,20 +311,19 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
-      INTEGER                                            :: istat
       TYPE(C_PTR)                                        :: lb_cube, sphere_bounds, ub_cube
       INTERFACE
-         FUNCTION grid_collocate_pgf_product_rspace(grid_size_x, grid_size_y, grid_size_z, &
-                                                    grid_lbound_x, grid_lbound_y, grid_lbound_z, &
-                                                    compute_tau, use_subpatch, &
-                                                    la_max, la_min, lb_max, lb_min, &
-                                                    zeta, zetb, rscale, rab2, &
-                                                    dh, dh_inv, ra, rab, ng, lb_grid, perd, &
-                                                    lmax, radius, & ! only for general
-                                                    lb_cube, ub_cube, sphere_bounds, & ! only for ortho
-                                                    maxco, o1, o2, &
-                                                    pab, grid) &
-            RESULT(istat) BIND(C, name="grid_collocate_pgf_product_rspace")
+         SUBROUTINE grid_collocate_pgf_product_rspace(grid_size_x, grid_size_y, grid_size_z, &
+                                                      grid_lbound_x, grid_lbound_y, grid_lbound_z, &
+                                                      compute_tau, use_subpatch, &
+                                                      la_max, la_min, lb_max, lb_min, &
+                                                      zeta, zetb, rscale, rab2, &
+                                                      dh, dh_inv, ra, rab, ng, lb_grid, perd, &
+                                                      lmax, radius, &
+                                                      lb_cube, ub_cube, sphere_bounds, &
+                                                      maxco, o1, o2, &
+                                                      pab, grid) &
+            BIND(C, name="grid_collocate_pgf_product_rspace")
             IMPORT :: C_PTR, C_INT, C_DOUBLE, C_BOOL
             INTEGER(KIND=C_INT), VALUE                :: grid_size_x
             INTEGER(KIND=C_INT), VALUE                :: grid_size_y
@@ -359,8 +358,7 @@ CONTAINS
             INTEGER(KIND=C_INT), VALUE                :: o2
             TYPE(C_PTR), VALUE                        :: pab
             TYPE(C_PTR), VALUE                        :: grid
-            INTEGER(KIND=C_INT)                       :: istat
-         END FUNCTION grid_collocate_pgf_product_rspace
+         END SUBROUTINE grid_collocate_pgf_product_rspace
       END INTERFACE
 
       IF (.NOT. use_subpatch) THEN
@@ -374,43 +372,39 @@ CONTAINS
       ENDIF
 
       ! TODO: Are LBOUND(grid, :) always 1 ???
-      istat = grid_collocate_pgf_product_rspace(grid_size_x=SIZE(grid, 1), &
-                                                grid_size_y=SIZE(grid, 2), &
-                                                grid_size_z=SIZE(grid, 3), &
-                                                grid_lbound_x=LBOUND(grid, 1), &
-                                                grid_lbound_y=LBOUND(grid, 2), &
-                                                grid_lbound_z=LBOUND(grid, 3), &
-                                                compute_tau=LOGICAL(compute_tau, KIND=C_BOOL), &
-                                                use_subpatch=LOGICAL(use_subpatch, KIND=C_BOOL), &
-                                                la_max=la_max, &
-                                                la_min=la_min, &
-                                                lb_max=lb_max, &
-                                                lb_min=lb_min, &
-                                                zeta=zeta, &
-                                                zetb=zetb, &
-                                                rscale=rscale, &
-                                                rab2=rab2, &
-                                                dh=C_LOC(dh(1, 1)), &
-                                                dh_inv=C_LOC(dh_inv(1, 1)), &
-                                                ra=C_LOC(ra(1)), &
-                                                rab=C_LOC(rab(1)), &
-                                                ng=C_LOC(npts(1)), & !TODO: weired renaming
-                                                lb_grid=C_LOC(lb_grid(1)), &
-                                                perd=C_LOC(perd(1)), &
-                                                lmax=lmax_global, &
-                                                radius=radius, &
-                                                lb_cube=lb_cube, &
-                                                ub_cube=ub_cube, &
-                                                sphere_bounds=sphere_bounds, &
-                                                maxco=maxco, &
-                                                o1=o1, &
-                                                o2=o2, &
-                                                pab=C_LOC(pab(1, 1)), &
-                                                grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
-
-      CPASSERT(istat == 0)
-
-      ! DEALLOCATE (pab_local)
+      CALL grid_collocate_pgf_product_rspace(grid_size_x=SIZE(grid, 1), &
+                                             grid_size_y=SIZE(grid, 2), &
+                                             grid_size_z=SIZE(grid, 3), &
+                                             grid_lbound_x=LBOUND(grid, 1), &
+                                             grid_lbound_y=LBOUND(grid, 2), &
+                                             grid_lbound_z=LBOUND(grid, 3), &
+                                             compute_tau=LOGICAL(compute_tau, KIND=C_BOOL), &
+                                             use_subpatch=LOGICAL(use_subpatch, KIND=C_BOOL), &
+                                             la_max=la_max, &
+                                             la_min=la_min, &
+                                             lb_max=lb_max, &
+                                             lb_min=lb_min, &
+                                             zeta=zeta, &
+                                             zetb=zetb, &
+                                             rscale=rscale, &
+                                             rab2=rab2, &
+                                             dh=C_LOC(dh(1, 1)), &
+                                             dh_inv=C_LOC(dh_inv(1, 1)), &
+                                             ra=C_LOC(ra(1)), &
+                                             rab=C_LOC(rab(1)), &
+                                             ng=C_LOC(npts(1)), & !TODO: weired renaming
+                                             lb_grid=C_LOC(lb_grid(1)), &
+                                             perd=C_LOC(perd(1)), &
+                                             lmax=lmax_global, &
+                                             radius=radius, &
+                                             lb_cube=lb_cube, &
+                                             ub_cube=ub_cube, &
+                                             sphere_bounds=sphere_bounds, &
+                                             maxco=maxco, &
+                                             o1=o1, &
+                                             o2=o2, &
+                                             pab=C_LOC(pab(1, 1)), &
+                                             grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
 
    END SUBROUTINE collocate_pgf_product_rspace
 
