@@ -9,6 +9,7 @@ MODULE grid_base_ref
                                               C_DOUBLE,&
                                               C_INT,&
                                               C_LOC,&
+                                              C_NULL_PTR,&
                                               C_PTR
    USE kinds,                           ONLY: dp
    USE spmat_types,                     ONLY: spmat_get,&
@@ -58,7 +59,7 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
-      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gsphere_bound, gub_cube
+      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gsphere_bounds, gub_cube
       LOGICAL                                            :: atom_pair_changed, radius_inconsistent, &
                                                             use_subpatch
       REAL(KIND=dp)                                      :: adh, drmin, max_rad_ga, rab2, radius, &
@@ -100,10 +101,9 @@ CONTAINS
          max_radius = task_list%cinfo(igrid_level)%max_radius
          max_rad_ga = task_list%cinfo(igrid_level)%max_rad_ga
 
-         NULLIFY (glb_cube, gub_cube, gsphere_bound)
          glb_cube => task_list%cinfo(igrid_level)%lb_cube
          gub_cube => task_list%cinfo(igrid_level)%ub_cube
-         gsphere_bound => task_list%cinfo(igrid_level)%sphere_bounds
+         gsphere_bounds => task_list%cinfo(igrid_level)%sphere_bounds
 
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
@@ -237,9 +237,10 @@ CONTAINS
                                               perd=perd, &
                                               npts=npts, &
                                               lb_grid=lb_grid, &
-                                              lb_cube=glb_cube(:, imr), &
-                                              ub_cube=gub_cube(:, imr), &
-                                              sphere_bounds=gsphere_bound(:, imr), &
+                                              glb_cube=glb_cube, &
+                                              gub_cube=gub_cube, &
+                                              gsphere_bounds=gsphere_bounds, &
+                                              imr=imr, &
                                               compute_tau=compute_tau, &
                                               use_subpatch=use_subpatch, &
                                               lmax_global=lmax_global, &
@@ -276,9 +277,10 @@ CONTAINS
 !> \param perd ...
 !> \param npts ...
 !> \param lb_grid ...
-!> \param lb_cube ...
-!> \param ub_cube ...
-!> \param sphere_bounds ...
+!> \param glb_cube ...
+!> \param gub_cube ...
+!> \param gsphere_bounds ...
+!> \param imr ...
 !> \param compute_tau ...
 !> \param use_subpatch ...
 !> \param lmax_global Maximum possible value of lmax used to dimension arrays
@@ -289,7 +291,7 @@ CONTAINS
                                            ra, rab, rab2, radius, rscale, pab, o1, o2, &
                                            grid, &
                                            dh, dh_inv, perd, npts, lb_grid, &
-                                           lb_cube, ub_cube, sphere_bounds, &
+                                           glb_cube, gub_cube, gsphere_bounds, imr, &
                                            compute_tau, use_subpatch, lmax_global, maxco)
 
       INTEGER, INTENT(IN)                                :: la_max
@@ -304,12 +306,13 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
       INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: perd, npts, lb_grid
-      INTEGER, DIMENSION(3), TARGET                      :: lb_cube, ub_cube
-      INTEGER, DIMENSION(:), TARGET                      :: sphere_bounds
+      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bounds
+      INTEGER, INTENT(IN)                                :: imr
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
       INTEGER                                            :: istat
+      TYPE(C_PTR)                                        :: lb_cube, sphere_bounds, ub_cube
       INTERFACE
          FUNCTION grid_collocate_pgf_product_rspace(grid_size_x, grid_size_y, grid_size_z, &
                                                     grid_lbound_x, grid_lbound_y, grid_lbound_z, &
@@ -360,6 +363,16 @@ CONTAINS
          END FUNCTION grid_collocate_pgf_product_rspace
       END INTERFACE
 
+      IF (.NOT. use_subpatch) THEN
+         lb_cube = C_LOC(glb_cube(1, imr))
+         ub_cube = C_LOC(gub_cube(1, imr))
+         sphere_bounds = C_LOC(gsphere_bounds(1, imr))
+      ELSE
+         lb_cube = C_NULL_PTR
+         ub_cube = C_NULL_PTR
+         sphere_bounds = C_NULL_PTR
+      ENDIF
+
       ! TODO: Are LBOUND(grid, :) always 1 ???
       istat = grid_collocate_pgf_product_rspace(grid_size_x=SIZE(grid, 1), &
                                                 grid_size_y=SIZE(grid, 2), &
@@ -386,9 +399,9 @@ CONTAINS
                                                 perd=C_LOC(perd(1)), &
                                                 lmax=lmax_global, &
                                                 radius=radius, &
-                                                lb_cube=C_LOC(lb_cube(1)), &
-                                                ub_cube=C_LOC(ub_cube(1)), &
-                                                sphere_bounds=C_LOC(sphere_bounds(1)), &
+                                                lb_cube=lb_cube, &
+                                                ub_cube=ub_cube, &
+                                                sphere_bounds=sphere_bounds, &
                                                 maxco=maxco, &
                                                 o1=o1, &
                                                 o2=o2, &
