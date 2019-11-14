@@ -529,7 +529,7 @@ static void grid_collocate_ortho(const int grid_size_x,
                                  const double rp[3],
                                  const int ng[3],
                                  const int lb_grid[3],
-                                 const int perd[3],
+                                 const bool periodic[3],
                                  const int lb_cube[3],
                                  const int ub_cube[3],
                                  const int *sphere_bounds,
@@ -570,7 +570,7 @@ static void grid_collocate_ortho(const int grid_size_x,
                                 grid_lbound_y + grid_size_y,
                                 grid_lbound_z + grid_size_z};
     for (int i=0; i<3; i++) {
-        grid_fill_map(perd[i] == 1,
+        grid_fill_map(periodic[i],
                       lb_cube[i],
                       ub_cube[i],
                       cubecenter[i],
@@ -617,7 +617,7 @@ static void grid_collocate_general(const int grid_size_x,
                                    const double rp[3],
                                    const int ng[3],
                                    const int lb_grid[3],
-                                   const int perd[3],
+                                   const bool periodic[3],
                                    const int lmax,
                                    const double radius,
                                    double grid[grid_size_z][grid_size_y][grid_size_x]) {
@@ -746,7 +746,7 @@ static void grid_collocate_general(const int grid_size_x,
     for (int k=index_min[2]; k<=index_max[2]; k++) {
        const double dk = k - gp[2];
        int k_index;
-       if (perd[2] == 1) {
+       if (periodic[2]) {
           k_index = mod(k, ng[2]) + 1;
        } else {
           k_index = k - index_min[2] + offset[2];
@@ -776,7 +776,7 @@ static void grid_collocate_general(const int grid_size_x,
        for (int j=index_min[1]; j<=index_max[1]; j++) {
           const double dj = j - gp[1];
           int j_index;
-          if (perd[1] == 1) {
+          if (periodic[1]) {
              j_index = mod(j, ng[1]) + 1;
           } else {
              j_index = j - index_min[1] + offset[1];
@@ -851,7 +851,7 @@ static void grid_collocate_general(const int grid_size_x,
              res *= exp2i;
 
              int i_index;
-             if (perd[0] == 1) {
+             if (periodic[0]) {
                 i_index = mod(i, ng[0]) + 1;
              } else {
                 i_index = i - index_min[0] + offset[0];
@@ -863,13 +863,7 @@ static void grid_collocate_general(const int grid_size_x,
 }
 
 // *****************************************************************************
-void grid_collocate_pgf_product_rspace(const int grid_size_x,
-                                       const int grid_size_y,
-                                       const int grid_size_z,
-                                       const int grid_lbound_x,
-                                       const int grid_lbound_y,
-                                       const int grid_lbound_z,
-                                       const bool compute_tau,
+void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        const bool use_subpatch,
                                        const int la_max,
                                        const int la_min,
@@ -878,14 +872,13 @@ void grid_collocate_pgf_product_rspace(const int grid_size_x,
                                        const double zeta,
                                        const double zetb,
                                        const double rscale,
-                                       const double rab2,
                                        const double dh[3][3],
                                        const double dh_inv[3][3],
                                        const double ra[3],
                                        const double rab[3],
                                        const int ng[3],
                                        const int lb_grid[3],
-                                       const int perd[3],
+                                       const bool periodic[3],
                                        const int lmax,
                                        const double radius,
                                        const int lb_cube[3],
@@ -895,10 +888,17 @@ void grid_collocate_pgf_product_rspace(const int grid_size_x,
                                        const int o1,
                                        const int o2,
                                        const double pab[maxco][maxco],
+                                       const int grid_size_x,
+                                       const int grid_size_y,
+                                       const int grid_size_z,
+                                       const int grid_lbound_x,
+                                       const int grid_lbound_y,
+                                       const int grid_lbound_z,
                                        double grid[grid_size_z][grid_size_y][grid_size_x]) {
 
     const double zetp = zeta + zetb;
     const double f = zetb / zetp;
+    const double rab2 = rab[0] * rab[0] + rab[1] * rab[1] + rab[2] * rab[2];
     const double prefactor = rscale * exp(-zeta * f * rab2);
     double rp[3], rb[3];
     for (int i=0; i<3; i++) {
@@ -1007,7 +1007,7 @@ void grid_collocate_pgf_product_rspace(const int grid_size_x,
                                rp,
                                ng,
                                lb_grid,
-                               perd,
+                               periodic,
                                lmax,
                                radius,
                                grid);
@@ -1026,7 +1026,7 @@ void grid_collocate_pgf_product_rspace(const int grid_size_x,
                              rp,
                              ng,
                              lb_grid,
-                             perd,
+                             periodic,
                              lb_cube,
                              ub_cube,
                              sphere_bounds,
