@@ -321,15 +321,13 @@ static void grid_prepare_coef(const int la_max,
 
 // *****************************************************************************
 static void grid_fill_map(const bool periodic,
-                         const int lb_cube,
-                         const int ub_cube,
-                         const int cubecenter,
-                         const int lb_grid,
-                         const int grid_lbound,
-                         const int grid_ubound,
-                         const int ng,
-                         const int cmax,
-                         int map[2*cmax + 1]) {
+                          const int lb_cube,
+                          const int ub_cube,
+                          const int cubecenter,
+                          const int lb_grid,
+                          const int ng,
+                          const int cmax,
+                          int map[2*cmax + 1]) {
 
     if (periodic) {
          int start = lb_cube;
@@ -348,8 +346,8 @@ static void grid_fill_map(const bool periodic,
          // this takes partial grid + border regions into account
          const int offset = mod(cubecenter + lb_cube + lb_grid, ng) + 1 - lb_cube;
          // check for out of bounds
-         assert(ub_cube + offset <= grid_ubound);
-         assert(lb_cube + offset >= grid_lbound);
+         assert(ub_cube + offset <= ng + 1);
+         assert(lb_cube + offset >= 1);
          for (int ig=lb_cube; ig <= ub_cube; ig++) {
             map[ig + cmax] = ig + offset;
          }
@@ -406,19 +404,15 @@ static void grid_fill_pol(const double dr,
 }
 
 // *****************************************************************************
-static void grid_collocate_core(const int grid_size_x,
-                                const int grid_size_y,
-                                const int grid_size_z,
-                                const int grid_lbound_x,
-                                const int grid_lbound_y,
-                                const int grid_lbound_z,
-                                const int lp,
+static void grid_collocate_core(const int lp,
                                 const int cmax,
                                 const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
                                 const double pol[3][cmax+1][lp+1][2],
                                 const int map[3][2*cmax+1],
-                                const int *sphere_bounds,
-                                double grid[grid_size_z][grid_size_y][grid_size_x]) {
+                                const int nspheres,
+                                const int sphere_bounds[nspheres],
+                                const int ng[3],
+                                double grid[ng[2]][ng[1]][ng[0]]) {
 
     int sci = 0;
 
@@ -501,27 +495,21 @@ static void grid_collocate_core(const int grid_size_x,
                     s08 += coef_x[lxp][3]*pol[0][ig+cmax][lxp][1];
                 }
 
-                grid[k-grid_lbound_z][j-grid_lbound_y][i-grid_lbound_x] += s01;
-                grid[k2-grid_lbound_z][j-grid_lbound_y][i-grid_lbound_x] += s02;
-                grid[k-grid_lbound_z][j2-grid_lbound_y][i-grid_lbound_x] += s03;
-                grid[k2-grid_lbound_z][j2-grid_lbound_y][i-grid_lbound_x] += s04;
-                grid[k-grid_lbound_z][j-grid_lbound_y][i2-grid_lbound_x] += s05;
-                grid[k2-grid_lbound_z][j-grid_lbound_y][i2-grid_lbound_x] += s06;
-                grid[k-grid_lbound_z][j2-grid_lbound_y][i2-grid_lbound_x] += s07;
-                grid[k2-grid_lbound_z][j2-grid_lbound_y][i2-grid_lbound_x] += s08;
+                grid[k-1][j-1][i-1] += s01;
+                grid[k2-1][j-1][i-1] += s02;
+                grid[k-1][j2-1][i-1] += s03;
+                grid[k2-1][j2-1][i-1] += s04;
+                grid[k-1][j-1][i2-1] += s05;
+                grid[k2-1][j-1][i2-1] += s06;
+                grid[k-1][j2-1][i2-1] += s07;
+                grid[k2-1][j2-1][i2-1] += s08;
             }
         }
     }
 }
 
 // *****************************************************************************
-static void grid_collocate_ortho(const int grid_size_x,
-                                 const int grid_size_y,
-                                 const int grid_size_z,
-                                 const int grid_lbound_x,
-                                 const int grid_lbound_y,
-                                 const int grid_lbound_z,
-                                 const int lp,
+static void grid_collocate_ortho(const int lp,
                                  const double zetp,
                                  const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
                                  const double dh[3][3],
@@ -532,8 +520,9 @@ static void grid_collocate_ortho(const int grid_size_x,
                                  const bool periodic[3],
                                  const int lb_cube[3],
                                  const int ub_cube[3],
-                                 const int *sphere_bounds,
-                                 double grid[grid_size_z][grid_size_y][grid_size_x]) {
+                                 const int nspheres,
+                                 const int sphere_bounds[nspheres],
+                                 double grid[ng[2]][ng[1]][ng[0]]) {
 
    // *** position of the gaussian product
    //
@@ -565,18 +554,12 @@ static void grid_collocate_ortho(const int grid_size_x,
 
     // a mapping so that the ig corresponds to the right grid point
     int map[3][2*cmax+1];
-    const int grid_lbound[3] = {grid_lbound_x, grid_lbound_y, grid_lbound_z};
-    const int grid_ubound[3] = {grid_lbound_x + grid_size_x,
-                                grid_lbound_y + grid_size_y,
-                                grid_lbound_z + grid_size_z};
     for (int i=0; i<3; i++) {
         grid_fill_map(periodic[i],
                       lb_cube[i],
                       ub_cube[i],
                       cubecenter[i],
                       lb_grid[i],
-                      grid_lbound[i],
-                      grid_ubound[i],
                       ng[i],
                       cmax,
                       map[i]);
@@ -587,29 +570,19 @@ static void grid_collocate_ortho(const int grid_size_x,
         grid_fill_pol(dh[i][i], roffset[i], lb_cube[i], lp, cmax, zetp, pol[i]);
     }
 
-    grid_collocate_core(grid_size_x,
-                        grid_size_y,
-                        grid_size_z,
-                        grid_lbound_x,
-                        grid_lbound_y,
-                        grid_lbound_z,
-                        lp,
+    grid_collocate_core(lp,
                         cmax,
                         coef_xyz,
                         pol,
                         map,
+                        nspheres,
                         sphere_bounds,
+                        ng,
                         grid);
 }
 
 // *****************************************************************************
-static void grid_collocate_general(const int grid_size_x,
-                                   const int grid_size_y,
-                                   const int grid_size_z,
-                                   const int grid_lbound_x,
-                                   const int grid_lbound_y,
-                                   const int grid_lbound_z,
-                                   const int lp,
+static void grid_collocate_general(const int lp,
                                    const double zetp,
                                    const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
                                    const double dh[3][3],
@@ -620,7 +593,7 @@ static void grid_collocate_general(const int grid_size_x,
                                    const bool periodic[3],
                                    const int lmax,
                                    const double radius,
-                                   double grid[grid_size_z][grid_size_y][grid_size_x]) {
+                                   double grid[ng[2]][ng[1]][ng[0]]) {
 
 //
 // transform P_{lxp,lyp,lzp} into a P_{lip,ljp,lkp} such that
@@ -856,7 +829,7 @@ static void grid_collocate_general(const int grid_size_x,
              } else {
                 i_index = i - index_min[0] + offset[0];
              }
-             grid[k_index-grid_lbound_z][j_index-grid_lbound_y][i_index-grid_lbound_x] += res;
+             grid[k_index-1][j_index-1][i_index-1] += res;
           }
        }
     }
@@ -883,18 +856,13 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        const double radius,
                                        const int lb_cube[3],
                                        const int ub_cube[3],
-                                       const int *sphere_bounds,
+                                       const int nspheres,
+                                       const int sphere_bounds[nspheres],
                                        const int maxco,
                                        const int o1,
                                        const int o2,
                                        const double pab[maxco][maxco],
-                                       const int grid_size_x,
-                                       const int grid_size_y,
-                                       const int grid_size_z,
-                                       const int grid_lbound_x,
-                                       const int grid_lbound_y,
-                                       const int grid_lbound_z,
-                                       double grid[grid_size_z][grid_size_y][grid_size_x]) {
+                                       double grid[ng[2]][ng[1]][ng[0]]){
 
     const double zetp = zeta + zetb;
     const double f = zetb / zetp;
@@ -993,13 +961,7 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                       coef_xyz);
 
     if (use_subpatch) {
-        grid_collocate_general(grid_size_x,
-                               grid_size_y,
-                               grid_size_z,
-                               grid_lbound_x,
-                               grid_lbound_y,
-                               grid_lbound_z,
-                               lp,
+        grid_collocate_general(lp,
                                zetp,
                                coef_xyz,
                                dh,
@@ -1012,13 +974,7 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                radius,
                                grid);
     } else {
-        grid_collocate_ortho(grid_size_x,
-                             grid_size_y,
-                             grid_size_z,
-                             grid_lbound_x,
-                             grid_lbound_y,
-                             grid_lbound_z,
-                             lp,
+        grid_collocate_ortho(lp,
                              zetp,
                              coef_xyz,
                              dh,
@@ -1029,6 +985,7 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                              periodic,
                              lb_cube,
                              ub_cube,
+                             nspheres,
                              sphere_bounds,
                              grid);
     }

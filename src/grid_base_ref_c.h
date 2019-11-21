@@ -31,13 +31,12 @@ extern "C" {
 // \param radius        Radius where Gaussian becomes small than threshold eps.
 // \param lb_cube       See pw/cube_utils.F.
 // \param ub_cube       See pw/cube_utils.F.
+// \param nspheres      Size of sphere_bounds array.
 // \param sphere_bounds See pw/cube_utils.F.
 // \param maxco         Dimensions of density matrix block pab.
 // \param o{1,2}        Offsets. The sub-block to be collocated starts at pab[o2][o1]
 // \param pab           The atom-pair's density matrix block P_{ab}
 //
-// \param grid_size_{x,y,z} Size of the grid array in given dimension.
-// \param grid_lbound_{x,y,z} Lower bound of the grid array in given dimension.
 // \param grid The output grid array to collocate into.
 //******************************************************************************
 void grid_collocate_pgf_product_rspace(const bool compute_tau,
@@ -60,18 +59,13 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        const double radius,
                                        const int lb_cube[3],
                                        const int ub_cube[3],
-                                       const int *sphere_bounds,
+                                       const int nspheres,
+                                       const int sphere_bounds[nspheres],
                                        const int maxco,
                                        const int o1,
                                        const int o2,
                                        const double pab[maxco][maxco],
-                                       const int grid_size_x,
-                                       const int grid_size_y,
-                                       const int grid_size_z,
-                                       const int grid_lbound_x,
-                                       const int grid_lbound_y,
-                                       const int grid_lbound_z,
-                                       double grid[grid_size_z][grid_size_y][grid_size_x]);
+                                       double grid[ng[2]][ng[1]][ng[0]]);
 
 #ifdef __cplusplus
 }

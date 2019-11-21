@@ -308,6 +308,7 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
+      INTEGER                                            :: nspheres
       LOGICAL(KIND=C_BOOL), DIMENSION(3), TARGET         :: periodic
       TYPE(C_PTR)                                        :: lb_cube, sphere_bounds, ub_cube
       INTERFACE
@@ -316,10 +317,8 @@ CONTAINS
                                                       zeta, zetb, rscale, &
                                                       dh, dh_inv, ra, rab, ng, lb_grid, periodic, &
                                                       lmax, radius, &
-                                                      lb_cube, ub_cube, sphere_bounds, &
+                                                      lb_cube, ub_cube, nspheres, sphere_bounds, &
                                                       maxco, o1, o2, pab, &
-                                                      grid_size_x, grid_size_y, grid_size_z, &
-                                                      grid_lbound_x, grid_lbound_y, grid_lbound_z, &
                                                       grid) &
             BIND(C, name="grid_collocate_pgf_product_rspace")
             IMPORT :: C_PTR, C_INT, C_DOUBLE, C_BOOL
@@ -343,17 +342,12 @@ CONTAINS
             REAL(KIND=C_DOUBLE), VALUE                :: radius
             TYPE(C_PTR), VALUE                        :: lb_cube
             TYPE(C_PTR), VALUE                        :: ub_cube
+            INTEGER(KIND=C_INT), VALUE                :: nspheres
             TYPE(C_PTR), VALUE                        :: sphere_bounds
             INTEGER(KIND=C_INT), VALUE                :: maxco
             INTEGER(KIND=C_INT), VALUE                :: o1
             INTEGER(KIND=C_INT), VALUE                :: o2
             TYPE(C_PTR), VALUE                        :: pab
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_x
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_y
-            INTEGER(KIND=C_INT), VALUE                :: grid_size_z
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_x
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_y
-            INTEGER(KIND=C_INT), VALUE                :: grid_lbound_z
             TYPE(C_PTR), VALUE                        :: grid
          END SUBROUTINE grid_collocate_pgf_product_rspace
       END INTERFACE
@@ -361,16 +355,37 @@ CONTAINS
       IF (.NOT. use_subpatch) THEN
          lb_cube = C_LOC(glb_cube(1, imr))
          ub_cube = C_LOC(gub_cube(1, imr))
+         CPASSERT(SIZE(glb_cube, 1) == 3 .AND. SIZE(gub_cube, 1) == 3)
          sphere_bounds = C_LOC(gsphere_bounds(1, imr))
+         nspheres = SIZE(gsphere_bounds, 1)
       ELSE
          lb_cube = C_NULL_PTR
          ub_cube = C_NULL_PTR
          sphere_bounds = C_NULL_PTR
+         nspheres = 0
       ENDIF
 
-      periodic = perd == 1
+      periodic = (perd == 1)
 
-      ! TODO: Are LBOUND(grid, :) always 1 ???
+      CPASSERT(SIZE(pab, 1) == maxco .AND. LBOUND(pab, 1) == 1)
+      CPASSERT(SIZE(pab, 2) == maxco .AND. LBOUND(pab, 2) == 1)
+
+      ! see rs_grid_create() in ./src/pw/realspace_grid_types.F
+      CPASSERT(SIZE(grid, 1) == npts(1) .AND. LBOUND(grid, 1) == 1)
+      CPASSERT(SIZE(grid, 2) == npts(2) .AND. LBOUND(grid, 2) == 1)
+      CPASSERT(SIZE(grid, 3) == npts(3) .AND. LBOUND(grid, 3) == 1)
+
+      !TODO: enable for gfortran 9
+      !CPASSERT(IS_CONTIGUOUS(dh))
+      !CPASSERT(IS_CONTIGUOUS(dh_inv))
+      !CPASSERT(IS_CONTIGUOUS(ra))
+      !CPASSERT(IS_CONTIGUOUS(rab))
+      !CPASSERT(IS_CONTIGUOUS(npts))
+      !CPASSERT(IS_CONTIGUOUS(lb_grid))
+      !CPASSERT(IS_CONTIGUOUS(periodic))
+      !CPASSERT(IS_CONTIGUOUS(pab))
+      !CPASSERT(IS_CONTIGUOUS(grid))
+
       CALL grid_collocate_pgf_product_rspace(compute_tau=LOGICAL(compute_tau, KIND=C_BOOL), &
                                              use_subpatch=LOGICAL(use_subpatch, KIND=C_BOOL), &
                                              la_max=la_max, &
@@ -391,18 +406,13 @@ CONTAINS
                                              radius=radius, &
                                              lb_cube=lb_cube, &
                                              ub_cube=ub_cube, &
+                                             nspheres=nspheres, &
                                              sphere_bounds=sphere_bounds, &
                                              maxco=maxco, &
                                              o1=o1, &
                                              o2=o2, &
                                              pab=C_LOC(pab(1, 1)), &
-                                             grid_size_x=SIZE(grid, 1), &
-                                             grid_size_y=SIZE(grid, 2), &
-                                             grid_size_z=SIZE(grid, 3), &
-                                             grid_lbound_x=LBOUND(grid, 1), &
-                                             grid_lbound_y=LBOUND(grid, 2), &
-                                             grid_lbound_z=LBOUND(grid, 3), &
-                                             grid=C_LOC(grid(LBOUND(grid, 1), LBOUND(grid, 2), LBOUND(grid, 3))))
+                                             grid=C_LOC(grid(1,1,1)))
 
    END SUBROUTINE collocate_pgf_product_rspace
 
