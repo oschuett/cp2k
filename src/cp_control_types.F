@@ -373,7 +373,6 @@ MODULE cp_control_types
       LOGICAL                              :: lsd_singlets
       LOGICAL                              :: invert_S
       LOGICAL                              :: precond
-      LOGICAL                              :: drho_by_collocation
       LOGICAL                              :: use_kinetic_energy_density
       INTEGER                              :: res_etype
       INTEGER                              :: diag_method

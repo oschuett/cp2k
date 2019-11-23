@@ -42,8 +42,7 @@ MODULE qs_rho_methods
                                               RECIPROCALSPACE,&
                                               pw_p_type,&
                                               pw_release
-   USE qs_collocate_density,            ONLY: calculate_drho_elec,&
-                                              calculate_rho_elec
+   USE qs_collocate_density,            ONLY: calculate_rho_elec
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type,&
                                               set_qs_env
@@ -244,40 +243,6 @@ CONTAINS
          END IF
       END IF
 
-      ! allocate drho_r and drho_g if xc_deriv_collocate
-      IF (dft_control%drho_by_collocation) THEN
-         ! drho_r
-         IF (my_rebuild_grids .OR. .NOT. ASSOCIATED(drho_r)) THEN
-            IF (ASSOCIATED(drho_r)) THEN
-               DO i = 1, SIZE(drho_r)
-                  CALL pw_release(drho_r(i)%pw)
-               END DO
-               DEALLOCATE (drho_r)
-            END IF
-            ALLOCATE (drho_r(3*nspins))
-            CALL qs_rho_set(rho, drho_r=drho_r)
-            DO i = 1, 3*nspins
-               CALL pw_pool_create_pw(auxbas_pw_pool, drho_r(i)%pw, &
-                                      use_data=REALDATA3D, in_space=REALSPACE)
-            END DO
-         END IF
-         ! drho_g
-         IF (my_rebuild_grids .OR. .NOT. ASSOCIATED(drho_g)) THEN
-            IF (ASSOCIATED(drho_g)) THEN
-               DO i = 1, SIZE(drho_g)
-                  CALL pw_release(drho_g(i)%pw)
-               END DO
-               DEALLOCATE (drho_g)
-            END IF
-            ALLOCATE (drho_g(3*nspins))
-            CALL qs_rho_set(rho, drho_g=drho_g)
-            DO i = 1, 3*nspins
-               CALL pw_pool_create_pw(auxbas_pw_pool, drho_g(i)%pw, &
-                                      use_data=COMPLEXDATA1D, in_space=RECIPROCALSPACE)
-            END DO
-         END IF
-      END IF
-
       ! allocate tau_r and tau_g if use_kinetic_energy_density
       IF (dft_control%use_kinetic_energy_density) THEN
          ! tau_r
@@ -437,21 +402,6 @@ CONTAINS
          END DO
          CALL qs_rho_set(rho_struct, rho_r_valid=.TRUE., rho_g_valid=.TRUE.)
 
-         ! if needed compute also the gradient of the density
-         IF (dft_control%drho_by_collocation) THEN
-            CALL qs_rho_get(rho_struct, rho_ao_kp=rho_ao_kp)
-            CPASSERT(.NOT. PRESENT(task_list_external))
-            CPASSERT(.NOT. PRESENT(pw_env_external))
-            DO ispin = 1, nspins
-               rho_ao => rho_ao_kp(ispin, :)
-               CALL calculate_drho_elec(matrix_p_kp=rho_ao, &
-                                        drho=drho_r(3*(ispin - 1) + 1:3*ispin), &
-                                        drho_gspace=drho_g(3*(ispin - 1) + 1:3*ispin), &
-                                        qs_env=qs_env, soft_valid=gapw)
-            END DO
-            CALL qs_rho_set(rho_struct, drho_r_valid=.TRUE., drho_g_valid=.TRUE.)
-         ENDIF
-
          ! if needed compute also the kinetic energy density
          IF (dft_control%use_kinetic_energy_density) THEN
             CALL qs_rho_get(rho_struct, rho_ao_kp=rho_ao_kp)
@@ -509,17 +459,6 @@ CONTAINS
                                     ks_env=ks_env, soft_valid=gapw_xc)
          END DO
          CALL qs_rho_set(rho_xc, rho_r_valid=.TRUE., rho_g_valid=.TRUE.)
-         ! if needed compute also the gradient of the density
-         IF (dft_control%drho_by_collocation) THEN
-            DO ispin = 1, nspins
-               rho_ao => rho_xc_ao(ispin, :)
-               CALL calculate_drho_elec(matrix_p_kp=rho_ao, &
-                                        drho=rho_xc_r(3*(ispin - 1) + 1:3*ispin), &
-                                        drho_gspace=drho_xc_g(3*(ispin - 1) + 1:3*ispin), &
-                                        qs_env=qs_env, soft_valid=gapw_xc)
-            END DO
-            CALL qs_rho_set(rho_xc, drho_r_valid=.TRUE., drho_g_valid=.TRUE.)
-         ENDIF
          ! if needed compute also the kinetic energy density
          IF (dft_control%use_kinetic_energy_density) THEN
             DO ispin = 1, nspins
@@ -567,8 +506,10 @@ CONTAINS
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: rho_ao_in, rho_ao_out
       TYPE(dft_control_type), POINTER                    :: dft_control
       TYPE(pw_env_type), POINTER                         :: pw_env
-      TYPE(pw_p_type), DIMENSION(:), POINTER :: drho_g_in, drho_g_out, drho_r_in, drho_r_out, &
-         rho_g_in, rho_g_out, rho_r_in, rho_r_out, tau_g_in, tau_g_out, tau_r_in, tau_r_out
+      TYPE(pw_p_type), DIMENSION(:), POINTER             :: drho_g_in, drho_r_in, rho_g_in, &
+                                                            rho_g_out, rho_r_in, rho_r_out, &
+                                                            tau_g_in, tau_g_out, tau_r_in, &
+                                                            tau_r_out
       TYPE(pw_p_type), POINTER                           :: rho_r_sccs_in, rho_r_sccs_out
       TYPE(pw_pool_type), POINTER                        :: auxbas_pw_pool
 
@@ -576,8 +517,8 @@ CONTAINS
 
       NULLIFY (dft_control, pw_env, auxbas_pw_pool)
       NULLIFY (rho_ao_in, rho_ao_out)
-      NULLIFY (rho_r_in, rho_r_out, rho_g_in, rho_g_out, drho_r_in, drho_r_out)
-      NULLIFY (drho_g_in, drho_g_out, tau_r_in, tau_r_out, tau_g_in, tau_g_out)
+      NULLIFY (rho_r_in, rho_r_out, rho_g_in, rho_g_out, drho_r_in)
+      NULLIFY (drho_g_in, tau_r_in, tau_r_out, tau_g_in, tau_g_out)
       NULLIFY (tot_rho_r_in, tot_rho_r_out, tot_rho_g_in, tot_rho_g_out)
       NULLIFY (rho_r_sccs_in, rho_r_sccs_out)
 
@@ -654,32 +595,6 @@ CONTAINS
                                 in_space=REALSPACE, &
                                 use_data=REALDATA3D)
          rho_r_sccs_out%pw%cr3d(:, :, :) = rho_r_sccs_in%pw%cr3d(:, :, :)
-      END IF
-
-      ! drho_r and drho_g are only needed if calculated by collocation
-      IF (dft_control%drho_by_collocation) THEN
-         ! drho_r
-         IF (ASSOCIATED(drho_r_in)) THEN
-            ALLOCATE (drho_r_out(3*nspins))
-            CALL qs_rho_set(rho_output, drho_r=drho_r_out)
-            DO i = 1, 3*nspins
-               CALL pw_pool_create_pw(auxbas_pw_pool, drho_r_out(i)%pw, &
-                                      use_data=REALDATA3D, in_space=REALSPACE)
-               drho_r_out(i)%pw%cr3d(:, :, :) = drho_r_in(i)%pw%cr3d(:, :, :)
-            END DO
-         END IF
-
-         ! drho_g
-         IF (ASSOCIATED(drho_g_in)) THEN
-            ALLOCATE (drho_g_out(3*nspins))
-            CALL qs_rho_set(rho_output, drho_g=drho_g_out)
-            DO i = 1, 3*nspins
-               CALL pw_pool_create_pw(auxbas_pw_pool, drho_g_out(i)%pw, &
-                                      use_data=COMPLEXDATA1D, &
-                                      in_space=RECIPROCALSPACE)
-               drho_g_out(i)%pw%cc(:) = drho_g_in(i)%pw%cc(:)
-            END DO
-         END IF
       END IF
 
       ! tau_r and tau_g are only needed in the case of Meta-GGA XC-functionals

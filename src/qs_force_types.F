@@ -393,8 +393,17 @@ CONTAINS
                qs_force(ikind)%overlap_admm(:, ia) = qs_force(ikind)%overlap_admm(:, ia) + force(:, iatom)
             END DO
          END DO
+      CASE ("rho_elec")
+         DO ikind = 1, SIZE(atomic_kind_set, 1)
+            atomic_kind => atomic_kind_set(ikind)
+            CALL get_atomic_kind(atomic_kind=atomic_kind, natom=natom_kind)
+            DO ia = 1, natom_kind
+               iatom = atomic_kind%atom_list(ia)
+               qs_force(ikind)%rho_elec(:, ia) = qs_force(ikind)%rho_elec(:, ia) + force(:, iatom)
+            END DO
+         END DO
       CASE DEFAULT
-         CPABORT("")
+         CPABORT("Unknown force type: "//TRIM(forcetype))
       END SELECT
 
    END SUBROUTINE add_qs_force

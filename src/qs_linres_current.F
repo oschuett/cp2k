@@ -53,6 +53,9 @@ MODULE qs_linres_current
         dbcsr_deallocate_matrix, dbcsr_distribution_type, dbcsr_finalize, dbcsr_get_block_p, &
         dbcsr_p_type, dbcsr_set, dbcsr_type, dbcsr_type_antisymmetric, dbcsr_type_no_symmetry
    USE gaussian_gridlevels,             ONLY: gridlevel_info_type
+   USE grid_api,                        ONLY: FUNC_AB,&
+                                              FUNC_ADBmDAB,&
+                                              FUNC_ARDBmDARB
    USE input_constants,                 ONLY: current_gauge_atom
    USE input_section_types,             ONLY: section_get_ivals,&
                                               section_get_lval,&
@@ -99,9 +102,6 @@ MODULE qs_linres_current
    USE qs_matrix_pools,                 ONLY: qs_matrix_pools_type
    USE qs_mo_types,                     ONLY: get_mo_set,&
                                               mo_set_p_type
-   USE qs_modify_pab_block,             ONLY: FUNC_AB,&
-                                              FUNC_ADBmDAB,&
-                                              FUNC_ARDBmDARB
    USE qs_neighbor_list_types,          ONLY: get_iterator_info,&
                                               neighbor_list_iterate,&
                                               neighbor_list_iterator_create,&
@@ -119,9 +119,10 @@ MODULE qs_linres_current
         rs_grid_retain, rs_grid_zero
    USE rs_pw_interface,                 ONLY: density_rs2pw
    USE task_list_methods,               ONLY: distribute_tasks,&
-                                              int2pair,&
                                               rs_distribute_matrix,&
                                               task_list_inner_loop
+   USE task_list_types,                 ONLY: reallocate_tasks,&
+                                              task_type
 #include "./base/base_uses.f90"
 
    IMPLICIT NONE
@@ -590,7 +591,6 @@ CONTAINS
          maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, ncob, nimages, nkind, nseta, nsetb, ntasks, &
          nthread, sgfa, sgfb
       INTEGER(kind=int_8), DIMENSION(:), POINTER         :: atom_pair_recv, atom_pair_send
-      INTEGER(kind=int_8), DIMENSION(:, :), POINTER      :: tasks
       INTEGER, DIMENSION(:), POINTER                     :: la_max, la_min, lb_max, lb_min, mylmax, &
                                                             npgfa, npgfb, nsgfa, nsgfb
       INTEGER, DIMENSION(:, :), POINTER                  :: first_sgfa, first_sgfb
@@ -602,9 +602,9 @@ CONTAINS
                                                             scale, scale2, zetp
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rb
       REAL(KIND=dp), DIMENSION(:), POINTER               :: set_radius_a, set_radius_b
-      REAL(KIND=dp), DIMENSION(:, :), POINTER :: dist_ab, jp_block_a, jp_block_b, jp_block_c, &
-         jp_block_d, jpab_a, jpab_b, jpab_c, jpab_d, jpblock_a, jpblock_b, jpblock_c, jpblock_d, &
-         rpgfa, rpgfb, sphi_a, sphi_b, work, zeta, zetb
+      REAL(KIND=dp), DIMENSION(:, :), POINTER :: jp_block_a, jp_block_b, jp_block_c, jp_block_d, &
+         jpab_a, jpab_b, jpab_c, jpab_d, jpblock_a, jpblock_b, jpblock_c, jpblock_d, rpgfa, rpgfb, &
+         sphi_a, sphi_b, work, zeta, zetb
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: jpabt_a, jpabt_b, jpabt_c, jpabt_d, workt
       TYPE(cell_type), POINTER                           :: cell
       TYPE(cp_para_env_type), POINTER                    :: para_env
@@ -629,12 +629,13 @@ CONTAINS
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_current, rs_rho
       TYPE(realspaces_grid_p_type), DIMENSION(:), &
          POINTER                                         :: rs_gauge
+      TYPE(task_type), DIMENSION(:), POINTER             :: tasks
 
       NULLIFY (qs_kind, cell, dft_control, orb_basis_set, rs_rho, &
                qs_kind_set, sab_orb, particle_set, rs_current, pw_env, &
-               rs_descs, para_env, dist_ab, set_radius_a, set_radius_b, la_max, &
+               rs_descs, para_env, set_radius_a, set_radius_b, la_max, &
                la_min, lb_max, lb_min, npgfa, npgfb, nsgfa, nsgfb, rpgfa, rpgfb, &
-               sphi_a, sphi_b, zeta, zetb, first_sgfa, first_sgfb, dist_ab, &
+               sphi_a, sphi_b, zeta, zetb, first_sgfa, first_sgfb, &
                tasks, workt, mat_a, mat_b, mat_c, mat_d, rs_gauge, mylmax)
       NULLIFY (deltajp_a, deltajp_b, deltajp_c, deltajp_d)
       NULLIFY (jp_block_a, jp_block_b, jp_block_c, jp_block_d)
@@ -717,12 +718,10 @@ CONTAINS
       CALL reallocate(jpabt_c, 1, maxco, 1, maxco, 0, nthread - 1)
       CALL reallocate(jpabt_d, 1, maxco, 1, maxco, 0, nthread - 1)
       CALL reallocate(workt, 1, maxco, 1, maxsgf_set, 0, nthread - 1)
-      CALL reallocate(tasks, 1, 6, 1, max_tasks)
-      CALL reallocate(dist_ab, 1, 3, 1, max_tasks)
+      CALL reallocate_tasks(tasks, max_tasks)
 
-      tasks = 0
       ntasks = 0
-      curr_tasks = SIZE(tasks, 2)
+      curr_tasks = SIZE(tasks)
 
       !   get maximum numbers
       natom = SIZE(particle_set)
@@ -866,10 +865,10 @@ CONTAINS
             END IF
          END IF
 
-         CALL task_list_inner_loop(tasks, dist_ab, ntasks, curr_tasks, rs_descs, &
+         CALL task_list_inner_loop(tasks, ntasks, curr_tasks, rs_descs, &
                                    dft_control, cube_info, gridlevel_info, cindex, &
                                    iatom, jatom, rpgfa, rpgfb, zeta, zetb, kind_radius_b, set_radius_a, set_radius_b, ra, rab, &
-                                   la_max, la_min, lb_max, lb_min, npgfa, npgfb, maxpgf, maxset, natom, nimages, nseta, nsetb)
+                                   la_max, la_min, lb_max, lb_min, npgfa, npgfb, nseta, nsetb)
 
       END DO
       CALL neighbor_list_iterator_release(nl_iterator)
@@ -884,8 +883,8 @@ CONTAINS
       ENDIF
 
       ! sorts / redistributes the task list
-      CALL distribute_tasks(rs_descs, ntasks, natom, maxset, maxpgf, nimages, &
-                            tasks, dist_ab, atom_pair_send, atom_pair_recv, &
+      CALL distribute_tasks(rs_descs, ntasks, natom, nimages, &
+                            tasks, atom_pair_send, atom_pair_recv, &
                             symmetric=.FALSE., reorder_rs_grid_ranks=.TRUE., &
                             skip_load_balance_distributed=.FALSE.)
 
@@ -975,12 +974,18 @@ CONTAINS
       ikind_old = -1; jkind_old = -1
 
       loop_tasks: DO itask = 1, ntasks
-
-         CALL int2pair(tasks(3, itask), igrid_level, cindex, iatom, jatom, iset, jset, ipgf, jpgf, &
-                       nimages, natom, maxset, maxpgf)
+         igrid_level = tasks(itask)%grid_level
+         cindex = tasks(itask)%image
+         iatom = tasks(itask)%iatom
+         jatom = tasks(itask)%jatom
+         iset = tasks(itask)%iset
+         jset = tasks(itask)%jset
+         ipgf = tasks(itask)%ipgf
+         jpgf = tasks(itask)%jpgf
+         rab = tasks(itask)%rab
 
          ! apparently generalised collocation not implemented correctly yet
-         CPASSERT(tasks(4, itask) .NE. 2)
+         CPASSERT(tasks(itask)%dist_type .NE. 2)
 
          IF (iatom .NE. iatom_old .OR. jatom .NE. jatom_old) THEN
 
@@ -1107,7 +1112,6 @@ CONTAINS
 
          ENDIF
 
-         rab(:) = dist_ab(:, itask)
          rab2 = rab(1)*rab(1) + rab(2)*rab(2) + rab(3)*rab(3)
          rb(:) = ra(:) + rab(:)
          zetp = zeta(ipgf, iset) + zetb(jpgf, jset)
@@ -1218,7 +1222,7 @@ CONTAINS
       END IF
       DEALLOCATE (deltajp_a, deltajp_b, deltajp_c, deltajp_d)
 
-      DEALLOCATE (jpabt_a, jpabt_b, jpabt_c, jpabt_d, workt, tasks, dist_ab)
+      DEALLOCATE (jpabt_a, jpabt_b, jpabt_c, jpabt_d, workt, tasks)
 
       IF (distributed_rs_grids) THEN
          DEALLOCATE (atom_pair_send, atom_pair_recv)

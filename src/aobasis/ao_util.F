@@ -94,6 +94,7 @@ MODULE ao_util
 
    PUBLIC :: exp_radius, &
              exp_radius_very_extended, &
+             exp_radius_single, &
              gauss_exponent, &
              gaussint_sph, &
              trace_r_AxB
@@ -277,7 +278,7 @@ CONTAINS
                                      zetp, eps, prefactor, cutoff, epsin) RESULT(radius)
 
       INTEGER, INTENT(IN)                                :: la_min, la_max, lb_min, lb_max
-      REAL(KIND=dp), DIMENSION(:, :), OPTIONAL, POINTER  :: pab
+      REAL(KIND=dp), DIMENSION(:, :), OPTIONAL           :: pab
       INTEGER, OPTIONAL                                  :: o1, o2
       REAL(KIND=dp), INTENT(IN)                          :: ra(3), rb(3), rp(3), zetp, eps, &
                                                             prefactor, cutoff
@@ -357,6 +358,38 @@ CONTAINS
       ENDDO
 
    END FUNCTION exp_radius_very_extended
+
+! **************************************************************************************************
+!> \brief computes the radius of the Gaussian outside of which it is smaller
+!>      than eps
+!> \param la_min ...
+!> \param la_max ...
+!> \param pab vector of coefficients with length ncoset(la_max)
+!> \param zetp ...
+!> \param eps ...
+!> \param prefactor ...
+!> \return ...
+! **************************************************************************************************
+   FUNCTION exp_radius_single(la_min, la_max, pab, zetp, eps, prefactor) RESULT(radius)
+
+      INTEGER, INTENT(IN)                                :: la_min, la_max
+      REAL(KIND=dp), DIMENSION(:)                        :: pab
+      REAL(KIND=dp), INTENT(IN)                          :: zetp, eps, prefactor
+      REAL(KIND=dp)                                      :: radius
+
+      INTEGER                                            :: i, n1, n2
+      REAL(KIND=dp)                                      :: epsin_local, prefactor_local
+
+      epsin_local = 1.0E-2_dp
+      n1 = ncoset(la_min - 1) + 1
+      n2 = ncoset(la_max)
+      prefactor_local = prefactor*MAXVAL(ABS(pab(n1:n2)))
+      radius = 0.0_dp
+      DO i = la_min, la_max
+         radius = MAX(radius, exp_radius(i, zetp, eps, prefactor_local, epsin_local))
+      ENDDO
+
+   END FUNCTION exp_radius_single
 
 ! **************************************************************************************************
 !> \brief ...

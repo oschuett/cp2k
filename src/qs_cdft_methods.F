@@ -10,6 +10,7 @@
 !> \author Nico Holmberg [03.2017]
 ! **************************************************************************************************
 MODULE qs_cdft_methods
+   USE ao_util,                         ONLY: exp_radius_single
    USE atomic_kind_types,               ONLY: atomic_kind_type,&
                                               get_atomic_kind,&
                                               get_atomic_kind_set
@@ -36,8 +37,7 @@ MODULE qs_cdft_methods
                                               section_vals_type
    USE kahan_sum,                       ONLY: accurate_dot_product,&
                                               accurate_sum
-   USE kinds,                           ONLY: dp,&
-                                              int_8
+   USE kinds,                           ONLY: dp
    USE message_passing,                 ONLY: mp_sum
    USE particle_types,                  ONLY: particle_type
    USE pw_env_types,                    ONLY: pw_env_get,&
@@ -59,14 +59,13 @@ MODULE qs_cdft_methods
                                               cdft_constraint_print,&
                                               hfun_scale,&
                                               hirshfeld_constraint_init
-   USE qs_collocate_density,            ONLY: collocate_pgf_product_rspace
+   USE qs_collocate_density,            ONLY: collocate_pgf_rspace
    USE qs_energy_types,                 ONLY: qs_energy_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
    USE qs_force_types,                  ONLY: qs_force_type
    USE qs_kind_types,                   ONLY: get_qs_kind,&
                                               qs_kind_type
-   USE qs_modify_pab_block,             ONLY: FUNC_AB
    USE qs_rho0_types,                   ONLY: get_rho0_mpole,&
                                               mpole_rho_atom,&
                                               rho0_mpole_type
@@ -1161,14 +1160,13 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       INTEGER                                            :: atom_a, handle, i, iatom, iex, igroup, &
-                                                            ikind, ithread, j, natom, npme, &
-                                                            nthread, numexp
-      INTEGER(KIND=int_8)                                :: subpatch_pattern
+                                                            ikind, j, natom, npme, numexp
       INTEGER, DIMENSION(:), POINTER                     :: atom_list, cores
       LOGICAL, ALLOCATABLE, DIMENSION(:)                 :: compute_charge, is_constraint
-      REAL(kind=dp)                                      :: alpha, coef, dvol, eps_rho_rspace, ra(3)
+      REAL(kind=dp)                                      :: alpha, coef, dvol, eps_rho_rspace, &
+                                                            ra(3), radius
       REAL(kind=dp), ALLOCATABLE, DIMENSION(:)           :: coefficients
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
+      REAL(KIND=dp), DIMENSION(1)                        :: cab
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(cdft_control_type), POINTER                   :: cdft_control
       TYPE(cell_type), POINTER                           :: cell
@@ -1185,7 +1183,7 @@ CONTAINS
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_single
       TYPE(realspace_grid_type), POINTER                 :: rs_rho_all, rs_rho_constr
 
-      NULLIFY (atom_list, cores, pab, atomic_kind_set, cell, dft_control, &
+      NULLIFY (atom_list, cores, atomic_kind_set, cell, dft_control, &
                hirshfeld_env, particle_set, pw_env, fnorm, auxbas_pw_pool, &
                auxbas_rs_desc, rs_rho_all, rs_rho_constr, cdft_control, &
                hirshfeld_control, rs_single)
@@ -1246,9 +1244,6 @@ CONTAINS
 
          ! Collocate Gaussians
          eps_rho_rspace = dft_control%qs_control%eps_rho_rspace
-         ALLOCATE (pab(1, 1))
-         nthread = 1
-         ithread = 0
 
          DO ikind = 1, SIZE(atomic_kind_set)
             numexp = hirshfeld_env%kind_shape_fn(ikind)%numexp
@@ -1278,33 +1273,24 @@ CONTAINS
                DO j = 1, npme
                   iatom = cores(j)
                   atom_a = atom_list(iatom)
-                  pab(1, 1) = coef*hirshfeld_env%charges(atom_a)
+                  cab(1) = coef*hirshfeld_env%charges(atom_a)
                   ra(:) = pbc(particle_set(atom_a)%r, cell)
-                  subpatch_pattern = 0
-                  CALL collocate_pgf_product_rspace(0, alpha, 0, 0, 0.0_dp, 0, ra, &
-                                                    (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, 1.0_dp, pab, 0, 0, &
-                                                    rs_rho_all, cell, cube_info, eps_rho_rspace, &
-                                                    ga_gb_function=FUNC_AB, ithread=ithread, use_subpatch=.TRUE., &
-                                                    subpatch_pattern=subpatch_pattern, lmax_global=0)
-                  IF (is_constraint(atom_a)) &
-                     CALL collocate_pgf_product_rspace(0, alpha, 0, 0, 0.0_dp, 0, ra, &
-                                                       (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, coefficients(atom_a), &
-                                                       pab, 0, 0, rs_rho_constr, cell, cube_info, eps_rho_rspace, &
-                                                       ga_gb_function=FUNC_AB, ithread=ithread, use_subpatch=.TRUE., &
-                                                       subpatch_pattern=subpatch_pattern, lmax_global=0)
+                  radius = exp_radius_single(0, 0, cab, alpha, eps_rho_rspace, 1.0_dp)
+                  CALL collocate_pgf_rspace(0, alpha, 0, ra, cab, rs_rho_all, cell, radius, 1.0_dp)
+                  IF (is_constraint(atom_a)) THEN
+                     radius = exp_radius_single(0, 0, cab, alpha, eps_rho_rspace, coefficients(atom_a))
+                     CALL collocate_pgf_rspace(0, alpha, 0, ra, cab, rs_rho_constr, cell, radius, coefficients(atom_a))
+                  END IF
                   IF (cdft_control%atomic_charges .AND. igroup == 1) THEN
-                     IF (compute_charge(atom_a)) &
-                        CALL collocate_pgf_product_rspace(0, alpha, 0, 0, 0.0_dp, 0, ra, &
-                                                          (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, 1.0_dp, pab, 0, 0, &
-                                                          rs_single(atom_a)%rs_grid, cell, cube_info, eps_rho_rspace, &
-                                                          ga_gb_function=FUNC_AB, ithread=ithread, use_subpatch=.TRUE., &
-                                                          subpatch_pattern=subpatch_pattern, lmax_global=0)
+                     IF (compute_charge(atom_a)) THEN
+                        radius = exp_radius_single(0, 0, cab, alpha, eps_rho_rspace, 1.0_dp)
+                        CALL collocate_pgf_rspace(0, alpha, 0, ra, cab, rs_single(atom_a)%rs_grid, cell, radius, 1.0_dp)
+                     END IF
                   END IF
                END DO
             END DO
             DEALLOCATE (cores)
          END DO
-         DEALLOCATE (pab)
 
          ! Transfer rs_rho_all to the correct grid and save it
          CALL get_hirshfeld_info(hirshfeld_env, fnorm=fnorm)

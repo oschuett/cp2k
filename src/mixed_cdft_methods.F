@@ -10,6 +10,7 @@
 !> \author Nico Holmberg [01.2017]
 ! **************************************************************************************************
 MODULE mixed_cdft_methods
+   USE ao_util,                         ONLY: exp_radius_single
    USE atomic_kind_types,               ONLY: atomic_kind_type,&
                                               get_atomic_kind
    USE cell_types,                      ONLY: cell_type,&
@@ -64,8 +65,7 @@ MODULE mixed_cdft_methods
                                               section_vals_type,&
                                               section_vals_val_get
    USE kinds,                           ONLY: default_path_length,&
-                                              dp,&
-                                              int_8
+                                              dp
    USE machine,                         ONLY: m_walltime
    USE mathlib,                         ONLY: diamat_all
    USE memory_utilities,                ONLY: reallocate
@@ -101,7 +101,7 @@ MODULE mixed_cdft_methods
    USE pw_types,                        ONLY: REALDATA3D,&
                                               REALSPACE
    USE qs_cdft_types,                   ONLY: cdft_control_type
-   USE qs_collocate_density,            ONLY: collocate_pgf_product_rspace
+   USE qs_collocate_density,            ONLY: collocate_pgf_rspace
    USE qs_energy_types,                 ONLY: qs_energy_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
@@ -114,7 +114,6 @@ MODULE mixed_cdft_methods
                                               deallocate_mo_set,&
                                               mo_set_p_type,&
                                               set_mo_set
-   USE qs_modify_pab_block,             ONLY: FUNC_AB
    USE realspace_grid_types,            ONLY: realspace_grid_type,&
                                               rs2pw,&
                                               rs_grid_release,&
@@ -2319,17 +2318,17 @@ CONTAINS
          routineP = moduleN//':'//routineN
 
       CHARACTER(len=2)                                   :: element_symbol
-      INTEGER :: atom_a, bounds(2), handle, i, iatom, iex, iforce_eval, ikind, iounit, ithread, j, &
-         jatom, katom, my_work, my_work_size, natom, nforce_eval, nkind, np(3), npme, nthread, &
-         numexp, offset_dlb, unit_nr
+      INTEGER :: atom_a, bounds(2), handle, i, iatom, iex, iforce_eval, ikind, iounit, j, jatom, &
+         katom, my_work, my_work_size, natom, nforce_eval, nkind, np(3), npme, numexp, offset_dlb, &
+         unit_nr
       INTEGER, DIMENSION(2, 3)                           :: bo, bo_conf
       INTEGER, DIMENSION(:), POINTER                     :: atom_list, cores, stride
       LOGICAL                                            :: build, mpi_io
       REAL(kind=dp)                                      :: alpha, chi, coef, ircov, jrcov, ra(3), &
-                                                            uij
+                                                            radius, uij
+      REAL(KIND=dp), DIMENSION(1)                        :: cab
       REAL(kind=dp), DIMENSION(3)                        :: cell_v, dist_vec, dr, r, r1, shift
       REAL(KIND=dp), DIMENSION(:), POINTER               :: radii_list
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(cdft_control_type), POINTER                   :: cdft_control
       TYPE(cell_type), POINTER                           :: cell
@@ -2344,7 +2343,7 @@ CONTAINS
       TYPE(realspace_grid_type), POINTER                 :: rs_cavity
       TYPE(section_vals_type), POINTER                   :: force_env_section, print_section
 
-      NULLIFY (pab, cell, force_env_qs, particle_set, force_env_section, print_section, &
+      NULLIFY (cell, force_env_qs, particle_set, force_env_section, print_section, &
                qs_kind_set, particles, subsys_mix, rs_cavity, cavity_env, auxbas_pw_pool, &
                atomic_kind_set, radii_list, cdft_control)
       logger => cp_get_default_logger()
@@ -2561,9 +2560,6 @@ CONTAINS
          ! be careful in parallel nsmax is choosen with multigrid in mind!
          CALL rs_grid_retain(rs_cavity)
          CALL rs_grid_zero(rs_cavity)
-         ALLOCATE (pab(1, 1))
-         nthread = 1
-         ithread = 0
          DO ikind = 1, SIZE(atomic_kind_set)
             numexp = cavity_env%kind_shape_fn(ikind)%numexp
             IF (numexp <= 0) CYCLE
@@ -2589,24 +2585,19 @@ CONTAINS
                DO j = 1, npme
                   iatom = cores(j)
                   atom_a = atom_list(iatom)
-                  pab(1, 1) = coef
+                  cab(1) = coef
                   IF (store_vectors) THEN
                      ra(:) = position_vecs(:, atom_a) + cell_v(:)/2._dp
                   ELSE
                      ra(:) = pbc(particle_set(atom_a)%r, cell)
                   END IF
                   IF (is_constraint(atom_a)) &
-                     CALL collocate_pgf_product_rspace(0, alpha, 0, 0, 0.0_dp, 0, ra, &
-                                                       (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, 1.0_dp, pab, 0, 0, &
-                                                       rs_cavity, cell, mixed_cdft%pw_env%cube_info(1), &
-                                                       mixed_cdft%eps_rho_rspace, ga_gb_function=FUNC_AB, &
-                                                       ithread=ithread, use_subpatch=.TRUE., &
-                                                       subpatch_pattern=0_int_8, lmax_global=0)
+                     radius = exp_radius_single(0, 0, cab, alpha, mixed_cdft%eps_rho_rspace, 1.0_dp)
+                  CALL collocate_pgf_rspace(0, alpha, 0, ra, cab, rs_cavity, cell, radius, 1.0_dp)
                END DO
             END DO
             DEALLOCATE (cores)
          END DO
-         DEALLOCATE (pab)
          CALL pw_pool_create_pw(auxbas_pw_pool, cdft_control%becke_control%cavity%pw, &
                                 use_data=REALDATA3D, in_space=REALSPACE)
          CALL rs_pw_transfer(rs_cavity, cdft_control%becke_control%cavity%pw, rs2pw)

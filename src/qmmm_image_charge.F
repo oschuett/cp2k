@@ -11,6 +11,7 @@
 ! **************************************************************************************************
 MODULE qmmm_image_charge
 
+   USE ao_util,                         ONLY: exp_radius_very_extended
    USE cell_types,                      ONLY: cell_type,&
                                               pbc
    USE cp_control_types,                ONLY: dft_control_type
@@ -36,8 +37,7 @@ MODULE qmmm_image_charge
                                               section_vals_type,&
                                               section_vals_val_get
    USE kinds,                           ONLY: default_path_length,&
-                                              dp,&
-                                              int_8
+                                              dp
    USE mathconstants,                   ONLY: pi
    USE memory_utilities,                ONLY: reallocate
    USE message_passing,                 ONLY: mp_bcast,&
@@ -64,7 +64,7 @@ MODULE qmmm_image_charge
    USE qs_energy_types,                 ONLY: qs_energy_type
    USE qs_environment_types,            ONLY: get_qs_env,&
                                               qs_environment_type
-   USE qs_integrate_potential,          ONLY: integrate_pgf_product_rspace
+   USE qs_integrate_potential,          ONLY: integrate_pgf_rspace
    USE realspace_grid_types,            ONLY: pw2rs,&
                                               realspace_grid_desc_type,&
                                               realspace_grid_type,&
@@ -355,9 +355,9 @@ CONTAINS
       INTEGER                                            :: atom_a, atom_b, atom_ref, handle, iatom, &
                                                             j, k, natom, npme
       INTEGER, DIMENSION(:), POINTER                     :: cores
-      REAL(KIND=dp)                                      :: eps_rho_rspace
+      REAL(KIND=dp)                                      :: eps_rho_rspace, eta, radius
       REAL(KIND=dp), DIMENSION(3)                        :: ra
-      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: hab
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: hab, pab
       TYPE(cell_type), POINTER                           :: cell
       TYPE(cp_para_env_type), POINTER                    :: para_env
       TYPE(dft_control_type), POINTER                    :: dft_control
@@ -369,7 +369,7 @@ CONTAINS
 
       NULLIFY (cores, hab, cell, auxbas_rs_desc, pw_env, para_env, &
                dft_control, rs_v)
-      ALLOCATE (hab(1, 1))
+      ALLOCATE (hab(1, 1), pab(1, 1))
 
       CALL get_qs_env(qs_env=qs_env, pw_env=pw_env)
       CALL pw_env_get(pw_env=pw_env, auxbas_rs_desc=auxbas_rs_desc, &
@@ -383,6 +383,7 @@ CONTAINS
                       para_env=para_env, pw_env=pw_env)
 
       eps_rho_rspace = dft_control%qs_control%eps_rho_rspace
+      eta = qmmm_env%image_charge_pot%eta
 
       natom = SIZE(qmmm_env%image_charge_pot%image_mm_list)
       k = 1
@@ -424,12 +425,14 @@ CONTAINS
          ENDIF
 
          hab(1, 1) = 0.0_dp
+         pab(1, 1) = 1.0_dp
 
-         CALL integrate_pgf_product_rspace(0, qmmm_env%image_charge_pot%eta, 0, &
-                                           0, 0.0_dp, 0, ra, (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, &
-                                           rs_v, cell, pw_env%cube_info(1), hab, o1=0, o2=0, &
-                                           eps_gvg_rspace=eps_rho_rspace, calculate_forces=.FALSE., &
-                                           use_subpatch=.TRUE., subpatch_pattern=0_int_8)
+         radius = exp_radius_very_extended(0, 0, 0, 0, pab, 0, 0, ra, ra, ra, &
+                                           eta, eps_rho_rspace, 1.0_dp, 1.0_dp)
+
+         CALL integrate_pgf_rspace(0, eta, 0, &
+                                   ra, rs_v, cell, hab, pab, radius, &
+                                   calculate_forces=.FALSE.)
 
          int_res(iatom) = hab(1, 1)
 
@@ -437,7 +440,7 @@ CONTAINS
 
       CALL mp_sum(int_res, para_env%group)
 
-      DEALLOCATE (hab, cores)
+      DEALLOCATE (hab, pab, cores)
 
       CALL rs_grid_release(rs_v)
 
@@ -470,7 +473,7 @@ CONTAINS
       INTEGER                                            :: atom_a, handle, iatom, j, natom, npme
       INTEGER, DIMENSION(:), POINTER                     :: cores
       LOGICAL                                            :: use_virial
-      REAL(KIND=dp)                                      :: eps_rho_rspace
+      REAL(KIND=dp)                                      :: eps_rho_rspace, eta, radius
       REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: hab, pab
       TYPE(cell_type), POINTER                           :: cell
@@ -509,6 +512,7 @@ CONTAINS
       END IF
 
       eps_rho_rspace = dft_control%qs_control%eps_rho_rspace
+      eta = qmmm_env%image_charge_pot%eta
 
       natom = SIZE(qmmm_env%image_charge_pot%image_mm_list)
 
@@ -545,12 +549,12 @@ CONTAINS
          force_a(:) = 0.0_dp
          force_b(:) = 0.0_dp
 
-         CALL integrate_pgf_product_rspace(0, qmmm_env%image_charge_pot%eta, 0, &
-                                           0, 0.0_dp, 0, ra, (/0.0_dp, 0.0_dp, 0.0_dp/), 0.0_dp, &
-                                           rs_v, cell, pw_env%cube_info(1), hab, pab, o1=0, o2=0, &
-                                           eps_gvg_rspace=eps_rho_rspace, calculate_forces=.TRUE., &
-                                           force_a=force_a, force_b=force_b, use_subpatch=.TRUE., &
-                                           subpatch_pattern=0_int_8)
+         radius = exp_radius_very_extended(0, 0, 0, 0, pab, 0, 0, ra, ra, ra, &
+                                           eta, eps_rho_rspace, 1.0_dp, 1.0_dp)
+
+         CALL integrate_pgf_rspace(0, eta, 0, ra, rs_v, cell, hab, pab, &
+                                   radius, calculate_forces=.TRUE., &
+                                   force_a=force_a, force_b=force_b)
 
          force_a(:) = coeff(iatom)*force_a(:)
          forces(:, iatom) = force_a(:)
