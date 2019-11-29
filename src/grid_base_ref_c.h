@@ -24,7 +24,8 @@ extern "C" {
 // \param dh_inv        Inverse incremental grid matrix
 // \param ra            Position of atom a.
 // \param rab           Vector difference between position of atom a and atom b.
-// \param ng            Number of grid points in each direction.
+// \param npts          Global number of grid points in each direction.
+// \param ngrid         Local number of grid points in each direction.
 // \param lb_grid       Lower bounds of the grid.
 // \param periodic      Whether simulation box is periodic in given direction.
 // \param lmax          Global maximum angular moment.
@@ -52,7 +53,8 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        const double dh_inv[3][3],
                                        const double ra[3],
                                        const double rab[3],
-                                       const int ng[3],
+                                       const int npts[3],
+                                       const int ngrid[3],
                                        const int lb_grid[3],
                                        const bool periodic[3],
                                        const int lmax,
@@ -65,7 +67,7 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        const int o1,
                                        const int o2,
                                        const double pab[maxco][maxco],
-                                       double grid[ng[2]][ng[1]][ng[0]]);
+                                       double grid[ngrid[2]][ngrid[1]][ngrid[0]]);
 
 #ifdef __cplusplus
 }

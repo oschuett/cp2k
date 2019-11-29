@@ -325,15 +325,16 @@ static void grid_fill_map(const bool periodic,
                           const int ub_cube,
                           const int cubecenter,
                           const int lb_grid,
-                          const int ng,
+                          const int npts,
+                          const int ngrid,
                           const int cmax,
                           int map[2*cmax + 1]) {
 
     if (periodic) {
          int start = lb_cube;
          while (true) {
-            const int offset = mod(cubecenter + start, ng)  + 1 - start;
-            const int length = min(ub_cube, ng - offset) - start;
+            const int offset = mod(cubecenter + start, npts)  + 1 - start;
+            const int length = min(ub_cube, npts - offset) - start;
             for (int ig=start; ig<=start+length; ig++) {
                map[ig + cmax] = ig + offset;
             }
@@ -344,9 +345,9 @@ static void grid_fill_map(const bool periodic,
          }
     } else {
          // this takes partial grid + border regions into account
-         const int offset = mod(cubecenter + lb_cube + lb_grid, ng) + 1 - lb_cube;
+         const int offset = mod(cubecenter + lb_cube + lb_grid, npts) + 1 - lb_cube;
          // check for out of bounds
-         assert(ub_cube + offset <= ng + 1);
+         assert(ub_cube + offset <= ngrid);
          assert(lb_cube + offset >= 1);
          for (int ig=lb_cube; ig <= ub_cube; ig++) {
             map[ig + cmax] = ig + offset;
@@ -411,8 +412,8 @@ static void grid_collocate_core(const int lp,
                                 const int map[3][2*cmax+1],
                                 const int nspheres,
                                 const int sphere_bounds[nspheres],
-                                const int ng[3],
-                                double grid[ng[2]][ng[1]][ng[0]]) {
+                                const int ngrid[3],
+                                double grid[ngrid[2]][ngrid[1]][ngrid[0]]) {
 
     int sci = 0;
 
@@ -515,20 +516,21 @@ static void grid_collocate_ortho(const int lp,
                                  const double dh[3][3],
                                  const double dh_inv[3][3],
                                  const double rp[3],
-                                 const int ng[3],
+                                 const int npts[3],
                                  const int lb_grid[3],
                                  const bool periodic[3],
                                  const int lb_cube[3],
                                  const int ub_cube[3],
                                  const int nspheres,
                                  const int sphere_bounds[nspheres],
-                                 double grid[ng[2]][ng[1]][ng[0]]) {
+                                 const int ngrid[3],
+                                 double grid[ngrid[2]][ngrid[1]][ngrid[0]]) {
 
    // *** position of the gaussian product
    //
    // this is the actual definition of the position on the grid
    // i.e. a point rp(:) gets here grid coordinates
-   // MODULO(rp(:)/dr(:),ng(:))+1
+   // MODULO(rp(:)/dr(:),npts(:))+1
    // hence (0.0,0.0,0.0) in real space is rsgrid%lb on the rsgrid ((1,1,1) on grid)
 
     // cubecenter(:) = FLOOR(MATMUL(dh_inv, rp))
@@ -560,7 +562,8 @@ static void grid_collocate_ortho(const int lp,
                       ub_cube[i],
                       cubecenter[i],
                       lb_grid[i],
-                      ng[i],
+                      npts[i],
+                      ngrid[i],
                       cmax,
                       map[i]);
     }
@@ -577,7 +580,7 @@ static void grid_collocate_ortho(const int lp,
                         map,
                         nspheres,
                         sphere_bounds,
-                        ng,
+                        ngrid,
                         grid);
 }
 
@@ -588,12 +591,13 @@ static void grid_collocate_general(const int lp,
                                    const double dh[3][3],
                                    const double dh_inv[3][3],
                                    const double rp[3],
-                                   const int ng[3],
+                                   const int npts[3],
                                    const int lb_grid[3],
                                    const bool periodic[3],
                                    const int lmax,
                                    const double radius,
-                                   double grid[ng[2]][ng[1]][ng[0]]) {
+                                   const int ngrid[3],
+                                   double grid[ngrid[2]][ngrid[1]][ngrid[0]]) {
 
 //
 // transform P_{lxp,lyp,lzp} into a P_{lip,ljp,lkp} such that
@@ -712,7 +716,7 @@ static void grid_collocate_general(const int lp,
 
     int offset[3];
     for (int idir=0; idir<3; idir++) {
-        offset[idir] = mod(index_min[idir] + lb_grid[idir], ng[idir]) + 1;
+        offset[idir] = mod(index_min[idir] + lb_grid[idir], npts[idir]) + 1;
     }
 
     // go over the grid, but cycle if the point is not within the radius
@@ -720,7 +724,7 @@ static void grid_collocate_general(const int lp,
        const double dk = k - gp[2];
        int k_index;
        if (periodic[2]) {
-          k_index = mod(k, ng[2]) + 1;
+          k_index = mod(k, npts[2]) + 1;
        } else {
           k_index = k - index_min[2] + offset[2];
        }
@@ -750,7 +754,7 @@ static void grid_collocate_general(const int lp,
           const double dj = j - gp[1];
           int j_index;
           if (periodic[1]) {
-             j_index = mod(j, ng[1]) + 1;
+             j_index = mod(j, npts[1]) + 1;
           } else {
              j_index = j - index_min[1] + offset[1];
           }
@@ -825,7 +829,7 @@ static void grid_collocate_general(const int lp,
 
              int i_index;
              if (periodic[0]) {
-                i_index = mod(i, ng[0]) + 1;
+                i_index = mod(i, npts[0]) + 1;
              } else {
                 i_index = i - index_min[0] + offset[0];
              }
@@ -849,7 +853,8 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        const double dh_inv[3][3],
                                        const double ra[3],
                                        const double rab[3],
-                                       const int ng[3],
+                                       const int npts[3],
+                                       const int ngrid[3],
                                        const int lb_grid[3],
                                        const bool periodic[3],
                                        const int lmax,
@@ -862,7 +867,7 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        const int o1,
                                        const int o2,
                                        const double pab[maxco][maxco],
-                                       double grid[ng[2]][ng[1]][ng[0]]){
+                                       double grid[ngrid[2]][ngrid[1]][ngrid[0]]){
 
     const double zetp = zeta + zetb;
     const double f = zetb / zetp;
@@ -967,11 +972,12 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                dh,
                                dh_inv,
                                rp,
-                               ng,
+                               npts,
                                lb_grid,
                                periodic,
                                lmax,
                                radius,
+                               ngrid,
                                grid);
     } else {
         grid_collocate_ortho(lp,
@@ -980,13 +986,14 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                              dh,
                              dh_inv,
                              rp,
-                             ng,
+                             npts,
                              lb_grid,
                              periodic,
                              lb_cube,
                              ub_cube,
                              nspheres,
                              sphere_bounds,
+                             ngrid,
                              grid);
     }
 }

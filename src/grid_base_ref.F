@@ -309,13 +309,14 @@ CONTAINS
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
       INTEGER                                            :: nspheres
+      INTEGER, DIMENSION(3), TARGET                      :: ngrid
       LOGICAL(KIND=C_BOOL), DIMENSION(3), TARGET         :: periodic
       TYPE(C_PTR)                                        :: lb_cube, sphere_bounds, ub_cube
       INTERFACE
          SUBROUTINE grid_collocate_pgf_product_rspace(compute_tau, use_subpatch, &
                                                       la_max, la_min, lb_max, lb_min, &
                                                       zeta, zetb, rscale, &
-                                                      dh, dh_inv, ra, rab, ng, lb_grid, periodic, &
+                                                      dh, dh_inv, ra, rab, npts, ngrid, lb_grid, periodic, &
                                                       lmax, radius, &
                                                       lb_cube, ub_cube, nspheres, sphere_bounds, &
                                                       maxco, o1, o2, pab, &
@@ -335,7 +336,8 @@ CONTAINS
             TYPE(C_PTR), VALUE                        :: dh_inv
             TYPE(C_PTR), VALUE                        :: ra
             TYPE(C_PTR), VALUE                        :: rab
-            TYPE(C_PTR), VALUE                        :: ng
+            TYPE(C_PTR), VALUE                        :: npts
+            TYPE(C_PTR), VALUE                        :: ngrid
             TYPE(C_PTR), VALUE                        :: lb_grid
             TYPE(C_PTR), VALUE                        :: periodic
             INTEGER(KIND=C_INT), VALUE                :: lmax
@@ -371,9 +373,10 @@ CONTAINS
       CPASSERT(SIZE(pab, 2) == maxco .AND. LBOUND(pab, 2) == 1)
 
       ! see rs_grid_create() in ./src/pw/realspace_grid_types.F
-      CPASSERT(SIZE(grid, 1) == npts(1) .AND. LBOUND(grid, 1) == 1)
-      CPASSERT(SIZE(grid, 2) == npts(2) .AND. LBOUND(grid, 2) == 1)
-      CPASSERT(SIZE(grid, 3) == npts(3) .AND. LBOUND(grid, 3) == 1)
+      CPASSERT(LBOUND(grid, 1) == 1)
+      CPASSERT(LBOUND(grid, 2) == 1)
+      CPASSERT(LBOUND(grid, 3) == 1)
+      ngrid = (/SIZE(grid, 1), SIZE(grid, 2), SIZE(grid, 3)/)
 
       !TODO: enable for gfortran 9
       !CPASSERT(IS_CONTIGUOUS(dh))
@@ -399,7 +402,8 @@ CONTAINS
                                              dh_inv=C_LOC(dh_inv(1, 1)), &
                                              ra=C_LOC(ra(1)), &
                                              rab=C_LOC(rab(1)), &
-                                             ng=C_LOC(npts(1)), & !TODO: weired renaming
+                                             npts=C_LOC(npts(1)), &
+                                             ngrid=C_LOC(ngrid(1)), &
                                              lb_grid=C_LOC(lb_grid(1)), &
                                              periodic=C_LOC(periodic(1)), &
                                              lmax=lmax_global, &
