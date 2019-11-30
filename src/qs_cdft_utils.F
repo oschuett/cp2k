@@ -372,9 +372,10 @@ CONTAINS
                   ELSE
                      ra(:) = pbc(particle_set(atom_a)%r, cell)
                   END IF
-                  IF (is_constraint(atom_a)) &
+                  IF (is_constraint(atom_a)) THEN
                      radius = exp_radius_single(0, 0, cab, alpha, dft_control%qs_control%eps_rho_rspace, 1.0_dp)
-                  CALL collocate_pgf_rspace(0, alpha, 0, ra, cab, rs_cavity, cell, radius, 1.0_dp)
+                     CALL collocate_pgf_rspace(0, alpha, 0, ra, cab, rs_cavity, cell, radius, 1.0_dp)
+                  ENDIF
                END DO
             END DO
             DEALLOCATE (cores)
