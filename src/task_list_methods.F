@@ -819,10 +819,6 @@ CONTAINS
          added_tasks = 1
       ENDIF
 
-      IF (.NOT. rs_desc%orthorhombic) THEN
-         tasks(ntasks)%dist_Type = 2
-      END IF
-
       lmax = la_max+lb_max
       is_ortho = (tasks(ntasks)%dist_type == 0 .OR. tasks(ntasks)%dist_type == 1) .AND. rs_desc%orthorhombic
       ! we assume the load is shared equally between processes dealing with a generalised Gaussian.

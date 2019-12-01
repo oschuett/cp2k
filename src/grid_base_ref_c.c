@@ -841,7 +841,7 @@ static void grid_collocate_general(const int lp,
 
 // *****************************************************************************
 void grid_collocate_pgf_product_rspace(const bool compute_tau,
-                                       const bool use_subpatch,
+                                       const bool use_ortho,
                                        const int la_max,
                                        const int la_min,
                                        const int lb_max,
@@ -965,21 +965,7 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                       pab_local,
                       coef_xyz);
 
-    if (use_subpatch) {
-        grid_collocate_general(lp,
-                               zetp,
-                               coef_xyz,
-                               dh,
-                               dh_inv,
-                               rp,
-                               npts,
-                               lb_grid,
-                               periodic,
-                               lmax,
-                               radius,
-                               ngrid,
-                               grid);
-    } else {
+    if (use_ortho) {
         grid_collocate_ortho(lp,
                              zetp,
                              coef_xyz,
@@ -995,6 +981,20 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                              sphere_bounds,
                              ngrid,
                              grid);
+    } else {
+        grid_collocate_general(lp,
+                               zetp,
+                               coef_xyz,
+                               dh,
+                               dh_inv,
+                               rp,
+                               npts,
+                               lb_grid,
+                               periodic,
+                               lmax,
+                               radius,
+                               ngrid,
+                               grid);
     }
 }
 

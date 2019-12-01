@@ -37,6 +37,7 @@ MODULE task_list_types
       REAL(KIND=dp), DIMENSION(3, 3)                :: dh_inv = 0.0_dp
       INTEGER, DIMENSION(3)                         :: perd = 0
       INTEGER, DIMENSION(3)                         :: npts = 0
+      LOGICAL                                       :: orthorhombic = .FALSE.
       INTEGER, DIMENSION(3)                         :: lb_grid = 0
       REAL(KIND=dp)                                 :: drmin = 0.0_dp
       INTEGER                                       :: max_radius = 0

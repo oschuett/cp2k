@@ -1812,6 +1812,7 @@ CONTAINS
          task_list%cinfo(igrid_level)%dh(1:3, 1:3) = cube_info(igrid_level)%dh(1:3, 1:3)
          task_list%cinfo(igrid_level)%dh_inv(1:3, 1:3) = cube_info(igrid_level)%dh_inv(1:3, 1:3)
          task_list%cinfo(igrid_level)%npts(1:3) = rs_rho(igrid_level)%rs_grid%desc%npts(1:3)
+         task_list%cinfo(igrid_level)%orthorhombic = rs_rho(igrid_level)%rs_grid%desc%orthorhombic
          task_list%cinfo(igrid_level)%lb_grid(1:3) = rs_rho(igrid_level)%rs_grid%desc%lb(1:3) - &
                                                      rs_rho(igrid_level)%rs_grid%lb_local(1:3)
          task_list%cinfo(igrid_level)%perd(1:3) = rs_rho(igrid_level)%rs_grid%desc%perd(1:3)

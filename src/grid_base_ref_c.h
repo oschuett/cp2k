@@ -15,7 +15,7 @@ extern "C" {
 //        This function then collocates all combinations of spherical harmonics.
 //
 // \param compute_tau   When true collocate kinetic energy density instead of density.
-// \param use_subpatch  When false use the faster ortho algorithm.
+// \param use_ortho     When true use the faster ortho algorithm.
 // \param l{a,b}_max    Max angular momentum to collocate for give atom.
 // \param l{a,b}_min    Lowest angular momentum to collocate for give atom.
 // \param zet_{a,b}     Gaussian's exponent of given atom.
@@ -41,7 +41,7 @@ extern "C" {
 // \param grid The output grid array to collocate into.
 //******************************************************************************
 void grid_collocate_pgf_product_rspace(const bool compute_tau,
-                                       const bool use_subpatch,
+                                       const bool use_ortho,
                                        const int la_max,
                                        const int la_min,
                                        const int lb_max,

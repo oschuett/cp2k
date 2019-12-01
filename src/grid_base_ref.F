@@ -60,8 +60,8 @@ CONTAINS
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gsphere_bounds, gub_cube
-      LOGICAL                                            :: atom_pair_changed, radius_inconsistent, &
-                                                            use_subpatch
+      LOGICAL                                            :: atom_pair_changed, orthorhombic, &
+                                                            radius_inconsistent, use_ortho
       REAL(KIND=dp)                                      :: adh, drmin, max_rad_ga, radius, rscale, &
                                                             zetp
       REAL(KIND=dp), DIMENSION(3)                        :: ra, rab, rb
@@ -104,6 +104,7 @@ CONTAINS
          glb_cube => task_list%cinfo(igrid_level)%lb_cube
          gub_cube => task_list%cinfo(igrid_level)%ub_cube
          gsphere_bounds => task_list%cinfo(igrid_level)%sphere_bounds
+         orthorhombic = task_list%cinfo(igrid_level)%orthorhombic
 
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
@@ -199,10 +200,10 @@ CONTAINS
 
             ! check whether we need to use the generalised collocation scheme
             IF (tasks(itask)%dist_type == 2) THEN
-               use_subpatch = .TRUE.
+               use_ortho = .FALSE.
                radius_inconsistent = radius > max_rad_ga
             ELSE
-               use_subpatch = .FALSE.
+               use_ortho = orthorhombic
                radius_inconsistent = imr > max_radius
             ENDIF
 
@@ -240,7 +241,7 @@ CONTAINS
                                               gsphere_bounds=gsphere_bounds, &
                                               imr=imr, &
                                               compute_tau=compute_tau, &
-                                              use_subpatch=use_subpatch, &
+                                              use_ortho=use_ortho, &
                                               lmax_global=lmax_global, &
                                               maxco=maxco)
 
@@ -279,7 +280,7 @@ CONTAINS
 !> \param gsphere_bounds ...
 !> \param imr ...
 !> \param compute_tau ...
-!> \param use_subpatch ...
+!> \param use_ortho ...
 !> \param lmax_global Maximum possible value of lmax used to dimension arrays
 !> \param maxco ...
 ! **************************************************************************************************
@@ -289,7 +290,7 @@ CONTAINS
                                            grid, &
                                            dh, dh_inv, perd, npts, lb_grid, &
                                            glb_cube, gub_cube, gsphere_bounds, imr, &
-                                           compute_tau, use_subpatch, lmax_global, maxco)
+                                           compute_tau, use_ortho, lmax_global, maxco)
 
       INTEGER, INTENT(IN)                                :: la_max
       REAL(KIND=dp), INTENT(IN)                          :: zeta
@@ -305,7 +306,7 @@ CONTAINS
       INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: perd, npts, lb_grid
       INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bounds
       INTEGER, INTENT(IN)                                :: imr
-      LOGICAL, INTENT(IN)                                :: compute_tau, use_subpatch
+      LOGICAL, INTENT(IN)                                :: compute_tau, use_ortho
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
       INTEGER                                            :: nspheres
@@ -313,7 +314,7 @@ CONTAINS
       LOGICAL(KIND=C_BOOL), DIMENSION(3), TARGET         :: periodic
       TYPE(C_PTR)                                        :: lb_cube, sphere_bounds, ub_cube
       INTERFACE
-         SUBROUTINE grid_collocate_pgf_product_rspace(compute_tau, use_subpatch, &
+         SUBROUTINE grid_collocate_pgf_product_rspace(compute_tau, use_ortho, &
                                                       la_max, la_min, lb_max, lb_min, &
                                                       zeta, zetb, rscale, &
                                                       dh, dh_inv, ra, rab, npts, ngrid, lb_grid, periodic, &
@@ -324,7 +325,7 @@ CONTAINS
             BIND(C, name="grid_collocate_pgf_product_rspace")
             IMPORT :: C_PTR, C_INT, C_DOUBLE, C_BOOL
             LOGICAL(KIND=C_BOOL), VALUE               :: compute_tau
-            LOGICAL(KIND=C_BOOL), VALUE               :: use_subpatch
+            LOGICAL(KIND=C_BOOL), VALUE               :: use_ortho
             INTEGER(KIND=C_INT), VALUE                :: la_max
             INTEGER(KIND=C_INT), VALUE                :: la_min
             INTEGER(KIND=C_INT), VALUE                :: lb_max
@@ -354,7 +355,7 @@ CONTAINS
          END SUBROUTINE grid_collocate_pgf_product_rspace
       END INTERFACE
 
-      IF (.NOT. use_subpatch) THEN
+      IF (use_ortho) THEN
          lb_cube = C_LOC(glb_cube(1, imr))
          ub_cube = C_LOC(gub_cube(1, imr))
          CPASSERT(SIZE(glb_cube, 1) == 3 .AND. SIZE(gub_cube, 1) == 3)
@@ -390,7 +391,7 @@ CONTAINS
       !CPASSERT(IS_CONTIGUOUS(grid))
 
       CALL grid_collocate_pgf_product_rspace(compute_tau=LOGICAL(compute_tau, KIND=C_BOOL), &
-                                             use_subpatch=LOGICAL(use_subpatch, KIND=C_BOOL), &
+                                             use_ortho=LOGICAL(use_ortho, KIND=C_BOOL), &
                                              la_max=la_max, &
                                              la_min=la_min, &
                                              lb_max=lb_max, &
