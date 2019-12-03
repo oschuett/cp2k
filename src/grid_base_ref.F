@@ -178,6 +178,11 @@ CONTAINS
                           1.0_dp, work(1, 1), maxco, &
                           sphi_b(1, sgfb), SIZE(sphi_b, 1), 0.0_dp, pab(1, 1), maxco)
 
+               !TODO: Only needed for tests/QS/regtest-kp-1/c_gapw*.inp, see below.
+               IF (iatom > jatom) THEN
+                  pab = TRANSPOSE(pab)
+               ENDIF
+
                iset_old = iset
                jset_old = jset
             ENDIF
@@ -217,33 +222,64 @@ CONTAINS
                CPABORT("Radius consistency check failed.")
             ENDIF
 
-            CALL collocate_pgf_product_rspace(la_max=la_max(iset), &
-                                              zeta=zeta(ipgf, iset), &
-                                              la_min=la_min(iset), &
-                                              lb_max=lb_max(jset), &
-                                              zetb=zetb(jpgf, jset), &
-                                              lb_min=lb_min(jset), &
-                                              ra=ra, &
-                                              rab=rab, &
-                                              radius=radius, &
-                                              rscale=rscale, &
-                                              pab=pab, &
-                                              o1=na1 - 1, &
-                                              o2=nb1 - 1, &
-                                              grid=rs_rho(igrid_level)%grid, &
-                                              dh=dh, &
-                                              dh_inv=dh_inv, &
-                                              perd=perd, &
-                                              npts=npts, &
-                                              lb_grid=lb_grid, &
-                                              glb_cube=glb_cube, &
-                                              gub_cube=gub_cube, &
-                                              gsphere_bounds=gsphere_bounds, &
-                                              imr=imr, &
-                                              compute_tau=compute_tau, &
-                                              use_ortho=use_ortho, &
-                                              lmax_global=lmax_global, &
-                                              maxco=maxco)
+            !TODO: IF/ELSE only needed for tests/QS/regtest-kp-1/c_gapw*.inp, see above.
+            IF (iatom <= jatom) THEN
+               CALL collocate_pgf_product_rspace(la_max=la_max(iset), &
+                                                 zeta=zeta(ipgf, iset), &
+                                                 la_min=la_min(iset), &
+                                                 lb_max=lb_max(jset), &
+                                                 zetb=zetb(jpgf, jset), &
+                                                 lb_min=lb_min(jset), &
+                                                 ra=ra, &
+                                                 rab=rab, &
+                                                 radius=radius, &
+                                                 rscale=rscale, &
+                                                 pab=pab, &
+                                                 o1=na1 - 1, &
+                                                 o2=nb1 - 1, &
+                                                 grid=rs_rho(igrid_level)%grid, &
+                                                 dh=dh, &
+                                                 dh_inv=dh_inv, &
+                                                 perd=perd, &
+                                                 npts=npts, &
+                                                 lb_grid=lb_grid, &
+                                                 glb_cube=glb_cube, &
+                                                 gub_cube=gub_cube, &
+                                                 gsphere_bounds=gsphere_bounds, &
+                                                 imr=imr, &
+                                                 compute_tau=compute_tau, &
+                                                 use_ortho=use_ortho, &
+                                                 lmax_global=lmax_global, &
+                                                 maxco=maxco)
+            ELSE
+               CALL collocate_pgf_product_rspace(la_max=lb_max(jset), &
+                                                 zeta=zetb(jpgf, jset), &
+                                                 la_min=lb_min(jset), &
+                                                 lb_max=la_max(iset), &
+                                                 zetb=zeta(ipgf, iset), &
+                                                 lb_min=la_min(iset), &
+                                                 ra=rb, &
+                                                 rab=-rab, &
+                                                 radius=radius, &
+                                                 rscale=rscale, &
+                                                 pab=pab, &
+                                                 o1=nb1 - 1, &
+                                                 o2=na1 - 1, &
+                                                 grid=rs_rho(igrid_level)%grid, &
+                                                 dh=dh, &
+                                                 dh_inv=dh_inv, &
+                                                 perd=perd, &
+                                                 npts=npts, &
+                                                 lb_grid=lb_grid, &
+                                                 glb_cube=glb_cube, &
+                                                 gub_cube=gub_cube, &
+                                                 gsphere_bounds=gsphere_bounds, &
+                                                 imr=imr, &
+                                                 compute_tau=compute_tau, &
+                                                 use_ortho=use_ortho, &
+                                                 lmax_global=lmax_global, &
+                                                 maxco=maxco)
+            ENDIF
 
          END DO loop_tasks
          END DO loop_pairs
