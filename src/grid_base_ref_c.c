@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <assert.h>
+#include <float.h>
 
 #include "grid_base_ref_c.h"
 
@@ -840,34 +841,34 @@ static void grid_collocate_general(const int lp,
 }
 
 // *****************************************************************************
-void grid_collocate_pgf_product_rspace(const bool compute_tau,
-                                       const bool use_ortho,
-                                       const int la_max,
-                                       const int la_min,
-                                       const int lb_max,
-                                       const int lb_min,
-                                       const double zeta,
-                                       const double zetb,
-                                       const double rscale,
-                                       const double dh[3][3],
-                                       const double dh_inv[3][3],
-                                       const double ra[3],
-                                       const double rab[3],
-                                       const int npts[3],
-                                       const int ngrid[3],
-                                       const int lb_grid[3],
-                                       const bool periodic[3],
-                                       const int lmax,
-                                       const double radius,
-                                       const int lb_cube[3],
-                                       const int ub_cube[3],
-                                       const int nspheres,
-                                       const int sphere_bounds[nspheres],
-                                       const int maxco,
-                                       const int o1,
-                                       const int o2,
-                                       const double pab[maxco][maxco],
-                                       double grid[ngrid[2]][ngrid[1]][ngrid[0]]){
+static void grid_collocate_internal(const bool compute_tau,
+                                    const bool use_ortho,
+                                    const int la_max,
+                                    const int la_min,
+                                    const int lb_max,
+                                    const int lb_min,
+                                    const double zeta,
+                                    const double zetb,
+                                    const double rscale,
+                                    const double dh[3][3],
+                                    const double dh_inv[3][3],
+                                    const double ra[3],
+                                    const double rab[3],
+                                    const int npts[3],
+                                    const int ngrid[3],
+                                    const int lb_grid[3],
+                                    const bool periodic[3],
+                                    const int lmax,
+                                    const double radius,
+                                    const int lb_cube[3],
+                                    const int ub_cube[3],
+                                    const int nspheres,
+                                    const int sphere_bounds[nspheres],
+                                    const int maxco,
+                                    const int o1,
+                                    const int o2,
+                                    const double pab[maxco][maxco],
+                                    double grid[ngrid[2]][ngrid[1]][ngrid[0]]){
 
     const double zetp = zeta + zetb;
     const double f = zetb / zetp;
@@ -996,6 +997,170 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                ngrid,
                                grid);
     }
+}
+
+
+// *****************************************************************************
+void grid_collocate_pgf_product_rspace(const bool compute_tau,
+                                       const bool use_ortho,
+                                       const int la_max,
+                                       const int la_min,
+                                       const int lb_max,
+                                       const int lb_min,
+                                       const double zeta,
+                                       const double zetb,
+                                       const double rscale,
+                                       const double dh[3][3],
+                                       const double dh_inv[3][3],
+                                       const double ra[3],
+                                       const double rab[3],
+                                       const int npts[3],
+                                       const int ngrid[3],
+                                       const int lb_grid[3],
+                                       const bool periodic[3],
+                                       const int lmax,
+                                       const double radius,
+                                       const int lb_cube[3],
+                                       const int ub_cube[3],
+                                       const int nspheres,
+                                       const int sphere_bounds[nspheres],
+                                       const int maxco,
+                                       const int o1,
+                                       const int o2,
+                                       const double pab[maxco][maxco],
+                                       double grid[ngrid[2]][ngrid[1]][ngrid[0]]){
+
+// Uncomment this to dump all tasks to file.
+//#define __GRID_DUMP_COLLOCATE_TASKS
+
+#ifdef __GRID_DUMP_COLLOCATE_TASKS
+    double grid_before[ngrid[2]][ngrid[1]][ngrid[0]];
+    for (int i=0; i<ngrid[2]; i++) {
+    for (int j=0; j<ngrid[1]; j++) {
+    for (int k=0; j<ngrid[0]; j++) {
+        grid_before[i][j][k] = grid[i][j][k];
+        grid[i][j][k] = 0.0;
+    }
+    }
+    }
+#endif
+
+    grid_collocate_internal(compute_tau,
+                            use_ortho,
+                            la_max,
+                            la_min,
+                            lb_max,
+                            lb_min,
+                            zeta,
+                            zetb,
+                            rscale,
+                            dh,
+                            dh_inv,
+                            ra,
+                            rab,
+                            npts,
+                            ngrid,
+                            lb_grid,
+                            periodic,
+                            lmax,
+                            radius,
+                            lb_cube,
+                            ub_cube,
+                            nspheres,
+                            sphere_bounds,
+                            maxco,
+                            o1,
+                            o2,
+                            pab,
+                            grid);
+
+#ifdef __GRID_DUMP_COLLOCATE_TASKS
+
+    static int counter = 0;
+    counter++;
+    char filename[100];
+    snprintf(filename, sizeof(filename), "grid_collocate_%05i.task", counter);
+
+    const int D = DECIMAL_DIG;  // In C11 we could use DBL_DECIMAL_DIG.
+    FILE *fp = fopen(filename, "w+");
+    fprintf(fp, "#Grid collocate task v1\n");
+    fprintf(fp, "compute_tau %i\n", compute_tau);
+    fprintf(fp, "use_ortho %i\n", use_ortho);
+    fprintf(fp, "la_max %i\n", la_max);
+    fprintf(fp, "la_min %i\n", la_min);
+    fprintf(fp, "lb_max %i\n", lb_max);
+    fprintf(fp, "lb_min %i\n", lb_min);
+    fprintf(fp, "zeta %.*e\n", D, zeta);
+    fprintf(fp, "zetb %.*e\n", D, zetb);
+    fprintf(fp, "rscale %.*e\n", D, rscale);
+    for (int i=0; i<3; i++)
+        fprintf(fp, "dh %i %.*e %.*e %.*e\n", i, D, dh[i][0], D, dh[i][1], D, dh[i][2]);
+    for (int i=0; i<3; i++)
+        fprintf(fp, "dh_inv %i %.*e %.*e %.*e\n", i, D, dh_inv[i][0], D, dh_inv[i][1], D, dh_inv[i][2]);
+    fprintf(fp, "ra %.*e %.*e %.*e\n", D, ra[0], D, ra[1], D, ra[2]);
+    fprintf(fp, "rab %.*e %.*e %.*e\n", D, rab[0], D, rab[1], D, rab[2]);
+    fprintf(fp, "npts %i %i %i\n", npts[0], npts[1], npts[2]);
+    fprintf(fp, "ngrid %i %i %i\n", ngrid[0], ngrid[1], ngrid[2]);
+    fprintf(fp, "lb_grid %i %i %i\n", lb_grid[0], lb_grid[1], lb_grid[2]);
+    fprintf(fp, "periodic %i %i %i\n", periodic[0], periodic[1], periodic[2]);
+    fprintf(fp, "lmax %i\n", lmax);
+    fprintf(fp, "radius %.*e\n", D, radius);
+    fprintf(fp, "lb_cube %i %i %i\n", lb_cube[0], lb_cube[1], lb_cube[2]);
+    fprintf(fp, "ub_cube %i %i %i\n", ub_cube[0], ub_cube[1], ub_cube[2]);
+    fprintf(fp, "nspheres %i\n", nspheres);
+
+    int nspheres_nonzero = 0;
+    for (int i=0; i<nspheres; i++) {
+        if (sphere_bounds[i] != 0) {
+            nspheres_nonzero++;
+        }
+    }
+    fprintf(fp, "nspheres_nonzero %i\n", nspheres_nonzero);
+
+    for (int i=0; i<nspheres; i++) {
+        if (sphere_bounds[i] != 0) {
+            fprintf(fp, "sphere_bounds %i %i\n", i, sphere_bounds[i]);
+        }
+    }
+
+    fprintf(fp, "maxco %i\n", maxco);
+    fprintf(fp, "o1 %i\n", o1);
+    fprintf(fp, "o2 %i\n", o2);
+
+    for (int i=0; i<maxco; i++) {
+    for (int j=0; j<maxco; j++) {
+        fprintf(fp, "pab %i %i %.*e\n", i, j, D, pab[i][j]);
+    }
+    }
+
+    int ngrid_nonzero = 0;
+    for (int i=0; i<ngrid[2]; i++) {
+    for (int j=0; j<ngrid[1]; j++) {
+    for (int k=0; j<ngrid[0]; j++) {
+        if (grid[i][j][k] != 0.0) {
+            ngrid_nonzero++;
+        }
+    }
+    }
+    }
+    fprintf(fp, "ngrid_nonzero %i\n", ngrid_nonzero);
+
+    for (int i=0; i<ngrid[2]; i++) {
+    for (int j=0; j<ngrid[1]; j++) {
+    for (int k=0; j<ngrid[0]; j++) {
+        if (grid[i][j][k] != 0.0) {
+            fprintf(fp, "grid %i %i %i %.*e\n", i, j, k, D, grid[i][j][k]);
+        }
+        grid[i][j][k] += grid_before[i][j][k];
+    }
+    }
+    }
+    fprintf(fp, "#THE_END\n");
+    fclose(fp);
+    printf("OLE Wrote %s\n", filename);
+
+#endif
+
 }
 
 //EOF
