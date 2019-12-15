@@ -1031,9 +1031,9 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        double grid[ngrid[2]][ngrid[1]][ngrid[0]]){
 
 // Uncomment this to dump all tasks to file.
-//#define __GRID_DUMP_COLLOCATE_TASKS
+//#define __GRID_DUMP_TASKS
 
-#ifdef __GRID_DUMP_COLLOCATE_TASKS
+#ifdef __GRID_DUMP_TASKS
     double grid_before[ngrid[2]][ngrid[1]][ngrid[0]];
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
@@ -1074,7 +1074,7 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                             pab,
                             grid);
 
-#ifdef __GRID_DUMP_COLLOCATE_TASKS
+#ifdef __GRID_DUMP_TASKS
 
     static int counter = 0;
     counter++;

@@ -275,6 +275,11 @@ CONTAINS
       flags = TRIM(flags)//" check_diag"
 #endif
 
+#if defined __GRID_DUMP_TASKS
+      flags = TRIM(flags)//" grid_dump_tasks"
+#endif
+
+
    END FUNCTION cp2k_flags
 
 ! **************************************************************************************************
