@@ -242,6 +242,7 @@ fi
 
 export OMP_NUM_THREADS=${numthreads}
 export CP2K_DATA_DIR=${cp2k_data_dir:-"${dir_base}/${cp2k_dir}/data"}
+export CP2K_ROOT_DIR=${cp2k_dir}
 
 #
 # these should not be needed

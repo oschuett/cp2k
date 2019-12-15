@@ -16,6 +16,7 @@
 double grid_collocate_replay(const char* filename){
     printf("Reading: '%s'\n", filename);
     FILE *fp = fopen(filename, "r");
+    assert(fp != NULL);
 
     char line[100], key[100];
 
