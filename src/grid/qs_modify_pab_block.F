@@ -12,7 +12,7 @@ MODULE qs_modify_pab_block
 
    USE kinds,                           ONLY: dp
    USE orbital_pointers,                ONLY: coset
-#include "./base/base_uses.f90"
+#include "../base/base_uses.f90"
 
    IMPLICIT NONE
 

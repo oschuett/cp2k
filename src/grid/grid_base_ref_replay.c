@@ -13,7 +13,7 @@
 #include "grid_base_ref_c.h"
 
 
-double grid_collocate_replay(const char* filename){
+double grid_collocate_replay(const char* filename, const int cycles){
     printf("Reading: '%s'\n", filename);
     FILE *fp = fopen(filename, "r");
     assert(fp != NULL);
@@ -222,9 +222,7 @@ double grid_collocate_replay(const char* filename){
     }
     }
 
-    const int N = 1000;  // For better statistics the task is collocated many times.
-
-    for (int i=0; i < N ; i++) {
+    for (int i=0; i < cycles ; i++) {
         grid_collocate_pgf_product_rspace(compute_tau,
                                           use_ortho,
                                           la_max,
@@ -260,7 +258,7 @@ double grid_collocate_replay(const char* filename){
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
     for (int k=0; j<ngrid[0]; j++) {
-        const double diff = fabs(grid_test[i][j][k] - N * grid_ref[i][j][k]);
+        const double diff = fabs(grid_test[i][j][k] - cycles * grid_ref[i][j][k]);
         max_diff = fmax(max_diff, diff);
     }
     }

@@ -39,7 +39,7 @@ MODULE grid_api
    USE task_list_types,                 ONLY: grid_base_type,&
                                               task_list_type
    USE virial_types,                    ONLY: virial_type
-#include "./base/base_uses.f90"
+#include "../base/base_uses.f90"
 
    IMPLICIT NONE
 

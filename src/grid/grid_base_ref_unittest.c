@@ -22,10 +22,10 @@ int main(){
         }
     }
 
-    const char rel_path[] = "tests/QS/regtest-ot-1/grid_collocate_sample.task";
+    const char rel_path[] = "./src/grid/sample_tasks/collocate_ortho_density.task";
     assert(strcat(filename, rel_path) != NULL);
 
-    const double max_diff = grid_collocate_replay(filename);
+    const double max_diff = grid_collocate_replay(filename, 1);
     if (max_diff > 1e-16) {
         printf("Max diff too high, test failed.\n");
         return 1;

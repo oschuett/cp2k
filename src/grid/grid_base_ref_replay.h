@@ -3,14 +3,11 @@
  *  Copyright (C) 2000 - 2019  CP2K developers group                         *
  *****************************************************************************/
 
-#include <assert.h>
-#include "grid_base_ref_replay.h"
+#ifndef GRID_BASE_REF_REPLAY_H
+#define GRID_BASE_REF_REPLAY_H
 
-int main(int argc, char *argv[]){
-    assert(argc == 2);
-    const double max_diff = grid_collocate_replay(argv[1]);
-    assert(max_diff < 1e-16);
-    return 0;
-}
+double grid_collocate_replay(const char* filename, int cycles);
+
+#endif
 
 //EOF

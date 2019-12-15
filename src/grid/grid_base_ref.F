@@ -17,7 +17,7 @@ MODULE grid_base_ref
    USE task_list_types,                 ONLY: grid_base_type,&
                                               task_list_type,&
                                               task_type
-#include "./base/base_uses.f90"
+#include "../base/base_uses.f90"
 
    IMPLICIT NONE
 

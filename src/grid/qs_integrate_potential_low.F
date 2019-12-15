@@ -18,7 +18,7 @@ MODULE qs_integrate_potential_low
                                               current_maxl,&
                                               ncoset
    USE realspace_grid_types,            ONLY: realspace_grid_type
-#include "./base/base_uses.f90"
+#include "../base/base_uses.f90"
 
    IMPLICIT NONE
 

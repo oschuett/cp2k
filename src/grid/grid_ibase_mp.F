@@ -4,13 +4,15 @@
 !--------------------------------------------------------------------------------------------------!
 
 ! **************************************************************************************************
-MODULE grid_ibase_ref
+MODULE grid_ibase_mp
    USE cell_types,                      ONLY: cell_type
    USE cube_utils,                      ONLY: cube_info_type
    USE dbcsr_api,                       ONLY: dbcsr_add_block_node,&
+                                              dbcsr_distribution_get,&
                                               dbcsr_distribution_type,&
                                               dbcsr_finalize,&
                                               dbcsr_get_block_p,&
+                                              dbcsr_get_info,&
                                               dbcsr_p_type,&
                                               dbcsr_work_create
    USE kinds,                           ONLY: dp
@@ -20,15 +22,18 @@ MODULE grid_ibase_ref
    USE task_list_types,                 ONLY: task_list_type,&
                                               task_type
    USE virial_types,                    ONLY: virial_type
-#include "./base/base_uses.f90"
+
+!$ USE OMP_LIB, ONLY: omp_get_max_threads, omp_get_thread_num, omp_get_num_threads
+
+#include "../base/base_uses.f90"
 
    IMPLICIT NONE
 
    PRIVATE
 
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'grid_ibase_ref'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'grid_ibase_mp'
 
-   PUBLIC :: grid_integrate_ref
+   PUBLIC :: grid_integrate_mp
 
 ! **************************************************************************************************
 
@@ -54,10 +59,10 @@ CONTAINS
 !> \param use_virial ...
 !> \param virial ...
 ! **************************************************************************************************
-   SUBROUTINE grid_integrate_ref(rs_v, dhmat, deltap, task_list, cube_info, cell, &
-                                 eps_gvg_rspace, admm_scal_fac, &
-                                 my_compute_tau, pab_required, map_consistent, kind_of, posat, &
-                                 calculate_forces, force, use_virial, virial)
+   SUBROUTINE grid_integrate_mp(rs_v, dhmat, deltap, task_list, cube_info, cell, &
+                                eps_gvg_rspace, admm_scal_fac, &
+                                my_compute_tau, pab_required, map_consistent, kind_of, posat, &
+                                calculate_forces, force, use_virial, virial)
 
       TYPE(realspace_grid_p_type), DIMENSION(:), POINTER :: rs_v
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: dhmat, deltap
@@ -74,26 +79,26 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: use_virial
       TYPE(virial_type), POINTER                         :: virial
 
-      CHARACTER(len=*), PARAMETER :: routineN = 'grid_integrate_ref', &
+      CHARACTER(len=*), PARAMETER :: routineN = 'grid_integrate_mp', &
          routineP = moduleN//':'//routineN
 
       INTEGER :: bcol, brow, iatom, igrid_level, ikind, ilevel, img, ipair, ipgf, ipgf_new, iset, &
-         iset_new, iset_old, itask, jatom, jkind, jpgf, jpgf_new, jset, jset_new, jset_old, maxco, &
-         maxpgf, maxset, maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, ncob, nimages, sgfa, sgfb
+         iset_new, iset_old, itask, ithread, jatom, jkind, jpgf, jpgf_new, jset, jset_new, &
+         jset_old, maxco, maxpgf, maxset, maxsgf_set, na1, na2, natom, nb1, nb2, ncoa, ncob, &
+         nimages, nthread, sgfa, sgfb
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
       LOGICAL                                            :: atom_pair_changed, atom_pair_done, &
-                                                            found, new_set_pair_coming, &
-                                                            use_subpatch
+                                                            found, has_threads, &
+                                                            new_set_pair_coming, use_subpatch
       REAL(KIND=dp)                                      :: dab, rab2, scalef, zetp
       REAL(KIND=dp), DIMENSION(3)                        :: force_a, force_b, ra, rab, rab_inv, rb
       REAL(KIND=dp), DIMENSION(3, 3)                     :: my_virial_a, my_virial_b
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: h_block, hab, p_block, pab, sphi_a, &
                                                             sphi_b, work, zeta, zetb
+      TYPE(dbcsr_distribution_type)                      :: dist
       TYPE(task_type), DIMENSION(:), POINTER             :: tasks
-
-!     TYPE(dbcsr_distribution_type)                      :: dist
 
       ! short cuts to task list variables
       tasks => task_list%tasks
@@ -103,6 +108,29 @@ CONTAINS
       maxpgf = task_list%maxpgf
       nimages = task_list%nimages
       natom = task_list%natoms
+
+      nthread = 1
+!$    nthread = omp_get_max_threads()
+
+!$OMP PARALLEL DEFAULT(NONE), &
+!$OMP SHARED(tasks,natom,maxset), &
+!$OMP SHARED(maxco,maxsgf_set,maxpgf,dhmat,deltap,use_virial,admm_scal_fac), &
+!$OMP SHARED(pab_required,calculate_forces,ncoset,rs_v,cube_info,my_compute_tau), &
+!$OMP SHARED(map_consistent,eps_gvg_rspace,force,virial,cell,posat,kind_of), &
+!$OMP SHARED(task_list,nthread,nimages), &
+!$OMP PRIVATE(ithread,work,hab,pab,iset_old,jset_old), &
+!$OMP PRIVATE(iatom,jatom,iset,jset,ikind,jkind,ilevel,ipgf,jpgf), &
+!$OMP PRIVATE(img,brow,bcol,first_sgfa,la_max,la_min,npgfa,nsgfa), &
+!$OMP PRIVATE(sphi_a,zeta,first_sgfb,lb_max,lb_min,npgfb), &
+!$OMP PRIVATE(nsgfb,sphi_b,zetb,found), &
+!$OMP PRIVATE(force_a,force_b,my_virial_a,my_virial_b,atom_pair_changed,h_block), &
+!$OMP PRIVATE(p_block,ncoa,sgfa,ncob,sgfb,rab,rab2,ra,rb,zetp,dab,igrid_level), &
+!$OMP PRIVATE(na1,na2,nb1,nb2,use_subpatch,rab_inv,new_set_pair_coming,atom_pair_done), &
+!$OMP PRIVATE(iset_new,jset_new,ipgf_new,jpgf_new,scalef), &
+!$OMP PRIVATE(itask,dist,has_threads)
+
+      ithread = 0
+!$    ithread = omp_get_thread_num()
 
       ! Allocate work storage
       ALLOCATE (work(maxco, maxsgf_set), hab(maxco, maxco))
@@ -114,12 +142,20 @@ CONTAINS
 
       ! Here we loop over gridlevels first, finalising the matrix after each grid level is
       ! completed.  On each grid level, we loop over atom pairs, which will only access
+      ! a single block of each matrix, so with OpenMP, each matrix block is only touched
+      ! by a single thread for each grid level
       loop_gridlevels: DO igrid_level = 1, task_list%ngrid_levels
 
          DO img = 1, nimages
-            CALL dbcsr_work_create(dhmat(img)%matrix, work_mutable=.TRUE.)
+            CALL dbcsr_work_create(dhmat(img)%matrix, work_mutable=.TRUE., n=nthread)
+            CALL dbcsr_get_info(dhmat(img)%matrix, distribution=dist)
+            CALL dbcsr_distribution_get(dist, has_threads=has_threads)
+!$          IF (.NOT. has_threads) &
+!$             CPABORT("No thread distribution defined.")
          END DO
+!$OMP BARRIER
 
+!$OMP DO schedule (dynamic, MAX(1,task_list%npairs(igrid_level)/(nthread*50)))
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
          loop_tasks: DO itask = task_list%taskstart(ipair, igrid_level), task_list%taskstop(ipair, igrid_level)
 
@@ -238,8 +274,14 @@ CONTAINS
             nb1 = (jpgf - 1)*ncoset(lb_max(jset)) + 1
             nb2 = jpgf*ncoset(lb_max(jset))
 
-            IF (tasks(itask)%dist_type .EQ. 2) THEN
-               use_subpatch = .TRUE.
+            ! check whether we need to use fawzi's generalised collocation scheme
+            IF (rs_v(igrid_level)%rs_grid%desc%distributed) THEN
+               !tasks(4,:) is 0 for replicated, 1 for distributed 2 for exceptional distributed tasks
+               IF (tasks(itask)%dist_type .EQ. 2) THEN
+                  use_subpatch = .TRUE.
+               ELSE
+                  use_subpatch = .FALSE.
+               ENDIF
             ELSE
                use_subpatch = .FALSE.
             ENDIF
@@ -346,6 +388,7 @@ CONTAINS
             END IF
 
             IF (atom_pair_done) THEN
+!$OMP CRITICAL(force_critical)
                IF (iatom == jatom) THEN
                   scalef = 1.0_dp
                ELSE
@@ -359,9 +402,11 @@ CONTAINS
                      virial%pv_virial = virial%pv_virial + scalef*admm_scal_fac*my_virial_b
                   END IF
                END IF
+!$OMP END CRITICAL (force_critical)
             ENDIF
          END DO loop_tasks
          END DO loop_pairs
+!$OMP END DO
 
          DO img = 1, nimages
             CALL dbcsr_finalize(dhmat(img)%matrix)
@@ -375,6 +420,8 @@ CONTAINS
          DEALLOCATE (pab)
       END IF
 
-   END SUBROUTINE grid_integrate_ref
+!$OMP END PARALLEL
 
-END MODULE grid_ibase_ref
+   END SUBROUTINE grid_integrate_mp
+
+END MODULE grid_ibase_mp
