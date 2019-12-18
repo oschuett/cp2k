@@ -279,7 +279,6 @@ CONTAINS
       flags = TRIM(flags)//" grid_dump_tasks"
 #endif
 
-
    END FUNCTION cp2k_flags
 
 ! **************************************************************************************************

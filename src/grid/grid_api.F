@@ -23,8 +23,7 @@ MODULE grid_api
    USE grid_base_ref,                   ONLY: grid_collocate_ref
    USE grid_ibase_mp,                   ONLY: grid_integrate_mp
    USE grid_ibase_ref,                  ONLY: grid_integrate_ref
-   USE kinds,                           ONLY: default_string_length,&
-                                              dp
+   USE kinds,                           ONLY: dp
    USE qs_integrate_potential_low,      ONLY: integrate_pgf_product_rspace,&
                                               integrate_pgf_rspace
    USE qs_modify_pab_block,             ONLY: &
