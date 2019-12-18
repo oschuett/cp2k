@@ -69,8 +69,6 @@ MODULE qs_integrate_potential_product
 
    PRIVATE
 
-   INTEGER :: debug_count = 0
-
    LOGICAL, PRIVATE, PARAMETER :: debug_this_module = .FALSE.
 
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'qs_integrate_potential_product'
