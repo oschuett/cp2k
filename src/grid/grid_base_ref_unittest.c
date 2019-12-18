@@ -22,7 +22,7 @@ int main(){
         }
     }
 
-    const char rel_path[] = "./src/grid/sample_tasks/collocate_ortho_density.task";
+    const char rel_path[] = "src/grid/sample_tasks/collocate_ortho_density.task";
     assert(strcat(filename, rel_path) != NULL);
 
     const double max_diff = grid_collocate_replay(filename, 1);
