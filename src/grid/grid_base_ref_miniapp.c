@@ -15,7 +15,7 @@ int main(int argc, char *argv[]){
     }
     const int cycles = 1000;  // For better statistics the task is collocated many times.
     const double max_diff = grid_collocate_replay(argv[1], cycles);
-    assert(max_diff < 1e-16);
+    assert(max_diff < 1e-18 * cycles);
     return 0;
 }
 

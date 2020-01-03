@@ -127,15 +127,22 @@ double grid_collocate_replay(const char* filename, const int cycles){
     assert(sscanf(line, "%s %le", key, &radius) == 2);
     assert(strcmp(key, "radius") == 0);
 
-    int lb_cube[3];
-    assert(fgets(line, sizeof(line), fp) != NULL);
-    assert(sscanf(line, "%s %i %i %i", key, &lb_cube[0], &lb_cube[1], &lb_cube[2]) == 4);
-    assert(strcmp(key, "lb_cube") == 0);
+    int *lb_cube, *ub_cube;
+    int lb_cube_arr[3], ub_cube_arr[3];
+    if (use_ortho) {
+        lb_cube = lb_cube_arr;
+        assert(fgets(line, sizeof(line), fp) != NULL);
+        assert(sscanf(line, "%s %i %i %i", key, &lb_cube[0], &lb_cube[1], &lb_cube[2]) == 4);
+        assert(strcmp(key, "lb_cube") == 0);
 
-    int ub_cube[3];
-    assert(fgets(line, sizeof(line), fp) != NULL);
-    assert(sscanf(line, "%s %i %i %i", key, &ub_cube[0], &ub_cube[1], &ub_cube[2]) == 4);
-    assert(strcmp(key, "ub_cube") == 0);
+        ub_cube = ub_cube_arr;
+        assert(fgets(line, sizeof(line), fp) != NULL);
+        assert(sscanf(line, "%s %i %i %i", key, &ub_cube[0], &ub_cube[1], &ub_cube[2]) == 4);
+        assert(strcmp(key, "ub_cube") == 0);
+    } else {
+        lb_cube = NULL;
+        ub_cube = NULL;
+    }
 
     int nspheres;
     assert(fgets(line, sizeof(line), fp) != NULL);

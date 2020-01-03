@@ -1105,8 +1105,10 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
     fprintf(fp, "periodic %i %i %i\n", periodic[0], periodic[1], periodic[2]);
     fprintf(fp, "lmax %i\n", lmax);
     fprintf(fp, "radius %.*e\n", D, radius);
-    fprintf(fp, "lb_cube %i %i %i\n", lb_cube[0], lb_cube[1], lb_cube[2]);
-    fprintf(fp, "ub_cube %i %i %i\n", ub_cube[0], ub_cube[1], ub_cube[2]);
+    if (use_ortho) {
+        fprintf(fp, "lb_cube %i %i %i\n", lb_cube[0], lb_cube[1], lb_cube[2]);
+        fprintf(fp, "ub_cube %i %i %i\n", ub_cube[0], ub_cube[1], ub_cube[2]);
+    }
     fprintf(fp, "nspheres %i\n", nspheres);
 
     int nspheres_nonzero = 0;
@@ -1157,7 +1159,7 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
     }
     fprintf(fp, "#THE_END\n");
     fclose(fp);
-    printf("OLE Wrote %s\n", filename);
+    printf("Wrote %s\n", filename);
 
 #endif
 
