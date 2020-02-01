@@ -22,8 +22,6 @@ lb_grid 0 0 0
 periodic 1 1 1
 lmax 1
 radius 4.351562500000000000000e+00
-nspheres 0
-nspheres_nonzero 0
 maxco 16
 o1 3
 o2 3

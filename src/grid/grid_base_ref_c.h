@@ -32,8 +32,6 @@ extern "C" {
 // \param radius        Radius where Gaussian becomes small than threshold eps.
 // \param lb_cube       See pw/cube_utils.F.
 // \param ub_cube       See pw/cube_utils.F.
-// \param nspheres      Size of sphere_bounds array.
-// \param sphere_bounds See pw/cube_utils.F.
 // \param maxco         Dimensions of density matrix block pab.
 // \param o{1,2}        Offsets. The sub-block to be collocated starts at pab[o2][o1]
 // \param pab           The atom-pair's density matrix block P_{ab}
@@ -61,8 +59,6 @@ void grid_collocate_pgf_product_rspace(const bool compute_tau,
                                        const double radius,
                                        const int lb_cube[3],
                                        const int ub_cube[3],
-                                       const int nspheres,
-                                       const int sphere_bounds[nspheres],
                                        const int maxco,
                                        const int o1,
                                        const int o2,

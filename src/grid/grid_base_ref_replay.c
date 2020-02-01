@@ -147,29 +147,6 @@ double grid_collocate_replay(const char* filename, const int cycles){
         ub_cube = NULL;
     }
 
-    int nspheres;
-    assert(fgets(line, sizeof(line), fp) != NULL);
-    assert(sscanf(line, "%s %i", key, &nspheres) == 2);
-    assert(strcmp(key, "nspheres") == 0);
-
-    int sphere_bounds[nspheres];
-    for (int i=0; i < nspheres; i++) {
-        sphere_bounds[i] = 0;
-    }
-
-    int nspheres_nonzero;
-    assert(fgets(line, sizeof(line), fp) != NULL);
-    assert(sscanf(line, "%s %i", key, &nspheres_nonzero) == 2);
-    assert(strcmp(key, "nspheres_nonzero") == 0);
-
-    for (int i=0; i < nspheres_nonzero; i++) {
-        int j, value;
-        assert(fgets(line, sizeof(line), fp) != NULL);
-        assert(sscanf(line, "%s %i %i", key, &j, &value) == 3);
-        assert(strcmp(key, "sphere_bounds") == 0);
-        sphere_bounds[j] = value;
-    }
-
     int maxco;
     assert(fgets(line, sizeof(line), fp) != NULL);
     assert(sscanf(line, "%s %i", key, &maxco) == 2);
@@ -259,8 +236,6 @@ double grid_collocate_replay(const char* filename, const int cycles){
                                           radius,
                                           lb_cube,
                                           ub_cube,
-                                          nspheres,
-                                          sphere_bounds,
                                           maxco,
                                           o1,
                                           o2,

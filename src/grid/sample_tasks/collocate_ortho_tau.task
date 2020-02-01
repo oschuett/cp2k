@@ -24,11 +24,6 @@ lmax 4
 radius 5.390625000000000000000e-01
 lb_cube -1 -1 -1
 ub_cube 2 2 2
-nspheres 234
-nspheres_nonzero 3
-sphere_bounds 0 -1
-sphere_bounds 3 -1
-sphere_bounds 5 -1
 maxco 20
 o1 0
 o2 0

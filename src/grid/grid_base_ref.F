@@ -59,7 +59,7 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER                     :: first_sgfa, first_sgfb, la_max, la_min, &
                                                             lb_max, lb_min, npgfa, npgfb, nsgfa, &
                                                             nsgfb
-      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gsphere_bounds, gub_cube
+      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube
       LOGICAL                                            :: atom_pair_changed, orthorhombic, &
                                                             radius_inconsistent, use_ortho
       REAL(KIND=dp)                                      :: adh, drmin, max_rad_ga, radius, rscale, &
@@ -103,7 +103,6 @@ CONTAINS
 
          glb_cube => task_list%cinfo(igrid_level)%lb_cube
          gub_cube => task_list%cinfo(igrid_level)%ub_cube
-         gsphere_bounds => task_list%cinfo(igrid_level)%sphere_bounds
          orthorhombic = task_list%cinfo(igrid_level)%orthorhombic
 
          loop_pairs: DO ipair = 1, task_list%npairs(igrid_level)
@@ -245,7 +244,6 @@ CONTAINS
                                                  lb_grid=lb_grid, &
                                                  glb_cube=glb_cube, &
                                                  gub_cube=gub_cube, &
-                                                 gsphere_bounds=gsphere_bounds, &
                                                  imr=imr, &
                                                  compute_tau=compute_tau, &
                                                  use_ortho=use_ortho, &
@@ -273,7 +271,6 @@ CONTAINS
                                                  lb_grid=lb_grid, &
                                                  glb_cube=glb_cube, &
                                                  gub_cube=gub_cube, &
-                                                 gsphere_bounds=gsphere_bounds, &
                                                  imr=imr, &
                                                  compute_tau=compute_tau, &
                                                  use_ortho=use_ortho, &
@@ -313,7 +310,6 @@ CONTAINS
 !> \param lb_grid ...
 !> \param glb_cube ...
 !> \param gub_cube ...
-!> \param gsphere_bounds ...
 !> \param imr ...
 !> \param compute_tau ...
 !> \param use_ortho ...
@@ -325,7 +321,7 @@ CONTAINS
                                            ra, rab, radius, rscale, pab, o1, o2, &
                                            grid, &
                                            dh, dh_inv, perd, npts, lb_grid, &
-                                           glb_cube, gub_cube, gsphere_bounds, imr, &
+                                           glb_cube, gub_cube, imr, &
                                            compute_tau, use_ortho, lmax_global, maxco)
 
       INTEGER, INTENT(IN)                                :: la_max
@@ -340,22 +336,21 @@ CONTAINS
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       REAL(KIND=dp), DIMENSION(3, 3), INTENT(IN), TARGET :: dh, dh_inv
       INTEGER, DIMENSION(3), INTENT(IN), TARGET          :: perd, npts, lb_grid
-      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube, gsphere_bounds
+      INTEGER, DIMENSION(:, :), POINTER                  :: glb_cube, gub_cube
       INTEGER, INTENT(IN)                                :: imr
       LOGICAL, INTENT(IN)                                :: compute_tau, use_ortho
       INTEGER, INTENT(IN)                                :: lmax_global, maxco
 
-      INTEGER                                            :: nspheres
       INTEGER, DIMENSION(3), TARGET                      :: ngrid
       LOGICAL(KIND=C_BOOL), DIMENSION(3), TARGET         :: periodic
-      TYPE(C_PTR)                                        :: lb_cube, sphere_bounds, ub_cube
+      TYPE(C_PTR)                                        :: lb_cube, ub_cube
       INTERFACE
          SUBROUTINE grid_collocate_pgf_product_rspace(compute_tau, use_ortho, &
                                                       la_max, la_min, lb_max, lb_min, &
                                                       zeta, zetb, rscale, &
                                                       dh, dh_inv, ra, rab, npts, ngrid, lb_grid, periodic, &
                                                       lmax, radius, &
-                                                      lb_cube, ub_cube, nspheres, sphere_bounds, &
+                                                      lb_cube, ub_cube, &
                                                       maxco, o1, o2, pab, &
                                                       grid) &
             BIND(C, name="grid_collocate_pgf_product_rspace")
@@ -381,8 +376,6 @@ CONTAINS
             REAL(KIND=C_DOUBLE), VALUE                :: radius
             TYPE(C_PTR), VALUE                        :: lb_cube
             TYPE(C_PTR), VALUE                        :: ub_cube
-            INTEGER(KIND=C_INT), VALUE                :: nspheres
-            TYPE(C_PTR), VALUE                        :: sphere_bounds
             INTEGER(KIND=C_INT), VALUE                :: maxco
             INTEGER(KIND=C_INT), VALUE                :: o1
             INTEGER(KIND=C_INT), VALUE                :: o2
@@ -405,7 +398,6 @@ CONTAINS
       IF (use_ortho) THEN
          CPASSERT(IS_CONTIGUOUS(glb_cube))
          CPASSERT(IS_CONTIGUOUS(gub_cube))
-         CPASSERT(IS_CONTIGUOUS(gsphere_bounds))
       ENDIF
 #endif
 
@@ -413,13 +405,9 @@ CONTAINS
          lb_cube = C_LOC(glb_cube(1, imr))
          ub_cube = C_LOC(gub_cube(1, imr))
          CPASSERT(SIZE(glb_cube, 1) == 3 .AND. SIZE(gub_cube, 1) == 3)
-         sphere_bounds = C_LOC(gsphere_bounds(1, imr))
-         nspheres = SIZE(gsphere_bounds, 1)
       ELSE
          lb_cube = C_NULL_PTR
          ub_cube = C_NULL_PTR
-         sphere_bounds = C_NULL_PTR
-         nspheres = 0
       ENDIF
 
       periodic = (perd == 1)
@@ -454,8 +442,6 @@ CONTAINS
                                              radius=radius, &
                                              lb_cube=lb_cube, &
                                              ub_cube=ub_cube, &
-                                             nspheres=nspheres, &
-                                             sphere_bounds=sphere_bounds, &
                                              maxco=maxco, &
                                              o1=o1, &
                                              o2=o2, &
