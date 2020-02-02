@@ -45,7 +45,7 @@ CONTAINS
 
       TYPE(grid_base_type), DIMENSION(:)                 :: rs_rho
       TYPE(spmat_p_type), DIMENSION(:), INTENT(IN)       :: spmats
-      TYPE(task_list_type), POINTER                      :: task_list
+      TYPE(task_list_type), INTENT(IN)                   :: task_list
       LOGICAL, INTENT(IN)                                :: compute_tau
       INTEGER, DIMENSION(:), INTENT(IN)                  :: kind_of
       REAL(KIND=dp), DIMENSION(:, :), INTENT(IN)         :: posat
@@ -391,6 +391,24 @@ CONTAINS
          END SUBROUTINE grid_collocate_pgf_product_rspace
       END INTERFACE
 
+#if __GNUC__ >= 9
+      CPASSERT(IS_CONTIGUOUS(dh))
+      CPASSERT(IS_CONTIGUOUS(dh_inv))
+      CPASSERT(IS_CONTIGUOUS(ra))
+      CPASSERT(IS_CONTIGUOUS(rab))
+      CPASSERT(IS_CONTIGUOUS(npts))
+      CPASSERT(IS_CONTIGUOUS(ngrid))
+      CPASSERT(IS_CONTIGUOUS(lb_grid))
+      CPASSERT(IS_CONTIGUOUS(periodic))
+      CPASSERT(IS_CONTIGUOUS(pab))
+      CPASSERT(IS_CONTIGUOUS(grid))
+      IF (use_ortho) THEN
+         CPASSERT(IS_CONTIGUOUS(glb_cube))
+         CPASSERT(IS_CONTIGUOUS(gub_cube))
+         CPASSERT(IS_CONTIGUOUS(gsphere_bounds))
+      ENDIF
+#endif
+
       IF (use_ortho) THEN
          lb_cube = C_LOC(glb_cube(1, imr))
          ub_cube = C_LOC(gub_cube(1, imr))
@@ -414,17 +432,6 @@ CONTAINS
       CPASSERT(LBOUND(grid, 2) == 1)
       CPASSERT(LBOUND(grid, 3) == 1)
       ngrid = (/SIZE(grid, 1), SIZE(grid, 2), SIZE(grid, 3)/)
-
-      !TODO: enable for gfortran 9
-      !CPASSERT(IS_CONTIGUOUS(dh))
-      !CPASSERT(IS_CONTIGUOUS(dh_inv))
-      !CPASSERT(IS_CONTIGUOUS(ra))
-      !CPASSERT(IS_CONTIGUOUS(rab))
-      !CPASSERT(IS_CONTIGUOUS(npts))
-      !CPASSERT(IS_CONTIGUOUS(lb_grid))
-      !CPASSERT(IS_CONTIGUOUS(periodic))
-      !CPASSERT(IS_CONTIGUOUS(pab))
-      !CPASSERT(IS_CONTIGUOUS(grid))
 
       CALL grid_collocate_pgf_product_rspace(compute_tau=LOGICAL(compute_tau, KIND=C_BOOL), &
                                              use_ortho=LOGICAL(use_ortho, KIND=C_BOOL), &
