@@ -3,18 +3,21 @@
  *  Copyright (C) 2000 - 2020  CP2K developers group                         *
  *****************************************************************************/
 
+#define _XOPEN_SOURCE 700
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
 #include "grid_base_ref_replay.h"
 #include "grid_base_ref_c.h"
 
 
 double grid_collocate_replay(const char* filename, const int cycles){
-    printf("Reading: '%s'\n", filename);
+    printf("Task:     %s\n", filename);
     FILE *fp = fopen(filename, "r");
     assert(fp != NULL);
 
@@ -229,6 +232,11 @@ double grid_collocate_replay(const char* filename, const int cycles){
     }
     }
 
+    printf("Cycles:   %e\n", (float)cycles);
+
+    struct timespec start_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+
     for (int i=0; i < cycles ; i++) {
         grid_collocate_pgf_product_rspace(compute_tau,
                                           use_ortho,
@@ -260,6 +268,9 @@ double grid_collocate_replay(const char* filename, const int cycles){
                                           grid_test);
     }
 
+    struct timespec end_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
+
     double max_diff = 0.0;
 
     for (int i=0; i<ngrid[2]; i++) {
@@ -272,6 +283,10 @@ double grid_collocate_replay(const char* filename, const int cycles){
     }
 
     printf("Max diff: %le\n", max_diff);
+
+    const double delta_sec = (end_time.tv_sec - start_time.tv_sec) + 1e-9 * (end_time.tv_nsec - start_time.tv_nsec);
+    printf("Time:     %le sec\n", delta_sec);
+
     return max_diff;
 }
 
