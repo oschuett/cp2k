@@ -16,6 +16,7 @@
 
 #include "grid_collocate_replay.h"
 #include "grid_collocate_cpu.h"
+#include "grid_collocate_cuda.h"
 
 
 // *****************************************************************************
@@ -135,7 +136,7 @@ void grid_collocate_record(const bool use_ortho,
 }
 
 // *****************************************************************************
-double grid_collocate_replay(const char* filename, const int cycles){
+double grid_collocate_replay(const char* filename, const int cycles, const bool cuda){
     printf("Task:     %s\n", filename);
     FILE *fp = fopen(filename, "r");
     assert(fp != NULL && "Could not open task file.");
@@ -355,35 +356,65 @@ double grid_collocate_replay(const char* filename, const int cycles){
     struct timespec start_time;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
 
-    for (int i=0; i < cycles ; i++) {
-        grid_collocate_pgf_product_cpu(use_ortho,
-                                       func,
-                                       la_max,
-                                       la_min,
-                                       lb_max,
-                                       lb_min,
-                                       zeta,
-                                       zetb,
-                                       rscale,
-                                       dh,
-                                       dh_inv,
-                                       ra,
-                                       rab,
-                                       npts,
-                                       ngrid,
-                                       lb_grid,
-                                       periodic,
-                                       radius,
-                                       lb_cube,
-                                       ub_cube,
-                                       nspheres,
-                                       sphere_bounds,
-                                       o1,
-                                       o2,
-                                       n1,
-                                       n2,
-                                       pab,
-                                       grid_test);
+    if (cuda) {
+        grid_collocate_pgf_product_cuda(cycles,
+                                        use_ortho,
+                                        func,
+                                        la_max,
+                                        la_min,
+                                        lb_max,
+                                        lb_min,
+                                        zeta,
+                                        zetb,
+                                        rscale,
+                                        dh,
+                                        dh_inv,
+                                        ra,
+                                        rab,
+                                        npts,
+                                        ngrid,
+                                        lb_grid,
+                                        periodic,
+                                        radius,
+                                        lb_cube,
+                                        ub_cube,
+                                        o1,
+                                        o2,
+                                        n1,
+                                        n2,
+                                        pab,
+                                        grid_test);
+    } else {
+        for (int i=0; i < cycles ; i++) {
+            grid_collocate_pgf_product_cpu(use_ortho,
+                                           func,
+                                           la_max,
+                                           la_min,
+                                           lb_max,
+                                           lb_min,
+                                           zeta,
+                                           zetb,
+                                           rscale,
+                                           dh,
+                                           dh_inv,
+                                           ra,
+                                           rab,
+                                           npts,
+                                           ngrid,
+                                           lb_grid,
+                                           periodic,
+                                           radius,
+                                           lb_cube,
+                                           ub_cube,
+                                           nspheres,
+                                           sphere_bounds,
+                                           o1,
+                                           o2,
+                                           n1,
+                                           n2,
+                                           pab,
+                                           grid_test);
+        }
     }
 
     struct timespec end_time;

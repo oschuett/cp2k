@@ -16,7 +16,6 @@ extern "C" {
 //
 // \param use_ortho     When true use the faster ortho algorithm.
 // \param func          TODO
-// \param func_idir     TODO
 // \param l{a,b}_max    Max angular momentum to collocate for give atom.
 // \param l{a,b}_min    Lowest angular momentum to collocate for give atom.
 // \param zet_{a,b}     Gaussian's exponent of given atom.
