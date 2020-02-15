@@ -326,12 +326,13 @@ CONTAINS
 
    END SUBROUTINE
 
-   ! try to hide things from the optimizer, so that we get the same numbers,
-   ! always (this solves the optimisation problems with the intel and nag compiler
-   ! in which the counting loops and execution loops above are executed a different
-   ! number of times, even at -O1
 ! **************************************************************************************************
-!> \brief ...
+!> \brief res = CEILING(-0.1E-7_dp - prefactor*SQRT(MAX((i*drmin)**2 - kg2*dz2 - jg2*dy2, 0.0_dp)))
+!
+!         try to hide things from the optimizer, so that we get the same numbers,
+!         always (this solves the optimisation problems with the intel and nag compiler
+!         in which the counting loops and execution loops above are executed a different
+!         number of times, even at -O1
 !> \param prefactor ...
 !> \param i ...
 !> \param drmin ...

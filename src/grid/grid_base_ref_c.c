@@ -178,7 +178,6 @@ static void grid_fill_map(const bool periodic,
     }
 }
 
-
 // *****************************************************************************
 static void grid_fill_pol(const double dr,
                           const double roffset,
@@ -186,7 +185,7 @@ static void grid_fill_pol(const double dr,
                           const int lp,
                           const int cmax,
                           const double zetp,
-                          double pol[cmax+1][lp+1][2]) {
+                          double pol[lp+1][2*cmax+1]) {
 //
 //   compute the values of all (x-xp)**lp*exp(..)
 //
@@ -207,7 +206,7 @@ static void grid_fill_pol(const double dr,
           double pg = t_exp_min_1;
           // pg  = EXP(-zetp*rpg**2)
           for (int icoef=0; icoef<=lp; icoef++) {
-              pol[ig+cmax][icoef][0] = pg;
+              pol[icoef][ig+cmax] = pg;
               pg *= rpg;
           }
       }
@@ -221,7 +220,7 @@ static void grid_fill_pol(const double dr,
           double pg = t_exp_plus_1;
           // pg  = EXP(-zetp*rpg**2)
           for (int icoef=0; icoef<=lp; icoef++) {
-              pol[ig+cmax][icoef][1] = pg;
+              pol[icoef][1-ig+cmax] = pg;
               pg *= rpg;
           }
       }
@@ -231,105 +230,101 @@ static void grid_fill_pol(const double dr,
 static void grid_collocate_core(const int lp,
                                 const int cmax,
                                 const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
-                                const double pol[3][cmax+1][lp+1][2],
+                                const double pol[3][lp+1][2*cmax+1],
                                 const int map[3][2*cmax+1],
                                 const int nspheres,
                                 const int sphere_bounds[nspheres],
+                                const int lb_cube[3],
+                                const int ub_cube[3],
                                 const int ngrid[3],
                                 double grid[ngrid[2]][ngrid[1]][ngrid[0]]) {
 
-    int sci = 0;
+    // Create the full cube, ignoring periodicity for now.
+    const int nz = ub_cube[2] - lb_cube[2] + 1;
+    const int ny = ub_cube[1] - lb_cube[1] + 1;
+    const int nx = ub_cube[0] - lb_cube[0] + 1;
+    double cube[nz][ny][nx];
+    memset(cube, 0, sizeof(cube));
 
+    // These loops should be vectorized as possible.
+    int lxyz = 0;
+    for (int lzp=0; lzp <= lp; lzp++) {
+    for (int lyp=0; lyp <= lp-lzp; lyp++) {
+    for (int lxp=0; lxp <= lp-lzp-lyp; lxp++) {
+    const double coef = coef_xyz[lxyz++];
+
+        for (int k=0; k < nz; k++) {
+        for (int j=0; j < ny; j++) {
+        for (int i=0; i < nx; i++) {
+            cube[k][j][i] += coef * pol[2][lzp][k + lb_cube[2] + cmax]
+                                  * pol[1][lyp][j + lb_cube[1] + cmax]
+                                  * pol[0][lxp][i + lb_cube[0] + cmax];
+        }
+        }
+        }
+
+    }
+    }
+    }
+
+    //
+    // Write cube back to large grid taking periodicity and radius into account.
+    //
+
+    int sci = 0;
     const int kgmin = sphere_bounds[sci++];
     for (int kg=kgmin; kg <= 0; kg++) {
         const int kg2 = 1 - kg;
         const int k = map[2][kg + cmax];
         const int k2 = map[2][kg2 + cmax];
-
-        // initialize coef_xy
-        const int ncoef_xy = (lp+1)*(lp+2)/2;
-        double coef_xy[ncoef_xy][2];
-        for (int i=0; i < ncoef_xy; i++) {
-            coef_xy[i][0] = 0.0;
-            coef_xy[i][1] = 0.0;
-        }
-
-        int lxyz = 0;
-        for (int lzp=0; lzp <= lp; lzp++) {
-            int lxy = 0;
-            for (int lyp=0; lyp <= lp-lzp; lyp++) {
-                for (int lxp=0; lxp <= lp-lzp-lyp; lxp++) {
-                    coef_xy[lxy][0] += coef_xyz[lxyz] * pol[2][kg+cmax][lzp][0];
-                    coef_xy[lxy][1] += coef_xyz[lxyz] * pol[2][kg+cmax][lzp][1];
-                    lxyz++;
-                    lxy++;
-                }
-                lxy += lzp;
-            }
-        }
-
         const int jgmin = sphere_bounds[sci++];
         for (int jg=jgmin; jg <= 0; jg++) {
             const int jg2 = 1 - jg;
             const int j = map[1][jg + cmax];
             const int j2 = map[1][jg2 + cmax];
-
-            // initialize coef_x
-            double coef_x[lp+1][4];
-            for (int i=0; i < lp+1; i++) {
-                for (int j=0; j < 4; j++) {
-                    coef_x[i][j] = 0.0;
-                }
-            }
-
-            int lxy = 0;
-            for (int lyp=0; lyp <= lp; lyp++) {
-                for (int lxp=0; lxp <= lp-lyp; lxp++) {
-                    coef_x[lxp][0] += coef_xy[lxy][0]*pol[1][jg+cmax][lyp][0];
-                    coef_x[lxp][1] += coef_xy[lxy][1]*pol[1][jg+cmax][lyp][0];
-                    coef_x[lxp][2] += coef_xy[lxy][0]*pol[1][jg+cmax][lyp][1];
-                    coef_x[lxp][3] += coef_xy[lxy][1]*pol[1][jg+cmax][lyp][1];
-                    lxy++;
-                }
-            }
-
             const int igmin = sphere_bounds[sci++];
             for (int ig=igmin; ig<=0; ig++) {
                 const int ig2 = 1 - ig;
                 const int i = map[0][ig + cmax];
                 const int i2 = map[0][ig2 + cmax];
-
-                double s01 = 0.0;
-                double s02 = 0.0;
-                double s03 = 0.0;
-                double s04 = 0.0;
-                double s05 = 0.0;
-                double s06 = 0.0;
-                double s07 = 0.0;
-                double s08 = 0.0;
-
-                for (int lxp=0; lxp <= lp; lxp++) {
-                    s01 += coef_x[lxp][0]*pol[0][ig+cmax][lxp][0];
-                    s02 += coef_x[lxp][1]*pol[0][ig+cmax][lxp][0];
-                    s03 += coef_x[lxp][2]*pol[0][ig+cmax][lxp][0];
-                    s04 += coef_x[lxp][3]*pol[0][ig+cmax][lxp][0];
-                    s05 += coef_x[lxp][0]*pol[0][ig+cmax][lxp][1];
-                    s06 += coef_x[lxp][1]*pol[0][ig+cmax][lxp][1];
-                    s07 += coef_x[lxp][2]*pol[0][ig+cmax][lxp][1];
-                    s08 += coef_x[lxp][3]*pol[0][ig+cmax][lxp][1];
-                }
-
-                grid[k-1][j-1][i-1] += s01;
-                grid[k2-1][j-1][i-1] += s02;
-                grid[k-1][j2-1][i-1] += s03;
-                grid[k2-1][j2-1][i-1] += s04;
-                grid[k-1][j-1][i2-1] += s05;
-                grid[k2-1][j-1][i2-1] += s06;
-                grid[k-1][j2-1][i2-1] += s07;
-                grid[k2-1][j2-1][i2-1] += s08;
+                grid[k-1][j-1][i-1]    += cube[kg  - lb_cube[2]][jg  - lb_cube[1]][ig  - lb_cube[0]];
+                grid[k2-1][j-1][i-1]   += cube[kg2 - lb_cube[2]][jg  - lb_cube[1]][ig  - lb_cube[0]];
+                grid[k-1][j2-1][i-1]   += cube[kg  - lb_cube[2]][jg2 - lb_cube[1]][ig  - lb_cube[0]];
+                grid[k2-1][j2-1][i-1]  += cube[kg2 - lb_cube[2]][jg2 - lb_cube[1]][ig  - lb_cube[0]];
+                grid[k-1][j-1][i2-1]   += cube[kg  - lb_cube[2]][jg  - lb_cube[1]][ig2 - lb_cube[0]];
+                grid[k2-1][j-1][i2-1]  += cube[kg2 - lb_cube[2]][jg  - lb_cube[1]][ig2 - lb_cube[0]];
+                grid[k-1][j2-1][i2-1]  += cube[kg  - lb_cube[2]][jg2 - lb_cube[1]][ig2 - lb_cube[0]];
+                grid[k2-1][j2-1][i2-1] += cube[kg2 - lb_cube[2]][jg2 - lb_cube[1]][ig2 - lb_cube[0]];
             }
         }
     }
+
+    // This does not work yet :-(
+    // Unfortunatelly, I've not yet manage to reproduce the sphere_bounds
+    // exactly with an on-the-fly formular because they use quantized distances.
+    // See init_cube_info() for details.
+    //
+    //const double drmin = min(dh[0][0], min(dh[1][1], dh[2][2]));
+    //const double eff_radius = drmin * max(1, ceil(radius/drmin));
+    //const double eff_radius2 = eff_radius*eff_radius;
+    //
+    //for (int k=0; k < nz; k++) {
+    //for (int j=0; j < ny; j++) {
+    //for (int i=0; i < nx; i++) {
+    //    const int k2 = map[2][k + lb_cube[2] + cmax];
+    //    const int j2 = map[1][j + lb_cube[1] + cmax];
+    //    const int i2 = map[0][i + lb_cube[0] + cmax];
+    //    const double dk = (k + lb_cube[2]) * dh[2][2];
+    //    const double dj = (j + lb_cube[1]) * dh[1][1];
+    //    const double di = (i + lb_cube[0]) * dh[0][0];
+    //    const double cur_radius2 = dk*dk + dj*dj + di*di;
+    //    if (cur_radius2 < eff_radius2) {
+    //      grid[k2-1][j2-1][i2-1] += cube[k][j][i];
+    //    }
+    //}
+    //}
+    //}
+
 }
 
 // *****************************************************************************
@@ -391,7 +386,7 @@ static void grid_collocate_ortho(const int lp,
                       map[i]);
     }
 
-    double pol[3][cmax+1][lp+1][2];
+    double pol[3][lp+1][2*cmax+1];
     for (int i=0; i<3; i++) {
         grid_fill_pol(dh[i][i], roffset[i], lb_cube[i], lp, cmax, zetp, pol[i]);
     }
@@ -403,6 +398,8 @@ static void grid_collocate_ortho(const int lp,
                         map,
                         nspheres,
                         sphere_bounds,
+                        lb_cube,
+                        ub_cube,
                         ngrid,
                         grid);
 }
