@@ -2,7 +2,7 @@
 # the second field tells which test should be run in order to compare with the last available output
 # see regtest/TEST_FILES
 #
-water-noconstraint.inp                                 1      1e-13             -17.09249024668712
+water-noconstraint.inp                                 1      1e-13             -17.09249024668470
 # These tests give identical value of constraint
 water-cdft-1.inp                                      71      1e-12                 7.980507208154
 water-cdft-2.inp                                      71      1e-12                 7.980507208154
