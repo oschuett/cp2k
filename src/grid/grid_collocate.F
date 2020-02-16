@@ -7,11 +7,9 @@ MODULE grid_collocate
                                               C_DOUBLE,&
                                               C_INT,&
                                               C_LOC,&
-                                              C_NULL_PTR,&
                                               C_PTR
    USE cell_types,                      ONLY: cell_type
-   USE cube_utils,                      ONLY: cube_info_type,&
-                                              return_cube
+   USE cube_utils,                      ONLY: cube_info_type
    USE kinds,                           ONLY: dp,&
                                               int_8
    USE realspace_grid_types,            ONLY: realspace_grid_type
@@ -103,21 +101,17 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'collocate_pgf_product', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: nspheres
       INTEGER(KIND=int_8)                                :: my_subpatch_pattern
-      INTEGER, DIMENSION(3), TARGET                      :: lb_cube, lb_grid, ngrid, ub_cube
-      INTEGER, DIMENSION(:), POINTER                     :: sphere_bounds
+      INTEGER, DIMENSION(3), TARGET                      :: lb_grid, ngrid
       LOGICAL                                            :: my_use_subpatch, use_ortho
       LOGICAL(KIND=C_BOOL), DIMENSION(3), TARGET         :: periodic
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
-      TYPE(C_PTR)                                        :: lb_cube_c, sphere_bounds_c, ub_cube_c
       INTERFACE
          SUBROUTINE grid_collocate_pgf_product_cpu(use_ortho, func, &
                                                    la_max, la_min, lb_max, lb_min, &
                                                    zeta, zetb, rscale, &
                                                    dh, dh_inv, ra, rab, npts, ngrid, lb_grid, &
                                                    periodic, radius, &
-                                                   lb_cube, ub_cube, nspheres, sphere_bounds, &
                                                    o1, o2, n1, n2, pab, &
                                                    grid) &
             BIND(C, name="grid_collocate_pgf_product_cpu")
@@ -140,10 +134,6 @@ CONTAINS
             TYPE(C_PTR), VALUE                        :: lb_grid
             TYPE(C_PTR), VALUE                        :: periodic
             REAL(KIND=C_DOUBLE), VALUE                :: radius
-            TYPE(C_PTR), VALUE                        :: lb_cube
-            TYPE(C_PTR), VALUE                        :: ub_cube
-            INTEGER(KIND=C_INT), VALUE                :: nspheres
-            TYPE(C_PTR), VALUE                        :: sphere_bounds
             INTEGER(KIND=C_INT), VALUE                :: o1
             INTEGER(KIND=C_INT), VALUE                :: o2
             INTEGER(KIND=C_INT), VALUE                :: n1
@@ -155,6 +145,7 @@ CONTAINS
 
       !TODO remove unused dummy arguments
       MARK_USED(cell)
+      MARK_USED(cube_info)
 
       IF (PRESENT(use_subpatch)) THEN
          my_use_subpatch = use_subpatch
@@ -179,21 +170,6 @@ CONTAINS
       END IF
 
       use_ortho = rsgrid%desc%orthorhombic .AND. .NOT. my_use_subpatch
-
-      IF (use_ortho) THEN
-         NULLIFY (sphere_bounds)
-         CALL return_cube(cube_info, radius, lb_cube, ub_cube, sphere_bounds)
-         lb_cube_c = C_LOC(lb_cube(1))
-         ub_cube_c = C_LOC(ub_cube(1))
-         sphere_bounds_c = C_LOC(sphere_bounds(1))
-         nspheres = SIZE(sphere_bounds, 1)
-      ELSE
-         lb_cube_c = C_NULL_PTR
-         ub_cube_c = C_NULL_PTR
-         sphere_bounds_c = C_NULL_PTR
-         nspheres = 0
-      ENDIF
-
       periodic = (rsgrid%desc%perd == 1)
 
       CPASSERT(LBOUND(pab, 1) == 1)
@@ -221,11 +197,6 @@ CONTAINS
       CPASSERT(IS_CONTIGUOUS(periodic))
       CPASSERT(IS_CONTIGUOUS(pab))
       CPASSERT(IS_CONTIGUOUS(grid))
-      IF (use_ortho) THEN
-         CPASSERT(IS_CONTIGUOUS(lb_cube))
-         CPASSERT(IS_CONTIGUOUS(ub_cube))
-         CPASSERT(IS_CONTIGUOUS(sphere_bounds))
-      ENDIF
 #endif
 
       CALL grid_collocate_pgf_product_cpu(use_ortho=LOGICAL(use_ortho, KIND=C_BOOL), &
@@ -246,10 +217,6 @@ CONTAINS
                                           lb_grid=C_LOC(lb_grid(1)), &
                                           periodic=C_LOC(periodic(1)), &
                                           radius=radius, &
-                                          lb_cube=lb_cube_c, &
-                                          ub_cube=ub_cube_c, &
-                                          nspheres=nspheres, &
-                                          sphere_bounds=sphere_bounds_c, &
                                           o1=o1, &
                                           o2=o2, &
                                           n1=SIZE(pab, 1), &

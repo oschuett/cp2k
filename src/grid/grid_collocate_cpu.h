@@ -31,10 +31,6 @@ extern "C" {
 // \param periodic      Whether simulation box is periodic in given direction.
 // \param lmax          Global maximum angular moment.
 // \param radius        Radius where Gaussian becomes small than threshold eps.
-// \param lb_cube       See pw/cube_utils.F.
-// \param ub_cube       See pw/cube_utils.F.
-// \param nspheres      Size of sphere_bounds array.
-// \param sphere_bounds See pw/cube_utils.F.
 // \param o{1,2}        Offsets. The sub-block to be collocated starts at pab[o2][o1]
 // \param n{1,2}        Dimensions of density matrix block pab.
 // \param pab           The atom-pair's density matrix block P_{ab}
@@ -59,10 +55,6 @@ void grid_collocate_pgf_product_cpu(const bool use_ortho,
                                     const int lb_grid[3],
                                     const bool periodic[3],
                                     const double radius,
-                                    const int lb_cube[3],
-                                    const int ub_cube[3],
-                                    const int nspheres,
-                                    const int sphere_bounds[nspheres],
                                     const int o1,
                                     const int o2,
                                     const int n1,

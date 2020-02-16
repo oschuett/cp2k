@@ -1,4 +1,4 @@
-#Grid collocate task v3
+#Grid collocate task v5
 use_ortho 0
 func 200
 la_max 0
@@ -21,8 +21,6 @@ ngrid 9 9 12
 lb_grid 0 0 0
 periodic 1 1 1
 radius 1.058593750000000000000e+01
-nspheres 0
-nspheres_nonzero 0
 o1 4
 o2 4
 n1 5

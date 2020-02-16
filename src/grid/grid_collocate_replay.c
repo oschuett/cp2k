@@ -37,10 +37,6 @@ void grid_collocate_record(const bool use_ortho,
                            const int lb_grid[3],
                            const bool periodic[3],
                            const double radius,
-                           const int lb_cube[3],
-                           const int ub_cube[3],
-                           const int nspheres,
-                           const int sphere_bounds[nspheres],
                            const int o1,
                            const int o2,
                            const int n1,
@@ -55,7 +51,7 @@ void grid_collocate_record(const bool use_ortho,
 
     const int D = DECIMAL_DIG;  // In C11 we could use DBL_DECIMAL_DIG.
     FILE *fp = fopen(filename, "w+");
-    fprintf(fp, "#Grid collocate task v3\n");
+    fprintf(fp, "#Grid collocate task v5\n");
     fprintf(fp, "use_ortho %i\n", use_ortho);
     fprintf(fp, "func %i\n", func);
     fprintf(fp, "la_max %i\n", la_max);
@@ -76,26 +72,6 @@ void grid_collocate_record(const bool use_ortho,
     fprintf(fp, "lb_grid %i %i %i\n", lb_grid[0], lb_grid[1], lb_grid[2]);
     fprintf(fp, "periodic %i %i %i\n", periodic[0], periodic[1], periodic[2]);
     fprintf(fp, "radius %.*e\n", D, radius);
-    if (use_ortho) {
-        fprintf(fp, "lb_cube %i %i %i\n", lb_cube[0], lb_cube[1], lb_cube[2]);
-        fprintf(fp, "ub_cube %i %i %i\n", ub_cube[0], ub_cube[1], ub_cube[2]);
-    }
-    fprintf(fp, "nspheres %i\n", nspheres);
-
-    int nspheres_nonzero = 0;
-    for (int i=0; i<nspheres; i++) {
-        if (sphere_bounds[i] != 0) {
-            nspheres_nonzero++;
-        }
-    }
-    fprintf(fp, "nspheres_nonzero %i\n", nspheres_nonzero);
-
-    for (int i=0; i<nspheres; i++) {
-        if (sphere_bounds[i] != 0) {
-            fprintf(fp, "sphere_bounds %i %i\n", i, sphere_bounds[i]);
-        }
-    }
-
     fprintf(fp, "o1 %i\n", o1);
     fprintf(fp, "o2 %i\n", o2);
     fprintf(fp, "n1 %i\n", n1);
@@ -143,7 +119,7 @@ double grid_collocate_replay(const char* filename, const int cycles){
     char line[100], key[100];
 
     assert(fgets(line, sizeof(line), fp) != NULL);
-    assert(strcmp(line, "#Grid collocate task v3\n") == 0);
+    assert(strcmp(line, "#Grid collocate task v5\n") == 0);
 
     int use_ortho_i;
     assert(fgets(line, sizeof(line), fp) != NULL);
@@ -243,46 +219,6 @@ double grid_collocate_replay(const char* filename, const int cycles){
     assert(sscanf(line, "%99s %le", key, &radius) == 2);
     assert(strcmp(key, "radius") == 0);
 
-    int *lb_cube, *ub_cube;
-    int lb_cube_arr[3], ub_cube_arr[3];
-    if (use_ortho) {
-        lb_cube = lb_cube_arr;
-        assert(fgets(line, sizeof(line), fp) != NULL);
-        assert(sscanf(line, "%99s %i %i %i", key, &lb_cube[0], &lb_cube[1], &lb_cube[2]) == 4);
-        assert(strcmp(key, "lb_cube") == 0);
-
-        ub_cube = ub_cube_arr;
-        assert(fgets(line, sizeof(line), fp) != NULL);
-        assert(sscanf(line, "%99s %i %i %i", key, &ub_cube[0], &ub_cube[1], &ub_cube[2]) == 4);
-        assert(strcmp(key, "ub_cube") == 0);
-    } else {
-        lb_cube = NULL;
-        ub_cube = NULL;
-    }
-
-    int nspheres;
-    assert(fgets(line, sizeof(line), fp) != NULL);
-    assert(sscanf(line, "%99s %i", key, &nspheres) == 2);
-    assert(strcmp(key, "nspheres") == 0);
-
-    int sphere_bounds[nspheres];
-    for (int i=0; i < nspheres; i++) {
-        sphere_bounds[i] = 0;
-    }
-
-    int nspheres_nonzero;
-    assert(fgets(line, sizeof(line), fp) != NULL);
-    assert(sscanf(line, "%99s %i", key, &nspheres_nonzero) == 2);
-    assert(strcmp(key, "nspheres_nonzero") == 0);
-
-    for (int i=0; i < nspheres_nonzero; i++) {
-        int j, value;
-        assert(fgets(line, sizeof(line), fp) != NULL);
-        assert(sscanf(line, "%99s %i %i", key, &j, &value) == 3);
-        assert(strcmp(key, "sphere_bounds") == 0);
-        sphere_bounds[j] = value;
-    }
-
     int o1;
     assert(fgets(line, sizeof(line), fp) != NULL);
     assert(sscanf(line, "%99s %i", key, &o1) == 2);
@@ -320,6 +256,7 @@ double grid_collocate_replay(const char* filename, const int cycles){
     assert(sscanf(line, "%99s %i", key, &ngrid_nonzero) == 2);
     assert(strcmp(key, "ngrid_nonzero") == 0);
 
+    // Can be large, run with "ulimit -s unlimited".
     double grid_ref[ngrid[2]][ngrid[1]][ngrid[0]];
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
@@ -374,10 +311,6 @@ double grid_collocate_replay(const char* filename, const int cycles){
                                        lb_grid,
                                        periodic,
                                        radius,
-                                       lb_cube,
-                                       ub_cube,
-                                       nspheres,
-                                       sphere_bounds,
                                        o1,
                                        o2,
                                        n1,
