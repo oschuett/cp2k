@@ -67,35 +67,29 @@ static void grid_prepare_coef(const int la_max,
                       const int la_min,
                       const int lb_max,
                       const int lb_min,
+                      const int lp,
                       const double prefactor,
-                      const double alpha[3][lb_max+1][la_max+1][la_max+lb_max+1],
+                      const double alpha[3][lb_max+1][la_max+1][lp+1],
                       const double pab[ncoset[lb_max]][ncoset[la_max]],
-                      const int ncoef_xyz,
-                      double coef_xyz[ncoef_xyz]) {
+                      double coef_xyz[lp+1][lp+1][lp+1]) {
 
-
-    const int lp = la_max + lb_max;
-
-    double coef_xyt[((lp+1)*(lp+2))/2];
+    double coef_xyt[lp+1][lp+1];
     double coef_xtt[lp+1];
 
-    int lxyz = 0;
     for (int lzp = 0; lzp<=lp; lzp++) {
     for (int lyp = 0; lyp<=lp-lzp; lyp++) {
     for (int lxp = 0; lxp<=lp-lzp-lyp; lxp++) {
-       coef_xyz[lxyz++] = 0.0;
+       coef_xyz[lzp][lyp][lxp] = 0.0;
     }
     }
     }
 
     for (int lzb = 0; lzb<=lb_max; lzb++) {
     for (int lza = 0; lza<=la_max; lza++) {
-       int lxy = 0;
        for (int lyp = 0; lyp<=lp-lza-lzb; lyp++) {
           for (int lxp = 0; lxp<=lp-lza-lzb-lyp; lxp++) {
-             coef_xyt[lxy++] = 0.0;
+             coef_xyt[lyp][lxp] = 0.0;
           }
-          lxy = lxy + lza + lzb;
        }
        for (int lyb = 0; lyb<=lb_max-lzb; lyb++) {
        for (int lya = 0; lya<=la_max-lza; lya++) {
@@ -113,28 +107,17 @@ static void grid_prepare_coef(const int la_max,
              }
           }
           }
-          int lxy = 0;
           for (int lyp = 0; lyp<=lya+lyb; lyp++) {
              for (int lxp = 0; lxp<=lp-lza-lzb-lya-lyb; lxp++) {
-                coef_xyt[lxy++] += alpha[1][lyb][lya][lyp] * coef_xtt[lxp];
+                coef_xyt[lyp][lxp] += alpha[1][lyb][lya][lyp] * coef_xtt[lxp];
              }
-             lxy += lza + lzb + lya + lyb - lyp;
           }
        }
        }
-       lxyz = 0;
        for (int lzp = 0; lzp<=lza+lzb; lzp++) {
-          int lxy = 0;
           for (int lyp = 0; lyp<=lp-lza-lzb; lyp++) {
              for (int lxp = 0; lxp<=lp-lza-lzb-lyp; lxp++) {
-                coef_xyz[lxyz++] += alpha[2][lzb][lza][lzp] * coef_xyt[lxy++];
-             }
-             lxy += lza + lzb;
-             lxyz += lza + lzb - lzp;
-          }
-          for (int lyp = lp-lza-lzb+1; lyp<=lp-lzp; lyp++) {
-             for (int lxp = 0; lxp<=lp-lyp-lzp; lxp++) {
-                lxyz++;
+                coef_xyz[lzp][lyp][lxp] += alpha[2][lzb][lza][lzp] * coef_xyt[lyp][lxp];
              }
           }
        }
@@ -232,7 +215,7 @@ static void grid_fill_pol(const double dr,
 // *****************************************************************************
 static void grid_collocate_core(const int lp,
                                 const int cmax,
-                                const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                                const double coef_xyz[lp+1][lp+1][lp+1],
                                 const double pol[3][lp+1][2*cmax+1],
                                 const int map[3][2*cmax+1],
                                 const int lb_cube[3],
@@ -251,22 +234,19 @@ static void grid_collocate_core(const int lp,
     memset(cube, 0, sizeof(cube));
 
     // These loops should be as vectorized as possible.
-    int lxyz = 0;
     for (int lzp=0; lzp <= lp; lzp++) {
     for (int lyp=0; lyp <= lp-lzp; lyp++) {
     for (int lxp=0; lxp <= lp-lzp-lyp; lxp++) {
-    const double coef = coef_xyz[lxyz++];
-
         for (int k=0; k < nz; k++) {
         for (int j=0; j < ny; j++) {
         for (int i=0; i < nx; i++) {
-            cube[k][j][i] += coef * pol[2][lzp][k + lb_cube[2] + cmax]
-                                  * pol[1][lyp][j + lb_cube[1] + cmax]
-                                  * pol[0][lxp][i + lb_cube[0] + cmax];
+            cube[k][j][i] += coef_xyz[lzp][lyp][lxp]
+                             * pol[2][lzp][k + lb_cube[2] + cmax]
+                             * pol[1][lyp][j + lb_cube[1] + cmax]
+                             * pol[0][lxp][i + lb_cube[0] + cmax];
         }
         }
         }
-
     }
     }
     }
@@ -304,7 +284,7 @@ static void grid_collocate_core(const int lp,
 // *****************************************************************************
 static void grid_collocate_ortho(const int lp,
                                  const double zetp,
-                                 const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                                 const double coef_xyz[lp+1][lp+1][lp+1],
                                  const double dh[3][3],
                                  const double dh_inv[3][3],
                                  const double rp[3],
@@ -390,7 +370,7 @@ static void grid_collocate_ortho(const int lp,
 // *****************************************************************************
 static void grid_collocate_general(const int lp,
                                    const double zetp,
-                                   const double coef_xyz[(lp+1)*(lp+2)*(lp+3)/6],
+                                   const double coef_xyz[lp+1][lp+1][lp+1],
                                    const double dh[3][3],
                                    const double dh_inv[3][3],
                                    const double rp[3],
@@ -409,6 +389,7 @@ static void grid_collocate_general(const int lp,
 //
 
     // aux mapping array to simplify life
+    //TODO instead of this map we could use 3D arrays like coef_xyz.
     int coef_map[lp+1][lp+1][lp+1];
 
     //TODO really needed?
@@ -477,8 +458,7 @@ static void grid_collocate_general(const int lp,
                 const int jl = jlx + jly + jlz;
                 const int kl = klx + kly + klz;
                 const int lijk= coef_map[kl][jl][il];
-                const int lxyz = coef_map[lz][ly][lx];
-                coef_ijk[lijk-1] += coef_xyz[lxyz-1] *
+                coef_ijk[lijk-1] += coef_xyz[lz][ly][lx] *
                    hmatgridp[ilx][0][0] * hmatgridp[jlx][1][0] * hmatgridp[klx][2][0] *
                    hmatgridp[ily][0][1] * hmatgridp[jly][1][1] * hmatgridp[kly][2][1] *
                    hmatgridp[ilz][0][2] * hmatgridp[jlz][1][2] * hmatgridp[klz][2][2] *
@@ -727,16 +707,15 @@ static void grid_collocate_internal(const bool use_ortho,
     //
 
     const int lp = la_max_prep + lb_max_prep;
-    const int ncoef_xyz = (lp+1)*(lp+2)*(lp+3)/6;
-    double coef_xyz[ncoef_xyz];
+    double coef_xyz[lp+1][lp+1][lp+1];
     grid_prepare_coef(la_max_prep,
                       la_min_prep,
                       lb_max_prep,
                       lb_min_prep,
+                      lp,
                       prefactor,
                       alpha,
                       pab_prep,
-                      ncoef_xyz,
                       coef_xyz);
 
     if (use_ortho) {
