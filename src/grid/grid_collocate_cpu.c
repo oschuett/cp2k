@@ -192,7 +192,7 @@ static void grid_fill_pol(const double dr,
           double pg = t_exp_min_1;
           // pg  = EXP(-zetp*rpg**2)
           for (int icoef=0; icoef<=lp; icoef++) {
-              pol[icoef][ig+cmax] = pg;
+              pol[icoef][ig-lb_cube] = pg;
               pg *= rpg;
           }
       }
@@ -206,7 +206,7 @@ static void grid_fill_pol(const double dr,
           double pg = t_exp_plus_1;
           // pg  = EXP(-zetp*rpg**2)
           for (int icoef=0; icoef<=lp; icoef++) {
-              pol[icoef][1-ig+cmax] = pg;
+              pol[icoef][1-ig-lb_cube] = pg;
               pg *= rpg;
           }
       }
@@ -241,9 +241,7 @@ static void grid_collocate_core(const int lp,
         for (int j=0; j < ny; j++) {
         for (int i=0; i < nx; i++) {
             cube[k][j][i] += coef_xyz[lzp][lyp][lxp]
-                             * pol[2][lzp][k + lb_cube[2] + cmax]
-                             * pol[1][lyp][j + lb_cube[1] + cmax]
-                             * pol[0][lxp][i + lb_cube[0] + cmax];
+                             * pol[2][lzp][k] * pol[1][lyp][j] * pol[0][lxp][i];
         }
         }
         }
