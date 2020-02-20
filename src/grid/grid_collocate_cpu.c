@@ -73,16 +73,10 @@ static void grid_prepare_coef(const int la_max,
                       const double pab[ncoset[lb_max]][ncoset[la_max]],
                       double coef_xyz[lp+1][lp+1][lp+1]) {
 
+    memset(coef_xyz, 0, (lp+1)*(lp+1)*(lp+1)*sizeof(double));
+
     double coef_xyt[lp+1][lp+1];
     double coef_xtt[lp+1];
-
-    for (int lzp = 0; lzp<=lp; lzp++) {
-    for (int lyp = 0; lyp<=lp-lzp; lyp++) {
-    for (int lxp = 0; lxp<=lp-lzp-lyp; lxp++) {
-       coef_xyz[lzp][lyp][lxp] = 0.0;
-    }
-    }
-    }
 
     for (int lzb = 0; lzb<=lb_max; lzb++) {
     for (int lza = 0; lza<=la_max; lza++) {
@@ -231,12 +225,12 @@ static void grid_collocate_core(const int lp,
     const int ny = ub_cube[1] - lb_cube[1] + 1;
     const int nx = ub_cube[0] - lb_cube[0] + 1;
     double cube[nz][ny][nx];   // Can be large, run with "ulimit -s unlimited".
-    memset(cube, 0, sizeof(cube));
+    memset(cube, 0, nz*ny*nx*sizeof(double));
 
     // These loops should be as vectorized as possible.
     for (int lzp=0; lzp <= lp; lzp++) {
-    for (int lyp=0; lyp <= lp-lzp; lyp++) {
-    for (int lxp=0; lxp <= lp-lzp-lyp; lxp++) {
+    for (int lyp=0; lyp <= lp; lyp++) {
+    for (int lxp=0; lxp <= lp; lxp++) {
         for (int k=0; k < nz; k++) {
         for (int j=0; j < ny; j++) {
         for (int i=0; i < nx; i++) {
@@ -671,7 +665,7 @@ static void grid_collocate_internal(const bool use_ortho,
     const int n1_prep = ncoset[la_max_prep];
     const int n2_prep = ncoset[lb_max_prep];
     double pab_prep[n2_prep][n1_prep];
-    memset(pab_prep, 0, sizeof(pab_prep));
+    memset(pab_prep, 0, n2_prep*n1_prep*sizeof(double));
 
     grid_prepare_pab(func, o1, o2, la_max, la_min, lb_max, lb_min,
                      zeta, zetb, n1, n2, pab, n1_prep, n2_prep, pab_prep);
