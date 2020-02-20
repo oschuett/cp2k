@@ -38,7 +38,9 @@ int main(int argc, char *argv[]){
     }
 
     int errors = 0;
-    errors += run_test(argv[1], "collocate_ortho_density.task");
+    errors += run_test(argv[1], "collocate_ortho_density_l0000.task");
+    errors += run_test(argv[1], "collocate_ortho_density_l3300.task");
+    errors += run_test(argv[1], "collocate_ortho_density_l3333.task");
     errors += run_test(argv[1], "collocate_ortho_tau.task");
     errors += run_test(argv[1], "collocate_general_density.task");
     errors += run_test(argv[1], "collocate_general_tau.task");
