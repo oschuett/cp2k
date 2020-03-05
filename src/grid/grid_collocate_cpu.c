@@ -774,7 +774,7 @@ void grid_collocate_pgf_product_cpu(const bool use_ortho,
     double grid_before[ngrid[2]][ngrid[1]][ngrid[0]];
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; j<ngrid[0]; j++) {
+    for (int k=0; k<ngrid[0]; k++) {
         grid_before[i][j][k] = grid[i][j][k];
         grid[i][j][k] = 0.0;
     }
@@ -836,7 +836,7 @@ void grid_collocate_pgf_product_cpu(const bool use_ortho,
 
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; j<ngrid[0]; j++) {
+    for (int k=0; k<ngrid[0]; k++) {
         grid[i][j][k] += grid_before[i][j][k];
     }
     }

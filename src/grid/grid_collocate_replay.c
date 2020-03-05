@@ -86,7 +86,7 @@ void grid_collocate_record(const bool use_ortho,
     int ngrid_nonzero = 0;
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; j<ngrid[0]; j++) {
+    for (int k=0; k<ngrid[0]; k++) {
         if (grid[i][j][k] != 0.0) {
             ngrid_nonzero++;
         }
@@ -97,7 +97,7 @@ void grid_collocate_record(const bool use_ortho,
 
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; j<ngrid[0]; j++) {
+    for (int k=0; k<ngrid[0]; k++) {
         if (grid[i][j][k] != 0.0) {
             fprintf(fp, "grid %i %i %i %.*e\n", i, j, k, D, grid[i][j][k]);
         }
@@ -260,7 +260,7 @@ double grid_collocate_replay(const char* filename, const int cycles){
     double grid_ref[ngrid[2]][ngrid[1]][ngrid[0]];
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; j<ngrid[0]; j++) {
+    for (int k=0; k<ngrid[0]; k++) {
         grid_ref[i][j][k] = 0.0;
     }
     }
@@ -281,7 +281,7 @@ double grid_collocate_replay(const char* filename, const int cycles){
     double grid_test[ngrid[2]][ngrid[1]][ngrid[0]];
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; j<ngrid[0]; j++) {
+    for (int k=0; k<ngrid[0]; k++) {
         grid_test[i][j][k] = 0.0;
     }
     }
@@ -326,7 +326,7 @@ double grid_collocate_replay(const char* filename, const int cycles){
 
     for (int i=0; i<ngrid[2]; i++) {
     for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; j<ngrid[0]; j++) {
+    for (int k=0; k<ngrid[0]; k++) {
         const double diff = fabs(grid_test[i][j][k] - cycles * grid_ref[i][j][k]);
         max_diff = fmax(max_diff, diff);
     }
