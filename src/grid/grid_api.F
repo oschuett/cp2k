@@ -12,6 +12,7 @@ MODULE grid_api
         GRID_FUNC_DX, GRID_FUNC_DXDX, GRID_FUNC_DXDY, GRID_FUNC_DY, GRID_FUNC_DYDY, &
         GRID_FUNC_DYDZ, GRID_FUNC_DZ, GRID_FUNC_DZDX, GRID_FUNC_DZDZ, collocate_pgf_product
    USE grid_integrate,                  ONLY: integrate_pgf_product
+#include "../base/base_uses.f90"
 
    IMPLICIT NONE
 
@@ -48,7 +49,25 @@ MODULE grid_api
 
    PUBLIC :: collocate_pgf_product
    PUBLIC :: integrate_pgf_product
+   PUBLIC :: grid_library_init
+   PUBLIC :: grid_library_finalize
 
 CONTAINS
+
+! **************************************************************************************************
+!> \brief Initialize grid library
+! **************************************************************************************************
+   SUBROUTINE grid_library_init(unit_nr)
+     INTEGER, INTENT(IN) :: unit_nr
+     MARK_USED(unit_nr)  ! Could print config if unit_nr > 0.
+   END SUBROUTINE grid_library_init
+
+! **************************************************************************************************
+!> \brief Finalize grid library
+! **************************************************************************************************
+   SUBROUTINE grid_library_finalize(unit_nr)
+     INTEGER, INTENT(IN) :: unit_nr
+     MARK_USED(unit_nr)  ! Could print a statistics if unit_nr > 0.
+   END SUBROUTINE grid_library_finalize
 
 END MODULE grid_api

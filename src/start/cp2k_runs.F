@@ -134,6 +134,7 @@ MODULE cp2k_runs
    USE tmc_setup,                       ONLY: do_analyze_files,&
                                               do_tmc
    USE vibrational_analysis,            ONLY: vb_anal
+   USE grid_api,                        ONLY: grid_library_init, grid_library_finalize
 #include "../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -197,6 +198,8 @@ CONTAINS
 
       CALL pw_fpga_init()
 
+      CALL grid_library_init(unit_nr=output_unit)
+
       CALL dbcsr_init_lib(mpi_comm, io_unit=output_unit)
 
       CALL cp_sirius_init()
@@ -259,6 +262,7 @@ CONTAINS
          ! But, we don't want to change the public f77_interface.
          ! TODO: refactor cp2k's startup code
          CALL dbcsr_finalize_lib()
+         CALL grid_library_finalize(unit_nr=output_unit)
          CALL cp_sirius_finalize()
          CALL pw_cuda_finalize()
          CALL pw_fpga_finalize()
@@ -395,6 +399,8 @@ CONTAINS
 
       CALL dbcsr_print_statistics()
       CALL dbcsr_finalize_lib()
+
+      CALL grid_library_finalize(unit_nr=output_unit)
 
       m_memory_max_mpi = m_memory_max
       CALL mp_max(m_memory_max_mpi, mpi_comm)
