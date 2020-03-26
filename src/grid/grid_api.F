@@ -12,6 +12,9 @@ MODULE grid_api
         GRID_FUNC_DX, GRID_FUNC_DXDX, GRID_FUNC_DXDY, GRID_FUNC_DY, GRID_FUNC_DYDY, &
         GRID_FUNC_DYDZ, GRID_FUNC_DZ, GRID_FUNC_DZDX, GRID_FUNC_DZDZ, collocate_pgf_product
    USE grid_integrate,                  ONLY: integrate_pgf_product
+   USE message_passing,                 ONLY: mp_sum
+   USE ISO_C_BINDING,                   ONLY: C_INT, C_FUNPTR, C_FUNLOC, C_NULL_CHAR, C_CHAR, C_LONG
+   USE OMP_LIB, ONLY: omp_get_thread_num
 #include "../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -57,17 +60,65 @@ CONTAINS
 ! **************************************************************************************************
 !> \brief Initialize grid library
 ! **************************************************************************************************
-   SUBROUTINE grid_library_init(unit_nr)
-     INTEGER, INTENT(IN) :: unit_nr
-     MARK_USED(unit_nr)  ! Could print config if unit_nr > 0.
+   SUBROUTINE grid_library_init()
+      INTERFACE
+         SUBROUTINE grid_globals_init(thread_num) BIND(C, name="grid_globals_init")
+            IMPORT :: C_INT
+            INTEGER(KIND=C_INT), VALUE                :: thread_num
+         END SUBROUTINE grid_globals_init
+      END INTERFACE
+
+      ! Passing thread_num to ensure that Fortran and C runtimes agree on OpenMP thread numbers.
+
+!$OMP PARALLEL DEFAULT(NONE)
+      CALL grid_globals_init(thread_num=omp_get_thread_num())
+!$OMP END PARALLEL
+
    END SUBROUTINE grid_library_init
 
 ! **************************************************************************************************
 !> \brief Finalize grid library
 ! **************************************************************************************************
-   SUBROUTINE grid_library_finalize(unit_nr)
-     INTEGER, INTENT(IN) :: unit_nr
-     MARK_USED(unit_nr)  ! Could print a statistics if unit_nr > 0.
+   SUBROUTINE grid_library_finalize(mpi_comm, unit_nr)
+     INTEGER, INTENT(IN)                             :: mpi_comm, unit_nr
+
+     INTERFACE
+        SUBROUTINE grid_globals_finalize(mpi_sum_func, print_func) BIND(C, name="grid_globals_finalize")
+           IMPORT :: C_FUNPTR
+           TYPE(C_FUNPTR), VALUE                     :: mpi_sum_func
+           TYPE(C_FUNPTR), VALUE                     :: print_func
+        END SUBROUTINE grid_globals_finalize
+     END INTERFACE
+
+     ! Since Fortran unit and mpi-group numbers can't be used from C, we pass function pointers instead.
+
+!$OMP PARALLEL DEFAULT(NONE)
+     CALL grid_globals_finalize(mpi_sum_func=C_FUNLOC(mpi_sum_func), &
+                                print_func=C_FUNLOC(print_func))
+!$OMP END PARALLEL
+
+     CONTAINS
+
+     SUBROUTINE mpi_sum_func(number) BIND(C)
+        INTEGER(KIND=C_LONG), INTENT(INOUT)                :: number
+        CALL mp_sum(number, mpi_comm)
+     END SUBROUTINE mpi_sum_func
+
+     SUBROUTINE print_func(message) BIND(C)
+        CHARACTER(LEN=1, KIND=C_CHAR), INTENT(IN)          :: message(*)
+        CHARACTER(LEN=1000)                                :: buffer
+        INTEGER                                            :: i
+        IF (unit_nr > 0) THEN
+           ! Convert C char array into Fortran string.
+           buffer = ""
+           DO i = 1, LEN(buffer)
+              IF (message(i) == C_NULL_CHAR) EXIT
+              buffer(i:i) = message(i)
+           END DO
+           ! Print the message.
+           WRITE (unit_nr, FMT="(A)", ADVANCE="NO") buffer(1:i-1)
+        END IF
+      END SUBROUTINE print_func
    END SUBROUTINE grid_library_finalize
 
 END MODULE grid_api

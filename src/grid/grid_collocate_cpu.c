@@ -14,6 +14,7 @@
 #include "grid_collocate_cpu.h"
 #include "grid_prepare_pab.h"
 #include "grid_common.h"
+#include "grid_globals.h"
 
 
 // *****************************************************************************
@@ -711,6 +712,7 @@ static void grid_collocate_internal(const bool use_ortho,
                       coef_xyz);
 
     if (use_ortho) {
+        grid_stats_add((Counters){.collocate_ortho_cpu = 1});
         grid_collocate_ortho(lp,
                              zetp,
                              coef_xyz,
@@ -724,6 +726,7 @@ static void grid_collocate_internal(const bool use_ortho,
                              ngrid,
                              grid);
     } else {
+        grid_stats_add((Counters){.collocate_general_cpu = 1});
         grid_collocate_general(lp,
                                zetp,
                                coef_xyz,
