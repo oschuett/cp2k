@@ -60,7 +60,7 @@ void grid_collocate_pgf_product_cpu(const bool use_ortho,
                                     const int n1,
                                     const int n2,
                                     const double pab[n2][n1],
-                                    double grid[ngrid[2]][ngrid[1]][ngrid[0]]);
+                                    double* grid);
 
 #ifdef __cplusplus
 }

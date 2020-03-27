@@ -31,7 +31,7 @@ void grid_collocate_record(const bool use_ortho,
                            const int n1,
                            const int n2,
                            const double pab[n2][n1],
-                           const double grid[ngrid[2]][ngrid[1]][ngrid[0]]); 
+                           const double* grid);
 
 double grid_collocate_replay(const char* filename, int cycles);
 

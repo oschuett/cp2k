@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "grid_collocate_replay.h"
 #include "grid_collocate_cpu.h"
@@ -219,7 +220,7 @@ static void grid_collocate_core(const int lp,
                                 const double dh_inv[3][3],
                                 const double disr_radius,
                                 const int ngrid[3],
-                                double grid[ngrid[2]][ngrid[1]][ngrid[0]]) {
+                                double* grid) {
 
     // Create the full cube, ignoring periodicity for now.
     const int nz = ub_cube[2] - lb_cube[2] + 1;
@@ -268,7 +269,9 @@ static void grid_collocate_core(const int lp,
             const int igmin = ceil(-1e-8 - sqrt(max(0.0, jremain)) * dh_inv[0][0]);
             for (int ig=igmin; ig<=1-igmin; ig++) {
                 const int i = map[0][ig + cmax];  // target location on the grid
-                grid[k-1][j-1][i-1] += cube[kg - lb_cube[2]][jg - lb_cube[1]][ig - lb_cube[0]];
+                const double res = cube[kg - lb_cube[2]][jg - lb_cube[1]][ig - lb_cube[0]];
+                //grid[k-1][j-1][i-1] += res;
+                grid[(k-1)*ngrid[1]*ngrid[0] + (j-1)*ngrid[0] + i-1] += res;
             }
         }
     }
@@ -286,7 +289,7 @@ static void grid_collocate_ortho(const int lp,
                                  const bool periodic[3],
                                  const double radius,
                                  const int ngrid[3],
-                                 double grid[ngrid[2]][ngrid[1]][ngrid[0]]) {
+                                 double* grid) {
 
    // *** position of the gaussian product
    //
@@ -372,7 +375,7 @@ static void grid_collocate_general(const int lp,
                                    const bool periodic[3],
                                    const double radius,
                                    const int ngrid[3],
-                                   double grid[ngrid[2]][ngrid[1]][ngrid[0]]) {
+                                   double* grid) {
 
 // Translated from collocate_general_opt()
 //
@@ -611,7 +614,8 @@ static void grid_collocate_general(const int lp,
              } else {
                 i_index = i - index_min[0] + offset[0];
              }
-             grid[k_index-1][j_index-1][i_index-1] += res;
+             //grid[k_index-1][j_index-1][i_index-1] += res;
+             grid[(k_index-1)*ngrid[1]*ngrid[0] + (j_index-1)*ngrid[0] + i_index-1] += res;
           }
        }
     }
@@ -641,7 +645,7 @@ static void grid_collocate_internal(const bool use_ortho,
                                     const int n1,
                                     const int n2,
                                     const double pab[n2][n1],
-                                    double grid[ngrid[2]][ngrid[1]][ngrid[0]]){
+                                    double* grid){
 
     const double zetp = zeta + zetb;
     const double f = zetb / zetp;
@@ -767,22 +771,16 @@ void grid_collocate_pgf_product_cpu(const bool use_ortho,
                                     const int n1,
                                     const int n2,
                                     const double pab[n2][n1],
-                                    double grid[ngrid[2]][ngrid[1]][ngrid[0]]){
+                                    double* grid){
 
 // Uncomment this to dump all tasks to file.
-// #define __GRID_DUMP_TASKS
+//#define __GRID_DUMP_TASKS
 
 #ifdef __GRID_DUMP_TASKS
-    // Can be large, run with "ulimit -s unlimited".
-    double grid_before[ngrid[2]][ngrid[1]][ngrid[0]];
-    for (int i=0; i<ngrid[2]; i++) {
-    for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; k<ngrid[0]; k++) {
-        grid_before[i][j][k] = grid[i][j][k];
-        grid[i][j][k] = 0.0;
-    }
-    }
-    }
+    const size_t sizeof_grid = sizeof(double) * ngrid[0] * ngrid[1] * ngrid[2];
+    double *grid_before = malloc(sizeof_grid);
+    memcpy(grid_before, grid, sizeof_grid);
+    memset(grid, 0, sizeof_grid);
 #endif
 
     grid_collocate_internal(use_ortho,
@@ -837,13 +835,11 @@ void grid_collocate_pgf_product_cpu(const bool use_ortho,
                           pab,
                           grid);
 
-    for (int i=0; i<ngrid[2]; i++) {
-    for (int j=0; j<ngrid[1]; j++) {
-    for (int k=0; k<ngrid[0]; k++) {
-        grid[i][j][k] += grid_before[i][j][k];
+    for (int i=0; i < ngrid[0] * ngrid[1] * ngrid[2]; i++) {
+        grid[i] += grid_before[i];
     }
-    }
-    }
+
+    free(grid_before);
 #endif
 
 }
