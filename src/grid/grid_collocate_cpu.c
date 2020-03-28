@@ -155,7 +155,7 @@ static void grid_fill_map(const bool periodic[3],
                           const int npts[3],
                           const int ngrid[3],
                           const int cmax,
-                          int map[3][2*cmax + 1]) {
+                          int map[2*cmax + 1][3]) {
 
     for (int idir=0; idir<3; idir++) {
         if (periodic[idir]) {
@@ -166,7 +166,7 @@ static void grid_fill_map(const bool periodic[3],
                 const int offset = mod(cubecenter[idir] + start, npts[idir])  + 1 - start;
                 const int length = min(ub_cube[idir], npts[idir] - offset) - start;
                 for (int ig=start; ig<=start+length; ig++) {
-                   map[idir][ig + cmax] = ig + offset;
+                   map[ig + cmax][idir] = ig + offset;
                 }
                 if (start + length >= ub_cube[idir]){
                     break;
@@ -180,7 +180,7 @@ static void grid_fill_map(const bool periodic[3],
              assert(ub_cube[idir] + offset <= ngrid[idir]);
              assert(lb_cube[idir] + offset >= 1);
              for (int ig=lb_cube[idir]; ig <= ub_cube[idir]; ig++) {
-                map[idir][ig + cmax] = ig + offset;
+                map[ig + cmax][idir] = ig + offset;
              }
         }
     }
@@ -242,7 +242,7 @@ static void grid_collocate_core(const int lp,
                                 const int cmax,
                                 const Array3d coef_xyz,
                                 const Array3d pol,
-                                const int map[3][2*cmax+1],
+                                const int map[2*cmax+1][3],
                                 //const int map[][3],
                                 const int lb_cube[3],
                                 const int ub_cube[3],
@@ -288,19 +288,19 @@ static void grid_collocate_core(const int lp,
 
     const int kgmin = ceil(-1e-8 - disr_radius * dh_inv[2][2]);
     for (int kg=kgmin; kg <= 1-kgmin; kg++) {
-        const int k = map[2][kg + cmax];   // target location on the grid
+        const int k = map[kg + cmax][2];   // target location on the grid
         const int kd = (2*kg - 1) / 2;     // distance from center in grid points
         const double kr = kd * dh[2][2];   // distance from center in a.u.
         const double kremain = disr_radius * disr_radius - kr * kr;
         const int jgmin = ceil(-1e-8 - sqrt(max(0.0, kremain)) * dh_inv[1][1]);
         for (int jg=jgmin; jg <= 1-jgmin; jg++) {
-            const int j = map[1][jg + cmax];  // target location on the grid
+            const int j = map[jg + cmax][1];  // target location on the grid
             const int jd = (2*jg - 1) / 2;    // distance from center in grid points
             const double jr = jd * dh[1][1];  // distance from center in a.u.
             const double jremain = kremain - jr * jr;
             const int igmin = ceil(-1e-8 - sqrt(max(0.0, jremain)) * dh_inv[0][0]);
             for (int ig=igmin; ig<=1-igmin; ig++) {
-                const int i = map[0][ig + cmax];  // target location on the grid
+                const int i = map[ig + cmax][0];  // target location on the grid
                 const double res = cube[kg - lb_cube[2]][jg - lb_cube[1]][ig - lb_cube[0]];
                 //grid[k-1][j-1][i-1] += res;
                 grid[(k-1)*ngrid[1]*ngrid[0] + (j-1)*ngrid[0] + i-1] += res;
@@ -364,7 +364,7 @@ static void grid_collocate_ortho(const int lp,
     // a mapping so that the ig corresponds to the right grid point
     //const size_t sizeof_map = (2*cmax+1) * 3 * sizeof(int);
     //int (*map)[3] = malloc(sizeof_map);
-    int map[3][2*cmax+1];
+    int map[2*cmax+1][3];
     grid_fill_map(periodic,
                   lb_cube,
                   ub_cube,
