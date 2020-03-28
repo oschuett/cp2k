@@ -20,21 +20,38 @@
 // *****************************************************************************
 typedef struct {
    double* data;
-   //int n1, n2, n3, n4;
    int s1, s2, s3;
-} Array4D;
+} Array4d;
 
 #define Array4dAt(array, i, j, k, l) \
    array.data[i*array.s1 + j*array.s2 + k*array.s3 + l]
 
-// *****************************************************************************
-static Array4D create_array_4d(int n1, int n2, int n3, int n4) {
+static Array4d create_array_4d(int n1, int n2, int n3, int n4) {
     const size_t sizeof_array = sizeof(double) * n1 * n2 * n3 * n4;
-    Array4D array;
+    Array4d array;
     array.data = malloc(sizeof_array);
     array.s1 = n2*n3*n4;
     array.s2 = n3*n4;
     array.s3 = n4;
+    memset(array.data, 0, sizeof_array);
+    return array;
+}
+
+// *****************************************************************************
+typedef struct {
+   double* data;
+   int s1, s2;
+} Array3d;
+
+#define Array3dAt(array, i, j, k) \
+   array.data[i*array.s1 + j*array.s2 + k]
+
+static Array3d create_array_3d(int n1, int n2, int n3) {
+    const size_t sizeof_array = sizeof(double) * n1 * n2 * n3;
+    Array3d array;
+    array.data = malloc(sizeof_array);
+    array.s1 = n2*n3;
+    array.s2 = n3;
     memset(array.data, 0, sizeof_array);
     return array;
 }
@@ -45,7 +62,7 @@ static void grid_prepare_alpha(const double ra[3],
                                const double rp[3],
                                const int la_max,
                                const int lb_max,
-                               Array4D alpha) {
+                               Array4d alpha) {
 
     //
     //   compute polynomial expansion coefs -> (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
@@ -81,11 +98,9 @@ static void grid_prepare_coef(const int la_max,
                               const int lb_min,
                               const int lp,
                               const double prefactor,
-                              const Array4D alpha,
+                              const Array4d alpha,
                               const double pab[ncoset[lb_max]][ncoset[la_max]],
-                              double coef_xyz[lp+1][lp+1][lp+1]) {
-
-    memset(coef_xyz, 0, (lp+1)*(lp+1)*(lp+1)*sizeof(double));
+                              Array3d coef_xyz) {
 
     double coef_xyt[lp+1][lp+1];
     double coef_xtt[lp+1];
@@ -123,7 +138,7 @@ static void grid_prepare_coef(const int la_max,
        for (int lzp = 0; lzp<=lza+lzb; lzp++) {
           for (int lyp = 0; lyp<=lp-lza-lzb; lyp++) {
              for (int lxp = 0; lxp<=lp-lza-lzb-lyp; lxp++) {
-                coef_xyz[lzp][lyp][lxp] += Array4dAt(alpha, 2, lzb, lza, lzp) * coef_xyt[lyp][lxp];
+                Array3dAt(coef_xyz, lzp, lyp, lxp) += Array4dAt(alpha, 2, lzb, lza, lzp) * coef_xyt[lyp][lxp];
              }
           }
        }
@@ -171,13 +186,12 @@ static void grid_fill_map(const bool periodic,
 
 
 // *****************************************************************************
-static void grid_fill_pol(const double dr,
-                          const double roffset,
-                          const int lb_cube,
+static void grid_fill_pol(const double dh[3][3],
+                          const double roffset[3],
+                          const int lb_cube[3],
                           const int lp,
-                          const int cmax,
                           const double zetp,
-                          double pol[lp+1][2*cmax+1]) {
+                          Array3d pol) {
 //
 //   compute the values of all (x-xp)**lp*exp(..)
 //
@@ -186,43 +200,46 @@ static void grid_fill_pol(const double dr,
 //  exp( -a*(x+d)**2)=exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
 //  exp(-2*a*(x+d)*d)=exp(-2*a*x*d)*exp(-2*a*d**2)
 //
-      const double t_exp_1 = exp(-zetp * pow(dr, 2));
-      const double t_exp_2 = pow(t_exp_1, 2);
+    for (int idir=0; idir<3; idir++) {
+        const double dr = dh[idir][idir];
+        const double t_exp_1 = exp(-zetp * pow(dr, 2));
+        const double t_exp_2 = pow(t_exp_1, 2);
 
-      double t_exp_min_1 = exp(-zetp * pow(+dr - roffset, 2));
-      double t_exp_min_2 = exp(-2 * zetp * (+dr - roffset) * (-dr));
-      for (int ig=0; ig >= lb_cube; ig--) {
-          const double rpg = ig * dr - roffset;
-          t_exp_min_1 *= t_exp_min_2 * t_exp_1;
-          t_exp_min_2 *= t_exp_2;
-          double pg = t_exp_min_1;
-          // pg  = EXP(-zetp*rpg**2)
-          for (int icoef=0; icoef<=lp; icoef++) {
-              pol[icoef][ig-lb_cube] = pg;
-              pg *= rpg;
-          }
-      }
+        double t_exp_min_1 = exp(-zetp * pow(+dr - roffset[idir], 2));
+        double t_exp_min_2 = exp(-2 * zetp * (+dr - roffset[idir]) * (-dr));
+        for (int ig=0; ig >= lb_cube[idir]; ig--) {
+            const double rpg = ig * dr - roffset[idir];
+            t_exp_min_1 *= t_exp_min_2 * t_exp_1;
+            t_exp_min_2 *= t_exp_2;
+            double pg = t_exp_min_1;
+            // pg  = EXP(-zetp*rpg**2)
+            for (int icoef=0; icoef<=lp; icoef++) {
+                Array3dAt(pol, idir, icoef, ig-lb_cube[idir]) = pg;
+                pg *= rpg;
+            }
+        }
 
-      double t_exp_plus_1 = exp(-zetp * pow(-roffset,2));
-      double t_exp_plus_2 = exp(-2 * zetp * (-roffset) * (+dr));
-      for (int ig=0; ig >= lb_cube; ig--) {
-          const double rpg = (1-ig) * dr - roffset;
-          t_exp_plus_1 *= t_exp_plus_2 * t_exp_1;
-          t_exp_plus_2 *= t_exp_2;
-          double pg = t_exp_plus_1;
-          // pg  = EXP(-zetp*rpg**2)
-          for (int icoef=0; icoef<=lp; icoef++) {
-              pol[icoef][1-ig-lb_cube] = pg;
-              pg *= rpg;
-          }
-      }
+        double t_exp_plus_1 = exp(-zetp * pow(-roffset[idir],2));
+        double t_exp_plus_2 = exp(-2 * zetp * (-roffset[idir]) * (+dr));
+        for (int ig=0; ig >= lb_cube[idir]; ig--) {
+            const double rpg = (1-ig) * dr - roffset[idir];
+            t_exp_plus_1 *= t_exp_plus_2 * t_exp_1;
+            t_exp_plus_2 *= t_exp_2;
+            double pg = t_exp_plus_1;
+            // pg  = EXP(-zetp*rpg**2)
+            for (int icoef=0; icoef<=lp; icoef++) {
+                Array3dAt(pol, idir, icoef, 1-ig-lb_cube[idir]) = pg;
+                pg *= rpg;
+            }
+        }
+    }
 }
 
 // *****************************************************************************
 static void grid_collocate_core(const int lp,
                                 const int cmax,
-                                const double coef_xyz[lp+1][lp+1][lp+1],
-                                const double pol[3][lp+1][2*cmax+1],
+                                const Array3d coef_xyz,
+                                const Array3d pol,
                                 const int map[3][2*cmax+1],
                                 const int lb_cube[3],
                                 const int ub_cube[3],
@@ -246,8 +263,10 @@ static void grid_collocate_core(const int lp,
         for (int k=0; k < nz; k++) {
         for (int j=0; j < ny; j++) {
         for (int i=0; i < nx; i++) {
-            cube[k][j][i] += coef_xyz[lzp][lyp][lxp]
-                             * pol[2][lzp][k] * pol[1][lyp][j] * pol[0][lxp][i];
+            cube[k][j][i] += Array3dAt(coef_xyz, lzp, lyp, lxp)
+                             * Array3dAt(pol, 2, lzp, k)
+                             * Array3dAt(pol, 1, lyp, j)
+                             * Array3dAt(pol, 0, lxp, i);
         }
         }
         }
@@ -290,7 +309,7 @@ static void grid_collocate_core(const int lp,
 // *****************************************************************************
 static void grid_collocate_ortho(const int lp,
                                  const double zetp,
-                                 const double coef_xyz[lp+1][lp+1][lp+1],
+                                 const Array3d coef_xyz,
                                  const double dh[3][3],
                                  const double dh_inv[3][3],
                                  const double rp[3],
@@ -353,10 +372,8 @@ static void grid_collocate_ortho(const int lp,
                       map[i]);
     }
 
-    double pol[3][lp+1][2*cmax+1];
-    for (int i=0; i<3; i++) {
-        grid_fill_pol(dh[i][i], roffset[i], lb_cube[i], lp, cmax, zetp, pol[i]);
-    }
+    Array3d pol = create_array_3d(3, lp+1, 2*cmax+1);
+    grid_fill_pol(dh, roffset, lb_cube, lp, zetp, pol);
 
     grid_collocate_core(lp,
                         cmax,
@@ -376,7 +393,7 @@ static void grid_collocate_ortho(const int lp,
 // *****************************************************************************
 static void grid_collocate_general(const int lp,
                                    const double zetp,
-                                   const double coef_xyz[lp+1][lp+1][lp+1],
+                                   const Array3d coef_xyz,
                                    const double dh[3][3],
                                    const double dh_inv[3][3],
                                    const double rp[3],
@@ -464,7 +481,7 @@ static void grid_collocate_general(const int lp,
                 const int jl = jlx + jly + jlz;
                 const int kl = klx + kly + klz;
                 const int lijk= coef_map[kl][jl][il];
-                coef_ijk[lijk-1] += coef_xyz[lz][ly][lx] *
+                coef_ijk[lijk-1] += Array3dAt(coef_xyz, lz, ly, lx) *
                    hmatgridp[ilx][0][0] * hmatgridp[jlx][1][0] * hmatgridp[klx][2][0] *
                    hmatgridp[ily][0][1] * hmatgridp[jly][1][1] * hmatgridp[kly][2][1] *
                    hmatgridp[ilz][0][2] * hmatgridp[jlz][1][2] * hmatgridp[klz][2][2] *
@@ -698,15 +715,8 @@ static void grid_collocate_internal(const bool use_ortho,
     // (current implementation is l**7)
     //
 
-    Array4D alpha = create_array_4d(3, lb_max_prep+1, la_max_prep+1, la_max_prep+lb_max_prep+1);
-
-    //double alpha[3][lb_max_prep+1][la_max_prep+1][la_max_prep+lb_max_prep+1];
-    grid_prepare_alpha(ra,
-                       rb,
-                       rp,
-                       la_max_prep,
-                       lb_max_prep,
-                       alpha);
+    Array4d alpha = create_array_4d(3, lb_max_prep+1, la_max_prep+1, la_max_prep+lb_max_prep+1);
+    grid_prepare_alpha(ra, rb, rp, la_max_prep, lb_max_prep, alpha);
 
     //
     //   compute P_{lxp,lyp,lzp} given P_{lxa,lya,lza,lxb,lyb,lzb} and alpha(ls,lxa,lxb,1)
@@ -716,7 +726,7 @@ static void grid_collocate_internal(const bool use_ortho,
     //
 
     const int lp = la_max_prep + lb_max_prep;
-    double coef_xyz[lp+1][lp+1][lp+1];
+    Array3d coef_xyz = create_array_3d(lp+1, lp+1, lp+1);
     grid_prepare_coef(la_max_prep,
                       la_min_prep,
                       lb_max_prep,
