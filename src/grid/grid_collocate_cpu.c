@@ -155,7 +155,7 @@ static void grid_fill_map(const bool periodic[3],
                           const int npts[3],
                           const int ngrid[3],
                           const int cmax,
-                          int map[2*cmax + 1][3]) {
+                          int map[][3]) {
 
     for (int idir=0; idir<3; idir++) {
         if (periodic[idir]) {
@@ -242,8 +242,7 @@ static void grid_collocate_core(const int lp,
                                 const int cmax,
                                 const Array3d coef_xyz,
                                 const Array3d pol,
-                                const int map[2*cmax+1][3],
-                                //const int map[][3],
+                                const int map[][3],
                                 const int lb_cube[3],
                                 const int ub_cube[3],
                                 const double dh[3][3],
@@ -362,9 +361,8 @@ static void grid_collocate_ortho(const int lp,
     }
 
     // a mapping so that the ig corresponds to the right grid point
-    //const size_t sizeof_map = (2*cmax+1) * 3 * sizeof(int);
-    //int (*map)[3] = malloc(sizeof_map);
-    int map[2*cmax+1][3];
+    const size_t sizeof_map = (2*cmax+1) * 3 * sizeof(int);
+    int (*map)[3] = malloc(sizeof_map);
     grid_fill_map(periodic,
                   lb_cube,
                   ub_cube,
@@ -390,6 +388,8 @@ static void grid_collocate_ortho(const int lp,
                         disr_radius,
                         ngrid,
                         grid);
+    free(map);
+    free(pol.data);
 }
 
 
@@ -769,6 +769,9 @@ static void grid_collocate_internal(const bool use_ortho,
                                ngrid,
                                grid);
     }
+
+    free(alpha.data);
+    free(coef_xyz.data);
 }
 
 
