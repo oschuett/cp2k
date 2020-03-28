@@ -17,6 +17,27 @@
 #include "grid_common.h"
 #include "grid_globals.h"
 
+// *****************************************************************************
+typedef struct {
+   double* data;
+   //int n1, n2, n3, n4;
+   int s1, s2, s3;
+} Array4D;
+
+#define Array4dAt(array, i, j, k, l) \
+   array.data[i*array.s1 + j*array.s2 + k*array.s3 + l]
+
+// *****************************************************************************
+static Array4D create_array_4d(int n1, int n2, int n3, int n4) {
+    const size_t sizeof_array = sizeof(double) * n1 * n2 * n3 * n4;
+    Array4D array;
+    array.data = malloc(sizeof_array);
+    array.s1 = n2*n3*n4;
+    array.s2 = n3*n4;
+    array.s3 = n4;
+    memset(array.data, 0, sizeof_array);
+    return array;
+}
 
 // *****************************************************************************
 static void grid_prepare_alpha(const double ra[3],
@@ -24,18 +45,7 @@ static void grid_prepare_alpha(const double ra[3],
                                const double rp[3],
                                const int la_max,
                                const int lb_max,
-                               double alpha[3][lb_max+1][la_max+1][la_max+lb_max+1]) {
-
-    // Initialize with zeros.
-    for (int iaxis=0; iaxis<3; iaxis++) {
-    for (int lxb=0; lxb<=lb_max; lxb++) {
-    for (int lxa=0; lxa<=la_max; lxa++) {
-    for (int lxp=0; lxp<=la_max+lb_max; lxp++) {
-        alpha[iaxis][lxb][lxa][lxp] = 0.0;
-    }
-    }
-    }
-    }
+                               Array4D alpha) {
 
     //
     //   compute polynomial expansion coefs -> (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
@@ -52,7 +62,7 @@ static void grid_prepare_alpha(const double ra[3],
              double binomial_l_lxb = 1.0;
              double b = 1.0;
              for (int l=0; l<=lxb; l++) {
-                alpha[iaxis][lxb][lxa][lxa-l+lxb-k] += binomial_k_lxa * binomial_l_lxb * a * b;
+                Array4dAt(alpha, iaxis, lxb, lxa, lxa-l+lxb-k) += binomial_k_lxa * binomial_l_lxb * a * b;
                 binomial_l_lxb *= ((double)(lxb - l)) / ((double)(l + 1));
                 b *= drpb;
              }
@@ -66,14 +76,14 @@ static void grid_prepare_alpha(const double ra[3],
 
 // *****************************************************************************
 static void grid_prepare_coef(const int la_max,
-                      const int la_min,
-                      const int lb_max,
-                      const int lb_min,
-                      const int lp,
-                      const double prefactor,
-                      const double alpha[3][lb_max+1][la_max+1][lp+1],
-                      const double pab[ncoset[lb_max]][ncoset[la_max]],
-                      double coef_xyz[lp+1][lp+1][lp+1]) {
+                              const int la_min,
+                              const int lb_max,
+                              const int lb_min,
+                              const int lp,
+                              const double prefactor,
+                              const Array4D alpha,
+                              const double pab[ncoset[lb_max]][ncoset[la_max]],
+                              double coef_xyz[lp+1][lp+1][lp+1]) {
 
     memset(coef_xyz, 0, (lp+1)*(lp+1)*(lp+1)*sizeof(double));
 
@@ -99,13 +109,13 @@ static void grid_prepare_coef(const int la_max,
              const int jco = coset(lxb, lyb, lzb);
              const double p_ele = prefactor * pab[jco][ico];
              for (int lxp = 0; lxp<=lxa+lxb; lxp++) {
-                coef_xtt[lxp] += p_ele * alpha[0][lxb][lxa][lxp];
+                coef_xtt[lxp] += p_ele * Array4dAt(alpha, 0, lxb, lxa, lxp);
              }
           }
           }
           for (int lyp = 0; lyp<=lya+lyb; lyp++) {
              for (int lxp = 0; lxp<=lp-lza-lzb-lya-lyb; lxp++) {
-                coef_xyt[lyp][lxp] += alpha[1][lyb][lya][lyp] * coef_xtt[lxp];
+                coef_xyt[lyp][lxp] += Array4dAt(alpha, 1, lyb, lya, lyp) * coef_xtt[lxp];
              }
           }
        }
@@ -113,7 +123,7 @@ static void grid_prepare_coef(const int la_max,
        for (int lzp = 0; lzp<=lza+lzb; lzp++) {
           for (int lyp = 0; lyp<=lp-lza-lzb; lyp++) {
              for (int lxp = 0; lxp<=lp-lza-lzb-lyp; lxp++) {
-                coef_xyz[lzp][lyp][lxp] += alpha[2][lzb][lza][lzp] * coef_xyt[lyp][lxp];
+                coef_xyz[lzp][lyp][lxp] += Array4dAt(alpha, 2, lzb, lza, lzp) * coef_xyt[lyp][lxp];
              }
           }
        }
@@ -688,7 +698,9 @@ static void grid_collocate_internal(const bool use_ortho,
     // (current implementation is l**7)
     //
 
-    double alpha[3][lb_max_prep+1][la_max_prep+1][la_max_prep+lb_max_prep+1];
+    Array4D alpha = create_array_4d(3, lb_max_prep+1, la_max_prep+1, la_max_prep+lb_max_prep+1);
+
+    //double alpha[3][lb_max_prep+1][la_max_prep+1][la_max_prep+lb_max_prep+1];
     grid_prepare_alpha(ra,
                        rb,
                        rp,
