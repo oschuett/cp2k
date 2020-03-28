@@ -147,40 +147,42 @@ static void grid_prepare_coef(const int la_max,
 }
 
 // *****************************************************************************
-static void grid_fill_map(const bool periodic,
-                          const int lb_cube,
-                          const int ub_cube,
-                          const int cubecenter,
-                          const int lb_grid,
-                          const int npts,
-                          const int ngrid,
+static void grid_fill_map(const bool periodic[3],
+                          const int lb_cube[3],
+                          const int ub_cube[3],
+                          const int cubecenter[3],
+                          const int lb_grid[3],
+                          const int npts[3],
+                          const int ngrid[3],
                           const int cmax,
-                          int map[2*cmax + 1]) {
+                          int map[3][2*cmax + 1]) {
 
-    if (periodic) {
-         //for (int i=0; i <= 2*cmax; i++)
-         //    map[i] = mod(cubecenter + i - cmax, npts) + 1;
-         int start = lb_cube;
-         while (true) {
-            const int offset = mod(cubecenter + start, npts)  + 1 - start;
-            const int length = min(ub_cube, npts - offset) - start;
-            for (int ig=start; ig<=start+length; ig++) {
-               map[ig + cmax] = ig + offset;
-            }
-            if (start + length >= ub_cube){
-                break;
-            }
-            start += length + 1;
-         }
-    } else {
-         // this takes partial grid + border regions into account
-         const int offset = mod(cubecenter + lb_cube + lb_grid, npts) + 1 - lb_cube;
-         // check for out of bounds
-         assert(ub_cube + offset <= ngrid);
-         assert(lb_cube + offset >= 1);
-         for (int ig=lb_cube; ig <= ub_cube; ig++) {
-            map[ig + cmax] = ig + offset;
-         }
+    for (int idir=0; idir<3; idir++) {
+        if (periodic[idir]) {
+             //for (int i=0; i <= 2*cmax; i++)
+             //    map[i] = mod(cubecenter + i - cmax, npts) + 1;
+             int start = lb_cube[idir];
+             while (true) {
+                const int offset = mod(cubecenter[idir] + start, npts[idir])  + 1 - start;
+                const int length = min(ub_cube[idir], npts[idir] - offset) - start;
+                for (int ig=start; ig<=start+length; ig++) {
+                   map[idir][ig + cmax] = ig + offset;
+                }
+                if (start + length >= ub_cube[idir]){
+                    break;
+                }
+                start += length + 1;
+             }
+        } else {
+             // this takes partial grid + border regions into account
+             const int offset = mod(cubecenter[idir] + lb_cube[idir] + lb_grid[idir], npts[idir]) + 1 - lb_cube[idir];
+             // check for out of bounds
+             assert(ub_cube[idir] + offset <= ngrid[idir]);
+             assert(lb_cube[idir] + offset >= 1);
+             for (int ig=lb_cube[idir]; ig <= ub_cube[idir]; ig++) {
+                map[idir][ig + cmax] = ig + offset;
+             }
+        }
     }
 }
 
@@ -241,6 +243,7 @@ static void grid_collocate_core(const int lp,
                                 const Array3d coef_xyz,
                                 const Array3d pol,
                                 const int map[3][2*cmax+1],
+                                //const int map[][3],
                                 const int lb_cube[3],
                                 const int ub_cube[3],
                                 const double dh[3][3],
@@ -359,18 +362,18 @@ static void grid_collocate_ortho(const int lp,
     }
 
     // a mapping so that the ig corresponds to the right grid point
+    //const size_t sizeof_map = (2*cmax+1) * 3 * sizeof(int);
+    //int (*map)[3] = malloc(sizeof_map);
     int map[3][2*cmax+1];
-    for (int i=0; i<3; i++) {
-        grid_fill_map(periodic[i],
-                      lb_cube[i],
-                      ub_cube[i],
-                      cubecenter[i],
-                      lb_grid[i],
-                      npts[i],
-                      ngrid[i],
-                      cmax,
-                      map[i]);
-    }
+    grid_fill_map(periodic,
+                  lb_cube,
+                  ub_cube,
+                  cubecenter,
+                  lb_grid,
+                  npts,
+                  ngrid,
+                  cmax,
+                  map);
 
     Array3d pol = create_array_3d(3, lp+1, 2*cmax+1);
     grid_fill_pol(dh, roffset, lb_cube, lp, zetp, pol);
