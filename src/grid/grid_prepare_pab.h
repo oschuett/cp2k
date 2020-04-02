@@ -34,12 +34,22 @@
 #define GRID_FUNC_DYDY 802
 #define GRID_FUNC_DZDZ 803
 
+// *****************************************************************************
+#define Array2dAt(array, i, j) array.data[i*array.s1 + j]
+
+typedef struct {
+   double* data;
+   int s1; // stride 1
+} Array2d; //TODO: rename into Matrix?
+
+// *****************************************************************************
 void grid_prepare_get_ldiffs(const int func,
                              int* la_min_diff,
                              int* la_max_diff,
                              int* lb_min_diff,
                              int* lb_max_diff);
 
+// *****************************************************************************
 void grid_prepare_pab(const int func,
                       const int o1,
                       const int o2,
@@ -49,12 +59,8 @@ void grid_prepare_pab(const int func,
                       const int lb_min,
                       const double zeta,
                       const double zetb,
-                      const int n1,
-                      const int n2,
-                      const double pab[n2][n1],
-                      const int n1_prep,
-                      const int n2_prep,
-                      double pab_prep[n2_prep][n1_prep]);
+                      const Array2d pab,
+                      Array2d pab_prep);
 
 #endif
 

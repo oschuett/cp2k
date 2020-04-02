@@ -1,4 +1,6 @@
-CFLAGS   = -g -O3 -std=c99 -fopenmp -march=native -Wall -Wextra
+CFLAGS   = -g -O3 -std=c99 -fopenmp -march=native -Wall -Wextra -Wvla
+
+#-Werror=vla
 
 all: grid_collocate_miniapp.x
 

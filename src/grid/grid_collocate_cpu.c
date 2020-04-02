@@ -18,21 +18,11 @@
 #include "grid_globals.h"
 
 // *****************************************************************************
-typedef struct {
-   double* data;
-   int s1, s2, s3;
-} Array4d;
-
-#define Array4dAt(array, i, j, k, l) \
-   array.data[i*array.s1 + j*array.s2 + k*array.s3 + l]
-
-static Array4d create_array_4d(int n1, int n2, int n3, int n4) {
-    const size_t sizeof_array = sizeof(double) * n1 * n2 * n3 * n4;
-    Array4d array;
+static Array2d allocate_array_2d(int n1, int n2) {
+    const size_t sizeof_array = sizeof(double) * n1 * n2;
+    Array2d array;
     array.data = malloc(sizeof_array);
-    array.s1 = n2*n3*n4;
-    array.s2 = n3*n4;
-    array.s3 = n4;
+    array.s1 = n2;
     memset(array.data, 0, sizeof_array);
     return array;
 }
@@ -43,15 +33,34 @@ typedef struct {
    int s1, s2;
 } Array3d;
 
-#define Array3dAt(array, i, j, k) \
-   array.data[i*array.s1 + j*array.s2 + k]
+#define Array3dAt(array, i, j, k) array.data[i*array.s1 + j*array.s2 + k]
 
-static Array3d create_array_3d(int n1, int n2, int n3) {
+static Array3d allocate_array_3d(int n1, int n2, int n3) {
     const size_t sizeof_array = sizeof(double) * n1 * n2 * n3;
     Array3d array;
     array.data = malloc(sizeof_array);
     array.s1 = n2*n3;
     array.s2 = n3;
+    memset(array.data, 0, sizeof_array);
+    return array;
+}
+
+// *****************************************************************************
+typedef struct {
+   double* data;
+   int s1, s2, s3;
+} Array4d;
+
+#define Array4dAt(array, i, j, k, l) \
+   array.data[i*array.s1 + j*array.s2 + k*array.s3 + l]
+
+static Array4d allocate_array_4d(int n1, int n2, int n3, int n4) {
+    const size_t sizeof_array = sizeof(double) * n1 * n2 * n3 * n4;
+    Array4d array;
+    array.data = malloc(sizeof_array);
+    array.s1 = n2*n3*n4;
+    array.s2 = n3*n4;
+    array.s3 = n4;
     memset(array.data, 0, sizeof_array);
     return array;
 }
@@ -99,7 +108,7 @@ static void grid_prepare_coef(const int la_max,
                               const int lp,
                               const double prefactor,
                               const Array4d alpha,
-                              const double pab[ncoset[lb_max]][ncoset[la_max]],
+                              const Array2d pab,
                               Array3d coef_xyz) {
 
     double coef_xyt[lp+1][lp+1];
@@ -122,7 +131,7 @@ static void grid_prepare_coef(const int la_max,
           for (int lxa = max(la_min-lza-lya, 0); lxa<=la_max-lza-lya; lxa++) {
              const int ico = coset(lxa, lya, lza);
              const int jco = coset(lxb, lyb, lzb);
-             const double p_ele = prefactor * pab[jco][ico];
+             const double p_ele = prefactor * Array2dAt(pab, jco, ico);
              for (int lxp = 0; lxp<=lxa+lxb; lxp++) {
                 coef_xtt[lxp] += p_ele * Array4dAt(alpha, 0, lxb, lxa, lxp);
              }
@@ -373,7 +382,7 @@ static void grid_collocate_ortho(const int lp,
                   cmax,
                   map);
 
-    Array3d pol = create_array_3d(3, lp+1, 2*cmax+1);
+    Array3d pol = allocate_array_3d(3, lp+1, 2*cmax+1);
     grid_fill_pol(dh, roffset, lb_cube, lp, zetp, pol);
 
     grid_collocate_core(lp,
@@ -674,7 +683,7 @@ static void grid_collocate_internal(const bool use_ortho,
                                     const int o2,
                                     const int n1,
                                     const int n2,
-                                    const double pab[n2][n1],
+                                    const double* pab,
                                     double* grid){
 
     const double zetp = zeta + zetb;
@@ -696,14 +705,12 @@ static void grid_collocate_internal(const bool use_ortho,
     const int lb_min_prep = max(lb_min + lb_min_diff, 0);
     const int la_max_prep = la_max + la_max_diff;
     const int lb_max_prep = lb_max + lb_max_diff;
+    Array2d pab_prep = allocate_array_2d(ncoset[lb_max_prep], ncoset[la_max_prep]);
 
-    const int n1_prep = ncoset[la_max_prep];
-    const int n2_prep = ncoset[lb_max_prep];
-    double pab_prep[n2_prep][n1_prep];
-    memset(pab_prep, 0, n2_prep*n1_prep*sizeof(double));
+    Array2d pab_orig = {.data=pab, .s1=n2};
 
     grid_prepare_pab(func, o1, o2, la_max, la_min, lb_max, lb_min,
-                     zeta, zetb, n1, n2, pab, n1_prep, n2_prep, pab_prep);
+                     zeta, zetb, pab_orig, pab_prep);
 
     //   *** initialise the coefficient matrix, we transform the sum
     //
@@ -718,7 +725,7 @@ static void grid_collocate_internal(const bool use_ortho,
     // (current implementation is l**7)
     //
 
-    Array4d alpha = create_array_4d(3, lb_max_prep+1, la_max_prep+1, la_max_prep+lb_max_prep+1);
+    Array4d alpha = allocate_array_4d(3, lb_max_prep+1, la_max_prep+1, la_max_prep+lb_max_prep+1);
     grid_prepare_alpha(ra, rb, rp, la_max_prep, lb_max_prep, alpha);
 
     //
@@ -729,7 +736,7 @@ static void grid_collocate_internal(const bool use_ortho,
     //
 
     const int lp = la_max_prep + lb_max_prep;
-    Array3d coef_xyz = create_array_3d(lp+1, lp+1, lp+1);
+    Array3d coef_xyz = allocate_array_3d(lp+1, lp+1, lp+1);
     grid_prepare_coef(la_max_prep,
                       la_min_prep,
                       lb_max_prep,
