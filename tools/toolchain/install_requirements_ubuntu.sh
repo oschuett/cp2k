@@ -6,6 +6,9 @@
 
 echo "Installing Ubuntu packages..."
 
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+
 apt-get update -qq
 
 apt-get install -qq --no-install-recommends \
@@ -21,8 +24,7 @@ apt-get install -qq --no-install-recommends \
     make                                    \
     nano                                    \
     pkg-config                              \
-    python                                  \
-    python-numpy                            \
+    python3-numpy                           \
     python3                                 \
     unzip                                   \
     wget                                    \

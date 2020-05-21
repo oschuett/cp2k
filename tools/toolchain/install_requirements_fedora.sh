@@ -20,8 +20,7 @@ dnf -qy install                             \
     make                                    \
     nano                                    \
     pkg-config                              \
-    python                                  \
-    python-numpy                            \
+    python3-numpy                           \
     python3                                 \
     unzip                                   \
     vim-common                              \
