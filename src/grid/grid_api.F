@@ -114,7 +114,7 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'collocate_pgf_product', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: i, j, k, my_subpatch_pattern
+      INTEGER                                            :: i, j, k, my_subpatch_pattern, my_pos
       INTEGER, DIMENSION(3), TARGET                      :: npts_global, npts_local, shift_local
       INTEGER, SAVE                                      :: counter = 0
       LOGICAL(KIND=C_BOOL)                               :: my_use_subpatch, orthorhombic
@@ -215,7 +215,7 @@ CONTAINS
             CPASSERT(shift_local(i) == 0)
          ELSE
             ! Not periodic meaning the grid in this direction is distributed among processors.
-            CPASSERT(npts_local(i) /= npts_global(i))
+            CPASSERT(npts_local(i) < npts_global(i))
             IF (my_use_subpatch) THEN
                ! Check bounds of grid section that is owned by this processor.
                CPASSERT(rsgrid%lb_real(i) == rsgrid%lb_local(i) + rsgrid%desc%border)
@@ -286,6 +286,7 @@ CONTAINS
             tolerance = 2e-10
          END IF
          counter = counter + 1
+         my_pos = rsgrid%desc%my_pos
          DO i = 1, SIZE(rsgrid%r, 1)
          DO j = 1, SIZE(rsgrid%r, 2)
          DO k = 1, SIZE(rsgrid%r, 3)
@@ -294,18 +295,18 @@ CONTAINS
             rel_diff = diff/MAX(1.0_dp, ABS(ref_value))
             !IF ((ref_value==0.0_dp) .NEQV. (grid(i, j, k)==0.0_dp)) THEN
             IF (rel_diff > tolerance) THEN
-               WRITE (*, *) "counter: ", counter, "diff: ", diff
-               WRITE (*, *) "counter: ", counter, "rel. diff: ", rel_diff
-               WRITE (*, *) "counter: ", counter, "value:", grid(i, j, k), "ref_value:", ref_value
-               WRITE (*, *) "counter: ", counter, "ijk:", i - 1, j - 1, k - 1
-               WRITE (*, *) "counter: ", counter, "npts_global:", npts_global
-               WRITE (*, *) "counter: ", counter, "npts_local:", npts_local
-               WRITE (*, *) "counter: ", counter, "shift_local:", shift_local
-               WRITE (*, *) "counter: ", counter, "orthorhombic:", orthorhombic
-               WRITE (*, *) "counter: ", counter, "ga_gb_function:", ga_gb_function
-               WRITE (*, *) "counter: ", counter, "use_subpatch:", my_use_subpatch
-               WRITE (*, *) "counter: ", counter, "subpatch_pattern:", my_subpatch_pattern
-               WRITE (*, *) "counter: ", counter, "border:", rsgrid%desc%border
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "diff: ", diff
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "rel. diff: ", rel_diff
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "value:", grid(i, j, k), "ref_value:", ref_value
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "ijk:", i - 1, j - 1, k - 1
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "npts_global:", npts_global
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "npts_local:", npts_local
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "shift_local:", shift_local
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "orthorhombic:", orthorhombic
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "ga_gb_function:", ga_gb_function
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "use_subpatch:", my_use_subpatch
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "subpatch_pattern:", my_subpatch_pattern
+               WRITE (*, *) "counter: ", counter, "my_pos: ", my_pos, "border:", rsgrid%desc%border
                CPABORT("Collocate validation failed.")
             END IF
          ENDDO
