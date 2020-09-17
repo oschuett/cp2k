@@ -148,7 +148,7 @@ static void fill_map(const int lb_cube, const int ub_cube, const int cubecenter,
  ******************************************************************************/
 static void fill_pol(const double dr, const double roffset, const int lb_cube,
                      const int lp, const int cmax, const double zetp,
-                     double pol[lp + 1][2 * cmax + 1]) {
+                     double pol[2 * cmax + 1][lp + 1]) {
 
   //  Reuse the result from the previous gridpoint to avoid to many exps:
   //  exp( -a*(x+d)**2) = exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
@@ -166,7 +166,7 @@ static void fill_pol(const double dr, const double roffset, const int lb_cube,
     double pg = t_exp_min_1;
     // pg  = EXP(-zetp*rpg**2)
     for (int icoef = 0; icoef <= lp; icoef++) {
-      pol[icoef][ig - lb_cube] = pg;
+      pol[ig - lb_cube][icoef] = pg;
       pg *= rpg;
     }
   }
@@ -180,7 +180,7 @@ static void fill_pol(const double dr, const double roffset, const int lb_cube,
     double pg = t_exp_plus_1;
     // pg  = EXP(-zetp*rpg**2)
     for (int icoef = 0; icoef <= lp; icoef++) {
-      pol[icoef][1 - ig - lb_cube] = pg;
+      pol[1 - ig - lb_cube][icoef] = pg;
       pg *= rpg;
     }
   }
@@ -192,7 +192,7 @@ static void fill_pol(const double dr, const double roffset, const int lb_cube,
  ******************************************************************************/
 static void collocate_core_simple(
     const int lp, const int cmax, const double coef_xyz[lp + 1][lp + 1][lp + 1],
-    const double pol[3][lp + 1][2 * cmax + 1], const int lb_cube[3],
+    const double pol[3][2 * cmax + 1][lp + 1], const int lb_cube[3],
     const int ub_cube[3], const double dh[3][3], const double dh_inv[3][3],
     const double disr_radius, const int cubecenter[3], const int npts_global[3],
     const int npts_local[3], const int shift_local[3], double *grid) {
@@ -205,15 +205,15 @@ static void collocate_core_simple(
   double *cube = malloc(nz * ny * nx * sizeof(double));
   memset(cube, 0, nz * ny * nx * sizeof(double));
 
-  for (int lzp = 0; lzp <= lp; lzp++) {
-    for (int lyp = 0; lyp <= lp - lzp; lyp++) {
-      for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
-        for (int k = 0; k < nz; k++) {
-          for (int j = 0; j < ny; j++) {
-            for (int i = 0; i < nx; i++) {
+  for (int k = 0; k < nz; k++) {
+    for (int j = 0; j < ny; j++) {
+      for (int i = 0; i < nx; i++) {
+        for (int lzp = 0; lzp <= lp; lzp++) {
+          for (int lyp = 0; lyp <= lp - lzp; lyp++) {
+            for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
               cube[k * ny * nx + j * nx + i] += coef_xyz[lzp][lyp][lxp] *
-                                                pol[2][lzp][k] *
-                                                pol[1][lyp][j] * pol[0][lxp][i];
+                                                pol[2][k][lzp] *
+                                                pol[1][j][lyp] * pol[0][i][lxp];
             }
           }
         }
@@ -268,7 +268,7 @@ static void collocate_core_simple(
  ******************************************************************************/
 static void collocate_core(const int lp, const int cmax,
                            const double coef_xyz[lp + 1][lp + 1][lp + 1],
-                           const double pol[3][lp + 1][2 * cmax + 1],
+                           const double pol[3][2 * cmax + 1][lp + 1],
                            const int map[3][2 * cmax + 1], const int lb_cube[3],
                            const double dh[3][3], const double dh_inv[3][3],
                            const double disr_radius, const int npts_local[3],
@@ -293,9 +293,9 @@ static void collocate_core(const int lp, const int cmax,
       for (int lyp = 0; lyp <= lp - lzp; lyp++) {
         for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
           coef_xy[lxy][0] +=
-              coef_xyz[lzp][lyp][lxp] * pol[2][lzp][kg - lb_cube[2]];
+              coef_xyz[lzp][lyp][lxp] * pol[2][kg - lb_cube[2]][lzp];
           coef_xy[lxy][1] +=
-              coef_xyz[lzp][lyp][lxp] * pol[2][lzp][kg2 - lb_cube[2]];
+              coef_xyz[lzp][lyp][lxp] * pol[2][kg2 - lb_cube[2]][lzp];
           lxy++;
         }
         lxy += lzp;
@@ -322,10 +322,10 @@ static void collocate_core(const int lp, const int cmax,
       int lxy = 0;
       for (int lyp = 0; lyp <= lp; lyp++) {
         for (int lxp = 0; lxp <= lp - lyp; lxp++) {
-          coef_x[lxp][0] += coef_xy[lxy][0] * pol[1][lyp][jg - lb_cube[1]];
-          coef_x[lxp][1] += coef_xy[lxy][1] * pol[1][lyp][jg - lb_cube[1]];
-          coef_x[lxp][2] += coef_xy[lxy][0] * pol[1][lyp][jg2 - lb_cube[1]];
-          coef_x[lxp][3] += coef_xy[lxy][1] * pol[1][lyp][jg2 - lb_cube[1]];
+          coef_x[lxp][0] += coef_xy[lxy][0] * pol[1][jg - lb_cube[1]][lyp];
+          coef_x[lxp][1] += coef_xy[lxy][1] * pol[1][jg - lb_cube[1]][lyp];
+          coef_x[lxp][2] += coef_xy[lxy][0] * pol[1][jg2 - lb_cube[1]][lyp];
+          coef_x[lxp][3] += coef_xy[lxy][1] * pol[1][jg2 - lb_cube[1]][lyp];
           lxy++;
         }
       }
@@ -349,14 +349,14 @@ static void collocate_core(const int lp, const int cmax,
         double s08 = 0.0;
 
         for (int lxp = 0; lxp <= lp; lxp++) {
-          s01 += coef_x[lxp][0] * pol[0][lxp][ig - lb_cube[0]];
-          s02 += coef_x[lxp][1] * pol[0][lxp][ig - lb_cube[0]];
-          s03 += coef_x[lxp][2] * pol[0][lxp][ig - lb_cube[0]];
-          s04 += coef_x[lxp][3] * pol[0][lxp][ig - lb_cube[0]];
-          s05 += coef_x[lxp][0] * pol[0][lxp][ig2 - lb_cube[0]];
-          s06 += coef_x[lxp][1] * pol[0][lxp][ig2 - lb_cube[0]];
-          s07 += coef_x[lxp][2] * pol[0][lxp][ig2 - lb_cube[0]];
-          s08 += coef_x[lxp][3] * pol[0][lxp][ig2 - lb_cube[0]];
+          s01 += coef_x[lxp][0] * pol[0][ig - lb_cube[0]][lxp];
+          s02 += coef_x[lxp][1] * pol[0][ig - lb_cube[0]][lxp];
+          s03 += coef_x[lxp][2] * pol[0][ig - lb_cube[0]][lxp];
+          s04 += coef_x[lxp][3] * pol[0][ig - lb_cube[0]][lxp];
+          s05 += coef_x[lxp][0] * pol[0][ig2 - lb_cube[0]][lxp];
+          s06 += coef_x[lxp][1] * pol[0][ig2 - lb_cube[0]][lxp];
+          s07 += coef_x[lxp][2] * pol[0][ig2 - lb_cube[0]][lxp];
+          s08 += coef_x[lxp][3] * pol[0][ig2 - lb_cube[0]][lxp];
         }
 
         const int stride = npts_local[1] * npts_local[0];
@@ -431,12 +431,12 @@ static void collocate_ortho(const int lp, const double zetp,
     cmax = imax(cmax, ub_cube[i]);
   }
 
-  double pol_mutable[3][lp + 1][2 * cmax + 1];
+  double pol_mutable[3][2 * cmax + 1][lp + 1];
   for (int i = 0; i < 3; i++) {
     fill_pol(dh[i][i], roffset[i], lb_cube[i], lp, cmax, zetp, pol_mutable[i]);
   }
-  const double(*pol)[lp + 1][2 * cmax + 1] =
-      (const double(*)[lp + 1][2 * cmax + 1]) pol_mutable;
+  const double(*pol)[2 * cmax + 1][lp + 1] =
+      (const double(*)[2 * cmax + 1][lp + 1]) pol_mutable;
 
   // Enable to run a much simpler, but also slower implementation.
   if (false) {
@@ -606,10 +606,24 @@ static void collocate_general(const int border_mask, const int lp,
     }
   }
 
+  // precompute modulos
+  int map_k[index_max[2] - index_min[2] + 1];
+  for (int k = index_min[2]; k <= index_max[2]; k++) {
+    map_k[k - index_min[2]] = modulo(k - shift_local[2], npts_global[2]);
+  }
+  int map_j[index_max[1] - index_min[1] + 1];
+  for (int j = index_min[1]; j <= index_max[1]; j++) {
+    map_j[j - index_min[1]] = modulo(j - shift_local[1], npts_global[1]);
+  }
+  int map_i[index_max[0] - index_min[0] + 1];
+  for (int i = index_min[0]; i <= index_max[0]; i++) {
+    map_i[i - index_min[0]] = modulo(i - shift_local[0], npts_global[0]);
+  }
+
   // go over the grid, but cycle if the point is not within the radius
   for (int k = index_min[2]; k <= index_max[2]; k++) {
-    const int k_index = modulo(k - shift_local[2], npts_global[2]);
-    if (k_index < bounds[2][0] || bounds[2][1] < k_index) {
+    const int kg = map_k[k - index_min[2]];
+    if (kg < bounds[2][0] || bounds[2][1] < kg) {
       continue;
     }
 
@@ -635,8 +649,8 @@ static void collocate_general(const int border_mask, const int lp,
     }
 
     for (int j = index_min[1]; j <= index_max[1]; j++) {
-      const int j_index = modulo(j - shift_local[1], npts_global[1]);
-      if (j_index < bounds[1][0] || bounds[1][1] < j_index) {
+      const int jg = map_j[j - index_min[1]];
+      if (jg < bounds[1][0] || bounds[1][1] < jg) {
         continue;
       }
 
@@ -689,9 +703,17 @@ static void collocate_general(const int border_mask, const int lp,
       const int ismin = ceil((-b - sqrt_d) / (2.0 * a));
       const int ismax = floor((-b + sqrt_d) / (2.0 * a));
 
+      //const double exp_zetp_a = exp(-zetp * a);
+      //const double exp_zetp_2a = exp_zetp_a * exp_zetp_a;
+      //double exp_zetp_2a_i = exp(-zetp * 2 * a * ismin);
+      //double exp_zetp_a_ii = exp(-zetp * a * ismin * ismin);
+      //const double exp_zetp_b = exp(-zetp * b);
+      //double exp_zetp_b_i = exp(-zetp * b * ismin);
+      //const double exp_zetp_c = exp(-zetp * c);
+
       for (int i = ismin; i <= ismax; i++) {
-        const int i_index = modulo(i - shift_local[0], npts_global[0]);
-        if (i_index < bounds[0][0] || bounds[0][1] < i_index) {
+        const int ig = map_i[i - index_min[0]];
+        if (ig < bounds[0][0] || bounds[0][1] < ig) {
           continue;
         }
 
@@ -704,11 +726,14 @@ static void collocate_general(const int border_mask, const int lp,
           dip *= di;
         }
 
-        // Could be done with a recursion, but would obfuscate code a lot.
         res *= exp(-zetp * ((a * i + b) * i + c));
+        //res *= exp_zetp_a_ii * exp_zetp_b_i * exp_zetp_c;
+        //exp_zetp_a_ii *= exp_zetp_2a_i * exp_zetp_a;
+        //exp_zetp_2a_i *= exp_zetp_2a;
+        //exp_zetp_b_i *= exp_zetp_b;
 
-        const int grid_index = k_index * npts_local[1] * npts_local[0] +
-                               j_index * npts_local[0] + i_index;
+        const int grid_index =
+            kg * npts_local[1] * npts_local[0] + jg * npts_local[0] + ig;
         grid[grid_index] += res;
       }
     }
