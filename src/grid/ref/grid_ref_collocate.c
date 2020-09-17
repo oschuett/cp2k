@@ -102,24 +102,6 @@ static void pab_to_xyz(const int la_max, const int la_min, const int lb_max,
 }
 
 /*******************************************************************************
- * \brief Computes mapping from cube to grid indices.
- *        Used only in the orthorhombic case.
- * \author Ole Schuett
- ******************************************************************************/
-static void fill_map(const int lb_cube, const int ub_cube, const int cubecenter,
-                     const int npts_global, const int shift_local,
-                     const int cmax, int map[2 * cmax + 1]) {
-
-  for (int i = 0; i < 2 * cmax + 1; i++) {
-    map[i] = INT_MAX; // Safety net, will trigger out of bounds.
-  }
-
-  for (int ig = lb_cube; ig <= ub_cube; ig++) {
-    map[ig + cmax] = modulo(cubecenter + ig - shift_local, npts_global);
-  }
-}
-
-/*******************************************************************************
  * \brief Computes (x-xp)**lp*exp(..) for all cube points in one dimension.
  *        Used only in the orthorhombic case.
  * \author Ole Schuett
@@ -191,10 +173,7 @@ static void collocate_core(const int lp, const int cmax, const double *xyz,
     // initialize coef_xy
     const int ncoef_xy = (lp + 1) * (lp + 2) / 2;
     double coef_xy[ncoef_xy][2];
-    for (int i = 0; i < ncoef_xy; i++) {
-      coef_xy[i][0] = 0.0;
-      coef_xy[i][1] = 0.0;
-    }
+    memset(coef_xy, 0, ncoef_xy * 2 * sizeof(double));
 
     for (int lzp = 0; lzp <= lp; lzp++) {
       int lxy = 0;
@@ -345,11 +324,13 @@ static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
   const double(*pol)[2 * cmax + 1][lp + 1] =
       (const double(*)[2 * cmax + 1][lp + 1]) pol_mutable;
 
-  // a mapping so that the ig corresponds to the right grid point
+  // Precompute mapping from cube to grid indices.
   int map_mutable[3][2 * cmax + 1];
   for (int i = 0; i < 3; i++) {
-    fill_map(lb_cube[i], ub_cube[i], cubecenter[i], npts_global[i],
-             shift_local[i], cmax, map_mutable[i]);
+    for (int ig = lb_cube[i]; ig <= ub_cube[i]; ig++) {
+      map_mutable[i][ig + cmax] =
+          modulo(cubecenter[i] + ig - shift_local[i], npts_global[i]);
+    }
   }
   const int(*map)[2 * cmax + 1] = (const int(*)[2 * cmax + 1]) map_mutable;
 
