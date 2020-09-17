@@ -18,30 +18,22 @@
 #include "grid_ref_prepare_pab.h"
 
 /*******************************************************************************
- * \brief Computes the polynomial expansion coefficients:
- *        (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
- *        Results are passed to grid_prepare_coef.
+ * \brief Compute coefficients for all combinations of angular momentum.
+ *        Results are passed to collocate_ortho and collocate_general.
  * \author Ole Schuett
  ******************************************************************************/
-static void
-prepare_alpha(const double ra[3], const double rb[3], const double rp[3],
-              const int la_max, const int lb_max,
-              double alpha[3][lb_max + 1][la_max + 1][la_max + lb_max + 1]) {
+static void pab_to_xyz(const int la_max, const int la_min, const int lb_max,
+                       const int lb_min, const int lp, const double prefactor,
+                       const double ra[3], const double rb[3],
+                       const double rp[3], const double *pab, double *xyz) {
 
-  // Initialize with zeros.
-  for (int iaxis = 0; iaxis < 3; iaxis++) {
-    for (int lxb = 0; lxb <= lb_max; lxb++) {
-      for (int lxa = 0; lxa <= la_max; lxa++) {
-        for (int lxp = 0; lxp <= la_max + lb_max; lxp++) {
-          alpha[iaxis][lxb][lxa][lxp] = 0.0;
-        }
-      }
-    }
-  }
-
-  for (int iaxis = 0; iaxis < 3; iaxis++) {
-    const double drpa = rp[iaxis] - ra[iaxis];
-    const double drpb = rp[iaxis] - rb[iaxis];
+  // Computes the polynomial expansion coefficients:
+  //     (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
+  double alpha[3][lb_max + 1][la_max + 1][lp + 1];
+  memset(alpha, 0, 3 * (lb_max + 1) * (la_max + 1) * (lp + 1) * sizeof(double));
+  for (int i = 0; i < 3; i++) {
+    const double drpa = rp[i] - ra[i];
+    const double drpb = rp[i] - rb[i];
     for (int lxa = 0; lxa <= la_max; lxa++) {
       for (int lxb = 0; lxb <= lb_max; lxb++) {
         double binomial_k_lxa = 1.0;
@@ -50,7 +42,7 @@ prepare_alpha(const double ra[3], const double rb[3], const double rp[3],
           double binomial_l_lxb = 1.0;
           double b = 1.0;
           for (int l = 0; l <= lxb; l++) {
-            alpha[iaxis][lxb][lxa][lxa - l + lxb - k] +=
+            alpha[i][lxb][lxa][lxa - l + lxb - k] +=
                 binomial_k_lxa * binomial_l_lxb * a * b;
             binomial_l_lxb *= ((double)(lxb - l)) / ((double)(l + 1));
             b *= drpb;
@@ -61,61 +53,47 @@ prepare_alpha(const double ra[3], const double rb[3], const double rp[3],
       }
     }
   }
-}
 
-/*******************************************************************************
- * \brief Compute coefficients for all combinations of angular momentum.
- *        Results are passed to collocate_ortho and collocate_general.
- * \author Ole Schuett
- ******************************************************************************/
-static void prepare_coef(const int la_max, const int la_min, const int lb_max,
-                         const int lb_min, const int lp, const double prefactor,
-                         const double alpha[3][lb_max + 1][la_max + 1][lp + 1],
-                         const double pab[ncoset[lb_max]][ncoset[la_max]],
-                         double coef_xyz[lp + 1][lp + 1][lp + 1]) {
-
-  memset(coef_xyz, 0, (lp + 1) * (lp + 1) * (lp + 1) * sizeof(double));
-
-  double coef_xyt[lp + 1][lp + 1];
-  double coef_xtt[lp + 1];
+  //   *** initialise the coefficient matrix, we transform the sum
+  //
+  // sum_{lxa,lya,lza,lxb,lyb,lzb} P_{lxa,lya,lza,lxb,lyb,lzb} *
+  //         (x-a_x)**lxa (y-a_y)**lya (z-a_z)**lza (x-b_x)**lxb (y-a_y)**lya
+  //         (z-a_z)**lza
+  //
+  // into
+  //
+  // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-p_x)**lxp (y-p_y)**lyp (z-p_z)**lzp
+  //
+  // where p is center of the product gaussian, and lp = la_max + lb_max
+  // (current implementation is l**7)
+  //
 
   for (int lzb = 0; lzb <= lb_max; lzb++) {
     for (int lza = 0; lza <= la_max; lza++) {
-      for (int lyp = 0; lyp <= lp - lza - lzb; lyp++) {
-        for (int lxp = 0; lxp <= lp - lza - lzb - lyp; lxp++) {
-          coef_xyt[lyp][lxp] = 0.0;
-        }
-      }
       for (int lyb = 0; lyb <= lb_max - lzb; lyb++) {
         for (int lya = 0; lya <= la_max - lza; lya++) {
-          const int lxpm = (lb_max - lzb - lyb) + (la_max - lza - lya);
-          for (int i = 0; i <= lxpm; i++) {
-            coef_xtt[i] = 0.0;
-          }
-          for (int lxb = imax(lb_min - lzb - lyb, 0); lxb <= lb_max - lzb - lyb;
-               lxb++) {
-            for (int lxa = imax(la_min - lza - lya, 0);
-                 lxa <= la_max - lza - lya; lxa++) {
+          const int lxb_min = imax(lb_min - lzb - lyb, 0);
+          const int lxa_min = imax(la_min - lza - lya, 0);
+          for (int lxb = lxb_min; lxb <= lb_max - lzb - lyb; lxb++) {
+            for (int lxa = lxa_min; lxa <= la_max - lza - lya; lxa++) {
               const int ico = coset(lxa, lya, lza);
               const int jco = coset(lxb, lyb, lzb);
-              const double p_ele = prefactor * pab[jco][ico];
-              for (int lxp = 0; lxp <= lxa + lxb; lxp++) {
-                coef_xtt[lxp] += p_ele * alpha[0][lxb][lxa][lxp];
+              const int pab_index = jco * ncoset[la_max] + ico; // pab[jco][ico]
+
+              for (int lzp = 0; lzp <= lza + lzb; lzp++) {
+                for (int lyp = 0; lyp <= lp - lza - lzb; lyp++) {
+                  for (int lxp = 0; lxp <= lp - lza - lzb - lyp; lxp++) {
+                    const double p = alpha[0][lxb][lxa][lxp] *
+                                     alpha[1][lyb][lya][lyp] *
+                                     alpha[2][lzb][lza][lzp] * prefactor;
+                    const int xyz_index = lzp * (lp + 1) * (lp + 1) +
+                                          lyp * (lp + 1) +
+                                          lxp; // xyz[lzp][lyp][lxp]
+                    xyz[xyz_index] += p * pab[pab_index];
+                  }
+                }
               }
             }
-          }
-          for (int lyp = 0; lyp <= lya + lyb; lyp++) {
-            for (int lxp = 0; lxp <= lp - lza - lzb - lya - lyb; lxp++) {
-              coef_xyt[lyp][lxp] += alpha[1][lyb][lya][lyp] * coef_xtt[lxp];
-            }
-          }
-        }
-      }
-      for (int lzp = 0; lzp <= lza + lzb; lzp++) {
-        for (int lyp = 0; lyp <= lp - lza - lzb; lyp++) {
-          for (int lxp = 0; lxp <= lp - lza - lzb - lyp; lxp++) {
-            coef_xyz[lzp][lyp][lxp] +=
-                alpha[2][lzb][lza][lzp] * coef_xyt[lyp][lxp];
           }
         }
       }
@@ -187,92 +165,22 @@ static void fill_pol(const double dr, const double roffset, const int lb_cube,
 }
 
 /*******************************************************************************
- * \brief  A much simpler but also slower implementation of collocate_core.
- * \author Ole Schuett
- ******************************************************************************/
-static void collocate_core_simple(
-    const int lp, const int cmax, const double coef_xyz[lp + 1][lp + 1][lp + 1],
-    const double pol[3][2 * cmax + 1][lp + 1], const int lb_cube[3],
-    const int ub_cube[3], const double dh[3][3], const double dh_inv[3][3],
-    const double disr_radius, const int cubecenter[3], const int npts_global[3],
-    const int npts_local[3], const int shift_local[3], double *grid) {
-
-  // Create the full cube, ignoring periodicity for now.
-  const int nz = ub_cube[2] - lb_cube[2] + 1;
-  const int ny = ub_cube[1] - lb_cube[1] + 1;
-  const int nx = ub_cube[0] - lb_cube[0] + 1;
-
-  double *cube = malloc(nz * ny * nx * sizeof(double));
-  memset(cube, 0, nz * ny * nx * sizeof(double));
-
-  for (int k = 0; k < nz; k++) {
-    for (int j = 0; j < ny; j++) {
-      for (int i = 0; i < nx; i++) {
-        for (int lzp = 0; lzp <= lp; lzp++) {
-          for (int lyp = 0; lyp <= lp - lzp; lyp++) {
-            for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
-              cube[k * ny * nx + j * nx + i] += coef_xyz[lzp][lyp][lxp] *
-                                                pol[2][k][lzp] *
-                                                pol[1][j][lyp] * pol[0][i][lxp];
-            }
-          }
-        }
-      }
-    }
-  }
-
-  //
-  // Write cube back to large grid taking periodicity and radius into account.
-  //
-
-  // The cube contains an even number of grid points in each direction and
-  // collocation is always performed on a pair of two opposing grid points.
-  // Hence, the points with index 0 and 1 are both assigned distance zero via
-  // the formular distance=(2*index-1)/2.
-
-  const int kgmin = ceil(-1e-8 - disr_radius * dh_inv[2][2]);
-  for (int kg = kgmin; kg <= 1 - kgmin; kg++) {
-    const int ka = cubecenter[2] + kg - shift_local[2];
-    const int k = modulo(ka, npts_global[2]); // target location on the grid
-    const int kd = (2 * kg - 1) / 2; // distance from center in grid points
-    const double kr = kd * dh[2][2]; // distance from center in a.u.
-    const double kremain = disr_radius * disr_radius - kr * kr;
-    const int jgmin = ceil(-1e-8 - sqrt(fmax(0.0, kremain)) * dh_inv[1][1]);
-    for (int jg = jgmin; jg <= 1 - jgmin; jg++) {
-      const int ja = cubecenter[1] + jg - shift_local[1];
-      const int j = modulo(ja, npts_global[1]); // target location on the grid
-      const int jd = (2 * jg - 1) / 2; // distance from center in grid points
-      const double jr = jd * dh[1][1]; // distance from center in a.u.
-      const double jremain = kremain - jr * jr;
-      const int igmin = ceil(-1e-8 - sqrt(fmax(0.0, jremain)) * dh_inv[0][0]);
-      for (int ig = igmin; ig <= 1 - igmin; ig++) {
-        const int ia = cubecenter[0] + ig - shift_local[0];
-        const int i = modulo(ia, npts_global[0]); // target location on the grid
-        const int grid_index =
-            k * npts_local[1] * npts_local[0] + j * npts_local[0] + i;
-        const int cube_index = (kg - lb_cube[2]) * ny * nx +
-                               (jg - lb_cube[1]) * nx + (ig - lb_cube[0]);
-        grid[grid_index] += cube[cube_index];
-      }
-    }
-  }
-
-  free(cube);
-}
-
-/*******************************************************************************
  * \brief Fills the 3D cube by taking the outer product of the 1D pol arrays.
  *        The majority of cpu cycles are spend in this routine.
  *        Used only in the orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
-static void collocate_core(const int lp, const int cmax,
-                           const double coef_xyz[lp + 1][lp + 1][lp + 1],
+static void collocate_core(const int lp, const int cmax, const double *xyz,
                            const double pol[3][2 * cmax + 1][lp + 1],
                            const int map[3][2 * cmax + 1], const int lb_cube[3],
                            const double dh[3][3], const double dh_inv[3][3],
                            const double disr_radius, const int npts_local[3],
                            double *grid) {
+
+  // The cube contains an even number of grid points in each direction and
+  // collocation is always performed on a pair of two opposing grid points.
+  // Hence, the points with index 0 and 1 are both assigned distance zero via
+  // the formular distance=(2*index-1)/2.
 
   const int kgmin = ceil(-1e-8 - disr_radius * dh_inv[2][2]);
   for (int kg = kgmin; kg <= 0; kg++) {
@@ -292,10 +200,10 @@ static void collocate_core(const int lp, const int cmax,
       int lxy = 0;
       for (int lyp = 0; lyp <= lp - lzp; lyp++) {
         for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
-          coef_xy[lxy][0] +=
-              coef_xyz[lzp][lyp][lxp] * pol[2][kg - lb_cube[2]][lzp];
-          coef_xy[lxy][1] +=
-              coef_xyz[lzp][lyp][lxp] * pol[2][kg2 - lb_cube[2]][lzp];
+          const int xyz_index = lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) +
+                                lxp; // xyz[lzp][lyp][lxp]
+          coef_xy[lxy][0] += xyz[xyz_index] * pol[2][kg - lb_cube[2]][lzp];
+          coef_xy[lxy][1] += xyz[xyz_index] * pol[2][kg2 - lb_cube[2]][lzp];
           lxy++;
         }
         lxy += lzp;
@@ -377,12 +285,11 @@ static void collocate_core(const int lp, const int cmax,
  * \brief Collocate kernel for the orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
-static void collocate_ortho(const int lp, const double zetp,
-                            const double coef_xyz[lp + 1][lp + 1][lp + 1],
-                            const double dh[3][3], const double dh_inv[3][3],
-                            const double rp[3], const int npts_global[3],
-                            const int npts_local[3], const int shift_local[3],
-                            const double radius, double *grid) {
+static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
+                        const double dh_inv[3][3], const double rp[3],
+                        const int npts_global[3], const int npts_local[3],
+                        const int shift_local[3], const double radius,
+                        const double *xyz, double *grid) {
 
   // *** position of the gaussian product
   //
@@ -438,23 +345,16 @@ static void collocate_ortho(const int lp, const double zetp,
   const double(*pol)[2 * cmax + 1][lp + 1] =
       (const double(*)[2 * cmax + 1][lp + 1]) pol_mutable;
 
-  // Enable to run a much simpler, but also slower implementation.
-  if (false) {
-    collocate_core_simple(lp, cmax, coef_xyz, pol, lb_cube, ub_cube, dh, dh_inv,
-                          disr_radius, cubecenter, npts_global, npts_local,
-                          shift_local, grid);
-  } else {
-    // a mapping so that the ig corresponds to the right grid point
-    int map_mutable[3][2 * cmax + 1];
-    for (int i = 0; i < 3; i++) {
-      fill_map(lb_cube[i], ub_cube[i], cubecenter[i], npts_global[i],
-               shift_local[i], cmax, map_mutable[i]);
-    }
-    const int(*map)[2 * cmax + 1] = (const int(*)[2 * cmax + 1]) map_mutable;
-
-    collocate_core(lp, cmax, coef_xyz, pol, map, lb_cube, dh, dh_inv,
-                   disr_radius, npts_local, grid);
+  // a mapping so that the ig corresponds to the right grid point
+  int map_mutable[3][2 * cmax + 1];
+  for (int i = 0; i < 3; i++) {
+    fill_map(lb_cube[i], ub_cube[i], cubecenter[i], npts_global[i],
+             shift_local[i], cmax, map_mutable[i]);
   }
+  const int(*map)[2 * cmax + 1] = (const int(*)[2 * cmax + 1]) map_mutable;
+
+  collocate_core(lp, cmax, xyz, pol, map, lb_cube, dh, dh_inv, disr_radius,
+                 npts_local, grid);
 }
 
 /*******************************************************************************
@@ -462,8 +362,7 @@ static void collocate_ortho(const int lp, const double zetp,
  * \author Ole Schuett
  ******************************************************************************/
 static void collocate_general(const int border_mask, const int lp,
-                              const double zetp,
-                              const double coef_xyz[lp + 1][lp + 1][lp + 1],
+                              const double zetp, const double *xyz,
                               const double dh[3][3], const double dh_inv[3][3],
                               const double rp[3], const int npts_global[3],
                               const int npts_local[3], const int shift_local[3],
@@ -563,8 +462,10 @@ static void collocate_general(const int border_mask, const int lp,
                     const int jl = jlx + jly + jlz;
                     const int kl = klx + kly + klz;
                     const int lijk = coef_map[kl][jl][il];
+                    const int xyz_index = lz * (lp + 1) * (lp + 1) +
+                                          ly * (lp + 1) + lx; // xyz[lz][ly][lx]
                     coef_ijk[lijk - 1] +=
-                        coef_xyz[lz][ly][lx] * hmatgridp[ilx][0][0] *
+                        xyz[xyz_index] * hmatgridp[ilx][0][0] *
                         hmatgridp[jlx][1][0] * hmatgridp[klx][2][0] *
                         hmatgridp[ily][0][1] * hmatgridp[jly][1][1] *
                         hmatgridp[kly][2][1] * hmatgridp[ilz][0][2] *
@@ -785,55 +686,30 @@ void grid_ref_collocate_pgf_product(
 
   const int n1_prep = ncoset[la_max_prep];
   const int n2_prep = ncoset[lb_max_prep];
-  double pab_prep_mutable[n2_prep][n1_prep];
-  memset(pab_prep_mutable, 0, n2_prep * n1_prep * sizeof(double));
+  const size_t pab_prep_size = n2_prep * n1_prep;
+  double pab_prep[pab_prep_size];
+  memset(pab_prep, 0, pab_prep_size * sizeof(double));
   grid_ref_prepare_pab(func, o1, o2, la_max, la_min, lb_max, lb_min, zeta, zetb,
-                       n1, n2, pab, n1_prep, n2_prep, pab_prep_mutable);
-  const double(*pab_prep)[n1_prep] = (const double(*)[n1_prep])pab_prep_mutable;
+                       n1, n2, pab, n1_prep, n2_prep,
+                       (double(*)[n1_prep])pab_prep);
 
-  //   *** initialise the coefficient matrix, we transform the sum
-  //
-  // sum_{lxa,lya,lza,lxb,lyb,lzb} P_{lxa,lya,lza,lxb,lyb,lzb} *
-  //         (x-a_x)**lxa (y-a_y)**lya (z-a_z)**lza (x-b_x)**lxb (y-a_y)**lya
-  //         (z-a_z)**lza
-  //
-  // into
-  //
-  // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-p_x)**lxp (y-p_y)**lyp (z-p_z)**lzp
-  //
-  // where p is center of the product gaussian, and lp = la_max + lb_max
-  // (current implementation is l**7)
-  //
+  const size_t xyz_size = (lp + 1) * (lp + 1) * (lp + 1);
+  double xyz[xyz_size];
+  memset(xyz, 0, xyz_size * sizeof(double));
 
-  double alpha_mutable[3][lb_max_prep + 1][la_max_prep + 1][lp + 1];
-  prepare_alpha(ra, rb, rp, la_max_prep, lb_max_prep, alpha_mutable);
-  const double(*alpha)[lb_max_prep + 1][la_max_prep + 1][lp + 1] =
-      (const double(*)[lb_max_prep + 1][la_max_prep + 1][lp + 1]) alpha_mutable;
-
-  //
-  //   compute P_{lxp,lyp,lzp} given P_{lxa,lya,lza,lxb,lyb,lzb} and
-  //   alpha(ls,lxa,lxb,1) use a three step procedure we don't store zeros, so
-  //   counting is done using lxyz,lxy in order to have contiguous memory access
-  //   in collocate_fast.F
-  //
-
-  double coef_xyz_mutable[lp + 1][lp + 1][lp + 1];
-  prepare_coef(la_max_prep, la_min_prep, lb_max_prep, lb_min_prep, lp,
-               prefactor, alpha, pab_prep, coef_xyz_mutable);
-  const double(*coef_xyz)[lp + 1][lp + 1] =
-      (const double(*)[lp + 1][lp + 1]) coef_xyz_mutable;
+  pab_to_xyz(la_max_prep, la_min_prep, lb_max_prep, lb_min_prep, lp, prefactor,
+             ra, rb, rp, pab_prep, xyz);
 
   if (orthorhombic && border_mask == 0) {
     // Here we ignore bounds_owned and always collocate the entire cube,
     // thereby assuming that the cube fits into the local grid.
     grid_library_gather_stats((grid_library_stats){.ref_collocate_ortho = 1});
-    collocate_ortho(lp, zetp, coef_xyz, dh, dh_inv, rp, npts_global, npts_local,
-                    shift_local, radius, grid);
+    xyz_to_grid(lp, zetp, dh, dh_inv, rp, npts_global, npts_local, shift_local,
+                radius, xyz, grid);
   } else {
     grid_library_gather_stats((grid_library_stats){.ref_collocate_general = 1});
-    collocate_general(border_mask, lp, zetp, coef_xyz, dh, dh_inv, rp,
-                      npts_global, npts_local, shift_local, border_width,
-                      radius, grid);
+    collocate_general(border_mask, lp, zetp, xyz, dh, dh_inv, rp, npts_global,
+                      npts_local, shift_local, border_width, radius, grid);
   }
 }
 
