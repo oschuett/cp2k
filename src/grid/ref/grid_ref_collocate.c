@@ -126,6 +126,73 @@ static inline void ortho_xyz_to_xy(const int lp, const double pol_kg[lp + 1],
  * \brief TODO
  * \author Ole Schuett
  ******************************************************************************/
+static inline void ortho_xy_to_x(const int lp, const double pol_jg[lp + 1],
+                                 const double pol_jg2[lp + 1],
+                                 const double *coef_xy, double *coef_x) {
+
+  for (int lyp = 0; lyp <= lp; lyp++) {
+    for (int lxp = 0; lxp <= lp - lyp; lxp++) {
+      const int xy_index = lyp * (lp + 1) * 2 + lxp * 2; // coef_xy[lyp][lxp]
+      coef_x[lxp * 4 + 0] += coef_xy[xy_index + 0] * pol_jg[lyp];
+      coef_x[lxp * 4 + 1] += coef_xy[xy_index + 1] * pol_jg[lyp];
+      coef_x[lxp * 4 + 2] += coef_xy[xy_index + 0] * pol_jg2[lyp];
+      coef_x[lxp * 4 + 3] += coef_xy[xy_index + 1] * pol_jg2[lyp];
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void
+ortho_x_to_grid(const int lp, const int k, const int k2, const int jg,
+                const int jg2, const int cmax, const double kremain,
+                const double pol[3][2 * cmax + 1][lp + 1],
+                const int map[3][2 * cmax + 1], const double dh[3][3],
+                const double dh_inv[3][3], const int npts_local[3],
+                const double *coef_x, double *grid) {
+
+  const int j = map[1][jg + cmax];
+  const int j2 = map[1][jg2 + cmax];
+  const int jd = (2 * jg - 1) / 2; // distance from center in grid points
+  const double jr = jd * dh[1][1]; // distance from center in a.u.
+  const double jremain = kremain - jr * jr;
+  const int igmin = ceil(-1e-8 - sqrt(fmax(0.0, jremain)) * dh_inv[0][0]);
+  for (int ig = igmin; ig <= 0; ig++) {
+    const int ig2 = 1 - ig;
+    const int i = map[0][ig + cmax];
+    const int i2 = map[0][ig2 + cmax];
+
+    const int stride = npts_local[1] * npts_local[0];
+    const int grid_index_1 = k * stride + j * npts_local[0] + i;
+    const int grid_index_2 = k2 * stride + j * npts_local[0] + i;
+    const int grid_index_3 = k * stride + j2 * npts_local[0] + i;
+    const int grid_index_4 = k2 * stride + j2 * npts_local[0] + i;
+    const int grid_index_5 = k * stride + j * npts_local[0] + i2;
+    const int grid_index_6 = k2 * stride + j * npts_local[0] + i2;
+    const int grid_index_7 = k * stride + j2 * npts_local[0] + i2;
+    const int grid_index_8 = k2 * stride + j2 * npts_local[0] + i2;
+
+    for (int lxp = 0; lxp <= lp; lxp++) {
+      const double p1 = pol[0][ig + cmax][lxp];
+      const double p2 = pol[0][ig2 + cmax][lxp];
+      grid[grid_index_1] += coef_x[lxp * 4 + 0] * p1;
+      grid[grid_index_2] += coef_x[lxp * 4 + 1] * p1;
+      grid[grid_index_3] += coef_x[lxp * 4 + 2] * p1;
+      grid[grid_index_4] += coef_x[lxp * 4 + 3] * p1;
+      grid[grid_index_5] += coef_x[lxp * 4 + 0] * p2;
+      grid[grid_index_6] += coef_x[lxp * 4 + 1] * p2;
+      grid[grid_index_7] += coef_x[lxp * 4 + 2] * p2;
+      grid[grid_index_8] += coef_x[lxp * 4 + 3] * p2;
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
 static inline void
 ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
                  const double pol[3][2 * cmax + 1][lp + 1],
@@ -146,61 +213,13 @@ ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
   const int jgmin = ceil(-1e-8 - sqrt(fmax(0.0, kremain)) * dh_inv[1][1]);
   for (int jg = jgmin; jg <= 0; jg++) {
     const int jg2 = 1 - jg;
-    const int j = map[1][jg + cmax];
-    const int j2 = map[1][jg2 + cmax];
 
     // initialize coef_x
-    double coef_x[lp + 1][4];
+    double coef_x[(lp + 1) * 4];
     memset(coef_x, 0, (lp + 1) * 4 * sizeof(double));
-    for (int lyp = 0; lyp <= lp; lyp++) {
-      for (int lxp = 0; lxp <= lp - lyp; lxp++) {
-        const int xy_index = lyp * (lp + 1) * 2 + lxp * 2; // coef_xy[lyp][lxp]
-        coef_x[lxp][0] += coef_xy[xy_index + 0] * pol[1][jg + cmax][lyp];
-        coef_x[lxp][1] += coef_xy[xy_index + 1] * pol[1][jg + cmax][lyp];
-        coef_x[lxp][2] += coef_xy[xy_index + 0] * pol[1][jg2 + cmax][lyp];
-        coef_x[lxp][3] += coef_xy[xy_index + 1] * pol[1][jg2 + cmax][lyp];
-      }
-    }
-
-    const int jd = (2 * jg - 1) / 2; // distance from center in grid points
-    const double jr = jd * dh[1][1]; // distance from center in a.u.
-    const double jremain = kremain - jr * jr;
-    const int igmin = ceil(-1e-8 - sqrt(fmax(0.0, jremain)) * dh_inv[0][0]);
-    for (int ig = igmin; ig <= 0; ig++) {
-      const int ig2 = 1 - ig;
-      const int i = map[0][ig + cmax];
-      const int i2 = map[0][ig2 + cmax];
-
-      double s01 = 0.0;
-      double s02 = 0.0;
-      double s03 = 0.0;
-      double s04 = 0.0;
-      double s05 = 0.0;
-      double s06 = 0.0;
-      double s07 = 0.0;
-      double s08 = 0.0;
-
-      for (int lxp = 0; lxp <= lp; lxp++) {
-        s01 += coef_x[lxp][0] * pol[0][ig + cmax][lxp];
-        s02 += coef_x[lxp][1] * pol[0][ig + cmax][lxp];
-        s03 += coef_x[lxp][2] * pol[0][ig + cmax][lxp];
-        s04 += coef_x[lxp][3] * pol[0][ig + cmax][lxp];
-        s05 += coef_x[lxp][0] * pol[0][ig2 + cmax][lxp];
-        s06 += coef_x[lxp][1] * pol[0][ig2 + cmax][lxp];
-        s07 += coef_x[lxp][2] * pol[0][ig2 + cmax][lxp];
-        s08 += coef_x[lxp][3] * pol[0][ig2 + cmax][lxp];
-      }
-
-      const int stride = npts_local[1] * npts_local[0];
-      grid[k * stride + j * npts_local[0] + i] += s01;
-      grid[k2 * stride + j * npts_local[0] + i] += s02;
-      grid[k * stride + j2 * npts_local[0] + i] += s03;
-      grid[k2 * stride + j2 * npts_local[0] + i] += s04;
-      grid[k * stride + j * npts_local[0] + i2] += s05;
-      grid[k2 * stride + j * npts_local[0] + i2] += s06;
-      grid[k * stride + j2 * npts_local[0] + i2] += s07;
-      grid[k2 * stride + j2 * npts_local[0] + i2] += s08;
-    }
+    ortho_xy_to_x(lp, pol[1][jg + cmax], pol[1][jg2 + cmax], coef_xy, coef_x);
+    ortho_x_to_grid(lp, k, k2, jg, jg2, cmax, kremain, pol, map, dh, dh_inv,
+                    npts_local, coef_x, grid);
   }
 }
 
