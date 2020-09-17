@@ -126,7 +126,7 @@ static void fill_pol(const double dr, const double roffset, const int lb_cube,
     double pg = t_exp_min_1;
     // pg  = EXP(-zetp*rpg**2)
     for (int icoef = 0; icoef <= lp; icoef++) {
-      pol[ig - lb_cube][icoef] = pg;
+      pol[ig + cmax][icoef] = pg;
       pg *= rpg;
     }
   }
@@ -140,7 +140,7 @@ static void fill_pol(const double dr, const double roffset, const int lb_cube,
     double pg = t_exp_plus_1;
     // pg  = EXP(-zetp*rpg**2)
     for (int icoef = 0; icoef <= lp; icoef++) {
-      pol[1 - ig - lb_cube][icoef] = pg;
+      pol[1 - ig + cmax][icoef] = pg;
       pg *= rpg;
     }
   }
@@ -174,10 +174,9 @@ static inline void ortho_xyz_to_xy(const int lp, const double pol_kg[lp + 1],
 static inline void
 ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
                  const double pol[3][2 * cmax + 1][lp + 1],
-                 const int map[3][2 * cmax + 1], const int lb_cube[3],
-                 const double dh[3][3], const double dh_inv[3][3],
-                 const double disr_radius, const int npts_local[3],
-                 const double *coef_xy, double *grid) {
+                 const int map[3][2 * cmax + 1], const double dh[3][3],
+                 const double dh_inv[3][3], const double disr_radius,
+                 const int npts_local[3], const double *coef_xy, double *grid) {
 
   const int k = map[2][kg + cmax];
   const int k2 = map[2][kg2 + cmax];
@@ -196,11 +195,10 @@ ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
     for (int lyp = 0; lyp <= lp; lyp++) {
       for (int lxp = 0; lxp <= lp - lyp; lxp++) {
         const int xy_index = lyp * (lp + 1) * 2 + lxp * 2; // coef_xy[lyp][lxp]
-        // TODO: coule we use cmax instead of lb_cube here?
-        coef_x[lxp][0] += coef_xy[xy_index + 0] * pol[1][jg - lb_cube[1]][lyp];
-        coef_x[lxp][1] += coef_xy[xy_index + 1] * pol[1][jg - lb_cube[1]][lyp];
-        coef_x[lxp][2] += coef_xy[xy_index + 0] * pol[1][jg2 - lb_cube[1]][lyp];
-        coef_x[lxp][3] += coef_xy[xy_index + 1] * pol[1][jg2 - lb_cube[1]][lyp];
+        coef_x[lxp][0] += coef_xy[xy_index + 0] * pol[1][jg + cmax][lyp];
+        coef_x[lxp][1] += coef_xy[xy_index + 1] * pol[1][jg + cmax][lyp];
+        coef_x[lxp][2] += coef_xy[xy_index + 0] * pol[1][jg2 + cmax][lyp];
+        coef_x[lxp][3] += coef_xy[xy_index + 1] * pol[1][jg2 + cmax][lyp];
       }
     }
 
@@ -223,14 +221,14 @@ ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
       double s08 = 0.0;
 
       for (int lxp = 0; lxp <= lp; lxp++) {
-        s01 += coef_x[lxp][0] * pol[0][ig - lb_cube[0]][lxp];
-        s02 += coef_x[lxp][1] * pol[0][ig - lb_cube[0]][lxp];
-        s03 += coef_x[lxp][2] * pol[0][ig - lb_cube[0]][lxp];
-        s04 += coef_x[lxp][3] * pol[0][ig - lb_cube[0]][lxp];
-        s05 += coef_x[lxp][0] * pol[0][ig2 - lb_cube[0]][lxp];
-        s06 += coef_x[lxp][1] * pol[0][ig2 - lb_cube[0]][lxp];
-        s07 += coef_x[lxp][2] * pol[0][ig2 - lb_cube[0]][lxp];
-        s08 += coef_x[lxp][3] * pol[0][ig2 - lb_cube[0]][lxp];
+        s01 += coef_x[lxp][0] * pol[0][ig + cmax][lxp];
+        s02 += coef_x[lxp][1] * pol[0][ig + cmax][lxp];
+        s03 += coef_x[lxp][2] * pol[0][ig + cmax][lxp];
+        s04 += coef_x[lxp][3] * pol[0][ig + cmax][lxp];
+        s05 += coef_x[lxp][0] * pol[0][ig2 + cmax][lxp];
+        s06 += coef_x[lxp][1] * pol[0][ig2 + cmax][lxp];
+        s07 += coef_x[lxp][2] * pol[0][ig2 + cmax][lxp];
+        s08 += coef_x[lxp][3] * pol[0][ig2 + cmax][lxp];
       }
 
       const int stride = npts_local[1] * npts_local[0];
@@ -254,7 +252,7 @@ ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
  ******************************************************************************/
 static void collocate_core(const int lp, const int cmax, const double *xyz,
                            const double pol[3][2 * cmax + 1][lp + 1],
-                           const int map[3][2 * cmax + 1], const int lb_cube[3],
+                           const int map[3][2 * cmax + 1],
                            const double dh[3][3], const double dh_inv[3][3],
                            const double disr_radius, const int npts_local[3],
                            double *grid) {
@@ -271,10 +269,9 @@ static void collocate_core(const int lp, const int cmax, const double *xyz,
     // initialize coef_xy
     double coef_xy[(lp + 1) * (lp + 1) * 2];
     memset(coef_xy, 0, (lp + 1) * (lp + 1) * 2 * sizeof(double));
-    ortho_xyz_to_xy(lp, pol[2][kg - lb_cube[2]], pol[2][kg2 - lb_cube[2]], xyz,
-                    coef_xy);
-    ortho_xy_to_grid(lp, kg, kg2, cmax, pol, map, lb_cube, dh, dh_inv,
-                     disr_radius, npts_local, coef_xy, grid);
+    ortho_xyz_to_xy(lp, pol[2][kg + cmax], pol[2][kg2 + cmax], xyz, coef_xy);
+    ortho_xy_to_grid(lp, kg, kg2, cmax, pol, map, dh, dh_inv, disr_radius,
+                     npts_local, coef_xy, grid);
   }
 }
 
@@ -352,8 +349,8 @@ static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
   }
   const int(*map)[2 * cmax + 1] = (const int(*)[2 * cmax + 1]) map_mutable;
 
-  collocate_core(lp, cmax, xyz, pol, map, lb_cube, dh, dh_inv, disr_radius,
-                 npts_local, grid);
+  collocate_core(lp, cmax, xyz, pol, map, dh, dh_inv, disr_radius, npts_local,
+                 grid);
 }
 
 /*******************************************************************************
