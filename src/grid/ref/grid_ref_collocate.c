@@ -102,26 +102,6 @@ static void pab_to_xyz(const int la_max, const int la_min, const int lb_max,
 }
 
 /*******************************************************************************
- * \brief Computes (x-xp)**lp*exp(..) for all cube points in one dimension.
- *        Used only in the orthorhombic case.
- * \author Ole Schuett
- ******************************************************************************/
-static inline void fill_pol(const double dr, const double roffset, const int lp,
-                            const int cmax, const double zetp,
-                            double pol[2 * cmax + 1][lp + 1]) {
-
-  for (int ig = -cmax; ig <= +cmax; ig++) {
-    const double rpg = ig * dr - roffset;
-    const double prefactor = exp(-zetp * rpg * rpg);
-    double pow_l = prefactor;
-    for (int l = 0; l <= lp; l++) {
-      pol[ig + cmax][l] = pow_l; // prefactor * pow(rpg, l)
-      pow_l *= rpg;
-    }
-  }
-}
-
-/*******************************************************************************
  * \brief TODO
  * \author Ole Schuett
  ******************************************************************************/
@@ -302,24 +282,29 @@ static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
   }
 
   // cmax = MAXVAL(ub_cube)
-  int cmax = INT_MIN;
-  for (int i = 0; i < 3; i++) {
-    cmax = imax(cmax, ub_cube[i]);
-  }
+  const int cmax = imax(imax(ub_cube[0], ub_cube[1]), ub_cube[2]);
 
+  // Precompute (x-xp)**lp*exp(..) for each direction.
   double pol_mutable[3][2 * cmax + 1][lp + 1];
   for (int i = 0; i < 3; i++) {
-    fill_pol(dh[i][i], roffset[i], lp, cmax, zetp, pol_mutable[i]);
+    for (int k = -cmax; k <= +cmax; k++) {
+      const double rpg = k * dh[i][i] - roffset[i];
+      double pow_l = exp(-zetp * rpg * rpg);
+      for (int l = 0; l <= lp; l++) {
+        pol_mutable[i][k + cmax][l] = pow_l; // exp(-zetp*rpg*rpg) * pow(rpg, l)
+        pow_l *= rpg;
+      }
+    }
   }
   const double(*pol)[2 * cmax + 1][lp + 1] =
       (const double(*)[2 * cmax + 1][lp + 1]) pol_mutable;
 
-  // Precompute mapping from cube to grid indices.
+  // Precompute mapping from cube to grid indices for each direction
   int map_mutable[3][2 * cmax + 1];
   for (int i = 0; i < 3; i++) {
-    for (int ig = lb_cube[i]; ig <= ub_cube[i]; ig++) {
-      map_mutable[i][ig + cmax] =
-          modulo(cubecenter[i] + ig - shift_local[i], npts_global[i]);
+    for (int k = -cmax; k <= +cmax; k++) {
+      map_mutable[i][k + cmax] =
+          modulo(cubecenter[i] + k - shift_local[i], npts_global[i]);
     }
   }
   const int(*map)[2 * cmax + 1] = (const int(*)[2 * cmax + 1]) map_mutable;
