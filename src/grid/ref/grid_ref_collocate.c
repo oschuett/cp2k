@@ -171,21 +171,17 @@ static void collocate_core(const int lp, const int cmax, const double *xyz,
     const int k2 = map[2][kg2 + cmax];
 
     // initialize coef_xy
-    const int ncoef_xy = (lp + 1) * (lp + 2) / 2;
-    double coef_xy[ncoef_xy][2];
-    memset(coef_xy, 0, ncoef_xy * 2 * sizeof(double));
-
+    double coef_xy[lp + 1][lp + 1][2];
+    memset(coef_xy, 0, (lp + 1) * (lp + 1) * 2 * sizeof(double));
     for (int lzp = 0; lzp <= lp; lzp++) {
-      int lxy = 0;
       for (int lyp = 0; lyp <= lp - lzp; lyp++) {
         for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
           const int xyz_index = lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) +
                                 lxp; // xyz[lzp][lyp][lxp]
-          coef_xy[lxy][0] += xyz[xyz_index] * pol[2][kg - lb_cube[2]][lzp];
-          coef_xy[lxy][1] += xyz[xyz_index] * pol[2][kg2 - lb_cube[2]][lzp];
-          lxy++;
+          coef_xy[lyp][lxp][0] += xyz[xyz_index] * pol[2][kg - lb_cube[2]][lzp];
+          coef_xy[lyp][lxp][1] +=
+              xyz[xyz_index] * pol[2][kg2 - lb_cube[2]][lzp];
         }
-        lxy += lzp;
       }
     }
 
@@ -200,20 +196,15 @@ static void collocate_core(const int lp, const int cmax, const double *xyz,
 
       // initialize coef_x
       double coef_x[lp + 1][4];
-      for (int i = 0; i < lp + 1; i++) {
-        for (int j = 0; j < 4; j++) {
-          coef_x[i][j] = 0.0;
-        }
-      }
-
-      int lxy = 0;
+      memset(coef_x, 0, (lp + 1) * 4 * sizeof(double));
       for (int lyp = 0; lyp <= lp; lyp++) {
         for (int lxp = 0; lxp <= lp - lyp; lxp++) {
-          coef_x[lxp][0] += coef_xy[lxy][0] * pol[1][jg - lb_cube[1]][lyp];
-          coef_x[lxp][1] += coef_xy[lxy][1] * pol[1][jg - lb_cube[1]][lyp];
-          coef_x[lxp][2] += coef_xy[lxy][0] * pol[1][jg2 - lb_cube[1]][lyp];
-          coef_x[lxp][3] += coef_xy[lxy][1] * pol[1][jg2 - lb_cube[1]][lyp];
-          lxy++;
+          coef_x[lxp][0] += coef_xy[lyp][lxp][0] * pol[1][jg - lb_cube[1]][lyp];
+          coef_x[lxp][1] += coef_xy[lyp][lxp][1] * pol[1][jg - lb_cube[1]][lyp];
+          coef_x[lxp][2] +=
+              coef_xy[lyp][lxp][0] * pol[1][jg2 - lb_cube[1]][lyp];
+          coef_x[lxp][3] +=
+              coef_xy[lyp][lxp][1] * pol[1][jg2 - lb_cube[1]][lyp];
         }
       }
 
