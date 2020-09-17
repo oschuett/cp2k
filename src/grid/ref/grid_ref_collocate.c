@@ -133,6 +133,11 @@ ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
                  const double dh_inv[3][3], const double disr_radius,
                  const int npts_local[3], const double *coef_xy, double *grid) {
 
+  // The cube contains an even number of grid points in each direction and
+  // collocation is always performed on a pair of two opposing grid points.
+  // Hence, the points with index 0 and 1 are both assigned distance zero via
+  // the formular distance=(2*index-1)/2.
+
   const int k = map[2][kg + cmax];
   const int k2 = map[2][kg2 + cmax];
   const int kd = (2 * kg - 1) / 2; // distance from center in grid points
@@ -196,37 +201,6 @@ ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
       grid[k * stride + j2 * npts_local[0] + i2] += s07;
       grid[k2 * stride + j2 * npts_local[0] + i2] += s08;
     }
-  }
-}
-
-/*******************************************************************************
- * \brief Fills the 3D cube by taking the outer product of the 1D pol arrays.
- *        The majority of cpu cycles are spend in this routine.
- *        Used only in the orthorhombic case.
- * \author Ole Schuett
- ******************************************************************************/
-static void collocate_core(const int lp, const int cmax, const double *xyz,
-                           const double pol[3][2 * cmax + 1][lp + 1],
-                           const int map[3][2 * cmax + 1],
-                           const double dh[3][3], const double dh_inv[3][3],
-                           const double disr_radius, const int npts_local[3],
-                           double *grid) {
-
-  // The cube contains an even number of grid points in each direction and
-  // collocation is always performed on a pair of two opposing grid points.
-  // Hence, the points with index 0 and 1 are both assigned distance zero via
-  // the formular distance=(2*index-1)/2.
-
-  const int kgmin = ceil(-1e-8 - disr_radius * dh_inv[2][2]);
-  for (int kg = kgmin; kg <= 0; kg++) {
-    const int kg2 = 1 - kg;
-
-    // initialize coef_xy
-    double coef_xy[(lp + 1) * (lp + 1) * 2];
-    memset(coef_xy, 0, (lp + 1) * (lp + 1) * 2 * sizeof(double));
-    ortho_xyz_to_xy(lp, pol[2][kg + cmax], pol[2][kg2 + cmax], xyz, coef_xy);
-    ortho_xy_to_grid(lp, kg, kg2, cmax, pol, map, dh, dh_inv, disr_radius,
-                     npts_local, coef_xy, grid);
   }
 }
 
@@ -309,8 +283,17 @@ static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
   }
   const int(*map)[2 * cmax + 1] = (const int(*)[2 * cmax + 1]) map_mutable;
 
-  collocate_core(lp, cmax, xyz, pol, map, dh, dh_inv, disr_radius, npts_local,
-                 grid);
+  // Loop over k dimension of the cube.
+  const int kgmin = ceil(-1e-8 - disr_radius * dh_inv[2][2]);
+  for (int kg = kgmin; kg <= 0; kg++) {
+    const int kg2 = 1 - kg;
+    // initialize coef_xy
+    double coef_xy[(lp + 1) * (lp + 1) * 2];
+    memset(coef_xy, 0, (lp + 1) * (lp + 1) * 2 * sizeof(double));
+    ortho_xyz_to_xy(lp, pol[2][kg + cmax], pol[2][kg2 + cmax], xyz, coef_xy);
+    ortho_xy_to_grid(lp, kg, kg2, cmax, pol, map, dh, dh_inv, disr_radius,
+                     npts_local, coef_xy, grid);
+  }
 }
 
 /*******************************************************************************
