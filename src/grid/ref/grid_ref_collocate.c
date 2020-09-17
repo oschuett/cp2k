@@ -106,42 +106,17 @@ static void pab_to_xyz(const int la_max, const int la_min, const int lb_max,
  *        Used only in the orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
-static void fill_pol(const double dr, const double roffset, const int lb_cube,
-                     const int lp, const int cmax, const double zetp,
-                     double pol[2 * cmax + 1][lp + 1]) {
+static inline void fill_pol(const double dr, const double roffset, const int lp,
+                            const int cmax, const double zetp,
+                            double pol[2 * cmax + 1][lp + 1]) {
 
-  //  Reuse the result from the previous gridpoint to avoid to many exps:
-  //  exp( -a*(x+d)**2) = exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
-  //  exp(-2*a*(x+d)*d) = exp(-2*a*x*d)*exp(-2*a*d**2)
-
-  const double t_exp_1 = exp(-zetp * pow(dr, 2));
-  const double t_exp_2 = pow(t_exp_1, 2);
-
-  double t_exp_min_1 = exp(-zetp * pow(+dr - roffset, 2));
-  double t_exp_min_2 = exp(-2 * zetp * (+dr - roffset) * (-dr));
-  for (int ig = 0; ig >= lb_cube; ig--) {
+  for (int ig = -cmax; ig <= +cmax; ig++) {
     const double rpg = ig * dr - roffset;
-    t_exp_min_1 *= t_exp_min_2 * t_exp_1;
-    t_exp_min_2 *= t_exp_2;
-    double pg = t_exp_min_1;
-    // pg  = EXP(-zetp*rpg**2)
-    for (int icoef = 0; icoef <= lp; icoef++) {
-      pol[ig + cmax][icoef] = pg;
-      pg *= rpg;
-    }
-  }
-
-  double t_exp_plus_1 = exp(-zetp * pow(-roffset, 2));
-  double t_exp_plus_2 = exp(-2 * zetp * (-roffset) * (+dr));
-  for (int ig = 0; ig >= lb_cube; ig--) {
-    const double rpg = (1 - ig) * dr - roffset;
-    t_exp_plus_1 *= t_exp_plus_2 * t_exp_1;
-    t_exp_plus_2 *= t_exp_2;
-    double pg = t_exp_plus_1;
-    // pg  = EXP(-zetp*rpg**2)
-    for (int icoef = 0; icoef <= lp; icoef++) {
-      pol[1 - ig + cmax][icoef] = pg;
-      pg *= rpg;
+    const double prefactor = exp(-zetp * rpg * rpg);
+    double pow_l = prefactor;
+    for (int l = 0; l <= lp; l++) {
+      pol[ig + cmax][l] = pow_l; // prefactor * pow(rpg, l)
+      pow_l *= rpg;
     }
   }
 }
@@ -334,7 +309,7 @@ static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
 
   double pol_mutable[3][2 * cmax + 1][lp + 1];
   for (int i = 0; i < 3; i++) {
-    fill_pol(dh[i][i], roffset[i], lb_cube[i], lp, cmax, zetp, pol_mutable[i]);
+    fill_pol(dh[i][i], roffset[i], lp, cmax, zetp, pol_mutable[i]);
   }
   const double(*pol)[2 * cmax + 1][lp + 1] =
       (const double(*)[2 * cmax + 1][lp + 1]) pol_mutable;
