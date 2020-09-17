@@ -147,6 +147,106 @@ static void fill_pol(const double dr, const double roffset, const int lb_cube,
 }
 
 /*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void ortho_xyz_to_xy(const int lp, const double pol_kg[lp + 1],
+                                   const double pol_kg2[lp + 1],
+                                   const double *xyz, double *coef_xy) {
+
+  for (int lzp = 0; lzp <= lp; lzp++) {
+    for (int lyp = 0; lyp <= lp - lzp; lyp++) {
+      for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
+        const int xyz_index = lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) +
+                              lxp;                         // xyz[lzp][lyp][lxp]
+        const int xy_index = lyp * (lp + 1) * 2 + lxp * 2; // coef_xy[lyp][lxp]
+        coef_xy[xy_index + 0] += xyz[xyz_index] * pol_kg[lzp];
+        coef_xy[xy_index + 1] += xyz[xyz_index] * pol_kg2[lzp];
+      }
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void
+ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
+                 const double pol[3][2 * cmax + 1][lp + 1],
+                 const int map[3][2 * cmax + 1], const int lb_cube[3],
+                 const double dh[3][3], const double dh_inv[3][3],
+                 const double disr_radius, const int npts_local[3],
+                 const double *coef_xy, double *grid) {
+
+  const int k = map[2][kg + cmax];
+  const int k2 = map[2][kg2 + cmax];
+  const int kd = (2 * kg - 1) / 2; // distance from center in grid points
+  const double kr = kd * dh[2][2]; // distance from center in a.u.
+  const double kremain = disr_radius * disr_radius - kr * kr;
+  const int jgmin = ceil(-1e-8 - sqrt(fmax(0.0, kremain)) * dh_inv[1][1]);
+  for (int jg = jgmin; jg <= 0; jg++) {
+    const int jg2 = 1 - jg;
+    const int j = map[1][jg + cmax];
+    const int j2 = map[1][jg2 + cmax];
+
+    // initialize coef_x
+    double coef_x[lp + 1][4];
+    memset(coef_x, 0, (lp + 1) * 4 * sizeof(double));
+    for (int lyp = 0; lyp <= lp; lyp++) {
+      for (int lxp = 0; lxp <= lp - lyp; lxp++) {
+        const int xy_index = lyp * (lp + 1) * 2 + lxp * 2; // coef_xy[lyp][lxp]
+        // TODO: coule we use cmax instead of lb_cube here?
+        coef_x[lxp][0] += coef_xy[xy_index + 0] * pol[1][jg - lb_cube[1]][lyp];
+        coef_x[lxp][1] += coef_xy[xy_index + 1] * pol[1][jg - lb_cube[1]][lyp];
+        coef_x[lxp][2] += coef_xy[xy_index + 0] * pol[1][jg2 - lb_cube[1]][lyp];
+        coef_x[lxp][3] += coef_xy[xy_index + 1] * pol[1][jg2 - lb_cube[1]][lyp];
+      }
+    }
+
+    const int jd = (2 * jg - 1) / 2; // distance from center in grid points
+    const double jr = jd * dh[1][1]; // distance from center in a.u.
+    const double jremain = kremain - jr * jr;
+    const int igmin = ceil(-1e-8 - sqrt(fmax(0.0, jremain)) * dh_inv[0][0]);
+    for (int ig = igmin; ig <= 0; ig++) {
+      const int ig2 = 1 - ig;
+      const int i = map[0][ig + cmax];
+      const int i2 = map[0][ig2 + cmax];
+
+      double s01 = 0.0;
+      double s02 = 0.0;
+      double s03 = 0.0;
+      double s04 = 0.0;
+      double s05 = 0.0;
+      double s06 = 0.0;
+      double s07 = 0.0;
+      double s08 = 0.0;
+
+      for (int lxp = 0; lxp <= lp; lxp++) {
+        s01 += coef_x[lxp][0] * pol[0][ig - lb_cube[0]][lxp];
+        s02 += coef_x[lxp][1] * pol[0][ig - lb_cube[0]][lxp];
+        s03 += coef_x[lxp][2] * pol[0][ig - lb_cube[0]][lxp];
+        s04 += coef_x[lxp][3] * pol[0][ig - lb_cube[0]][lxp];
+        s05 += coef_x[lxp][0] * pol[0][ig2 - lb_cube[0]][lxp];
+        s06 += coef_x[lxp][1] * pol[0][ig2 - lb_cube[0]][lxp];
+        s07 += coef_x[lxp][2] * pol[0][ig2 - lb_cube[0]][lxp];
+        s08 += coef_x[lxp][3] * pol[0][ig2 - lb_cube[0]][lxp];
+      }
+
+      const int stride = npts_local[1] * npts_local[0];
+      grid[k * stride + j * npts_local[0] + i] += s01;
+      grid[k2 * stride + j * npts_local[0] + i] += s02;
+      grid[k * stride + j2 * npts_local[0] + i] += s03;
+      grid[k2 * stride + j2 * npts_local[0] + i] += s04;
+      grid[k * stride + j * npts_local[0] + i2] += s05;
+      grid[k2 * stride + j * npts_local[0] + i2] += s06;
+      grid[k * stride + j2 * npts_local[0] + i2] += s07;
+      grid[k2 * stride + j2 * npts_local[0] + i2] += s08;
+    }
+  }
+}
+
+/*******************************************************************************
  * \brief Fills the 3D cube by taking the outer product of the 1D pol arrays.
  *        The majority of cpu cycles are spend in this routine.
  *        Used only in the orthorhombic case.
@@ -167,87 +267,14 @@ static void collocate_core(const int lp, const int cmax, const double *xyz,
   const int kgmin = ceil(-1e-8 - disr_radius * dh_inv[2][2]);
   for (int kg = kgmin; kg <= 0; kg++) {
     const int kg2 = 1 - kg;
-    const int k = map[2][kg + cmax];
-    const int k2 = map[2][kg2 + cmax];
 
     // initialize coef_xy
-    double coef_xy[lp + 1][lp + 1][2];
+    double coef_xy[(lp + 1) * (lp + 1) * 2];
     memset(coef_xy, 0, (lp + 1) * (lp + 1) * 2 * sizeof(double));
-    for (int lzp = 0; lzp <= lp; lzp++) {
-      for (int lyp = 0; lyp <= lp - lzp; lyp++) {
-        for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
-          const int xyz_index = lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) +
-                                lxp; // xyz[lzp][lyp][lxp]
-          coef_xy[lyp][lxp][0] += xyz[xyz_index] * pol[2][kg - lb_cube[2]][lzp];
-          coef_xy[lyp][lxp][1] +=
-              xyz[xyz_index] * pol[2][kg2 - lb_cube[2]][lzp];
-        }
-      }
-    }
-
-    const int kd = (2 * kg - 1) / 2; // distance from center in grid points
-    const double kr = kd * dh[2][2]; // distance from center in a.u.
-    const double kremain = disr_radius * disr_radius - kr * kr;
-    const int jgmin = ceil(-1e-8 - sqrt(fmax(0.0, kremain)) * dh_inv[1][1]);
-    for (int jg = jgmin; jg <= 0; jg++) {
-      const int jg2 = 1 - jg;
-      const int j = map[1][jg + cmax];
-      const int j2 = map[1][jg2 + cmax];
-
-      // initialize coef_x
-      double coef_x[lp + 1][4];
-      memset(coef_x, 0, (lp + 1) * 4 * sizeof(double));
-      for (int lyp = 0; lyp <= lp; lyp++) {
-        for (int lxp = 0; lxp <= lp - lyp; lxp++) {
-          coef_x[lxp][0] += coef_xy[lyp][lxp][0] * pol[1][jg - lb_cube[1]][lyp];
-          coef_x[lxp][1] += coef_xy[lyp][lxp][1] * pol[1][jg - lb_cube[1]][lyp];
-          coef_x[lxp][2] +=
-              coef_xy[lyp][lxp][0] * pol[1][jg2 - lb_cube[1]][lyp];
-          coef_x[lxp][3] +=
-              coef_xy[lyp][lxp][1] * pol[1][jg2 - lb_cube[1]][lyp];
-        }
-      }
-
-      const int jd = (2 * jg - 1) / 2; // distance from center in grid points
-      const double jr = jd * dh[1][1]; // distance from center in a.u.
-      const double jremain = kremain - jr * jr;
-      const int igmin = ceil(-1e-8 - sqrt(fmax(0.0, jremain)) * dh_inv[0][0]);
-      for (int ig = igmin; ig <= 0; ig++) {
-        const int ig2 = 1 - ig;
-        const int i = map[0][ig + cmax];
-        const int i2 = map[0][ig2 + cmax];
-
-        double s01 = 0.0;
-        double s02 = 0.0;
-        double s03 = 0.0;
-        double s04 = 0.0;
-        double s05 = 0.0;
-        double s06 = 0.0;
-        double s07 = 0.0;
-        double s08 = 0.0;
-
-        for (int lxp = 0; lxp <= lp; lxp++) {
-          s01 += coef_x[lxp][0] * pol[0][ig - lb_cube[0]][lxp];
-          s02 += coef_x[lxp][1] * pol[0][ig - lb_cube[0]][lxp];
-          s03 += coef_x[lxp][2] * pol[0][ig - lb_cube[0]][lxp];
-          s04 += coef_x[lxp][3] * pol[0][ig - lb_cube[0]][lxp];
-          s05 += coef_x[lxp][0] * pol[0][ig2 - lb_cube[0]][lxp];
-          s06 += coef_x[lxp][1] * pol[0][ig2 - lb_cube[0]][lxp];
-          s07 += coef_x[lxp][2] * pol[0][ig2 - lb_cube[0]][lxp];
-          s08 += coef_x[lxp][3] * pol[0][ig2 - lb_cube[0]][lxp];
-        }
-
-        const int stride = npts_local[1] * npts_local[0];
-        grid[k * stride + j * npts_local[0] + i] += s01;
-        grid[k2 * stride + j * npts_local[0] + i] += s02;
-        grid[k * stride + j2 * npts_local[0] + i] += s03;
-        grid[k2 * stride + j2 * npts_local[0] + i] += s04;
-        grid[k * stride + j * npts_local[0] + i2] += s05;
-        grid[k2 * stride + j * npts_local[0] + i2] += s06;
-        grid[k * stride + j2 * npts_local[0] + i2] += s07;
-        grid[k2 * stride + j2 * npts_local[0] + i2] += s08;
-      }
-    }
+    ortho_xyz_to_xy(lp, pol[2][kg - lb_cube[2]], pol[2][kg2 - lb_cube[2]], xyz,
+                    coef_xy);
+    ortho_xy_to_grid(lp, kg, kg2, cmax, pol, map, lb_cube, dh, dh_inv,
+                     disr_radius, npts_local, coef_xy, grid);
   }
 }
 
