@@ -18,140 +18,16 @@
 #include "grid_ref_prepare_pab.h"
 
 /*******************************************************************************
- * \brief Compute coefficients for all combinations of angular momentum.
- *        Results are passed to collocate_ortho and collocate_general.
- * \author Ole Schuett
- ******************************************************************************/
-static void pab_to_xyz(const int la_max, const int la_min, const int lb_max,
-                       const int lb_min, const int lp, const double prefactor,
-                       const double ra[3], const double rb[3],
-                       const double rp[3], const double *pab, double *xyz) {
-
-  // Computes the polynomial expansion coefficients:
-  //     (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
-  double alpha[3][lb_max + 1][la_max + 1][lp + 1];
-  memset(alpha, 0, 3 * (lb_max + 1) * (la_max + 1) * (lp + 1) * sizeof(double));
-  for (int i = 0; i < 3; i++) {
-    const double drpa = rp[i] - ra[i];
-    const double drpb = rp[i] - rb[i];
-    for (int lxa = 0; lxa <= la_max; lxa++) {
-      for (int lxb = 0; lxb <= lb_max; lxb++) {
-        double binomial_k_lxa = 1.0;
-        double a = 1.0;
-        for (int k = 0; k <= lxa; k++) {
-          double binomial_l_lxb = 1.0;
-          double b = 1.0;
-          for (int l = 0; l <= lxb; l++) {
-            alpha[i][lxb][lxa][lxa - l + lxb - k] +=
-                binomial_k_lxa * binomial_l_lxb * a * b;
-            binomial_l_lxb *= ((double)(lxb - l)) / ((double)(l + 1));
-            b *= drpb;
-          }
-          binomial_k_lxa *= ((double)(lxa - k)) / ((double)(k + 1));
-          a *= drpa;
-        }
-      }
-    }
-  }
-
-  //   *** initialise the coefficient matrix, we transform the sum
-  //
-  // sum_{lxa,lya,lza,lxb,lyb,lzb} P_{lxa,lya,lza,lxb,lyb,lzb} *
-  //         (x-a_x)**lxa (y-a_y)**lya (z-a_z)**lza (x-b_x)**lxb (y-a_y)**lya
-  //         (z-a_z)**lza
-  //
-  // into
-  //
-  // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-p_x)**lxp (y-p_y)**lyp (z-p_z)**lzp
-  //
-  // where p is center of the product gaussian, and lp = la_max + lb_max
-  // (current implementation is l**7)
-  //
-
-  for (int lzb = 0; lzb <= lb_max; lzb++) {
-    for (int lza = 0; lza <= la_max; lza++) {
-      for (int lyb = 0; lyb <= lb_max - lzb; lyb++) {
-        for (int lya = 0; lya <= la_max - lza; lya++) {
-          const int lxb_min = imax(lb_min - lzb - lyb, 0);
-          const int lxa_min = imax(la_min - lza - lya, 0);
-          for (int lxb = lxb_min; lxb <= lb_max - lzb - lyb; lxb++) {
-            for (int lxa = lxa_min; lxa <= la_max - lza - lya; lxa++) {
-              const int ico = coset(lxa, lya, lza);
-              const int jco = coset(lxb, lyb, lzb);
-              const int pab_index = jco * ncoset[la_max] + ico; // pab[jco][ico]
-
-              for (int lzp = 0; lzp <= lza + lzb; lzp++) {
-                for (int lyp = 0; lyp <= lp - lza - lzb; lyp++) {
-                  for (int lxp = 0; lxp <= lp - lza - lzb - lyp; lxp++) {
-                    const double p = alpha[0][lxb][lxa][lxp] *
-                                     alpha[1][lyb][lya][lyp] *
-                                     alpha[2][lzb][lza][lzp] * prefactor;
-                    const int xyz_index = lzp * (lp + 1) * (lp + 1) +
-                                          lyp * (lp + 1) +
-                                          lxp; // xyz[lzp][lyp][lxp]
-                    xyz[xyz_index] += p * pab[pab_index];
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-/*******************************************************************************
- * \brief TODO
- * \author Ole Schuett
- ******************************************************************************/
-static inline void ortho_xyz_to_xy(const int lp, const double pol_kg[lp + 1],
-                                   const double pol_kg2[lp + 1],
-                                   const double *xyz, double *coef_xy) {
-
-  for (int lzp = 0; lzp <= lp; lzp++) {
-    for (int lyp = 0; lyp <= lp - lzp; lyp++) {
-      for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
-        const int xyz_index = lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) +
-                              lxp;                         // xyz[lzp][lyp][lxp]
-        const int xy_index = lyp * (lp + 1) * 2 + lxp * 2; // coef_xy[lyp][lxp]
-        coef_xy[xy_index + 0] += xyz[xyz_index] * pol_kg[lzp];
-        coef_xy[xy_index + 1] += xyz[xyz_index] * pol_kg2[lzp];
-      }
-    }
-  }
-}
-
-/*******************************************************************************
- * \brief TODO
- * \author Ole Schuett
- ******************************************************************************/
-static inline void ortho_xy_to_x(const int lp, const double pol_jg[lp + 1],
-                                 const double pol_jg2[lp + 1],
-                                 const double *coef_xy, double *coef_x) {
-
-  for (int lyp = 0; lyp <= lp; lyp++) {
-    for (int lxp = 0; lxp <= lp - lyp; lxp++) {
-      const int xy_index = lyp * (lp + 1) * 2 + lxp * 2; // coef_xy[lyp][lxp]
-      coef_x[lxp * 4 + 0] += coef_xy[xy_index + 0] * pol_jg[lyp];
-      coef_x[lxp * 4 + 1] += coef_xy[xy_index + 1] * pol_jg[lyp];
-      coef_x[lxp * 4 + 2] += coef_xy[xy_index + 0] * pol_jg2[lyp];
-      coef_x[lxp * 4 + 3] += coef_xy[xy_index + 1] * pol_jg2[lyp];
-    }
-  }
-}
-
-/*******************************************************************************
  * \brief TODO
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
-ortho_x_to_grid(const int lp, const int k, const int k2, const int jg,
-                const int jg2, const int cmax, const double kremain,
-                const double pol[3][2 * cmax + 1][lp + 1],
-                const int map[3][2 * cmax + 1], const double dh[3][3],
-                const double dh_inv[3][3], const int npts_local[3],
-                const double *coef_x, double *grid) {
+ortho_cx_to_grid(const int lp, const int k, const int k2, const int jg,
+                 const int jg2, const int cmax, const double kremain,
+                 const double pol[3][2 * cmax + 1][lp + 1],
+                 const int map[3][2 * cmax + 1], const double dh[3][3],
+                 const double dh_inv[3][3], const int npts_local[3],
+                 const double *cx, double *grid) {
 
   const int j = map[1][jg + cmax];
   const int j2 = map[1][jg2 + cmax];
@@ -177,14 +53,33 @@ ortho_x_to_grid(const int lp, const int k, const int k2, const int jg,
     for (int lxp = 0; lxp <= lp; lxp++) {
       const double p1 = pol[0][ig + cmax][lxp];
       const double p2 = pol[0][ig2 + cmax][lxp];
-      grid[grid_index_1] += coef_x[lxp * 4 + 0] * p1;
-      grid[grid_index_2] += coef_x[lxp * 4 + 1] * p1;
-      grid[grid_index_3] += coef_x[lxp * 4 + 2] * p1;
-      grid[grid_index_4] += coef_x[lxp * 4 + 3] * p1;
-      grid[grid_index_5] += coef_x[lxp * 4 + 0] * p2;
-      grid[grid_index_6] += coef_x[lxp * 4 + 1] * p2;
-      grid[grid_index_7] += coef_x[lxp * 4 + 2] * p2;
-      grid[grid_index_8] += coef_x[lxp * 4 + 3] * p2;
+      grid[grid_index_1] += cx[lxp * 4 + 0] * p1;
+      grid[grid_index_2] += cx[lxp * 4 + 1] * p1;
+      grid[grid_index_3] += cx[lxp * 4 + 2] * p1;
+      grid[grid_index_4] += cx[lxp * 4 + 3] * p1;
+      grid[grid_index_5] += cx[lxp * 4 + 0] * p2;
+      grid[grid_index_6] += cx[lxp * 4 + 1] * p2;
+      grid[grid_index_7] += cx[lxp * 4 + 2] * p2;
+      grid[grid_index_8] += cx[lxp * 4 + 3] * p2;
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void ortho_cxy_to_cx(const int lp, const double pol_jg[lp + 1],
+                                   const double pol_jg2[lp + 1],
+                                   const double *cxy, double *cx) {
+
+  for (int lyp = 0; lyp <= lp; lyp++) {
+    for (int lxp = 0; lxp <= lp - lyp; lxp++) {
+      const int cxy_index = lyp * (lp + 1) * 2 + lxp * 2; // cxy[lyp][lxp]
+      cx[lxp * 4 + 0] += cxy[cxy_index + 0] * pol_jg[lyp];
+      cx[lxp * 4 + 1] += cxy[cxy_index + 1] * pol_jg[lyp];
+      cx[lxp * 4 + 2] += cxy[cxy_index + 0] * pol_jg2[lyp];
+      cx[lxp * 4 + 3] += cxy[cxy_index + 1] * pol_jg2[lyp];
     }
   }
 }
@@ -194,11 +89,11 @@ ortho_x_to_grid(const int lp, const int k, const int k2, const int jg,
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
-ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
-                 const double pol[3][2 * cmax + 1][lp + 1],
-                 const int map[3][2 * cmax + 1], const double dh[3][3],
-                 const double dh_inv[3][3], const double disr_radius,
-                 const int npts_local[3], const double *coef_xy, double *grid) {
+ortho_cxy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
+                  const double pol[3][2 * cmax + 1][lp + 1],
+                  const int map[3][2 * cmax + 1], const double dh[3][3],
+                  const double dh_inv[3][3], const double disr_radius,
+                  const int npts_local[3], const double *cxy, double *grid) {
 
   // The cube contains an even number of grid points in each direction and
   // collocation is always performed on a pair of two opposing grid points.
@@ -214,12 +109,34 @@ ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
   for (int jg = jgmin; jg <= 0; jg++) {
     const int jg2 = 1 - jg;
 
-    // initialize coef_x
-    double coef_x[(lp + 1) * 4];
-    memset(coef_x, 0, (lp + 1) * 4 * sizeof(double));
-    ortho_xy_to_x(lp, pol[1][jg + cmax], pol[1][jg2 + cmax], coef_xy, coef_x);
-    ortho_x_to_grid(lp, k, k2, jg, jg2, cmax, kremain, pol, map, dh, dh_inv,
-                    npts_local, coef_x, grid);
+    const size_t cx_size = (lp + 1) * 4;
+    double cx[cx_size];
+    memset(cx, 0, cx_size * sizeof(double));
+
+    ortho_cxy_to_cx(lp, pol[1][jg + cmax], pol[1][jg2 + cmax], cxy, cx);
+    ortho_cx_to_grid(lp, k, k2, jg, jg2, cmax, kremain, pol, map, dh, dh_inv,
+                     npts_local, cx, grid);
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void ortho_cxyz_to_cxy(const int lp, const double pol_kg[lp + 1],
+                                     const double pol_kg2[lp + 1],
+                                     const double *cxyz, double *cxy) {
+
+  for (int lzp = 0; lzp <= lp; lzp++) {
+    for (int lyp = 0; lyp <= lp - lzp; lyp++) {
+      for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
+        const int cxyz_index = lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) +
+                               lxp; // cxyz[lzp][lyp][lxp]
+        const int cxy_index = lyp * (lp + 1) * 2 + lxp * 2; // cxy[lyp][lxp]
+        cxy[cxy_index + 0] += cxyz[cxyz_index] * pol_kg[lzp];
+        cxy[cxy_index + 1] += cxyz[cxyz_index] * pol_kg2[lzp];
+      }
+    }
   }
 }
 
@@ -227,11 +144,12 @@ ortho_xy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
  * \brief Collocate kernel for the orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
-static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
-                        const double dh_inv[3][3], const double rp[3],
-                        const int npts_global[3], const int npts_local[3],
-                        const int shift_local[3], const double radius,
-                        const double *xyz, double *grid) {
+static void ortho_cxyz_to_grid(const int lp, const double zetp,
+                               const double dh[3][3], const double dh_inv[3][3],
+                               const double rp[3], const int npts_global[3],
+                               const int npts_local[3],
+                               const int shift_local[3], const double radius,
+                               const double *cxyz, double *grid) {
 
   // *** position of the gaussian product
   //
@@ -306,12 +224,14 @@ static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
   const int kgmin = ceil(-1e-8 - disr_radius * dh_inv[2][2]);
   for (int kg = kgmin; kg <= 0; kg++) {
     const int kg2 = 1 - kg;
-    // initialize coef_xy
-    double coef_xy[(lp + 1) * (lp + 1) * 2];
-    memset(coef_xy, 0, (lp + 1) * (lp + 1) * 2 * sizeof(double));
-    ortho_xyz_to_xy(lp, pol[2][kg + cmax], pol[2][kg2 + cmax], xyz, coef_xy);
-    ortho_xy_to_grid(lp, kg, kg2, cmax, pol, map, dh, dh_inv, disr_radius,
-                     npts_local, coef_xy, grid);
+
+    const size_t cxy_size = (lp + 1) * (lp + 1) * 2;
+    double cxy[cxy_size];
+    memset(cxy, 0, cxy_size * sizeof(double));
+
+    ortho_cxyz_to_cxy(lp, pol[2][kg + cmax], pol[2][kg2 + cmax], cxyz, cxy);
+    ortho_cxy_to_grid(lp, kg, kg2, cmax, pol, map, dh, dh_inv, disr_radius,
+                      npts_local, cxy, grid);
   }
 }
 
@@ -319,13 +239,14 @@ static void xyz_to_grid(const int lp, const double zetp, const double dh[3][3],
  * \brief Collocate kernel for general case, ie. non-ortho or with subpatches.
  * \author Ole Schuett
  ******************************************************************************/
-static void collocate_general(const int border_mask, const int lp,
-                              const double zetp, const double *xyz,
-                              const double dh[3][3], const double dh_inv[3][3],
-                              const double rp[3], const int npts_global[3],
-                              const int npts_local[3], const int shift_local[3],
-                              const int border_width[3], const double radius,
-                              double *grid) {
+static void general_cxyz_to_grid(const int border_mask, const int lp,
+                                 const double zetp, const double dh[3][3],
+                                 const double dh_inv[3][3], const double rp[3],
+                                 const int npts_global[3],
+                                 const int npts_local[3],
+                                 const int shift_local[3],
+                                 const int border_width[3], const double radius,
+                                 const double *cxyz, double *grid) {
 
   int bounds[3][2] = {{0, npts_local[0] - 1}, // Default for border_mask == 0.
                       {0, npts_local[1] - 1},
@@ -420,10 +341,11 @@ static void collocate_general(const int border_mask, const int lp,
                     const int jl = jlx + jly + jlz;
                     const int kl = klx + kly + klz;
                     const int lijk = coef_map[kl][jl][il];
-                    const int xyz_index = lz * (lp + 1) * (lp + 1) +
-                                          ly * (lp + 1) + lx; // xyz[lz][ly][lx]
+                    const int cxyz_index = lz * (lp + 1) * (lp + 1) +
+                                           ly * (lp + 1) +
+                                           lx; // cxyz[lz][ly][lx]
                     coef_ijk[lijk - 1] +=
-                        xyz[xyz_index] * hmatgridp[ilx][0][0] *
+                        cxyz[cxyz_index] * hmatgridp[ilx][0][0] *
                         hmatgridp[jlx][1][0] * hmatgridp[klx][2][0] *
                         hmatgridp[ily][0][1] * hmatgridp[jly][1][1] *
                         hmatgridp[kly][2][1] * hmatgridp[ilz][0][2] *
@@ -600,19 +522,129 @@ static void collocate_general(const int border_mask, const int lp,
 }
 
 /*******************************************************************************
- * \brief Collocates a single product of primitiv Gaussians.
- *        See grid_collocate.h for details.
+ * \brief TODO
  * \author Ole Schuett
  ******************************************************************************/
-void grid_ref_collocate_pgf_product(
-    const bool orthorhombic, const int border_mask, const int func,
-    const int la_max, const int la_min, const int lb_max, const int lb_min,
-    const double zeta, const double zetb, const double rscale,
-    const double dh[3][3], const double dh_inv[3][3], const double ra[3],
-    const double rab[3], const int npts_global[3], const int npts_local[3],
-    const int shift_local[3], const int border_width[3], const double radius,
-    const int o1, const int o2, const int n1, const int n2,
-    const double pab[n2][n1], double *grid) {
+static inline void
+cxyz_to_grid(const bool orthorhombic, const int border_mask, const int lp,
+             const double zetp, const double dh[3][3],
+             const double dh_inv[3][3], const double rp[3],
+             const int npts_global[3], const int npts_local[3],
+             const int shift_local[3], const int border_width[3],
+             const double radius, const double *cxyz, double *grid) {
+
+  if (orthorhombic && border_mask == 0) {
+    // Here we ignore bounds_owned and always collocate the entire cube,
+    // thereby assuming that the cube fits into the local grid.
+    grid_library_gather_stats((grid_library_stats){.ref_collocate_ortho = 1});
+    ortho_cxyz_to_grid(lp, zetp, dh, dh_inv, rp, npts_global, npts_local,
+                       shift_local, radius, cxyz, grid);
+  } else {
+    grid_library_gather_stats((grid_library_stats){.ref_collocate_general = 1});
+    general_cxyz_to_grid(border_mask, lp, zetp, dh, dh_inv, rp, npts_global,
+                         npts_local, shift_local, border_width, radius, cxyz,
+                         grid);
+  }
+}
+
+/*******************************************************************************
+ * \brief Compute coefficients for all combinations of angular momentum.
+ *        Results are passed to collocate_ortho and collocate_general.
+ * \author Ole Schuett
+ ******************************************************************************/
+static void cab_to_cxyz(const int la_max, const int la_min, const int lb_max,
+                        const int lb_min, const double prefactor,
+                        const double ra[3], const double rb[3],
+                        const double rp[3], const double *cab, double *cxyz) {
+
+  // Computes the polynomial expansion coefficients:
+  //     (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
+  const int lp = la_max + lb_max;
+  double alpha[3][lb_max + 1][la_max + 1][lp + 1];
+  memset(alpha, 0, 3 * (lb_max + 1) * (la_max + 1) * (lp + 1) * sizeof(double));
+  for (int i = 0; i < 3; i++) {
+    const double drpa = rp[i] - ra[i];
+    const double drpb = rp[i] - rb[i];
+    for (int lxa = 0; lxa <= la_max; lxa++) {
+      for (int lxb = 0; lxb <= lb_max; lxb++) {
+        double binomial_k_lxa = 1.0;
+        double a = 1.0;
+        for (int k = 0; k <= lxa; k++) {
+          double binomial_l_lxb = 1.0;
+          double b = 1.0;
+          for (int l = 0; l <= lxb; l++) {
+            alpha[i][lxb][lxa][lxa - l + lxb - k] +=
+                binomial_k_lxa * binomial_l_lxb * a * b;
+            binomial_l_lxb *= ((double)(lxb - l)) / ((double)(l + 1));
+            b *= drpb;
+          }
+          binomial_k_lxa *= ((double)(lxa - k)) / ((double)(k + 1));
+          a *= drpa;
+        }
+      }
+    }
+  }
+
+  //   *** initialise the coefficient matrix, we transform the sum
+  //
+  // sum_{lxa,lya,lza,lxb,lyb,lzb} P_{lxa,lya,lza,lxb,lyb,lzb} *
+  //         (x-a_x)**lxa (y-a_y)**lya (z-a_z)**lza (x-b_x)**lxb (y-a_y)**lya
+  //         (z-a_z)**lza
+  //
+  // into
+  //
+  // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-p_x)**lxp (y-p_y)**lyp (z-p_z)**lzp
+  //
+  // where p is center of the product gaussian, and lp = la_max + lb_max
+  // (current implementation is l**7)
+  //
+
+  for (int lzb = 0; lzb <= lb_max; lzb++) {
+    for (int lza = 0; lza <= la_max; lza++) {
+      for (int lyb = 0; lyb <= lb_max - lzb; lyb++) {
+        for (int lya = 0; lya <= la_max - lza; lya++) {
+          const int lxb_min = imax(lb_min - lzb - lyb, 0);
+          const int lxa_min = imax(la_min - lza - lya, 0);
+          for (int lxb = lxb_min; lxb <= lb_max - lzb - lyb; lxb++) {
+            for (int lxa = lxa_min; lxa <= la_max - lza - lya; lxa++) {
+              const int ico = coset(lxa, lya, lza);
+              const int jco = coset(lxb, lyb, lzb);
+              const int cab_index = jco * ncoset[la_max] + ico; // cab[jco][ico]
+
+              for (int lzp = 0; lzp <= lza + lzb; lzp++) {
+                for (int lyp = 0; lyp <= lp - lza - lzb; lyp++) {
+                  for (int lxp = 0; lxp <= lp - lza - lzb - lyp; lxp++) {
+                    const double p = alpha[0][lxb][lxa][lxp] *
+                                     alpha[1][lyb][lya][lyp] *
+                                     alpha[2][lzb][lza][lzp] * prefactor;
+                    const int cxyz_index = lzp * (lp + 1) * (lp + 1) +
+                                           lyp * (lp + 1) +
+                                           lxp; // cxyz[lzp][lyp][lxp]
+                    cxyz[cxyz_index] += p * cab[cab_index];
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void
+cab_to_grid(const bool orthorhombic, const int border_mask, const int la_max,
+            const int la_min, const int lb_max, const int lb_min,
+            const double zeta, const double zetb, const double rscale,
+            const double dh[3][3], const double dh_inv[3][3],
+            const double ra[3], const double rab[3], const int npts_global[3],
+            const int npts_local[3], const int shift_local[3],
+            const int border_width[3], const double radius, const double *cab,
+            double *grid) {
 
   // Check if radius is too small to be mapped onto grid of given resolution.
   double dh_max = 0.0;
@@ -632,43 +664,52 @@ void grid_ref_collocate_pgf_product(
     rb[i] = ra[i] + rab[i];
   }
 
+  const int lp = la_max + lb_max;
+  const size_t cxyz_size = (lp + 1) * (lp + 1) * (lp + 1);
+  double cxyz[cxyz_size];
+  memset(cxyz, 0, cxyz_size * sizeof(double));
+
+  cab_to_cxyz(la_max, la_min, lb_max, lb_min, prefactor, ra, rb, rp, cab, cxyz);
+  cxyz_to_grid(orthorhombic, border_mask, lp, zetp, dh, dh_inv, rp, npts_global,
+               npts_local, shift_local, border_width, radius, cxyz, grid);
+}
+
+/*******************************************************************************
+ * \brief Collocates a single product of primitiv Gaussians.
+ *        See grid_collocate.h for details.
+ * \author Ole Schuett
+ ******************************************************************************/
+void grid_ref_collocate_pgf_product(
+    const bool orthorhombic, const int border_mask, const int func,
+    const int la_max, const int la_min, const int lb_max, const int lb_min,
+    const double zeta, const double zetb, const double rscale,
+    const double dh[3][3], const double dh_inv[3][3], const double ra[3],
+    const double rab[3], const int npts_global[3], const int npts_local[3],
+    const int shift_local[3], const int border_width[3], const double radius,
+    const int o1, const int o2, const int n1, const int n2,
+    const double pab[n2][n1], double *grid) {
+
   int la_min_diff, la_max_diff, lb_min_diff, lb_max_diff;
   grid_ref_prepare_get_ldiffs(func, &la_min_diff, &la_max_diff, &lb_min_diff,
                               &lb_max_diff);
 
-  const int la_min_prep = imax(la_min + la_min_diff, 0);
-  const int lb_min_prep = imax(lb_min + lb_min_diff, 0);
-  const int la_max_prep = la_max + la_max_diff;
-  const int lb_max_prep = lb_max + lb_max_diff;
-  const int lp = la_max_prep + lb_max_prep;
+  const int la_min_cab = imax(la_min + la_min_diff, 0);
+  const int lb_min_cab = imax(lb_min + lb_min_diff, 0);
+  const int la_max_cab = la_max + la_max_diff;
+  const int lb_max_cab = lb_max + lb_max_diff;
 
-  const int n1_prep = ncoset[la_max_prep];
-  const int n2_prep = ncoset[lb_max_prep];
-  const size_t pab_prep_size = n2_prep * n1_prep;
-  double pab_prep[pab_prep_size];
-  memset(pab_prep, 0, pab_prep_size * sizeof(double));
+  const int n1_cab = ncoset[la_max_cab];
+  const int n2_cab = ncoset[lb_max_cab];
+
+  const size_t cab_size = n2_cab * n1_cab;
+  double cab[cab_size];
+  memset(cab, 0, cab_size * sizeof(double));
+
   grid_ref_prepare_pab(func, o1, o2, la_max, la_min, lb_max, lb_min, zeta, zetb,
-                       n1, n2, pab, n1_prep, n2_prep,
-                       (double(*)[n1_prep])pab_prep);
-
-  const size_t xyz_size = (lp + 1) * (lp + 1) * (lp + 1);
-  double xyz[xyz_size];
-  memset(xyz, 0, xyz_size * sizeof(double));
-
-  pab_to_xyz(la_max_prep, la_min_prep, lb_max_prep, lb_min_prep, lp, prefactor,
-             ra, rb, rp, pab_prep, xyz);
-
-  if (orthorhombic && border_mask == 0) {
-    // Here we ignore bounds_owned and always collocate the entire cube,
-    // thereby assuming that the cube fits into the local grid.
-    grid_library_gather_stats((grid_library_stats){.ref_collocate_ortho = 1});
-    xyz_to_grid(lp, zetp, dh, dh_inv, rp, npts_global, npts_local, shift_local,
-                radius, xyz, grid);
-  } else {
-    grid_library_gather_stats((grid_library_stats){.ref_collocate_general = 1});
-    collocate_general(border_mask, lp, zetp, xyz, dh, dh_inv, rp, npts_global,
-                      npts_local, shift_local, border_width, radius, grid);
-  }
+                       n1, n2, pab, n1_cab, n2_cab, (double(*)[n1_cab])cab);
+  cab_to_grid(orthorhombic, border_mask, la_max_cab, la_min_cab, lb_max_cab,
+              lb_min_cab, zeta, zetb, rscale, dh, dh_inv, ra, rab, npts_global,
+              npts_local, shift_local, border_width, radius, cab, grid);
 }
 
 // EOF
