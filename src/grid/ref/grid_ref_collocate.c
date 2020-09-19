@@ -144,12 +144,12 @@ static inline void ortho_cxyz_to_cxy(const int lp, const double pol_kg[lp + 1],
  * \brief Collocate kernel for the orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
-static void ortho_cxyz_to_grid(const int lp, const double zetp,
-                               const double dh[3][3], const double dh_inv[3][3],
-                               const double rp[3], const int npts_global[3],
-                               const int npts_local[3],
-                               const int shift_local[3], const double radius,
-                               const double *cxyz, double *grid) {
+static inline void
+ortho_cxyz_to_grid(const int lp, const double zetp, const double dh[3][3],
+                   const double dh_inv[3][3], const double rp[3],
+                   const int npts_global[3], const int npts_local[3],
+                   const int shift_local[3], const double radius,
+                   const double *cxyz, double *grid) {
 
   // *** position of the gaussian product
   //
@@ -239,8 +239,231 @@ static void ortho_cxyz_to_grid(const int lp, const double zetp,
  * \brief TODO
  * \author Ole Schuett
  ******************************************************************************/
-static void general_cxyz_to_cijk(const int lp, const double dh[3][3],
-                                 const double *cxyz, double *cijk) {
+static inline void general_cij_to_grid(
+    const int lp, const int k, const int kg, const int npts_local[3],
+    const int bounds_i[2], const int bounds_j[2], const int index_min[3],
+    const int index_max[3], const int map_i[], const int map_j[],
+    const double zetp, const double dh[3][3], const double gp[3],
+    const double radius, const double *cij, double *grid) {
+
+  for (int j = index_min[1]; j <= index_max[1]; j++) {
+    const int jg = map_j[j - index_min[1]];
+    if (jg < bounds_j[0] || bounds_j[1] < jg) {
+      continue;
+    }
+
+    double coef_xtt[lp + 1];
+    for (int i = 0; i <= lp; i++) {
+      coef_xtt[i] = 0.0;
+    }
+    double djp = 1.0;
+    const double dj = j - gp[1];
+    for (int jl = 0; jl <= lp; jl++) {
+      for (int il = 0; il <= lp - jl; il++) {
+        const int cij_index = jl * (lp + 1) + il; // [jl, il]
+        coef_xtt[il] += cij[cij_index] * djp;
+      }
+      djp *= dj;
+    }
+
+    //--------------------------------------------------------------------
+    // Find bounds for the inner loop based on a quadratic equation in i.
+    //
+    // The real-space vector from the center of the gaussian to the
+    // grid point i,j,k is given by:
+    //   r = (i-gp[0])*dh[0,:] + (j-gp[1])*dh[1,:] + (k-gp[2])*dh[2,:]
+    //
+    // Separating the term that depends on i:
+    //   r = i*dh[0,:] - gp[0]*dh[0,:] + (j-gp[1])*dh[1,:] + (k-gp[2])*dh[2,:]
+    //     = i*dh[0,:] + v
+    //
+    // The squared distance works out to:
+    //   r**2 = dh[0,:]**2 * i**2  +  2 * v * dh[0,:] * i  +  v**2
+    //        = a * i**2           +  b * i                +  c
+    //
+    // Solving r**2==radius**2 for i yields:
+    //    d =  b**2  -  4 * a * (c - radius**2)
+    //    i = (-b \pm sqrt(d)) / (2*a)
+    //
+    double a = 0.0, b = 0.0, c = 0.0;
+    for (int i = 0; i < 3; i++) {
+      const double v = (0 - gp[0]) * dh[0][i] + (j - gp[1]) * dh[1][i] +
+                       (k - gp[2]) * dh[2][i];
+      a += dh[0][i] * dh[0][i];
+      b += 2.0 * v * dh[0][i];
+      c += v * v;
+    }
+    const double d = b * b - 4.0 * a * (c - radius * radius);
+    if (d <= 0.0) {
+      continue;
+    }
+    const double sqrt_d = sqrt(d);
+    const int ismin = ceil((-b - sqrt_d) / (2.0 * a));
+    const int ismax = floor((-b + sqrt_d) / (2.0 * a));
+
+    const double exp_zetp_a = exp(-zetp * a);
+    const double exp_zetp_2a = exp_zetp_a * exp_zetp_a;
+    double exp_zetp_2a_i = exp(-zetp * 2 * a * ismin);
+    double exp_zetp_a_ii = exp(-zetp * a * ismin * ismin);
+    const double exp_zetp_b = exp(-zetp * b);
+    double exp_zetp_b_i = exp(-zetp * b * ismin);
+    const double exp_zetp_c = exp(-zetp * c);
+
+    for (int i = ismin; i <= ismax; i++) {
+      const int ig = map_i[i - index_min[0]];
+      if (ig < bounds_i[0] || bounds_i[1] < ig) {
+        continue;
+      }
+
+      // polynomial terms
+      double res = 0.0;
+      double dip = 1.0;
+      const double di = i - gp[0];
+      for (int il = 0; il <= lp; il++) {
+        res += coef_xtt[il] * dip;
+        dip *= di;
+      }
+
+      // res *= exp(-zetp * ((a * i + b) * i + c));
+      res *= exp_zetp_a_ii * exp_zetp_b_i * exp_zetp_c;
+      exp_zetp_a_ii *= exp_zetp_2a_i * exp_zetp_a;
+      exp_zetp_2a_i *= exp_zetp_2a;
+      exp_zetp_b_i *= exp_zetp_b;
+
+      const int stride = npts_local[1] * npts_local[0];
+      const int grid_index =
+          kg * stride + jg * npts_local[0] + ig; // [kg, jg, ig]
+      grid[grid_index] += res;
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void general_cijk_to_cij(const int lp, const double dk,
+                                       const double *cijk, double *cij) {
+
+  double dkp = 1.0;
+  for (int kl = 0; kl <= lp; kl++) {
+    for (int jl = 0; jl <= lp - kl; jl++) {
+      for (int il = 0; il <= lp - kl - jl; il++) {
+        const int cij_index = jl * (lp + 1) + il; // [jl, il]
+        const int cijk_index =
+            kl * (lp + 1) * (lp + 1) + jl * (lp + 1) + il; // [kl, jl, il]
+        cij[cij_index] += cijk[cijk_index] * dkp;
+      }
+    }
+    dkp *= dk;
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void
+general_cijk_to_grid(const int border_mask, const int lp, const double zetp,
+                     const double dh[3][3], const double dh_inv[3][3],
+                     const double rp[3], const int npts_global[3],
+                     const int npts_local[3], const int shift_local[3],
+                     const int border_width[3], const double radius,
+                     const double *cijk, double *grid) {
+
+  // Default for border_mask == 0.
+  int bounds_i[2] = {0, npts_local[0] - 1};
+  int bounds_j[2] = {0, npts_local[1] - 1};
+  int bounds_k[2] = {0, npts_local[2] - 1};
+
+  // See also rs_find_node() in task_list_methods.F.
+  // If the bit is set then we need to exclude the border in that direction.
+  if (border_mask & (1 << 0))
+    bounds_i[0] += border_width[0];
+  if (border_mask & (1 << 1))
+    bounds_i[1] -= border_width[0];
+  if (border_mask & (1 << 2))
+    bounds_j[0] += border_width[1];
+  if (border_mask & (1 << 3))
+    bounds_j[1] -= border_width[1];
+  if (border_mask & (1 << 4))
+    bounds_k[0] += border_width[2];
+  if (border_mask & (1 << 5))
+    bounds_k[1] -= border_width[2];
+
+  // center in grid coords
+  // gp = MATMUL(dh_inv, rp)
+  double gp[3] = {0.0, 0.0, 0.0};
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      gp[i] += dh_inv[j][i] * rp[j];
+    }
+  }
+
+  // CALL return_cube_nonortho(cube_info, radius, index_min, index_max, rp)
+  //
+  // get the min max indices that contain at least the cube that contains a
+  // sphere around rp of radius radius if the cell is very non-orthogonal this
+  // implies that many useless points are included this estimate can be improved
+  // (i.e. not box but sphere should be used)
+  int index_min[3] = {INT_MAX, INT_MAX, INT_MAX};
+  int index_max[3] = {INT_MIN, INT_MIN, INT_MIN};
+  for (int i = -1; i <= 1; i++) {
+    for (int j = -1; j <= 1; j++) {
+      for (int k = -1; k <= 1; k++) {
+        const double x = rp[0] + i * radius;
+        const double y = rp[1] + j * radius;
+        const double z = rp[2] + k * radius;
+        for (int idir = 0; idir < 3; idir++) {
+          const double resc =
+              dh_inv[0][idir] * x + dh_inv[1][idir] * y + dh_inv[2][idir] * z;
+          index_min[idir] = imin(index_min[idir], floor(resc));
+          index_max[idir] = imax(index_max[idir], ceil(resc));
+        }
+      }
+    }
+  }
+
+  // precompute modulos
+  int map_k[index_max[2] - index_min[2] + 1];
+  for (int k = index_min[2]; k <= index_max[2]; k++) {
+    map_k[k - index_min[2]] = modulo(k - shift_local[2], npts_global[2]);
+  }
+  int map_j[index_max[1] - index_min[1] + 1];
+  for (int j = index_min[1]; j <= index_max[1]; j++) {
+    map_j[j - index_min[1]] = modulo(j - shift_local[1], npts_global[1]);
+  }
+  int map_i[index_max[0] - index_min[0] + 1];
+  for (int i = index_min[0]; i <= index_max[0]; i++) {
+    map_i[i - index_min[0]] = modulo(i - shift_local[0], npts_global[0]);
+  }
+
+  // go over the grid, but cycle if the point is not within the radius
+  for (int k = index_min[2]; k <= index_max[2]; k++) {
+    const int kg = map_k[k - index_min[2]];
+    if (kg < bounds_k[0] || bounds_k[1] < kg) {
+      continue;
+    }
+    const double dk = k - gp[2];
+
+    // zero coef_xyt
+    const int cij_size = (lp + 1) * (lp + 1);
+    double cij[cij_size];
+    memset(cij, 0, cij_size * sizeof(double));
+
+    general_cijk_to_cij(lp, dk, cijk, cij);
+    general_cij_to_grid(lp, k, kg, npts_local, bounds_i, bounds_j, index_min,
+                        index_max, map_i, map_j, zetp, dh, gp, radius, cij,
+                        grid);
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void general_cxyz_to_cijk(const int lp, const double dh[3][3],
+                                        const double *cxyz, double *cijk) {
 
   // Translated from collocate_general_opt()
   //
@@ -307,206 +530,22 @@ static void general_cxyz_to_cijk(const int lp, const double dh[3][3],
  * \brief Collocate kernel for general case, ie. non-ortho or with subpatches.
  * \author Ole Schuett
  ******************************************************************************/
-static void general_cxyz_to_grid(const int border_mask, const int lp,
-                                 const double zetp, const double dh[3][3],
-                                 const double dh_inv[3][3], const double rp[3],
-                                 const int npts_global[3],
-                                 const int npts_local[3],
-                                 const int shift_local[3],
-                                 const int border_width[3], const double radius,
-                                 const double *cxyz, double *grid) {
+static inline void
+general_cxyz_to_grid(const int border_mask, const int lp, const double zetp,
+                     const double dh[3][3], const double dh_inv[3][3],
+                     const double rp[3], const int npts_global[3],
+                     const int npts_local[3], const int shift_local[3],
+                     const int border_width[3], const double radius,
+                     const double *cxyz, double *grid) {
 
   const size_t cijk_size = (lp + 1) * (lp + 1) * (lp + 1);
   double cijk[cijk_size];
   memset(cijk, 0, cijk_size * sizeof(double));
+
   general_cxyz_to_cijk(lp, dh, cxyz, cijk);
-
-  int bounds[3][2] = {{0, npts_local[0] - 1}, // Default for border_mask == 0.
-                      {0, npts_local[1] - 1},
-                      {0, npts_local[2] - 1}};
-
-  // See also rs_find_node() in task_list_methods.F.
-  // If the bit is set then we need to exclude the border in that direction.
-  if (border_mask & (1 << 0))
-    bounds[0][0] += border_width[0];
-  if (border_mask & (1 << 1))
-    bounds[0][1] -= border_width[0];
-  if (border_mask & (1 << 2))
-    bounds[1][0] += border_width[1];
-  if (border_mask & (1 << 3))
-    bounds[1][1] -= border_width[1];
-  if (border_mask & (1 << 4))
-    bounds[2][0] += border_width[2];
-  if (border_mask & (1 << 5))
-    bounds[2][1] -= border_width[2];
-
-  // center in grid coords
-  // gp = MATMUL(dh_inv, rp)
-  double gp[3] = {0.0, 0.0, 0.0};
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      gp[i] += dh_inv[j][i] * rp[j];
-    }
-  }
-
-  // CALL return_cube_nonortho(cube_info, radius, index_min, index_max, rp)
-  //
-  // get the min max indices that contain at least the cube that contains a
-  // sphere around rp of radius radius if the cell is very non-orthogonal this
-  // implies that many useless points are included this estimate can be improved
-  // (i.e. not box but sphere should be used)
-  int index_min[3] = {INT_MAX, INT_MAX, INT_MAX};
-  int index_max[3] = {INT_MIN, INT_MIN, INT_MIN};
-  for (int i = -1; i <= 1; i++) {
-    for (int j = -1; j <= 1; j++) {
-      for (int k = -1; k <= 1; k++) {
-        const double x = rp[0] + i * radius;
-        const double y = rp[1] + j * radius;
-        const double z = rp[2] + k * radius;
-        for (int idir = 0; idir < 3; idir++) {
-          const double resc =
-              dh_inv[0][idir] * x + dh_inv[1][idir] * y + dh_inv[2][idir] * z;
-          index_min[idir] = imin(index_min[idir], floor(resc));
-          index_max[idir] = imax(index_max[idir], ceil(resc));
-        }
-      }
-    }
-  }
-
-  // precompute modulos
-  int map_k[index_max[2] - index_min[2] + 1];
-  for (int k = index_min[2]; k <= index_max[2]; k++) {
-    map_k[k - index_min[2]] = modulo(k - shift_local[2], npts_global[2]);
-  }
-  int map_j[index_max[1] - index_min[1] + 1];
-  for (int j = index_min[1]; j <= index_max[1]; j++) {
-    map_j[j - index_min[1]] = modulo(j - shift_local[1], npts_global[1]);
-  }
-  int map_i[index_max[0] - index_min[0] + 1];
-  for (int i = index_min[0]; i <= index_max[0]; i++) {
-    map_i[i - index_min[0]] = modulo(i - shift_local[0], npts_global[0]);
-  }
-
-  // go over the grid, but cycle if the point is not within the radius
-  for (int k = index_min[2]; k <= index_max[2]; k++) {
-    const int kg = map_k[k - index_min[2]];
-    if (kg < bounds[2][0] || bounds[2][1] < kg) {
-      continue;
-    }
-
-    // zero coef_xyt
-    const int ncoef_xyt = ((lp + 1) * (lp + 2)) / 2;
-    double coef_xyt[ncoef_xyt];
-    for (int i = 0; i < ncoef_xyt; i++) {
-      coef_xyt[i] = 0.0;
-    }
-
-    double dkp = 1.0;
-    const double dk = k - gp[2];
-    for (int kl = 0; kl <= lp; kl++) {
-      int lxy = 0;
-      for (int jl = 0; jl <= lp - kl; jl++) {
-        for (int il = 0; il <= lp - kl - jl; il++) {
-          const int cijk_index =
-              kl * (lp + 1) * (lp + 1) + jl * (lp + 1) + il; // [kl, jl, il]
-          coef_xyt[lxy++] += cijk[cijk_index] * dkp;
-        }
-        lxy += kl;
-      }
-      dkp *= dk;
-    }
-
-    for (int j = index_min[1]; j <= index_max[1]; j++) {
-      const int jg = map_j[j - index_min[1]];
-      if (jg < bounds[1][0] || bounds[1][1] < jg) {
-        continue;
-      }
-
-      double coef_xtt[lp + 1];
-      for (int i = 0; i <= lp; i++) {
-        coef_xtt[i] = 0.0;
-      }
-      int lxy = 0;
-      double djp = 1.0;
-      const double dj = j - gp[1];
-      for (int jl = 0; jl <= lp; jl++) {
-        for (int il = 0; il <= lp - jl; il++) {
-          coef_xtt[il] += coef_xyt[lxy++] * djp;
-        }
-        djp *= dj;
-      }
-
-      //--------------------------------------------------------------------
-      // Find bounds for the inner loop based on a quadratic equation in i.
-      //
-      // The real-space vector from the center of the gaussian to the
-      // grid point i,j,k is given by:
-      //   r = (i-gp[0])*dh[0,:] + (j-gp[1])*dh[1,:] + (k-gp[2])*dh[2,:]
-      //
-      // Separating the term that depends on i:
-      //   r = i*dh[0,:] - gp[0]*dh[0,:] + (j-gp[1])*dh[1,:] + (k-gp[2])*dh[2,:]
-      //     = i*dh[0,:] + v
-      //
-      // The squared distance works out to:
-      //   r**2 = dh[0,:]**2 * i**2  +  2 * v * dh[0,:] * i  +  v**2
-      //        = a * i**2           +  b * i                +  c
-      //
-      // Solving r**2==radius**2 for i yields:
-      //    d =  b**2  -  4 * a * (c - radius**2)
-      //    i = (-b \pm sqrt(d)) / (2*a)
-      //
-      double a = 0.0, b = 0.0, c = 0.0;
-      for (int i = 0; i < 3; i++) {
-        const double v = (0 - gp[0]) * dh[0][i] + (j - gp[1]) * dh[1][i] +
-                         (k - gp[2]) * dh[2][i];
-        a += dh[0][i] * dh[0][i];
-        b += 2.0 * v * dh[0][i];
-        c += v * v;
-      }
-      const double d = b * b - 4.0 * a * (c - radius * radius);
-      if (d <= 0.0) {
-        continue;
-      }
-      const double sqrt_d = sqrt(d);
-      const int ismin = ceil((-b - sqrt_d) / (2.0 * a));
-      const int ismax = floor((-b + sqrt_d) / (2.0 * a));
-
-      //const double exp_zetp_a = exp(-zetp * a);
-      //const double exp_zetp_2a = exp_zetp_a * exp_zetp_a;
-      //double exp_zetp_2a_i = exp(-zetp * 2 * a * ismin);
-      //double exp_zetp_a_ii = exp(-zetp * a * ismin * ismin);
-      //const double exp_zetp_b = exp(-zetp * b);
-      //double exp_zetp_b_i = exp(-zetp * b * ismin);
-      //const double exp_zetp_c = exp(-zetp * c);
-
-      for (int i = ismin; i <= ismax; i++) {
-        const int ig = map_i[i - index_min[0]];
-        if (ig < bounds[0][0] || bounds[0][1] < ig) {
-          continue;
-        }
-
-        // polynomial terms
-        double res = 0.0;
-        double dip = 1.0;
-        const double di = i - gp[0];
-        for (int il = 0; il <= lp; il++) {
-          res += coef_xtt[il] * dip;
-          dip *= di;
-        }
-
-        res *= exp(-zetp * ((a * i + b) * i + c));
-        //res *= exp_zetp_a_ii * exp_zetp_b_i * exp_zetp_c;
-        //exp_zetp_a_ii *= exp_zetp_2a_i * exp_zetp_a;
-        //exp_zetp_2a_i *= exp_zetp_2a;
-        //exp_zetp_b_i *= exp_zetp_b;
-
-        const int stride = npts_local[1] * npts_local[0];
-        const int grid_index =
-            kg * stride + jg * npts_local[0] + ig; // [kg, jg, ig]
-        grid[grid_index] += res;
-      }
-    }
-  }
+  general_cijk_to_grid(border_mask, lp, zetp, dh, dh_inv, rp, npts_global,
+                       npts_local, shift_local, border_width, radius, cijk,
+                       grid);
 }
 
 /*******************************************************************************
@@ -540,10 +579,11 @@ cxyz_to_grid(const bool orthorhombic, const int border_mask, const int lp,
  *        Results are passed to collocate_ortho and collocate_general.
  * \author Ole Schuett
  ******************************************************************************/
-static void cab_to_cxyz(const int la_max, const int la_min, const int lb_max,
-                        const int lb_min, const double prefactor,
-                        const double ra[3], const double rb[3],
-                        const double rp[3], const double *cab, double *cxyz) {
+static inline void cab_to_cxyz(const int la_max, const int la_min,
+                               const int lb_max, const int lb_min,
+                               const double prefactor, const double ra[3],
+                               const double rb[3], const double rp[3],
+                               const double *cab, double *cxyz) {
 
   // Computes the polynomial expansion coefficients:
   //     (x-a)**lxa (x-b)**lxb -> sum_{ls} alpha(ls,lxa,lxb,1)*(x-p)**ls
