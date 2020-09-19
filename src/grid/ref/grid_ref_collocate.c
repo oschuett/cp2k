@@ -506,6 +506,11 @@ static inline void general_cxyz_to_cijk(const int lp, const double dh[3][3],
                     const int il = ilx + ily + ilz;
                     const int jl = jlx + jly + jlz;
                     const int kl = klx + kly + klz;
+                    const int lp1 = lp + 1;
+                    const int cijk_index =
+                        kl * lp1 * lp1 + jl * lp1 + il; // [kl,jl,il]
+                    const int cxyz_index =
+                        lz * lp1 * lp1 + ly * lp1 + lx; // [lz,ly,lx]
                     const double p =
                         hmatgridp[ilx][0][0] * hmatgridp[jlx][1][0] *
                         hmatgridp[klx][2][0] * hmatgridp[ily][0][1] *
@@ -514,11 +519,6 @@ static inline void general_cxyz_to_cijk(const int lp, const double dh[3][3],
                         hmatgridp[klz][2][2] * fac[lx] * fac[ly] * fac[lz] /
                         (fac[ilx] * fac[ily] * fac[ilz] * fac[jlx] * fac[jly] *
                          fac[jlz] * fac[klx] * fac[kly] * fac[klz]);
-                    const int lp1 = lp + 1;
-                    const int cijk_index =
-                        kl * lp1 * lp1 + jl * lp1 + il; // [kl,jl,il]
-                    const int cxyz_index =
-                        lz * lp1 * lp1 + ly * lp1 + lx; // [lz,ly,lx]
                     cijk[cijk_index] += p * cxyz[cxyz_index];
                   }
                 }
@@ -566,8 +566,6 @@ cxyz_to_grid(const bool orthorhombic, const int border_mask, const int lp,
              const double radius, const double *cxyz, double *grid) {
 
   if (orthorhombic && border_mask == 0) {
-    // Here we ignore bounds_owned and always collocate the entire cube,
-    // thereby assuming that the cube fits into the local grid.
     grid_library_gather_stats((grid_library_stats){.ref_collocate_ortho = 1});
     ortho_cxyz_to_grid(lp, zetp, dh, dh_inv, rp, npts_global, npts_local,
                        shift_local, radius, cxyz, grid);
@@ -594,6 +592,7 @@ static inline void cab_to_cxyz(const int la_max, const int la_min,
   const int lp = la_max + lb_max;
   double alpha[3][lb_max + 1][la_max + 1][lp + 1];
   memset(alpha, 0, 3 * (lb_max + 1) * (la_max + 1) * (lp + 1) * sizeof(double));
+
   for (int i = 0; i < 3; i++) {
     const double drpa = rp[i] - ra[i];
     const double drpb = rp[i] - rb[i];
@@ -642,7 +641,6 @@ static inline void cab_to_cxyz(const int la_max, const int la_min,
               const int ico = coset(lxa, lya, lza);
               const int jco = coset(lxb, lyb, lzb);
               const int cab_index = jco * ncoset[la_max] + ico; // [jco, ico]
-
               for (int lzp = 0; lzp <= lza + lzb; lzp++) {
                 for (int lyp = 0; lyp <= lp - lza - lzb; lyp++) {
                   for (int lxp = 0; lxp <= lp - lza - lzb - lyp; lxp++) {
@@ -680,11 +678,14 @@ cab_to_grid(const bool orthorhombic, const int border_mask, const int la_max,
 
   // Check if radius is too small to be mapped onto grid of given resolution.
   double dh_max = 0.0;
-  for (int i = 0; i < 3; i++)
-    for (int j = 0; j < 3; j++)
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
       dh_max = fmax(dh_max, fabs(dh[i][j]));
-  if (2.0 * radius < dh_max)
+    }
+  }
+  if (2.0 * radius < dh_max) {
     return;
+  }
 
   const double zetp = zeta + zetb;
   const double f = zetb / zetp;
@@ -729,7 +730,6 @@ void grid_ref_collocate_pgf_product(
   const int lb_min_cab = imax(lb_min + lb_min_diff, 0);
   const int la_max_cab = la_max + la_max_diff;
   const int lb_max_cab = lb_max + lb_max_diff;
-
   const int n1_cab = ncoset[la_max_cab];
   const int n2_cab = ncoset[lb_max_cab];
 
