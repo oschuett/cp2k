@@ -239,6 +239,90 @@ ortho_cxyz_to_grid(const int lp, const double zetp, const double dh[3][3],
  * \brief TODO
  * \author Ole Schuett
  ******************************************************************************/
+static inline void
+general_ci_to_grid(const int lp, const int j, const int jg, const int k,
+                   const int kg, const int npts_local[3], const int bounds_i[2],
+                   const int index_min[3], const int map_i[], const double zetp,
+                   const double dh[3][3], const double gp[3],
+                   const double radius, const double *ci, double *grid) {
+
+  //--------------------------------------------------------------------
+  // Find bounds for the inner loop based on a quadratic equation in i.
+  //
+  // The real-space vector from the center of the gaussian to the
+  // grid point i,j,k is given by:
+  //   r = (i-gp[0])*dh[0,:] + (j-gp[1])*dh[1,:] + (k-gp[2])*dh[2,:]
+  //
+  // Separating the term that depends on i:
+  //   r = i*dh[0,:] - gp[0]*dh[0,:] + (j-gp[1])*dh[1,:] + (k-gp[2])*dh[2,:]
+  //     = i*dh[0,:] + v
+  //
+  // The squared distance works out to:
+  //   r**2 = dh[0,:]**2 * i**2  +  2 * v * dh[0,:] * i  +  v**2
+  //        = a * i**2           +  b * i                +  c
+  //
+  // Solving r**2==radius**2 for i yields:
+  //    d =  b**2  -  4 * a * (c - radius**2)
+  //    i = (-b \pm sqrt(d)) / (2*a)
+  //
+  double a = 0.0, b = 0.0, c = 0.0;
+  for (int i = 0; i < 3; i++) {
+    const double v = (0 - gp[0]) * dh[0][i] + (j - gp[1]) * dh[1][i] +
+                     (k - gp[2]) * dh[2][i];
+    a += dh[0][i] * dh[0][i];
+    b += 2.0 * v * dh[0][i];
+    c += v * v;
+  }
+  const double d = b * b - 4.0 * a * (c - radius * radius);
+  if (d <= 0.0) {
+    return;
+  }
+  const double sqrt_d = sqrt(d);
+  const int ismin = ceil((-b - sqrt_d) / (2.0 * a));
+  const int ismax = floor((-b + sqrt_d) / (2.0 * a));
+
+  for (int i = ismin; i <= ismax; i++) {
+    const int ig = map_i[i - index_min[0]];
+    if (ig < bounds_i[0] || bounds_i[1] < ig) {
+      continue;
+    }
+
+    const double res = exp(-zetp * ((a * i + b) * i + c));
+
+    const int stride = npts_local[1] * npts_local[0];
+    const int grid_index =
+        kg * stride + jg * npts_local[0] + ig; // [kg, jg, ig]
+
+    // polynomial terms
+    double dip = res;
+    const double di = i - gp[0];
+    for (int il = 0; il <= lp; il++) {
+      grid[grid_index] += ci[il] * dip;
+      dip *= di;
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void general_cij_to_ci(const int lp, const double dj,
+                                     const double *cij, double *ci) {
+  double djp = 1.0;
+  for (int jl = 0; jl <= lp; jl++) {
+    for (int il = 0; il <= lp - jl; il++) {
+      const int cij_index = jl * (lp + 1) + il; // [jl, il]
+      ci[il] += cij[cij_index] * djp;
+    }
+    djp *= dj;
+  }
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
 static inline void general_cij_to_grid(
     const int lp, const int k, const int kg, const int npts_local[3],
     const int bounds_i[2], const int bounds_j[2], const int index_min[3],
@@ -251,90 +335,15 @@ static inline void general_cij_to_grid(
     if (jg < bounds_j[0] || bounds_j[1] < jg) {
       continue;
     }
-
-    double coef_xtt[lp + 1];
-    for (int i = 0; i <= lp; i++) {
-      coef_xtt[i] = 0.0;
-    }
-    double djp = 1.0;
     const double dj = j - gp[1];
-    for (int jl = 0; jl <= lp; jl++) {
-      for (int il = 0; il <= lp - jl; il++) {
-        const int cij_index = jl * (lp + 1) + il; // [jl, il]
-        coef_xtt[il] += cij[cij_index] * djp;
-      }
-      djp *= dj;
-    }
 
-    //--------------------------------------------------------------------
-    // Find bounds for the inner loop based on a quadratic equation in i.
-    //
-    // The real-space vector from the center of the gaussian to the
-    // grid point i,j,k is given by:
-    //   r = (i-gp[0])*dh[0,:] + (j-gp[1])*dh[1,:] + (k-gp[2])*dh[2,:]
-    //
-    // Separating the term that depends on i:
-    //   r = i*dh[0,:] - gp[0]*dh[0,:] + (j-gp[1])*dh[1,:] + (k-gp[2])*dh[2,:]
-    //     = i*dh[0,:] + v
-    //
-    // The squared distance works out to:
-    //   r**2 = dh[0,:]**2 * i**2  +  2 * v * dh[0,:] * i  +  v**2
-    //        = a * i**2           +  b * i                +  c
-    //
-    // Solving r**2==radius**2 for i yields:
-    //    d =  b**2  -  4 * a * (c - radius**2)
-    //    i = (-b \pm sqrt(d)) / (2*a)
-    //
-    double a = 0.0, b = 0.0, c = 0.0;
-    for (int i = 0; i < 3; i++) {
-      const double v = (0 - gp[0]) * dh[0][i] + (j - gp[1]) * dh[1][i] +
-                       (k - gp[2]) * dh[2][i];
-      a += dh[0][i] * dh[0][i];
-      b += 2.0 * v * dh[0][i];
-      c += v * v;
-    }
-    const double d = b * b - 4.0 * a * (c - radius * radius);
-    if (d <= 0.0) {
-      continue;
-    }
-    const double sqrt_d = sqrt(d);
-    const int ismin = ceil((-b - sqrt_d) / (2.0 * a));
-    const int ismax = floor((-b + sqrt_d) / (2.0 * a));
+    const size_t ci_size = lp + 1;
+    double ci[ci_size];
+    memset(ci, 0, ci_size * sizeof(double));
 
-    const double exp_zetp_a = exp(-zetp * a);
-    const double exp_zetp_2a = exp_zetp_a * exp_zetp_a;
-    double exp_zetp_2a_i = exp(-zetp * 2 * a * ismin);
-    double exp_zetp_a_ii = exp(-zetp * a * ismin * ismin);
-    const double exp_zetp_b = exp(-zetp * b);
-    double exp_zetp_b_i = exp(-zetp * b * ismin);
-    const double exp_zetp_c = exp(-zetp * c);
-
-    for (int i = ismin; i <= ismax; i++) {
-      const int ig = map_i[i - index_min[0]];
-      if (ig < bounds_i[0] || bounds_i[1] < ig) {
-        continue;
-      }
-
-      // polynomial terms
-      double res = 0.0;
-      double dip = 1.0;
-      const double di = i - gp[0];
-      for (int il = 0; il <= lp; il++) {
-        res += coef_xtt[il] * dip;
-        dip *= di;
-      }
-
-      // res *= exp(-zetp * ((a * i + b) * i + c));
-      res *= exp_zetp_a_ii * exp_zetp_b_i * exp_zetp_c;
-      exp_zetp_a_ii *= exp_zetp_2a_i * exp_zetp_a;
-      exp_zetp_2a_i *= exp_zetp_2a;
-      exp_zetp_b_i *= exp_zetp_b;
-
-      const int stride = npts_local[1] * npts_local[0];
-      const int grid_index =
-          kg * stride + jg * npts_local[0] + ig; // [kg, jg, ig]
-      grid[grid_index] += res;
-    }
+    general_cij_to_ci(lp, dj, cij, ci);
+    general_ci_to_grid(lp, j, jg, k, kg, npts_local, bounds_i, index_min, map_i,
+                       zetp, dh, gp, radius, ci, grid);
   }
 }
 
@@ -344,7 +353,6 @@ static inline void general_cij_to_grid(
  ******************************************************************************/
 static inline void general_cijk_to_cij(const int lp, const double dk,
                                        const double *cijk, double *cij) {
-
   double dkp = 1.0;
   for (int kl = 0; kl <= lp; kl++) {
     for (int jl = 0; jl <= lp - kl; jl++) {
