@@ -75,7 +75,7 @@ static inline void ortho_cxy_to_cx(const int lp, const double pol_jg[lp + 1],
 
   for (int lyp = 0; lyp <= lp; lyp++) {
     for (int lxp = 0; lxp <= lp - lyp; lxp++) {
-      const int cxy_index = lyp * (lp + 1) * 2 + lxp * 2; // cxy[lyp][lxp]
+      const int cxy_index = lyp * (lp + 1) * 2 + lxp * 2; // [lyp, lxp]
       cx[lxp * 4 + 0] += cxy[cxy_index + 0] * pol_jg[lyp];
       cx[lxp * 4 + 1] += cxy[cxy_index + 1] * pol_jg[lyp];
       cx[lxp * 4 + 2] += cxy[cxy_index + 0] * pol_jg2[lyp];
@@ -130,9 +130,9 @@ static inline void ortho_cxyz_to_cxy(const int lp, const double pol_kg[lp + 1],
   for (int lzp = 0; lzp <= lp; lzp++) {
     for (int lyp = 0; lyp <= lp - lzp; lyp++) {
       for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
-        const int cxyz_index = lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) +
-                               lxp; // cxyz[lzp][lyp][lxp]
-        const int cxy_index = lyp * (lp + 1) * 2 + lxp * 2; // cxy[lyp][lxp]
+        const int cxyz_index =
+            lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) + lxp; // [lzp, lyp, lxp]
+        const int cxy_index = lyp * (lp + 1) * 2 + lxp * 2;   // [lyp, lxp, 0]
         cxy[cxy_index + 0] += cxyz[cxyz_index] * pol_kg[lzp];
         cxy[cxy_index + 1] += cxyz[cxyz_index] * pol_kg2[lzp];
       }
@@ -249,27 +249,6 @@ static void general_cxyz_to_cijk(const int lp, const double dh[3][3],
   // sum_{lip,ljp,lkp} P_{lip,ljp,lkp} (i-i_p)**lip (j-j_p)**ljp (k-k_p)**lkp
   //
 
-  // aux mapping array to simplify life
-  int coef_map[lp + 1][lp + 1][lp + 1];
-
-  // Safety net, will trigger out of bounds.
-  for (int lzp = 0; lzp <= lp; lzp++) {
-    for (int lyp = 0; lyp <= lp; lyp++) {
-      for (int lxp = 0; lxp <= lp; lxp++) {
-        coef_map[lzp][lyp][lxp] = INT_MAX;
-      }
-    }
-  }
-
-  int lxyz = 0;
-  for (int lzp = 0; lzp <= lp; lzp++) {
-    for (int lyp = 0; lyp <= lp - lzp; lyp++) {
-      for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
-        coef_map[lzp][lyp][lxp] = ++lxyz;
-      }
-    }
-  }
-
   // transform using multinomials
   double hmatgridp[lp + 1][3][3];
   for (int i = 0; i < 3; i++) {
@@ -299,19 +278,20 @@ static void general_cxyz_to_cijk(const int lp, const double dh[3][3],
                     const int il = ilx + ily + ilz;
                     const int jl = jlx + jly + jlz;
                     const int kl = klx + kly + klz;
-                    const int lijk = coef_map[kl][jl][il];
-                    const int cxyz_index = lz * (lp + 1) * (lp + 1) +
-                                           ly * (lp + 1) +
-                                           lx; // cxyz[lz][ly][lx]
-                    cijk[lijk - 1] +=
-                        cxyz[cxyz_index] * hmatgridp[ilx][0][0] *
-                        hmatgridp[jlx][1][0] * hmatgridp[klx][2][0] *
-                        hmatgridp[ily][0][1] * hmatgridp[jly][1][1] *
-                        hmatgridp[kly][2][1] * hmatgridp[ilz][0][2] *
-                        hmatgridp[jlz][1][2] * hmatgridp[klz][2][2] * fac[lx] *
-                        fac[ly] * fac[lz] /
+                    const double p =
+                        hmatgridp[ilx][0][0] * hmatgridp[jlx][1][0] *
+                        hmatgridp[klx][2][0] * hmatgridp[ily][0][1] *
+                        hmatgridp[jly][1][1] * hmatgridp[kly][2][1] *
+                        hmatgridp[ilz][0][2] * hmatgridp[jlz][1][2] *
+                        hmatgridp[klz][2][2] * fac[lx] * fac[ly] * fac[lz] /
                         (fac[ilx] * fac[ily] * fac[ilz] * fac[jlx] * fac[jly] *
                          fac[jlz] * fac[klx] * fac[kly] * fac[klz]);
+                    const int lp1 = lp + 1;
+                    const int cijk_index =
+                        kl * lp1 * lp1 + jl * lp1 + il; // [kl,jl,il]
+                    const int cxyz_index =
+                        lz * lp1 * lp1 + ly * lp1 + lx; // [lz,ly,lx]
+                    cijk[cijk_index] += p * cxyz[cxyz_index];
                   }
                 }
               }
@@ -336,7 +316,7 @@ static void general_cxyz_to_grid(const int border_mask, const int lp,
                                  const int border_width[3], const double radius,
                                  const double *cxyz, double *grid) {
 
-  const size_t cijk_size = ((lp + 1) * (lp + 2) * (lp + 3)) / 6;
+  const size_t cijk_size = (lp + 1) * (lp + 1) * (lp + 1);
   double cijk[cijk_size];
   memset(cijk, 0, cijk_size * sizeof(double));
   general_cxyz_to_cijk(lp, dh, cxyz, cijk);
@@ -421,14 +401,15 @@ static void general_cxyz_to_grid(const int border_mask, const int lp,
       coef_xyt[i] = 0.0;
     }
 
-    int lxyz = 0;
     double dkp = 1.0;
     const double dk = k - gp[2];
     for (int kl = 0; kl <= lp; kl++) {
       int lxy = 0;
       for (int jl = 0; jl <= lp - kl; jl++) {
         for (int il = 0; il <= lp - kl - jl; il++) {
-          coef_xyt[lxy++] += cijk[lxyz++] * dkp;
+          const int cijk_index =
+              kl * (lp + 1) * (lp + 1) + jl * (lp + 1) + il; // [kl, jl, il]
+          coef_xyt[lxy++] += cijk[cijk_index] * dkp;
         }
         lxy += kl;
       }
@@ -519,8 +500,9 @@ static void general_cxyz_to_grid(const int border_mask, const int lp,
         //exp_zetp_2a_i *= exp_zetp_2a;
         //exp_zetp_b_i *= exp_zetp_b;
 
+        const int stride = npts_local[1] * npts_local[0];
         const int grid_index =
-            kg * npts_local[1] * npts_local[0] + jg * npts_local[0] + ig;
+            kg * stride + jg * npts_local[0] + ig; // [kg, jg, ig]
         grid[grid_index] += res;
       }
     }
@@ -615,7 +597,7 @@ static void cab_to_cxyz(const int la_max, const int la_min, const int lb_max,
             for (int lxa = lxa_min; lxa <= la_max - lza - lya; lxa++) {
               const int ico = coset(lxa, lya, lza);
               const int jco = coset(lxb, lyb, lzb);
-              const int cab_index = jco * ncoset[la_max] + ico; // cab[jco][ico]
+              const int cab_index = jco * ncoset[la_max] + ico; // [jco, ico]
 
               for (int lzp = 0; lzp <= lza + lzb; lzp++) {
                 for (int lyp = 0; lyp <= lp - lza - lzb; lyp++) {
@@ -623,9 +605,9 @@ static void cab_to_cxyz(const int la_max, const int la_min, const int lb_max,
                     const double p = alpha[0][lxb][lxa][lxp] *
                                      alpha[1][lyb][lya][lyp] *
                                      alpha[2][lzb][lza][lzp] * prefactor;
-                    const int cxyz_index = lzp * (lp + 1) * (lp + 1) +
-                                           lyp * (lp + 1) +
-                                           lxp; // cxyz[lzp][lyp][lxp]
+                    const int lp1 = lp + 1;
+                    const int cxyz_index =
+                        lzp * lp1 * lp1 + lyp * lp1 + lxp; // [lzp, lyp, lxp]
                     cxyz[cxyz_index] += p * cab[cab_index];
                   }
                 }
