@@ -236,36 +236,11 @@ static void ortho_cxyz_to_grid(const int lp, const double zetp,
 }
 
 /*******************************************************************************
- * \brief Collocate kernel for general case, ie. non-ortho or with subpatches.
+ * \brief TODO
  * \author Ole Schuett
  ******************************************************************************/
-static void general_cxyz_to_grid(const int border_mask, const int lp,
-                                 const double zetp, const double dh[3][3],
-                                 const double dh_inv[3][3], const double rp[3],
-                                 const int npts_global[3],
-                                 const int npts_local[3],
-                                 const int shift_local[3],
-                                 const int border_width[3], const double radius,
-                                 const double *cxyz, double *grid) {
-
-  int bounds[3][2] = {{0, npts_local[0] - 1}, // Default for border_mask == 0.
-                      {0, npts_local[1] - 1},
-                      {0, npts_local[2] - 1}};
-
-  // See also rs_find_node() in task_list_methods.F.
-  // If the bit is set then we need to exclude the border in that direction.
-  if (border_mask & (1 << 0))
-    bounds[0][0] += border_width[0];
-  if (border_mask & (1 << 1))
-    bounds[0][1] -= border_width[0];
-  if (border_mask & (1 << 2))
-    bounds[1][0] += border_width[1];
-  if (border_mask & (1 << 3))
-    bounds[1][1] -= border_width[1];
-  if (border_mask & (1 << 4))
-    bounds[2][0] += border_width[2];
-  if (border_mask & (1 << 5))
-    bounds[2][1] -= border_width[2];
+static void general_cxyz_to_cijk(const int lp, const double dh[3][3],
+                                 const double *cxyz, double *cijk) {
 
   // Translated from collocate_general_opt()
   //
@@ -295,15 +270,6 @@ static void general_cxyz_to_grid(const int border_mask, const int lp,
     }
   }
 
-  // center in grid coords
-  // gp = MATMUL(dh_inv, rp)
-  double gp[3] = {0.0, 0.0, 0.0};
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      gp[i] += dh_inv[j][i] * rp[j];
-    }
-  }
-
   // transform using multinomials
   double hmatgridp[lp + 1][3][3];
   for (int i = 0; i < 3; i++) {
@@ -313,13 +279,6 @@ static void general_cxyz_to_grid(const int border_mask, const int lp,
         hmatgridp[k][j][i] = hmatgridp[k - 1][j][i] * dh[j][i];
       }
     }
-  }
-
-  // zero coef_ijk
-  const int ncoef_ijk = ((lp + 1) * (lp + 2) * (lp + 3)) / 6;
-  double coef_ijk[ncoef_ijk];
-  for (int i = 0; i < ncoef_ijk; i++) {
-    coef_ijk[i] = 0.0;
   }
 
   const int lpx = lp;
@@ -344,7 +303,7 @@ static void general_cxyz_to_grid(const int border_mask, const int lp,
                     const int cxyz_index = lz * (lp + 1) * (lp + 1) +
                                            ly * (lp + 1) +
                                            lx; // cxyz[lz][ly][lx]
-                    coef_ijk[lijk - 1] +=
+                    cijk[lijk - 1] +=
                         cxyz[cxyz_index] * hmatgridp[ilx][0][0] *
                         hmatgridp[jlx][1][0] * hmatgridp[klx][2][0] *
                         hmatgridp[ily][0][1] * hmatgridp[jly][1][1] *
@@ -360,6 +319,53 @@ static void general_cxyz_to_grid(const int border_mask, const int lp,
           }
         }
       }
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief Collocate kernel for general case, ie. non-ortho or with subpatches.
+ * \author Ole Schuett
+ ******************************************************************************/
+static void general_cxyz_to_grid(const int border_mask, const int lp,
+                                 const double zetp, const double dh[3][3],
+                                 const double dh_inv[3][3], const double rp[3],
+                                 const int npts_global[3],
+                                 const int npts_local[3],
+                                 const int shift_local[3],
+                                 const int border_width[3], const double radius,
+                                 const double *cxyz, double *grid) {
+
+  const size_t cijk_size = ((lp + 1) * (lp + 2) * (lp + 3)) / 6;
+  double cijk[cijk_size];
+  memset(cijk, 0, cijk_size * sizeof(double));
+  general_cxyz_to_cijk(lp, dh, cxyz, cijk);
+
+  int bounds[3][2] = {{0, npts_local[0] - 1}, // Default for border_mask == 0.
+                      {0, npts_local[1] - 1},
+                      {0, npts_local[2] - 1}};
+
+  // See also rs_find_node() in task_list_methods.F.
+  // If the bit is set then we need to exclude the border in that direction.
+  if (border_mask & (1 << 0))
+    bounds[0][0] += border_width[0];
+  if (border_mask & (1 << 1))
+    bounds[0][1] -= border_width[0];
+  if (border_mask & (1 << 2))
+    bounds[1][0] += border_width[1];
+  if (border_mask & (1 << 3))
+    bounds[1][1] -= border_width[1];
+  if (border_mask & (1 << 4))
+    bounds[2][0] += border_width[2];
+  if (border_mask & (1 << 5))
+    bounds[2][1] -= border_width[2];
+
+  // center in grid coords
+  // gp = MATMUL(dh_inv, rp)
+  double gp[3] = {0.0, 0.0, 0.0};
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      gp[i] += dh_inv[j][i] * rp[j];
     }
   }
 
@@ -422,7 +428,7 @@ static void general_cxyz_to_grid(const int border_mask, const int lp,
       int lxy = 0;
       for (int jl = 0; jl <= lp - kl; jl++) {
         for (int il = 0; il <= lp - kl - jl; il++) {
-          coef_xyt[lxy++] += coef_ijk[lxyz++] * dkp;
+          coef_xyt[lxy++] += cijk[lxyz++] * dkp;
         }
         lxy += kl;
       }
