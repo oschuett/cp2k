@@ -18,7 +18,7 @@
 #include "grid_ref_prepare_pab.h"
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Collocates coefficients C_x onto the grid for orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
@@ -66,7 +66,7 @@ ortho_cx_to_grid(const int lp, const int k, const int k2, const int jg,
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Transforms coefficients C_xy into C_x by fixing grid index j.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void ortho_cxy_to_cx(const int lp, const double pol_jg[lp + 1],
@@ -75,7 +75,7 @@ static inline void ortho_cxy_to_cx(const int lp, const double pol_jg[lp + 1],
 
   for (int lyp = 0; lyp <= lp; lyp++) {
     for (int lxp = 0; lxp <= lp - lyp; lxp++) {
-      const int cxy_index = lyp * (lp + 1) * 2 + lxp * 2; // [lyp, lxp]
+      const int cxy_index = lyp * (lp + 1) * 2 + lxp * 2; // [lyp, lxp, 0]
       cx[lxp * 4 + 0] += cxy[cxy_index + 0] * pol_jg[lyp];
       cx[lxp * 4 + 1] += cxy[cxy_index + 1] * pol_jg[lyp];
       cx[lxp * 4 + 2] += cxy[cxy_index + 0] * pol_jg2[lyp];
@@ -85,7 +85,7 @@ static inline void ortho_cxy_to_cx(const int lp, const double pol_jg[lp + 1],
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Collocates coefficients C_xy onto the grid for orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
@@ -120,7 +120,7 @@ ortho_cxy_to_grid(const int lp, const int kg, const int kg2, const int cmax,
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Transforms coefficients C_xyz into C_xz by fixing grid index k.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void ortho_cxyz_to_cxy(const int lp, const double pol_kg[lp + 1],
@@ -141,7 +141,7 @@ static inline void ortho_cxyz_to_cxy(const int lp, const double pol_kg[lp + 1],
 }
 
 /*******************************************************************************
- * \brief Collocate kernel for the orthorhombic case.
+ * \brief Collocates coefficients C_xyz onto the grid for orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
@@ -236,7 +236,7 @@ ortho_cxyz_to_grid(const int lp, const double zetp, const double dh[3][3],
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Collocates coefficients C_i onto the grid for general case.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
@@ -304,7 +304,7 @@ general_ci_to_grid(const int lp, const int j, const int jg, const int k,
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Transforms coefficients C_ij into C_i by fixing grid index j.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void general_cij_to_ci(const int lp, const double dj,
@@ -320,7 +320,7 @@ static inline void general_cij_to_ci(const int lp, const double dj,
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Collocates coefficients C_ij onto the grid for general case.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void general_cij_to_grid(
@@ -348,7 +348,7 @@ static inline void general_cij_to_grid(
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Transforms coefficients C_ijk into C_ij by fixing grid index k.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void general_cijk_to_cij(const int lp, const double dk,
@@ -368,7 +368,7 @@ static inline void general_cijk_to_cij(const int lp, const double dk,
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Collocates coefficients C_ijk onto the grid for general case.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
@@ -467,18 +467,15 @@ general_cijk_to_grid(const int border_mask, const int lp, const double zetp,
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Transforms coefficients C_xyz into C_ijk.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void general_cxyz_to_cijk(const int lp, const double dh[3][3],
                                         const double *cxyz, double *cijk) {
 
-  // Translated from collocate_general_opt()
-  //
   // transform P_{lxp,lyp,lzp} into a P_{lip,ljp,lkp} such that
   // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-x_p)**lxp (y-y_p)**lyp (z-z_p)**lzp =
   // sum_{lip,ljp,lkp} P_{lip,ljp,lkp} (i-i_p)**lip (j-j_p)**ljp (k-k_p)**lkp
-  //
 
   // transform using multinomials
   double hmatgridp[lp + 1][3][3];
@@ -535,7 +532,7 @@ static inline void general_cxyz_to_cijk(const int lp, const double dh[3][3],
 }
 
 /*******************************************************************************
- * \brief Collocate kernel for general case, ie. non-ortho or with subpatches.
+ * \brief Collocates coefficients C_xyz onto the grid for general case.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
@@ -557,7 +554,7 @@ general_cxyz_to_grid(const int border_mask, const int lp, const double zetp,
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Collocates coefficients C_xyz onto the grid.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
@@ -583,8 +580,7 @@ cxyz_to_grid(const bool orthorhombic, const int border_mask, const int lp,
 }
 
 /*******************************************************************************
- * \brief Compute coefficients for all combinations of angular momentum.
- *        Results are passed to collocate_ortho and collocate_general.
+ * \brief Transforms coefficients C_ab into C_xyz.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void cab_to_cxyz(const int la_max, const int la_min,
@@ -669,7 +665,7 @@ static inline void cab_to_cxyz(const int la_max, const int la_min,
 }
 
 /*******************************************************************************
- * \brief TODO
+ * \brief Collocates coefficients C_ab onto the grid.
  * \author Ole Schuett
  ******************************************************************************/
 static inline void
