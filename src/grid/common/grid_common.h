@@ -67,13 +67,64 @@ static inline int imax(int x, int y) { return (x > y ? x : y); }
 static inline int modulo(int a, int m) { return ((a % m + m) % m); }
 
 /*******************************************************************************
- * \brief Prototype for BLAS dgemm.
+ * \brief Prototype for BLAS DGEMM subroutine.
  * \author Ole Schuett
  ******************************************************************************/
 void dgemm_(const char *transa, const char *transb, const int *m, const int *n,
             const int *k, const double *alpha, const double *a, const int *lda,
             const double *b, const int *ldb, const double *beta, double *c,
             const int *ldc);
+
+/*******************************************************************************
+ * \brief Convenient wrapper for BLAS DGEMM subroutine.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void blas_dgemm(const char transa, const char transb, const int m,
+                              const int n, const int k, const double alpha,
+                              const double *a, const int lda, const double *b,
+                              const int ldb, const double beta, double *c,
+                              const int ldc) {
+  dgemm_(&transa, &transb, &m, &n, &k, &alpha, a, &lda, b, &ldb, &beta, c,
+         &ldc);
+}
+
+/*******************************************************************************
+ * \brief Prototype for BLAS DGER subroutine.
+ * \author Ole Schuett
+ ******************************************************************************/
+void dger_(const int *m, const int *n, const double *alpha, const double *x,
+           const int *incx, const double *y, const int *incy, const double *a,
+           const int *lda);
+
+/*******************************************************************************
+ * \brief Convenient wrapper for BLAS DGER subroutine.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void blas_dger(const int m, const int n, const double alpha,
+                             const double *x, const int incx, const double *y,
+                             const int incy, const double *a, const int lda) {
+  dger_(&m, &n, &alpha, x, &incx, y, &incy, a, &lda);
+}
+
+/*******************************************************************************
+ * \brief Prototype for BLAS DGEMV subroutine.
+ * \author Ole Schuett
+ ******************************************************************************/
+void dgemv_(const char *transa, const int *m, const int *n, const double *alpha,
+            const double *a, const int *lda, const double *x, const int *incx,
+            const double *beta, const double *y, const int *incy);
+
+/*******************************************************************************
+ * \brief Convenient wrapper for BLAS DGEMV subroutine.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void blas_dgemv(const char transa, const int m, const int n,
+                              const double alpha, const double *a,
+                              const int lda, const double *x, const int incx,
+                              const double beta, const double *y,
+                              const int incy) {
+  dgemv_(&transa, &m, &n, &alpha, a, &lda, x, &incx, &beta, y, &incy);
+}
 
 #endif // GRID_COMMON_H
 

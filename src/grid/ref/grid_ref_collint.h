@@ -25,6 +25,295 @@
 #endif
 
 /*******************************************************************************
+ * \brief Precompute (x-xp)**l * exp(..) for all l=0..lp and x=lb_cube..ub_cube.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void fill_pol(const int lp, const int n, const double zetp,
+                            const double dr, const double roffset,
+                            const int lb_cube, double pol[n][lp + 1],
+                            double pol_trans[lp + 1][n]) {
+  //  Reuse the result from the previous gridpoint to avoid to many exps:
+  //  exp( -a*(x+d)**2) = exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
+  //  exp(-2*a*(x+d)*d) = exp(-2*a*x*d)*exp(-2*a*d**2)
+  const double t_exp_1 = exp(-zetp * pow(dr, 2));
+  const double t_exp_2 = pow(t_exp_1, 2);
+  double t_exp_min_1 = exp(-zetp * pow(+dr - roffset, 2));
+  double t_exp_min_2 = exp(-2 * zetp * (+dr - roffset) * (-dr));
+  for (int ig = 0; ig >= lb_cube; ig--) {
+    const double rpg = ig * dr - roffset;
+    t_exp_min_1 *= t_exp_min_2 * t_exp_1;
+    t_exp_min_2 *= t_exp_2;
+    double pg = t_exp_min_1;
+    for (int icoef = 0; icoef <= lp; icoef++) {
+      if (pol != NULL)
+        pol[ig - lb_cube][icoef] = pg; // exp(-zetp*rpg**2)
+      if (pol_trans != NULL)
+        pol_trans[icoef][ig - lb_cube] = pg;
+      pg *= rpg;
+    }
+  }
+  double t_exp_plus_1 = exp(-zetp * pow(-roffset, 2));
+  double t_exp_plus_2 = exp(-2 * zetp * (-roffset) * (+dr));
+  for (int ig = 0; ig >= lb_cube; ig--) {
+    const double rpg = (1 - ig) * dr - roffset;
+    t_exp_plus_1 *= t_exp_plus_2 * t_exp_1;
+    t_exp_plus_2 *= t_exp_2;
+    double pg = t_exp_plus_1;
+    for (int icoef = 0; icoef <= lp; icoef++) {
+      if (pol != NULL)
+        pol[1 - ig - lb_cube][icoef] = pg; // exp(-zetp*rpg**2)
+      if (pol_trans != NULL)
+        pol_trans[icoef][1 - ig - lb_cube] = pg;
+      pg *= rpg;
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief Collocates cube onto the grid for orthorhombic case.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void
+ortho_cube_to_grid(const int cmax, const int lb_cube[3], const int nx,
+                   const int ny, const int map[3][2 * cmax + 1],
+
+                   const double dh[3][3], const double dh_inv[3][3],
+                   const double disr_radius, const int npts_local[3],
+                   GRID_CONST_WHEN_COLLOCATE double *cube,
+                   GRID_CONST_WHEN_INTEGRATE double *grid) {
+
+  //
+  // Write cube back to large grid taking periodicity and radius into account.
+  //
+
+  // The cube contains an even number of grid points in each direction and
+  // collocation is always performed on a pair of two opposing grid points.
+  // Hence, the points with index 0 and 1 are both assigned distance zero via
+  // the formular distance=(2*index-1)/2.
+
+  const int kgmin = ceil(-1e-8 - disr_radius * dh_inv[2][2]);
+  for (int kg = kgmin; kg <= 1 - kgmin; kg++) {
+    const int k = map[2][kg + cmax]; // target location on the grid
+    const int kd = (2 * kg - 1) / 2; // distance from center in grid points
+    const double kr = kd * dh[2][2]; // distance from center in a.u.
+    const double kremain = disr_radius * disr_radius - kr * kr;
+    const int jgmin = ceil(-1e-8 - sqrt(fmax(0.0, kremain)) * dh_inv[1][1]);
+    for (int jg = jgmin; jg <= 1 - jgmin; jg++) {
+      const int j = map[1][jg + cmax]; // target location on the grid
+      const int jd = (2 * jg - 1) / 2; // distance from center in grid points
+      const double jr = jd * dh[1][1]; // distance from center in a.u.
+      const double jremain = kremain - jr * jr;
+      const int igmin = ceil(-1e-8 - sqrt(fmax(0.0, jremain)) * dh_inv[0][0]);
+      for (int ig = igmin; ig <= 1 - igmin; ig++) {
+        const int i = map[0][ig + cmax]; // target location on the grid
+        const int grid_index =
+            k * npts_local[1] * npts_local[0] + j * npts_local[0] + i;
+        const int cube_index = (kg - lb_cube[2]) * ny * nx +
+                               (jg - lb_cube[1]) * nx + (ig - lb_cube[0]);
+
+#if (GRID_DO_COLLOCATE)
+        grid[grid_index] += cube[cube_index]; // collocate
+#else
+        cube[cube_index] += grid[grid_index]; // integrate
+#endif
+      }
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief Collocates C_xyz onto the cube for orthorhombic case using BLAS DGEMM.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void
+ortho_dgemm_cxyz_to_cube(const int lp, const double zetp, const int lb_cube[3],
+                         const int ub_cube[3], const double dh[3][3],
+                         const double roffset[3],
+                         GRID_CONST_WHEN_COLLOCATE double *cxyz,
+                         GRID_CONST_WHEN_INTEGRATE double *cube) {
+
+  const int nx = ub_cube[0] - lb_cube[0] + 1;
+  const int ny = ub_cube[1] - lb_cube[1] + 1;
+  const int nz = ub_cube[2] - lb_cube[2] + 1;
+
+  // Precompute (x-xp)**l * exp(..) for all directions.
+  double polx_mutable[lp + 1][nx];
+  double poly_mutable[lp + 1][ny];
+  double polz_mutable[lp + 1][nz];
+  fill_pol(lp, nx, zetp, dh[0][0], roffset[0], lb_cube[0], NULL, polx_mutable);
+  fill_pol(lp, ny, zetp, dh[1][1], roffset[1], lb_cube[1], NULL, poly_mutable);
+  fill_pol(lp, nz, zetp, dh[2][2], roffset[2], lb_cube[2], NULL, polz_mutable);
+  const double(*polx) = (const double *)polx_mutable;
+  const double(*poly) = (const double *)poly_mutable;
+  const double(*polz) = (const double *)polz_mutable;
+
+  const int lp1 = lp + 1;
+  double work1[lp1 * lp1 * nz];
+  double work2[lp1 * nz * ny];
+
+#if (GRID_DO_COLLOCATE)
+  // collocate
+
+  // work1[ly,lx][k] = MATMUL(TRANSPOSE(cxyz[lz][ly,lx]), polz[lz][k])
+  blas_dgemm('N', 'T', nz, lp1 * lp1, lp1, 1.0, polz, nz, cxyz, lp1 * lp1, 0.0,
+             work1, nz);
+
+  // work2[lx,k][j] = MATMUL(TRANSPOSE(work1[ly][lx,k]), poly[ly][j])
+  blas_dgemm('N', 'T', ny, lp1 * nz, lp1, 1.0, poly, ny, work1, lp1 * nz, 0.0,
+             work2, ny);
+
+  // cube[k,j][i] = MATMUL(TRANSPOSE(work2[lx][k,j]),  polx[lx][i])
+  blas_dgemm('N', 'T', nx, nz * ny, lp1, 1.0, polx, nx, work2, nz * ny, 0.0,
+             cube, nx);
+
+#else
+  // integrate
+
+  // work2[lx][k,j] = MATMUL(polx[lx][i], TRANSPOSE(cube[k,j][i]))
+  blas_dgemm('T', 'N', nz * ny, lp1, nx, 1.0, cube, nx, polx, nx, 0.0, work2,
+             nz * ny);
+
+  // work1[ly][lx,k] = MATMUL(poly[ly][j], TRANSPOSE(work2[lx,k][j]))
+  blas_dgemm('T', 'N', lp1 * nz, lp1, ny, 1.0, work2, ny, poly, ny, 0.0, work1,
+             lp1 * nz);
+
+  // cxyz[lz][ly,lx] = MATMUL(polz[lz][k], TRANSPOSE(work1[ly,lx][k]))
+  blas_dgemm('T', 'N', lp1 * lp1, lp1, nz, 1.0, work1, nz, polz, nz, 0.0, cxyz,
+             lp1 * lp1);
+
+#endif
+}
+
+/*******************************************************************************
+ * \brief Collocates C_xyz onto the cube for orthorhombic case using BLAS DGER.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void
+ortho_dger_cxyz_to_cube(const int lp, const double zetp, const int lb_cube[3],
+                        const int ub_cube[3], const double dh[3][3],
+                        const double roffset[3],
+                        GRID_CONST_WHEN_COLLOCATE double *cxyz,
+                        GRID_CONST_WHEN_INTEGRATE double *cube) {
+
+  const int nx = ub_cube[0] - lb_cube[0] + 1;
+  const int ny = ub_cube[1] - lb_cube[1] + 1;
+  const int nz = ub_cube[2] - lb_cube[2] + 1;
+
+  // Precompute (x-xp)**l * exp(..) for all directions.
+  double polx_mutable[lp + 1][nx];
+  double poly_mutable[lp + 1][ny];
+  double polz_mutable[lp + 1][nz];
+  fill_pol(lp, nx, zetp, dh[0][0], roffset[0], lb_cube[0], NULL, polx_mutable);
+  fill_pol(lp, ny, zetp, dh[1][1], roffset[1], lb_cube[1], NULL, poly_mutable);
+  fill_pol(lp, nz, zetp, dh[2][2], roffset[2], lb_cube[2], NULL, polz_mutable);
+  const double(*polx)[nx] = (const double(*)[nx])polx_mutable;
+  const double(*poly)[ny] = (const double(*)[ny])poly_mutable;
+  const double(*polz)[nz] = (const double(*)[nz])polz_mutable;
+
+  for (int lzp = 0; lzp <= lp; lzp++) {
+    for (int lyp = 0; lyp <= lp - lzp; lyp++) {
+      for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
+        const int cxyz_index =
+            lzp * (lp + 1) * (lp + 1) + lyp * (lp + 1) + lxp; // [lzp, lyp, lxp]
+
+#if (GRID_DO_COLLOCATE)
+        // collocate
+        const double cval = cxyz[cxyz_index];
+
+        // work[nz][ny] = cval * MATMUL(polz[nz], TRANSPOSE(poly[ny]))
+        double work[nz * ny];
+        memset(work, 0, nz * ny * sizeof(double));
+        blas_dger(ny, nz, cval, poly[lyp], 1, polz[lzp], 1, work, ny);
+
+        // cube[nz,ny][nx] += MATMUL(work[nz,ny], TRANSPOSE(polx[nx]))
+        blas_dger(nx, nz * ny, 1.0, polx[lxp], 1, work, 1, cube, nx);
+
+#else
+        // integrate
+        double *cval = &cxyz[cxyz_index];
+
+        // work1[nz,ny] =  MATMUL(polx[nx], TRANSPOSE(cube[nz,ny][nx]))
+        double work1[nz * ny];
+        blas_dgemv('T', nx, nz * ny, 1.0, cube, nx, polx[lxp], 1, 0.0, work1,
+                   1);
+
+        // work2[nz] =  MATMUL(poly[ny], TRANSPOSE(work1[nz][ny]))
+        double work2[nz];
+        blas_dgemv('T', ny, nz, 1.0, work1, ny, poly[lyp], 1, 0.0, work2, 1);
+
+        // cval +=  MATMUL(poly[nz], TRANSPOSE(work2[nz][1]))
+        // TODO: could use blas_ddot
+        blas_dgemv('T', nz, 1, 1.0, work2, nz, polz[lzp], 1, 1.0, cval, 1);
+
+#endif
+      }
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief Collocates C_xyz onto the grid for orthorhombic case using BLAS DGEMM.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void ortho_dgemm_cxyz_to_grid(
+    const int lp, const double zetp, const int lb_cube[3], const int ub_cube[3],
+    const int cmax, const int map[3][2 * cmax + 1], const double disr_radius,
+    const double dh[3][3], const double dh_inv[3][3], const double roffset[3],
+    const int npts_local[3], GRID_CONST_WHEN_COLLOCATE double *cxyz,
+    GRID_CONST_WHEN_INTEGRATE double *grid) {
+
+  const int nx = ub_cube[0] - lb_cube[0] + 1;
+  const int ny = ub_cube[1] - lb_cube[1] + 1;
+  const int nz = ub_cube[2] - lb_cube[2] + 1;
+
+  double cube[nz * ny * nx]; // TODO: pre-allocate on the heap.
+  memset(cube, 0, nz * ny * nx * sizeof(double));
+
+#if (GRID_DO_COLLOCATE)
+  // collocate
+  ortho_dgemm_cxyz_to_cube(lp, zetp, lb_cube, ub_cube, dh, roffset, cxyz, cube);
+  ortho_cube_to_grid(cmax, lb_cube, nx, ny, map, dh, dh_inv, disr_radius,
+                     npts_local, cube, grid);
+#else
+  // integrate
+  ortho_cube_to_grid(cmax, lb_cube, nx, ny, map, dh, dh_inv, disr_radius,
+                     npts_local, cube, grid);
+  ortho_dgemm_cxyz_to_cube(lp, zetp, lb_cube, ub_cube, dh, roffset, cxyz, cube);
+#endif
+}
+
+/*******************************************************************************
+ * \brief Collocates C_xyz onto the grid for orthorhombic case using BLAS DGER.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void ortho_dger_cxyz_to_grid(
+    const int lp, const double zetp, const int lb_cube[3], const int ub_cube[3],
+    const int cmax, const int map[3][2 * cmax + 1], const double disr_radius,
+    const double dh[3][3], const double dh_inv[3][3], const double roffset[3],
+    const int npts_local[3], GRID_CONST_WHEN_COLLOCATE double *cxyz,
+    GRID_CONST_WHEN_INTEGRATE double *grid) {
+
+  const int nx = ub_cube[0] - lb_cube[0] + 1;
+  const int ny = ub_cube[1] - lb_cube[1] + 1;
+  const int nz = ub_cube[2] - lb_cube[2] + 1;
+
+  double cube[nz * ny * nx]; // TODO: pre-allocate on the heap.
+  memset(cube, 0, nz * ny * nx * sizeof(double));
+
+#if (GRID_DO_COLLOCATE)
+  // collocate
+  ortho_dger_cxyz_to_cube(lp, zetp, lb_cube, ub_cube, dh, roffset, cxyz, cube);
+  ortho_cube_to_grid(cmax, lb_cube, nx, ny, map, dh, dh_inv, disr_radius,
+                     npts_local, cube, grid);
+#else
+  // integrate
+  ortho_cube_to_grid(cmax, lb_cube, nx, ny, map, dh, dh_inv, disr_radius,
+                     npts_local, cube, grid);
+  ortho_dger_cxyz_to_cube(lp, zetp, lb_cube, ub_cube, dh, roffset, cxyz, cube);
+#endif
+}
+
+/*******************************************************************************
  * \brief Collocates registers reg onto the grid for orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
@@ -71,14 +360,14 @@ static inline void ortho_reg_to_grid(const int k, const int k2, const int j,
  * \brief Transforms coefficients C_x into registers reg by fixing grid index i.
  * \author Ole Schuett
  ******************************************************************************/
-static inline void ortho_cx_to_reg(const int lp, const double pol_ig[lp + 1],
-                                   const double pol_ig2[lp + 1],
+static inline void ortho_cx_to_reg(const int lp, const double polx_ig[lp + 1],
+                                   const double polx_ig2[lp + 1],
                                    GRID_CONST_WHEN_COLLOCATE double *cx,
                                    GRID_CONST_WHEN_INTEGRATE double *reg) {
 
   for (int lxp = 0; lxp <= lp; lxp++) {
-    const double p1 = pol_ig[lxp];
-    const double p2 = pol_ig2[lxp];
+    const double p1 = polx_ig[lxp];
+    const double p2 = polx_ig2[lxp];
 
 #if (GRID_DO_COLLOCATE)
     // collocate
@@ -108,14 +397,13 @@ static inline void ortho_cx_to_reg(const int lp, const double pol_ig[lp + 1],
  * \brief Collocates coefficients C_x onto the grid for orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
-static inline void ortho_cx_to_grid(const int lp, const int k, const int k2,
-                                    const int jg, const int jg2, const int cmax,
-                                    const double pol[3][2 * cmax + 1][lp + 1],
-                                    const int map[3][2 * cmax + 1],
-                                    const int npts_local[3],
-                                    int **sphere_bounds_iter,
-                                    GRID_CONST_WHEN_COLLOCATE double *cx,
-                                    GRID_CONST_WHEN_INTEGRATE double *grid) {
+static inline void
+ortho_cx_to_grid(const int lp, const int k, const int k2, const int jg,
+                 const int jg2, const int cmax, const int nx,
+                 const int lb_cube[3], const double polx[nx][lp + 1],
+                 const int map[3][2 * cmax + 1], const int npts_local[3],
+                 int **sphere_bounds_iter, GRID_CONST_WHEN_COLLOCATE double *cx,
+                 GRID_CONST_WHEN_INTEGRATE double *grid) {
 
   const int j = map[1][jg + cmax];
   const int j2 = map[1][jg2 + cmax];
@@ -124,18 +412,20 @@ static inline void ortho_cx_to_grid(const int lp, const int k, const int k2,
     const int ig2 = 1 - ig;
     const int i = map[0][ig + cmax];
     const int i2 = map[0][ig2 + cmax];
+    const double *polx_ig = polx[ig - lb_cube[0]];
+    const double *polx_ig2 = polx[ig2 - lb_cube[0]];
 
     // In all likelihood the compiler will keep these variables in registers.
     double reg[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 #if (GRID_DO_COLLOCATE)
     // collocate
-    ortho_cx_to_reg(lp, pol[0][ig + cmax], pol[0][ig2 + cmax], cx, reg);
+    ortho_cx_to_reg(lp, polx_ig, polx_ig2, cx, reg);
     ortho_reg_to_grid(k, k2, j, j2, i, i2, npts_local, reg, grid);
 #else
     // integrate
     ortho_reg_to_grid(k, k2, j, j2, i, i2, npts_local, reg, grid);
-    ortho_cx_to_reg(lp, pol[0][ig + cmax], pol[0][ig2 + cmax], cx, reg);
+    ortho_cx_to_reg(lp, polx_ig, polx_ig2, cx, reg);
 #endif
   }
 }
@@ -144,8 +434,8 @@ static inline void ortho_cx_to_grid(const int lp, const int k, const int k2,
  * \brief Transforms coefficients C_xy into C_x by fixing grid index j.
  * \author Ole Schuett
  ******************************************************************************/
-static inline void ortho_cxy_to_cx(const int lp, const double pol_jg[lp + 1],
-                                   const double pol_jg2[lp + 1],
+static inline void ortho_cxy_to_cx(const int lp, const double poly_jg[lp + 1],
+                                   const double poly_jg2[lp + 1],
                                    GRID_CONST_WHEN_COLLOCATE double *cxy,
                                    GRID_CONST_WHEN_INTEGRATE double *cx) {
 
@@ -155,16 +445,16 @@ static inline void ortho_cxy_to_cx(const int lp, const double pol_jg[lp + 1],
 
 #if (GRID_DO_COLLOCATE)
       // collocate
-      cx[lxp * 4 + 0] += cxy[cxy_index + 0] * pol_jg[lyp];
-      cx[lxp * 4 + 1] += cxy[cxy_index + 1] * pol_jg[lyp];
-      cx[lxp * 4 + 2] += cxy[cxy_index + 0] * pol_jg2[lyp];
-      cx[lxp * 4 + 3] += cxy[cxy_index + 1] * pol_jg2[lyp];
+      cx[lxp * 4 + 0] += cxy[cxy_index + 0] * poly_jg[lyp];
+      cx[lxp * 4 + 1] += cxy[cxy_index + 1] * poly_jg[lyp];
+      cx[lxp * 4 + 2] += cxy[cxy_index + 0] * poly_jg2[lyp];
+      cx[lxp * 4 + 3] += cxy[cxy_index + 1] * poly_jg2[lyp];
 #else
       // integrate
-      cxy[cxy_index + 0] += cx[lxp * 4 + 0] * pol_jg[lyp];
-      cxy[cxy_index + 1] += cx[lxp * 4 + 1] * pol_jg[lyp];
-      cxy[cxy_index + 0] += cx[lxp * 4 + 2] * pol_jg2[lyp];
-      cxy[cxy_index + 1] += cx[lxp * 4 + 3] * pol_jg2[lyp];
+      cxy[cxy_index + 0] += cx[lxp * 4 + 0] * poly_jg[lyp];
+      cxy[cxy_index + 1] += cx[lxp * 4 + 1] * poly_jg[lyp];
+      cxy[cxy_index + 0] += cx[lxp * 4 + 2] * poly_jg2[lyp];
+      cxy[cxy_index + 1] += cx[lxp * 4 + 3] * poly_jg2[lyp];
 #endif
     }
   }
@@ -174,14 +464,14 @@ static inline void ortho_cxy_to_cx(const int lp, const double pol_jg[lp + 1],
  * \brief Collocates coefficients C_xy onto the grid for orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
-static inline void ortho_cxy_to_grid(const int lp, const int kg, const int kg2,
-                                     const int cmax,
-                                     const double pol[3][2 * cmax + 1][lp + 1],
-                                     const int map[3][2 * cmax + 1],
-                                     const int npts_local[3],
-                                     int **sphere_bounds_iter,
-                                     GRID_CONST_WHEN_COLLOCATE double *cxy,
-                                     GRID_CONST_WHEN_INTEGRATE double *grid) {
+static inline void
+ortho_cxy_to_grid(const int lp, const int nx, const int ny,
+                  const int lb_cube[3], const double polx[nx][lp + 1],
+                  const double poly[ny][lp + 1], const int kg, const int kg2,
+                  const int cmax, const int map[3][2 * cmax + 1],
+                  const int npts_local[3], int **sphere_bounds_iter,
+                  GRID_CONST_WHEN_COLLOCATE double *cxy,
+                  GRID_CONST_WHEN_INTEGRATE double *grid) {
 
   // The cube contains an even number of grid points in each direction and
   // collocation is always performed on a pair of two opposing grid points.
@@ -195,19 +485,21 @@ static inline void ortho_cxy_to_grid(const int lp, const int kg, const int kg2,
   double cx[cx_size];
   for (int jg = jgmin; jg <= 0; jg++) {
     const int jg2 = 1 - jg;
+    const double *poly_jg = poly[jg - lb_cube[1]];
+    const double *poly_jg2 = poly[jg2 - lb_cube[1]];
 
     memset(cx, 0, cx_size * sizeof(double));
 
 #if (GRID_DO_COLLOCATE)
     // collocate
-    ortho_cxy_to_cx(lp, pol[1][jg + cmax], pol[1][jg2 + cmax], cxy, cx);
-    ortho_cx_to_grid(lp, k, k2, jg, jg2, cmax, pol, map, npts_local,
-                     sphere_bounds_iter, cx, grid);
+    ortho_cxy_to_cx(lp, poly_jg, poly_jg2, cxy, cx);
+    ortho_cx_to_grid(lp, k, k2, jg, jg2, cmax, nx, lb_cube, polx, map,
+                     npts_local, sphere_bounds_iter, cx, grid);
 #else
     // integrate
-    ortho_cx_to_grid(lp, k, k2, jg, jg2, cmax, pol, map, npts_local,
-                     sphere_bounds_iter, cx, grid);
-    ortho_cxy_to_cx(lp, pol[1][jg + cmax], pol[1][jg2 + cmax], cxy, cx);
+    ortho_cx_to_grid(lp, k, k2, jg, jg2, cmax, nx, lb_cube, polx, map,
+                     npts_local, sphere_bounds_iter, cx, grid);
+    ortho_cxy_to_cx(lp, poly_jg, poly_jg2, cxy, cx);
 #endif
   }
 }
@@ -216,8 +508,8 @@ static inline void ortho_cxy_to_grid(const int lp, const int kg, const int kg2,
  * \brief Transforms coefficients C_xyz into C_xz by fixing grid index k.
  * \author Ole Schuett
  ******************************************************************************/
-static inline void ortho_cxyz_to_cxy(const int lp, const double pol_kg[lp + 1],
-                                     const double pol_kg2[lp + 1],
+static inline void ortho_cxyz_to_cxy(const int lp, const double polz_kg[lp + 1],
+                                     const double polz_kg2[lp + 1],
                                      GRID_CONST_WHEN_COLLOCATE double *cxyz,
                                      GRID_CONST_WHEN_INTEGRATE double *cxy) {
 
@@ -230,15 +522,65 @@ static inline void ortho_cxyz_to_cxy(const int lp, const double pol_kg[lp + 1],
 
 #if (GRID_DO_COLLOCATE)
         // collocate
-        cxy[cxy_index + 0] += cxyz[cxyz_index] * pol_kg[lzp];
-        cxy[cxy_index + 1] += cxyz[cxyz_index] * pol_kg2[lzp];
+        cxy[cxy_index + 0] += cxyz[cxyz_index] * polz_kg[lzp];
+        cxy[cxy_index + 1] += cxyz[cxyz_index] * polz_kg2[lzp];
 #else
         // integrate
-        cxyz[cxyz_index] += cxy[cxy_index + 0] * pol_kg[lzp];
-        cxyz[cxyz_index] += cxy[cxy_index + 1] * pol_kg2[lzp];
+        cxyz[cxyz_index] += cxy[cxy_index + 0] * polz_kg[lzp];
+        cxyz[cxyz_index] += cxy[cxy_index + 1] * polz_kg2[lzp];
 #endif
       }
     }
+  }
+}
+
+/*******************************************************************************
+ * \brief Collocates coefficients C_xyz onto the grid for orthorhombic case.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline void ortho_classic_cxyz_to_grid(
+    const int lp, const double zetp, const int lb_cube[3], const int ub_cube[3],
+    const int cmax, const int map[3][2 * cmax + 1], const double dh[3][3],
+    const double roffset[3], const int npts_local[3], int **sphere_bounds_iter,
+    GRID_CONST_WHEN_COLLOCATE double *cxyz,
+    GRID_CONST_WHEN_INTEGRATE double *grid) {
+
+  const int nx = ub_cube[0] - lb_cube[0] + 1;
+  const int ny = ub_cube[1] - lb_cube[1] + 1;
+  const int nz = ub_cube[2] - lb_cube[2] + 1;
+
+  // Precompute (x-xp)**l * exp(..) for all directions.
+  double polx_mutable[nx][lp + 1];
+  double poly_mutable[ny][lp + 1];
+  double polz_mutable[nz][lp + 1];
+  fill_pol(lp, nx, zetp, dh[0][0], roffset[0], lb_cube[0], polx_mutable, NULL);
+  fill_pol(lp, ny, zetp, dh[1][1], roffset[1], lb_cube[1], poly_mutable, NULL);
+  fill_pol(lp, nz, zetp, dh[2][2], roffset[2], lb_cube[2], polz_mutable, NULL);
+  const double(*polx)[lp + 1] = (const double(*)[lp + 1]) polx_mutable;
+  const double(*poly)[lp + 1] = (const double(*)[lp + 1]) poly_mutable;
+  const double(*polz)[lp + 1] = (const double(*)[lp + 1]) polz_mutable;
+
+  // Loop over k dimension of the cube.
+  const int kgmin = *((*sphere_bounds_iter)++);
+  const size_t cxy_size = (lp + 1) * (lp + 1) * 2;
+  double cxy[cxy_size];
+  for (int kg = kgmin; kg <= 0; kg++) {
+    const int kg2 = 1 - kg;
+    const double *polz_kg = polz[kg - lb_cube[2]];
+    const double *polz_kg2 = polz[kg2 - lb_cube[2]];
+    memset(cxy, 0, cxy_size * sizeof(double));
+
+#if (GRID_DO_COLLOCATE)
+    // collocate
+    ortho_cxyz_to_cxy(lp, polz_kg, polz_kg2, cxyz, cxy);
+    ortho_cxy_to_grid(lp, nx, ny, lb_cube, polx, poly, kg, kg2, cmax, map,
+                      npts_local, sphere_bounds_iter, cxy, grid);
+#else
+    // integrate
+    ortho_cxy_to_grid(lp, nx, ny, lb_cube, polx, poly, kg, kg2, cmax, map,
+                      npts_local, sphere_bounds_iter, cxy, grid);
+    ortho_cxyz_to_cxy(lp, polz_kg, polz_kg2, cxyz, cxy);
+#endif
   }
 }
 
@@ -298,48 +640,8 @@ ortho_cxyz_to_grid(const int lp, const double zetp, const double dh[3][3],
     }
   }
 
-  // cmax = MAXVAL(ub_cube)
-  const int cmax = imax(imax(ub_cube[0], ub_cube[1]), ub_cube[2]);
-
-  // Precompute (x-xp)**lp*exp(..) for each direction.
-  double pol_mutable[3][2 * cmax + 1][lp + 1];
-  for (int idir = 0; idir < 3; idir++) {
-    const double dr = dh[idir][idir];
-    const double ro = roffset[idir];
-    //  Reuse the result from the previous gridpoint to avoid to many exps:
-    //  exp( -a*(x+d)**2) = exp(-a*x**2)*exp(-2*a*x*d)*exp(-a*d**2)
-    //  exp(-2*a*(x+d)*d) = exp(-2*a*x*d)*exp(-2*a*d**2)
-    const double t_exp_1 = exp(-zetp * pow(dr, 2));
-    const double t_exp_2 = pow(t_exp_1, 2);
-    double t_exp_min_1 = exp(-zetp * pow(+dr - ro, 2));
-    double t_exp_min_2 = exp(-2 * zetp * (+dr - ro) * (-dr));
-    for (int ig = 0; ig >= lb_cube[idir]; ig--) {
-      const double rpg = ig * dr - ro;
-      t_exp_min_1 *= t_exp_min_2 * t_exp_1;
-      t_exp_min_2 *= t_exp_2;
-      double pg = t_exp_min_1;
-      for (int icoef = 0; icoef <= lp; icoef++) {
-        pol_mutable[idir][ig + cmax][icoef] = pg; // exp(-zetp*rpg**2)
-        pg *= rpg;
-      }
-    }
-    double t_exp_plus_1 = exp(-zetp * pow(-ro, 2));
-    double t_exp_plus_2 = exp(-2 * zetp * (-ro) * (+dr));
-    for (int ig = 0; ig >= lb_cube[idir]; ig--) {
-      const double rpg = (1 - ig) * dr - ro;
-      t_exp_plus_1 *= t_exp_plus_2 * t_exp_1;
-      t_exp_plus_2 *= t_exp_2;
-      double pg = t_exp_plus_1;
-      for (int icoef = 0; icoef <= lp; icoef++) {
-        pol_mutable[idir][1 - ig + cmax][icoef] = pg; // exp(-zetp*rpg**2)
-        pg *= rpg;
-      }
-    }
-  }
-  const double(*pol)[2 * cmax + 1][lp + 1] =
-      (const double(*)[2 * cmax + 1][lp + 1]) pol_mutable;
-
   // Precompute mapping from cube to grid indices for each direction
+  const int cmax = imax(imax(ub_cube[0], ub_cube[1]), ub_cube[2]);
   int map_mutable[3][2 * cmax + 1];
   for (int i = 0; i < 3; i++) {
     for (int k = -cmax; k <= +cmax; k++) {
@@ -349,26 +651,20 @@ ortho_cxyz_to_grid(const int lp, const double zetp, const double dh[3][3],
   }
   const int(*map)[2 * cmax + 1] = (const int(*)[2 * cmax + 1]) map_mutable;
 
-  // Loop over k dimension of the cube.
-  const int kgmin = *((*sphere_bounds_iter)++);
-  const size_t cxy_size = (lp + 1) * (lp + 1) * 2;
-  double cxy[cxy_size];
-  for (int kg = kgmin; kg <= 0; kg++) {
-    const int kg2 = 1 - kg;
-
-    memset(cxy, 0, cxy_size * sizeof(double));
-
-#if (GRID_DO_COLLOCATE)
-    // collocate
-    ortho_cxyz_to_cxy(lp, pol[2][kg + cmax], pol[2][kg2 + cmax], cxyz, cxy);
-    ortho_cxy_to_grid(lp, kg, kg2, cmax, pol, map, npts_local,
-                      sphere_bounds_iter, cxy, grid);
-#else
-    // integrate
-    ortho_cxy_to_grid(lp, kg, kg2, cmax, pol, map, npts_local,
-                      sphere_bounds_iter, cxy, grid);
-    ortho_cxyz_to_cxy(lp, pol[2][kg + cmax], pol[2][kg2 + cmax], cxyz, cxy);
-#endif
+  const int KERNEL = 2;
+  if (KERNEL == 0) {
+    ortho_classic_cxyz_to_grid(lp, zetp, lb_cube, ub_cube, cmax, map, dh,
+                               roffset, npts_local, sphere_bounds_iter, cxyz,
+                               grid);
+  } else if (KERNEL == 1) {
+    ortho_dger_cxyz_to_grid(lp, zetp, lb_cube, ub_cube, cmax, map, disr_radius,
+                            dh, dh_inv, roffset, npts_local, cxyz, grid);
+  } else if (KERNEL == 2) {
+    ortho_dgemm_cxyz_to_grid(lp, zetp, lb_cube, ub_cube, cmax, map, disr_radius,
+                             dh, dh_inv, roffset, npts_local, cxyz, grid);
+  } else {
+    fprintf(stderr, "Unknown kernel in ortho_cxyz_to_grid: %i\n", KERNEL);
+    abort();
   }
 }
 
