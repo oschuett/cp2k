@@ -1,0 +1,150 @@
+FROM ubuntu:20.04
+USER root
+
+# author: Ole Schuett
+
+# Install Ubuntu packages.
+RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && \
+    apt-get update -qq && apt-get install -qq --no-install-recommends \
+    ca-certificates \
+    gcc \
+    g++ \
+    gfortran \
+    git \
+    less \
+    make \
+    nano \
+    python \
+    python3 \
+    unzip \
+    wget \
+    fftw3-dev \
+   && rm -rf /var/lib/apt/lists/*
+
+# Build OpenBLAS for optimal performance.
+RUN wget -q https://www.cp2k.org/static/downloads/OpenBLAS-0.3.10.tar.gz && \
+    echo "0484d275f87e9b8641ff2eecaa9df2830cbe276ac79ad80494822721de6e1693 OpenBLAS-0.3.10.tar.gz" | sha256sum --check
+RUN tar -zxf OpenBLAS-0.3.10.tar.gz && \
+    cd OpenBLAS-0.3.10 && \
+    make -j > make.log 2>&1 && \
+    make install PREFIX=/usr
+
+# Clone master branch
+WORKDIR /workspace/cp2k_master
+RUN git clone https://github.com/cp2k/cp2k.git .
+RUN git checkout -b master_20201023 e6b4556
+RUN git submodule update --init --recursive
+
+# Clone Mathieu's branch
+WORKDIR /workspace/cp2k_mathieu
+RUN git clone https://github.com/mtaillefumier/cp2k.git .
+RUN git checkout -b for_ole_update_20201023 144113c
+RUN git submodule update --init --recursive
+
+# Write ARCH files.
+WORKDIR /workspace
+RUN echo 'CC          = gcc'                                                                                            > local.ssmp && \
+    echo 'CXX         = g++'                                                                                           >> local.ssmp && \
+    echo 'AR          = ar -r'                                                                                         >> local.ssmp && \
+    echo 'FC          = gfortran'                                                                                      >> local.ssmp && \
+    echo 'LD          = gfortran'                                                                                      >> local.ssmp && \
+    echo 'DFLAGS      = -D__FFTW3 -march=native -mtune=native -fno-omit-frame-pointer -g -O3 -funroll-loops -fopenmp'  >> local.ssmp && \
+    echo 'CFLAGS      = -std=c99 -Wall -Wextra  $(DFLAGS)'                                                             >> local.ssmp && \
+    echo 'FCFLAGS     = -std=f2008 -fbacktrace -ffree-form -fimplicit-none $(DFLAGS)'                                  >> local.ssmp && \
+    echo 'LDFLAGS     = $(FCFLAGS)'                                                                                    >> local.ssmp && \
+    echo 'LIBS        = -lfftw3 -lfftw3_omp -lopenblas'                                                                >> local.ssmp && \
+    echo 'FYPPFLAGS   = -n --line-marker-format=gfortran5'                                                             >> local.ssmp
+
+# Compile master branch
+WORKDIR /workspace/cp2k_master
+RUN ln -s ../../local.ssmp ./arch/
+RUN make -j VERSION=ssmp
+    
+# Compile Mathieu's branch
+WORKDIR /workspace/cp2k_mathieu
+RUN ln -s ../../local.ssmp ./arch/
+RUN sed -i "s|openblas.h|cblas.h|" src/grid/cpu/*
+RUN echo '#include <cblas.h>\n#include <assert.h>' >> src/grid/common/grid_common.h
+RUN make -j VERSION=ssmp
+
+# Prepare input files
+WORKDIR /workspace/
+RUN cat /workspace/cp2k_master/benchmarks/QS/H2O-32.inp \
+    | sed "s|RUN_TYPE MD|RUN_TYPE ENERGY|" \
+    | sed "s|SCF_GUESS ATOMIC|SCF_GUESS ATOMIC\\n      MAX_SCF 10|" \
+    > H2O-32_ortho_spherical.inp
+RUN cat H2O-32_ortho_spherical.inp \
+    | sed "s|\&CELL|\&CELL\\n      ALPHA_BETA_GAMMA 89.0 92.0 91.0|"  \
+    > H2O-32_gener_spherical.inp
+RUN cat H2O-32_ortho_spherical.inp \
+    | sed "s|\&END GLOBAL|  \&GRID\\n     APPLY_CUTOFF FALSE\\n  \&END\\n\\&END GLOBAL|" \
+    > H2O-32_ortho_no_cutoff.inp
+RUN cat H2O-32_gener_spherical.inp \
+    | sed "s|\&END GLOBAL|  \&GRID\\n     APPLY_CUTOFF FALSE\\n  \&END\\n\\&END GLOBAL|" \
+    > H2O-32_gener_no_cutoff.inp
+
+# Run benchmarks
+ENV OMP_NUM_THREADS=1
+RUN ./cp2k_master/exe/local/cp2k.ssmp H2O-32_ortho_spherical.inp  | tee /workspace/TZV2P_ortho_spherical_referen.out
+RUN ./cp2k_master/exe/local/cp2k.ssmp H2O-32_gener_spherical.inp  | tee /workspace/TZV2P_gener_spherical_referen.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_ortho_spherical.inp | tee /workspace/TZV2P_ortho_spherical_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_gener_spherical.inp | tee /workspace/TZV2P_gener_spherical_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_ortho_no_cutoff.inp | tee /workspace/TZV2P_ortho_no_cutoff_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_gener_no_cutoff.inp | tee /workspace/TZV2P_gener_no_cutoff_mathieu.out
+
+RUN sed -i "s|TZV2P-GTH|cc-QZV3P-GTH|g" *.inp && sed -i "s|GTH_BASIS_SETS|HFX_BASIS|g" *.inp
+RUN ./cp2k_master/exe/local/cp2k.ssmp H2O-32_ortho_spherical.inp  | tee /workspace/cc-QZV3P_ortho_spherical_referen.out
+RUN ./cp2k_master/exe/local/cp2k.ssmp H2O-32_gener_spherical.inp  | tee /workspace/cc-QZV3P_gener_spherical_referen.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_ortho_spherical.inp | tee /workspace/cc-QZV3P_ortho_spherical_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_gener_spherical.inp | tee /workspace/cc-QZV3P_gener_spherical_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_ortho_no_cutoff.inp | tee /workspace/cc-QZV3P_ortho_no_cutoff_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_gener_no_cutoff.inp | tee /workspace/cc-QZV3P_gener_no_cutoff_mathieu.out
+
+RUN sed -i "s|cc-QZV3P-GTH|DZVP-MOLOPT-SR-GTH|g" *.inp && sed -i "s|HFX_BASIS|BASIS_MOLOPT|g" *.inp 
+RUN ./cp2k_master/exe/local/cp2k.ssmp H2O-32_ortho_spherical.inp  | tee /workspace/DZVP-MOLOPT-SR_ortho_spherical_referen.out
+RUN ./cp2k_master/exe/local/cp2k.ssmp H2O-32_gener_spherical.inp  | tee /workspace/DZVP-MOLOPT-SR_gener_spherical_referen.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_ortho_spherical.inp | tee /workspace/DZVP-MOLOPT-SR_ortho_spherical_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_gener_spherical.inp | tee /workspace/DZVP-MOLOPT-SR_gener_spherical_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_ortho_no_cutoff.inp | tee /workspace/DZVP-MOLOPT-SR_ortho_no_cutoff_mathieu.out
+RUN ./cp2k_mathieu/exe/local/cp2k.ssmp H2O-32_gener_no_cutoff.inp | tee /workspace/DZVP-MOLOPT-SR_gener_no_cutoff_mathieu.out
+
+#  ==== Clone Ole's branch ====
+#
+# WORKDIR /workspace/cp2k_ole
+# RUN git clone https://github.com/oschuett/cp2k.git .
+# RUN git checkout -b grid_dgemm_20201023 e18f4a6
+# RUN git submodule update --init --recursive
+# RUN ln -s ../../local.ssmp ./arch/
+# RUN make -j VERSION=ssmp
+# WORKDIR /workspace/
+# RUN ./cp2k_ole/exe/local/cp2k.ssmp H2O-32_short_ortho_spherical.inp  | tee /workspace/ole_____ortho_spherical.out
+# RUN ./cp2k_ole/exe/local/cp2k.ssmp H2O-32_short_gener_spherical.inp  | tee /workspace/ole_____gener_spherical.out
+
+
+#  ==== Coverage analysis ====
+#
+# WORKDIR /workspace/cp2k_mathieu
+# RUN cat ../local.ssmp \
+#     | sed "s|-O3|-O1 -coverage -fkeep-static-functions|" \
+#     > ./arch/local_coverage.ssmp
+# RUN make -j ARCH=local_coverage VERSION=ssmp
+# 
+# RUN sed -i "s|MAX_SCF 10|MAX_SCF 1|" ../*.inp
+# RUN ./exe/local_coverage/cp2k.ssmp ../H2O-32_short_ortho_spherical.inp
+# RUN ./exe/local_coverage/cp2k.ssmp ../H2O-32_short_gener_spherical.inp
+# RUN ./exe/local_coverage/cp2k.ssmp ../H2O-32_short_ortho_no_cutoff.inp
+# RUN ./exe/local_coverage/cp2k.ssmp ../H2O-32_short_gener_no_cutoff.inp
+# 
+# RUN wget -q https://github.com/linux-test-project/lcov/releases/download/v1.15/lcov-1.15.tar.gz && \
+#     echo "c1cda2fa33bec9aa2c2c73c87226cfe97de0831887176b45ee523c5e30f8053a  lcov-1.15.tar.gz" | sha256sum --check
+# RUN tar -xzf lcov-1.15.tar.gz && cd lcov-1.15 && make install
+# RUN cd /workspace/cp2k_mathieu/obj/local_coverage/ssmp/ && rm -v exts/dbcsr/dbcsr* hfx* qs*
+# RUN lcov --directory "/workspace/cp2k_mathieu/obj/local_coverage/ssmp/" --capture --output-file coverage.info
+# RUN mkdir cov_report && cd cov_report && genhtml ../coverage.info
+
+
+# Print results
+RUN grep "ENERGY|" *.out
+RUN grep "CP2K  " *.out 
+
+#EOF
