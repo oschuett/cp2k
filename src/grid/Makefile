@@ -1,6 +1,6 @@
 .PHONY : all clean
 
-all: grid_collocate_miniapp.x grid_collocate_unittest.x
+all: grid_miniapp.x grid_unittest.x
 
 clean:
 	rm -fv grid_*.o */grid_*.o grid_*.x
@@ -12,7 +12,7 @@ LIBS := -lm -lblas -lcudart -lcuda -lcublas -L${CUDA_PATH}/lib64
 
 ALL_HEADERS := $(shell find . -name "*.h")
 
-ALL_OBJECTS := grid_collocate_replay.o \
+ALL_OBJECTS := grid_replay.o \
                grid_task_list.o \
                common/grid_library.o \
                common/grid_buffer.o \
@@ -46,10 +46,10 @@ ALL_OBJECTS := grid_collocate_replay.o \
 %.o: %.cu $(ALL_HEADERS)
 	cd $(dir $<); nvcc -c $(NVFLAGS) $(notdir $<)
 
-grid_collocate_miniapp.x: grid_collocate_miniapp.o $(ALL_OBJECTS)
+grid_miniapp.x: grid_miniapp.o $(ALL_OBJECTS)
 	nvcc $(NVFLAGS) -o $@ $^ $(LIBS)
 
-grid_collocate_unittest.x: grid_collocate_unittest.o $(ALL_OBJECTS)
+grid_unittest.x: grid_unittest.o $(ALL_OBJECTS)
 	nvcc $(NVFLAGS) -o $@ $^ $(LIBS)
 
 #EOF
