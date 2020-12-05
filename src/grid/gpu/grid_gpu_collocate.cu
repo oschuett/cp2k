@@ -119,14 +119,8 @@ __device__ static void collocate_kernel(const kernel_params *params) {
   block_to_cab<IS_FUNC_AB>(params, &task, smem_cab);
 
   compute_alpha(params, &task, smem_alpha);
-
   cab_to_cxyz(params, &task, smem_alpha, smem_cab, smem_cxyz);
-
-  if (params->orthorhombic && task.border_mask == 0) {
-    ortho_cxyz_to_grid(params, &task, smem_cxyz, params->grid);
-  } else {
-    general_cxyz_to_grid(params, &task, smem_cxyz, params->grid);
-  }
+  cxyz_to_grid(params, &task, smem_cxyz, params->grid);
 }
 
 /*******************************************************************************

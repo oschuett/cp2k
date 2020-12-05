@@ -56,19 +56,35 @@ __device__ static double atomicAddDouble(double *address, double val) {
  * \brief Compute value of a single grid point with distance d{xyz} from center.
  * \author Ole Schuett
  ******************************************************************************/
-__device__ static double compute_point_value(const double dx, const double dy,
-                                             const double dz, const double zetp,
-                                             const int lp, const double *cxyz) {
+__device__ static void
+cxyz_to_gridpoint(const double dx, const double dy, const double dz,
+                  const double zetp, const int lp,
+                  GRID_CONST_WHEN_COLLOCATE double *cxyz,
+                  GRID_CONST_WHEN_INTEGRATE double *gridpoint) {
 
-  double result = 0.0; // accumulate into register
+  // Squared distance of point from center.
+  const double r2 = dx * dx + dy * dy + dz * dz;
+  const double gaussian = exp(-zetp * r2);
+
+#if (GRID_DO_COLLOCATE)
+  double reg = 0.0; // accumulate into register
+#endif
+
   double pow_dz = 1.0;
   for (int lzp = 0; lzp <= lp; lzp++) {
     double pow_dy = 1.0;
     for (int lyp = 0; lyp <= lp - lzp; lyp++) {
       double pow_dx = 1.0;
       for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
-        const double pol = pow_dx * pow_dy * pow_dz;
-        result += cxyz[coset(lxp, lyp, lzp)] * pol;
+        const double p = gaussian * pow_dx * pow_dy * pow_dz;
+
+#if (GRID_DO_COLLOCATE)
+        // collocate
+        reg += cxyz[coset(lxp, lyp, lzp)] * p;
+#else
+        // integrate
+        atomicAddDouble(&cxyz[coset(lxp, lyp, lzp)], *gridpoint * p);
+#endif
         pow_dx *= dx; // pow_dx = pow(dx, lxp)
       }
       pow_dy *= dy; // pow_dy = pow(dy, lyp)
@@ -76,9 +92,9 @@ __device__ static double compute_point_value(const double dx, const double dy,
     pow_dz *= dz; // pow_dz = pow(dz, lzp)
   }
 
-  // Squared distance of point from center.
-  const double r2 = dx * dx + dy * dy + dz * dz;
-  return result * exp(-zetp * r2);
+#if (GRID_DO_COLLOCATE)
+  atomicAddDouble(gridpoint, reg);
+#endif
 }
 
 /*******************************************************************************
@@ -224,10 +240,10 @@ static void init_constant_memory() {
  * \brief Collocates coefficients C_xyz onto the grid for orthorhombic case.
  * \author Ole Schuett
  ******************************************************************************/
-__device__ static void ortho_cxyz_to_grid(const kernel_params *params,
-                                          const smem_task *task,
-                                          GRID_CONST_WHEN_COLLOCATE double *cxyz,
-                                          GRID_CONST_WHEN_INTEGRATE double *grid) {
+__device__ static void
+ortho_cxyz_to_grid(const kernel_params *params, const smem_task *task,
+                   GRID_CONST_WHEN_COLLOCATE double *cxyz,
+                   GRID_CONST_WHEN_INTEGRATE double *grid) {
   // Discretize the radius.
   const double drmin =
       fmin(params->dh[0][0], fmin(params->dh[1][1], params->dh[2][2]));
@@ -285,17 +301,12 @@ __device__ static void ortho_cxyz_to_grid(const kernel_params *params,
         const double dy = (cubecenter[1] + j) * params->dh[1][1] - task->rp[1];
         const double dz = (cubecenter[2] + k) * params->dh[2][2] - task->rp[2];
 
-        // Compute grid point value and add to the global array.
         const int grid_index =
             kg * params->npts_local[1] * params->npts_local[0] +
             jg * params->npts_local[0] + ig;
-        const double value =
-            compute_point_value(dx, dy, dz, task->zetp, task->lp, cxyz);
-#if (GRID_DO_COLLOCATE)
-        atomicAddDouble(&grid[grid_index], value);
-#else
-        assert(false); // not yet implemented
-#endif
+
+        cxyz_to_gridpoint(dx, dy, dz, task->zetp, task->lp, cxyz,
+                          &grid[grid_index]);
       }
     }
   }
@@ -306,10 +317,10 @@ __device__ static void ortho_cxyz_to_grid(const kernel_params *params,
  * \brief Collocates coefficients C_xyz onto the grid for general case.
  * \author Ole Schuett
  ******************************************************************************/
-__device__ static void general_cxyz_to_grid(const kernel_params *params,
-                                            const smem_task *task,
-                                            GRID_CONST_WHEN_COLLOCATE double *cxyz,
-                                            GRID_CONST_WHEN_INTEGRATE double *grid) {
+__device__ static void
+general_cxyz_to_grid(const kernel_params *params, const smem_task *task,
+                     GRID_CONST_WHEN_COLLOCATE double *cxyz,
+                     GRID_CONST_WHEN_INTEGRATE double *grid) {
 
   // get the min max indices that contain at least the cube that contains a
   // sphere around rp of radius radius if the cell is very non-orthogonal this
@@ -394,20 +405,30 @@ __device__ static void general_cxyz_to_grid(const kernel_params *params,
           continue;
         }
 
-        // Compute grid point value and add to the global array.
-        const double value =
-            compute_point_value(dx, dy, dz, task->zetp, task->lp, cxyz);
         const int stride = params->npts_local[1] * params->npts_local[0];
         const int grid_index = kg * stride + jg * params->npts_local[0] + ig;
-#if (GRID_DO_COLLOCATE)
-        atomicAddDouble(&grid[grid_index], value);
-#else
-        assert(false);
-#endif
+        cxyz_to_gridpoint(dx, dy, dz, task->zetp, task->lp, cxyz,
+                          &grid[grid_index]);
       }
     }
   }
   __syncthreads(); // because of concurrent writes to grid
+}
+
+/*******************************************************************************
+ * \brief Collocates coefficients C_xyz onto the grid.
+ * \author Ole Schuett
+ ******************************************************************************/
+__device__ static void cxyz_to_grid(const kernel_params *params,
+                                    const smem_task *task,
+                                    GRID_CONST_WHEN_COLLOCATE double *cxyz,
+                                    GRID_CONST_WHEN_INTEGRATE double *grid) {
+
+  if (params->orthorhombic && task->border_mask == 0) {
+    ortho_cxyz_to_grid(params, task, cxyz, grid);
+  } else {
+    general_cxyz_to_grid(params, task, cxyz, grid);
+  }
 }
 
 /*******************************************************************************
@@ -480,22 +501,30 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
     for (int lyp = threadIdx.y; lyp <= task->lp - lzp; lyp += blockDim.y) {
       for (int lxp = threadIdx.x; lxp <= task->lp - lzp - lyp;
            lxp += blockDim.x) {
+#if (GRID_DO_COLLOCATE)
         double reg = 0.0; // accumulate into a register
+#endif
         for (int jco = 0; jco < ncoset(task->lb_max); jco++) {
           const orbital b = coset_inv[jco];
           for (int ico = 0; ico < ncoset(task->la_max); ico++) {
             const orbital a = coset_inv[ico];
-            reg += task->prefactor *
-                   cab[jco * task->n1_cab + ico] * // [jco, ico]
-                   alpha[0 * s1 + b.l[0] * s2 + a.l[0] * s3 + lxp] *
-                   alpha[1 * s1 + b.l[1] * s2 + a.l[1] * s3 + lyp] *
-                   alpha[2 * s1 + b.l[2] * s2 + a.l[2] * s3 + lzp];
+            const double p = task->prefactor *
+                             alpha[0 * s1 + b.l[0] * s2 + a.l[0] * s3 + lxp] *
+                             alpha[1 * s1 + b.l[1] * s2 + a.l[1] * s3 + lyp] *
+                             alpha[2 * s1 + b.l[2] * s2 + a.l[2] * s3 + lzp];
+            const int cab_index = jco * task->n1_cab + ico; // [jco, ico]
+
+#if (GRID_DO_COLLOCATE)
+            // collocate
+            reg += p * cab[cab_index];
+#else
+            // integrate
+            atomicAddDouble(&cab[cab_index], p * cxyz[coset(lxp, lyp, lzp)]);
+#endif
           }
         }
 #if (GRID_DO_COLLOCATE)
         cxyz[coset(lxp, lyp, lzp)] = reg; // overwrite - no zeroing needed.
-#else
-        assert(false); // not yet implemented
 #endif
       }
     }
@@ -625,6 +654,41 @@ __device__ static void fill_smem_task(const kernel_params *params,
   }
   __syncthreads(); // because of concurrent writes to task
 }
+
+// /*******************************************************************************
+//  * \brief Collocates coefficients C_ab onto the grid.
+//  * \author Ole Schuett
+//  ******************************************************************************/
+// __device__ static void cab_to_grid(const kernel_params* params) {
+//
+//   // Copy task from global to shared memory and precompute some stuff.
+//   __shared__ smem_task task;
+//   fill_smem_task(&params, &task);
+//
+//   // Check if radius is below the resolution of the grid.
+//   if (2.0 * task.radius < task.dh_max) {
+//     return; // nothing to do
+//   }
+//
+//   // Allot dynamic shared memory.
+//   extern __shared__ double shared_memory[];
+//   double *smem_cab = &shared_memory[params.smem_cab_offset];
+//   double *smem_alpha = &shared_memory[params.smem_alpha_offset];
+//   double *smem_cxyz = &shared_memory[params.smem_cxyz_offset];
+//
+// #if (GRID_DO_COLLOCATE)
+//   // collocate
+//   compute_alpha(&params, &task, smem_alpha);
+//   cab_to_cxyz(&params, &task, smem_alpha, smem_cab, smem_cxyz);
+//   cxyz_to_grid(params, task, cxyz, grid);
+// #else
+//   // integrate
+//   cxyz_to_grid(params, task, cxyz, grid);
+//   compute_alpha(&params, &task, smem_alpha);
+//   cab_to_cxyz(&params, &task, smem_alpha, smem_cab, smem_cxyz);
+// #endif
+//
+// }
 
 #endif // __GRID_CUDA
 // EOF

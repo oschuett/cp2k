@@ -42,17 +42,12 @@ __global__ static void integrate_kernel(const kernel_params params) {
   double *smem_alpha = &shared_memory[params.smem_alpha_offset];
   double *smem_cxyz = &shared_memory[params.smem_cxyz_offset];
 
+  cxyz_to_grid(&params, &task, smem_cxyz, params.grid);
+  compute_alpha(&params, &task, smem_alpha);
+  cab_to_cxyz(&params, &task, smem_alpha, smem_cab, smem_cxyz);
+
   //  block_to_cab<IS_FUNC_AB>(params, &task, smem_cab);
   //
-  //  compute_alpha(params, &task, smem_alpha);
-  //
-  //  cab_to_cxyz(params, &task, smem_alpha, smem_cab, smem_cxyz);
-  //
-  //  if (params->orthorhombic && task.border_mask == 0) {
-  //    ortho_cxyz_to_grid(params, &task, smem_cxyz, params->grid);
-  //  } else {
-  //    general_cxyz_to_grid(params, &task, smem_cxyz, params->grid);
-  //  }
 }
 
 /*******************************************************************************
