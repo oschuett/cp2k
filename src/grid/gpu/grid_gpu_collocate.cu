@@ -16,9 +16,83 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define GRID_DO_COLLOCATE 1
 #include "../common/grid_common.h"
+#include "../common/grid_prepare_pab.h"
 #include "grid_gpu_collint.h"
 #include "grid_gpu_collocate.h"
+
+/*******************************************************************************
+ * \brief Adds given value to matrix element cab[idx(b)][idx(a)].
+ * \author Ole Schuett
+ ******************************************************************************/
+__device__ static inline void prep_term(const orbital a, const orbital b,
+                                        const double value, const int n,
+                                        double *cab) {
+  atomicAddDouble(&cab[idx(b) * n + idx(a)], value);
+}
+
+/*******************************************************************************
+ * \brief Decontracts the subblock, going from spherical to cartesian harmonics.
+ * \author Ole Schuett
+ ******************************************************************************/
+template <bool IS_FUNC_AB>
+__device__ static void block_to_cab(const kernel_params *params,
+                                    const smem_task *task, double *cab) {
+
+  // The spherical index runs over angular momentum and then over contractions.
+  // The carthesian index runs over exponents and then over angular momentum.
+
+  // Zero cab.
+  if (threadIdx.z == 0) {
+    for (int i = threadIdx.y; i < task->n2_cab; i += blockDim.y) {
+      for (int j = threadIdx.x; j < task->n1_cab; j += blockDim.x) {
+        cab[i * task->n1_cab + j] = 0.0;
+      }
+    }
+  }
+  __syncthreads(); // because of concurrent writes to cab
+
+  // Decontract block, apply prepare_pab, and store in cab.
+  // This is a double matrix product. Since the pab block can be quite large the
+  // two products are fused to conserve shared memory.
+  for (int i = threadIdx.x; i < task->nsgf_setb; i += blockDim.x) {
+    for (int j = threadIdx.y; j < task->nsgf_seta; j += blockDim.y) {
+      double block_val;
+      if (task->block_transposed) {
+        block_val = task->block[j * task->nsgfb + i];
+      } else {
+        block_val = task->block[i * task->nsgfa + j];
+      }
+
+      if (IS_FUNC_AB) {
+        // fast path for common case
+        for (int k = threadIdx.z; k < task->ncosetb; k += blockDim.z) {
+          const double sphib = task->sphib[i * task->maxcob + k];
+          for (int l = 0; l < task->ncoseta; l++) {
+            const double sphia = task->sphia[j * task->maxcoa + l];
+            const double pab_val = block_val * sphia * sphib;
+            atomicAddDouble(&cab[k * task->ncoseta + l], pab_val);
+          }
+        }
+      } else {
+        // Since prepare_pab is a register hog we use it only when really needed
+        for (int k = threadIdx.z; k < task->ncosetb; k += blockDim.z) {
+          const orbital b = coset_inv[k];
+          for (int l = 0; l < task->ncoseta; l++) {
+            const orbital a = coset_inv[l];
+            const double sphia = task->sphia[j * task->maxcoa + idx(a)];
+            const double sphib = task->sphib[i * task->maxcob + idx(b)];
+            const double pab_val = block_val * sphia * sphib;
+            prepare_pab(params->func, a, b, task->zeta, task->zetb, pab_val,
+                        task->n1_cab, cab);
+          }
+        }
+      }
+    }
+  }
+  __syncthreads(); // because of concurrent writes to cab
+}
 
 /*******************************************************************************
  * \brief Cuda kernel for collocating all tasks of one grid level.

@@ -302,23 +302,22 @@ void grid_gpu_collocate_task_list(
 void grid_gpu_integrate_task_list(
     const grid_gpu_task_list *task_list, const bool orthorhombic,
     const bool compute_tau, const bool calculate_forces, const int natoms,
-    const int nlevels, const int npts_global[][3],
-    const int npts_local[][3], const int shift_local[][3],
-    const int border_width[][3], const double dh[][3][3],
-    const double dh_inv[][3][3], const grid_buffer *pab_blocks,
-    const double *grid[], grid_buffer *hab_blocks,
-    double forces[][3], double virial[3][3]) {
+    const int nlevels, const int npts_global[][3], const int npts_local[][3],
+    const int shift_local[][3], const int border_width[][3],
+    const double dh[][3][3], const double dh_inv[][3][3],
+    const grid_buffer *pab_blocks, const double *grid[],
+    grid_buffer *hab_blocks, double forces[][3], double virial[3][3]) {
 
   assert(task_list->nlevels == nlevels);
 
   const cudaStream_t stream = task_list->streams[0];
 
   // Prepare shared buffers using the first level's stream
-  double* forces_dev = NULL;
-  double* virial_dev = NULL;
-  double* pab_blocks_dev = NULL;
-  const size_t forces_size = 3*natoms*sizeof(double);
-  const size_t virial_size = 9*sizeof(double);
+  double *forces_dev = NULL;
+  double *virial_dev = NULL;
+  double *pab_blocks_dev = NULL;
+  const size_t forces_size = 3 * natoms * sizeof(double);
+  const size_t virial_size = 9 * sizeof(double);
   if (calculate_forces) {
     CHECK(cudaMalloc(&forces_dev, forces_size));
     CHECK(cudaMalloc(&virial_dev, virial_size));
@@ -330,7 +329,8 @@ void grid_gpu_integrate_task_list(
   }
 
   // zero device hab blocks buffers
-  CHECK(cudaMemsetAsync(hab_blocks->device_buffer, 0, hab_blocks->size, stream));
+  CHECK(
+      cudaMemsetAsync(hab_blocks->device_buffer, 0, hab_blocks->size, stream));
 
   // record event so other streams can wait for hab, pab, virial etc to be ready
   cudaEvent_t buffers_ready_event;
@@ -361,10 +361,9 @@ void grid_gpu_integrate_task_list(
     CHECK(cudaStreamWaitEvent(level_stream, buffers_ready_event, 0));
     grid_gpu_integrate_one_grid_level(
         task_list, first_task, last_task, orthorhombic, compute_tau,
-        calculate_forces,
-        npts_global[level], npts_local[level], shift_local[level],
-        border_width[level], dh[level], dh_inv[level], level_stream,
-        pab_blocks_dev, task_list->grid_dev[level],
+        calculate_forces, npts_global[level], npts_local[level],
+        shift_local[level], border_width[level], dh[level], dh_inv[level],
+        level_stream, pab_blocks_dev, task_list->grid_dev[level],
         hab_blocks->device_buffer, forces_dev, virial_dev);
 
     first_task = last_task + 1;
@@ -372,7 +371,7 @@ void grid_gpu_integrate_task_list(
 
   // download result from device to host.
   CHECK(cudaMemcpyAsync(hab_blocks->host_buffer, hab_blocks->device_buffer,
-        hab_blocks->size, cudaMemcpyDeviceToHost, stream));
+                        hab_blocks->size, cudaMemcpyDeviceToHost, stream));
 
   if (calculate_forces) {
     CHECK(cudaMemcpy(forces, forces_dev, forces_size, cudaMemcpyDeviceToHost));

@@ -18,8 +18,15 @@
 
 #include "../common/grid_basis_set.h"
 #include "../common/grid_common.h"
-#include "../common/grid_prepare_pab.h"
 #include "grid_gpu_task_list.h"
+
+#if (GRID_DO_COLLOCATE)
+#define GRID_CONST_WHEN_COLLOCATE const
+#define GRID_CONST_WHEN_INTEGRATE
+#else
+#define GRID_CONST_WHEN_COLLOCATE
+#define GRID_CONST_WHEN_INTEGRATE const
+#endif
 
 /*******************************************************************************
  * \brief Atomic add for doubles that also works prior to compute capability 6.
@@ -43,16 +50,6 @@ __device__ static double atomicAddDouble(double *address, double val) {
 
   return __longlong_as_double(old);
 #endif
-}
-
-/*******************************************************************************
- * \brief Adds given value to matrix element cab[idx(b)][idx(a)].
- * \author Ole Schuett
- ******************************************************************************/
-__device__ static inline void prep_term(const orbital a, const orbital b,
-                                        const double value, const int n,
-                                        double *cab) {
-  atomicAddDouble(&cab[idx(b) * n + idx(a)], value);
 }
 
 /*******************************************************************************
@@ -93,8 +90,6 @@ typedef struct {
   int smem_alpha_offset;
   int smem_cxyz_offset;
   int first_task;
-  enum grid_func func;
-  prepare_ldiffs ldiffs;
   bool orthorhombic;
   int npts_global[3];
   int npts_local[3];
@@ -102,14 +97,27 @@ typedef struct {
   int border_width[3];
   double dh[3][3];
   double dh_inv[3][3];
-  // pointers
   const grid_gpu_task *tasks;
   const int *atom_kinds;
   const grid_basis_set *basis_sets;
   const int *block_offsets;
   const double *pab_blocks;
   const double *atom_positions;
+
+#if (GRID_DO_COLLOCATE)
+  // collocate
+  enum grid_func func;
+  prepare_ldiffs ldiffs;
   double *grid;
+#else
+  // integrate
+  bool compute_tau;
+  bool calculate_forces;
+  const double *grid;
+  double *hab_blocks;
+  double *forces;
+  double *virial;
+#endif
 } kernel_params;
 
 /*******************************************************************************
@@ -218,7 +226,8 @@ static void init_constant_memory() {
  ******************************************************************************/
 __device__ static void ortho_cxyz_to_grid(const kernel_params *params,
                                           const smem_task *task,
-                                          const double *cxyz, double *grid) {
+                                          GRID_CONST_WHEN_COLLOCATE double *cxyz,
+                                          GRID_CONST_WHEN_INTEGRATE double *grid) {
   // Discretize the radius.
   const double drmin =
       fmin(params->dh[0][0], fmin(params->dh[1][1], params->dh[2][2]));
@@ -282,7 +291,11 @@ __device__ static void ortho_cxyz_to_grid(const kernel_params *params,
             jg * params->npts_local[0] + ig;
         const double value =
             compute_point_value(dx, dy, dz, task->zetp, task->lp, cxyz);
+#if (GRID_DO_COLLOCATE)
         atomicAddDouble(&grid[grid_index], value);
+#else
+        assert(false); // not yet implemented
+#endif
       }
     }
   }
@@ -295,7 +308,8 @@ __device__ static void ortho_cxyz_to_grid(const kernel_params *params,
  ******************************************************************************/
 __device__ static void general_cxyz_to_grid(const kernel_params *params,
                                             const smem_task *task,
-                                            const double *cxyz, double *grid) {
+                                            GRID_CONST_WHEN_COLLOCATE double *cxyz,
+                                            GRID_CONST_WHEN_INTEGRATE double *grid) {
 
   // get the min max indices that contain at least the cube that contains a
   // sphere around rp of radius radius if the cell is very non-orthogonal this
@@ -385,7 +399,11 @@ __device__ static void general_cxyz_to_grid(const kernel_params *params,
             compute_point_value(dx, dy, dz, task->zetp, task->lp, cxyz);
         const int stride = params->npts_local[1] * params->npts_local[0];
         const int grid_index = kg * stride + jg * params->npts_local[0] + ig;
+#if (GRID_DO_COLLOCATE)
         atomicAddDouble(&grid[grid_index], value);
+#else
+        assert(false);
+#endif
       }
     }
   }
@@ -436,7 +454,8 @@ __device__ static void compute_alpha(const kernel_params *params,
  ******************************************************************************/
 __device__ static void cab_to_cxyz(const kernel_params *params,
                                    const smem_task *task, const double *alpha,
-                                   const double *cab, double *cxyz) {
+                                   GRID_CONST_WHEN_COLLOCATE double *cab,
+                                   GRID_CONST_WHEN_INTEGRATE double *cxyz) {
 
   //   *** initialise the coefficient matrix, we transform the sum
   //
@@ -473,73 +492,15 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
                    alpha[2 * s1 + b.l[2] * s2 + a.l[2] * s3 + lzp];
           }
         }
+#if (GRID_DO_COLLOCATE)
         cxyz[coset(lxp, lyp, lzp)] = reg; // overwrite - no zeroing needed.
+#else
+        assert(false); // not yet implemented
+#endif
       }
     }
   }
   __syncthreads(); // because of concurrent writes to cxyz
-}
-
-/*******************************************************************************
- * \brief Decontracts the subblock, going from spherical to cartesian harmonics.
- * \author Ole Schuett
- ******************************************************************************/
-template <bool IS_FUNC_AB>
-__device__ static void block_to_cab(const kernel_params *params,
-                                    const smem_task *task, double *cab) {
-
-  // The spherical index runs over angular momentum and then over contractions.
-  // The carthesian index runs over exponents and then over angular momentum.
-
-  // Zero cab.
-  if (threadIdx.z == 0) {
-    for (int i = threadIdx.y; i < task->n2_cab; i += blockDim.y) {
-      for (int j = threadIdx.x; j < task->n1_cab; j += blockDim.x) {
-        cab[i * task->n1_cab + j] = 0.0;
-      }
-    }
-  }
-  __syncthreads(); // because of concurrent writes to cab
-
-  // Decontract block, apply prepare_pab, and store in cab.
-  // This is a double matrix product. Since the pab block can be quite large the
-  // two products are fused to conserve shared memory.
-  for (int i = threadIdx.x; i < task->nsgf_setb; i += blockDim.x) {
-    for (int j = threadIdx.y; j < task->nsgf_seta; j += blockDim.y) {
-      double block_val;
-      if (task->block_transposed) {
-        block_val = task->block[j * task->nsgfb + i];
-      } else {
-        block_val = task->block[i * task->nsgfa + j];
-      }
-
-      if (IS_FUNC_AB) {
-        // fast path for common case
-        for (int k = threadIdx.z; k < task->ncosetb; k += blockDim.z) {
-          const double sphib = task->sphib[i * task->maxcob + k];
-          for (int l = 0; l < task->ncoseta; l++) {
-            const double sphia = task->sphia[j * task->maxcoa + l];
-            const double pab_val = block_val * sphia * sphib;
-            atomicAddDouble(&cab[k * task->ncoseta + l], pab_val);
-          }
-        }
-      } else {
-        // Since prepare_pab is a register hog we use it only when really needed
-        for (int k = threadIdx.z; k < task->ncosetb; k += blockDim.z) {
-          const orbital b = coset_inv[k];
-          for (int l = 0; l < task->ncoseta; l++) {
-            const orbital a = coset_inv[l];
-            const double sphia = task->sphia[j * task->maxcoa + idx(a)];
-            const double sphib = task->sphib[i * task->maxcob + idx(b)];
-            const double pab_val = block_val * sphia * sphib;
-            prepare_pab(params->func, a, b, task->zeta, task->zetb, pab_val,
-                        task->n1_cab, cab);
-          }
-        }
-      }
-    }
-  }
-  __syncthreads(); // because of concurrent writes to cab
 }
 
 /*******************************************************************************
@@ -606,11 +567,17 @@ __device__ static void fill_smem_task(const kernel_params *params,
     task->lb_min_pab = jbasis.lmin[jset];
 
     // angular momentum range AFTER prepare_pab is applied
+#if (GRID_DO_COLLOCATE)
     task->la_max = ibasis.lmax[iset] + params->ldiffs.la_max_diff;
     task->lb_max = jbasis.lmax[jset] + params->ldiffs.lb_max_diff;
     task->la_min = imax(ibasis.lmin[iset] + params->ldiffs.la_min_diff, 0);
     task->lb_min = imax(jbasis.lmin[jset] + params->ldiffs.lb_min_diff, 0);
     task->lp = task->la_max + task->lb_max;
+#else
+    task->la_max = ibasis.lmax[iset];
+    task->lb_max = jbasis.lmax[jset];
+    task->lp = task->la_max + task->lb_max;
+#endif
 
     // size of entire spherical basis
     task->nsgfa = ibasis.nsgf;
