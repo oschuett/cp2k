@@ -235,11 +235,11 @@ void grid_integrate_task_list(
   switch (task_list->backend) {
 #ifdef __GRID_CUDA
   case GRID_BACKEND_GPU:
-    // grid_gpu_integrate_task_list(
-    //     task_list->gpu, orthorhombic, compute_tau, natoms,
-    //     nlevels, npts_global, npts_local, shift_local, border_width, dh,
-    //     dh_inv, pab_blocks, grid, hab_blocks, forces, virial);
-    // break;
+    grid_gpu_integrate_task_list(
+        task_list->gpu, orthorhombic, compute_tau, natoms,
+        nlevels, npts_global, npts_local, shift_local, border_width, dh,
+        dh_inv, pab_blocks, grid, hab_blocks, forces, virial);
+    break;
   case GRID_BACKEND_HYBRID:
     // grid_hybrid_integrate_task_list(
     //     task_list->hybrid, orthorhombic, compute_tau, natoms,

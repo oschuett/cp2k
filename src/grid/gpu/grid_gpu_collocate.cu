@@ -24,7 +24,7 @@
  * \brief Atomic add for doubles that also works prior to compute capability 6.
  * \author Ole Schuett
  ******************************************************************************/
-__device__ double atomicAddDouble(double *address, double val) {
+__device__ static double atomicAddDouble(double *address, double val) {
 #if __CUDA_ARCH__ >= 600
   atomicAdd(address, val); // part of cuda library
 #else

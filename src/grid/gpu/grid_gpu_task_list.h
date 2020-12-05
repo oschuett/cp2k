@@ -94,6 +94,22 @@ void grid_gpu_collocate_task_list(
     const int border_width[][3], const double dh[][3][3],
     const double dh_inv[][3][3], const grid_buffer *pab_blocks, double *grid[]);
 
+/*******************************************************************************
+ * \brief Integrate all tasks of in given list onto given grids.
+ *        See grid_task_list.h for details.
+ * \author Ole Schuett
+ ******************************************************************************/
+void grid_gpu_integrate_task_list(
+    const grid_gpu_task_list *task_list, const bool orthorhombic,
+    const bool compute_tau, const bool calculate_forces, const int natoms,
+    const int nlevels, const int npts_global[][3],
+    const int npts_local[][3], const int shift_local[][3],
+    const int border_width[][3], const double dh[][3][3],
+    const double dh_inv[][3][3], const grid_buffer *pab_blocks,
+    const double *grid[], grid_buffer *hab_blocks,
+    double forces[][3], double virial[3][3]);
+
+
 #ifdef __cplusplus
 }
 #endif
