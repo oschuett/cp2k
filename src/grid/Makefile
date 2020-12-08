@@ -3,7 +3,7 @@
 all: grid_miniapp.x grid_unittest.x
 
 clean:
-	rm -fv grid_*.o */grid_*.o grid_*.x
+	rm -fv *.o */*.o *.x
 
 CFLAGS := -fopenmp -g -O3 -std=c99 -march=native -Wall -Wextra -I${CUDA_PATH}/include -D__GRID_CUDA
 NVFLAGS := -g -O3 -arch sm_50 -Wno-deprecated-gpu-targets -Xcompiler "-fopenmp -Wall -Wextra" -D__GRID_CUDA
