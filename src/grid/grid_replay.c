@@ -457,7 +457,7 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
   printf("Task: %-62s   %9s %-7s   Cycles: %e   Max value: %le   Max "
          "diff: %le   Time: %le sec\n",
          filename, collocate ? "Collocate" : "Integrate",
-         batch ? "Batched" : "", (float)cycles, max_value, max_diff, delta_sec);
+         batch ? "Batched" : "PGF-Ref", (float)cycles, max_value, max_diff, delta_sec);
 
   free(grid_ref);
   free(grid_test);
