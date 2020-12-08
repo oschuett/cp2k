@@ -60,9 +60,9 @@ __device__ static void block_to_cab(const kernel_params *params,
     for (int j = threadIdx.y; j < task->nsgf_seta; j += blockDim.y) {
       double block_val;
       if (task->block_transposed) {
-        block_val = task->block[j * task->nsgfb + i];
+        block_val = task->pab_block[j * task->nsgfb + i];
       } else {
-        block_val = task->block[i * task->nsgfa + j];
+        block_val = task->pab_block[i * task->nsgfa + j];
       }
 
       if (IS_FUNC_AB) {

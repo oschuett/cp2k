@@ -183,9 +183,13 @@ typedef struct {
   int maxcoa;
   int maxcob;
   // pointers matrices
-  const double *block;
+  const double *pab_block;
   const double *sphia;
   const double *sphib;
+#if (!GRID_DO_COLLOCATE)
+  // integrate
+  double *hab_block;
+#endif
 } smem_task;
 
 /*******************************************************************************
@@ -645,12 +649,23 @@ __device__ static void fill_smem_task(const kernel_params *params,
     const int block_offset = params->block_offsets[block_num];
     task->block_transposed = (iatom > jatom);
     if (task->block_transposed) {
-      task->block =
+      task->pab_block =
           &params->pab_blocks[block_offset + sgfa * task->nsgfb + sgfb];
     } else {
-      task->block =
+      task->pab_block =
           &params->pab_blocks[block_offset + sgfb * task->nsgfa + sgfa];
     }
+
+#if (!GRID_DO_COLLOCATE)
+    // integrate
+    if (task->block_transposed) {
+      task->hab_block =
+          &params->hab_blocks[block_offset + sgfa * task->nsgfb + sgfb];
+    } else {
+      task->hab_block =
+          &params->hab_blocks[block_offset + sgfb * task->nsgfa + sgfa];
+    }
+#endif
   }
   __syncthreads(); // because of concurrent writes to task
 }

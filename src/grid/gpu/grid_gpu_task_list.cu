@@ -310,9 +310,8 @@ void grid_gpu_integrate_task_list(
 
   assert(task_list->nlevels == nlevels);
 
-  const cudaStream_t stream = task_list->streams[0];
-
   // Prepare shared buffers using the first level's stream
+  const cudaStream_t stream = task_list->streams[0];
   double *forces_dev = NULL;
   double *virial_dev = NULL;
   double *pab_blocks_dev = NULL;

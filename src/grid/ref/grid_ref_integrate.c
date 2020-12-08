@@ -184,6 +184,8 @@ void grid_ref_integrate_pgf_product(
               rab, npts_global, npts_local, shift_local, border_width, radius,
               vab_mutable, grid);
 
+  // printf("cab %i %i %le\n", 0, 0, vab_mutable[0]);
+
   //  vab contains all the information needed to find the elements of hab
   //  and optionally of derivatives of these elements
   const double(*vab)[m1] = (const double(*)[m1])vab_mutable;

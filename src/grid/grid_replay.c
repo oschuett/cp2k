@@ -431,33 +431,35 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
         const double diff = fabs(test_value - ref_value);
         max_diff = fmax(max_diff, diff);
         max_value = fmax(max_value, fabs(test_value));
+        // printf("%i %i ref: %le test: %le\n",i,j,ref_value, test_value);
       }
     }
-    // compare forces
-    for (int i = 0; i < 2; i++) {
-      for (int j = 0; j < 3; j++) {
-        const double ref_value = cycles * forces_ref[i][j];
-        const double test_value = forces_test[i][j];
-        const double diff = fabs(test_value - ref_value);
-        max_diff = fmax(max_diff, diff);
-        max_value = fmax(max_value, fabs(test_value));
-      }
-    }
-    // compare virial
-    for (int i = 0; i < 3; i++) {
-      for (int j = 0; j < 3; j++) {
-        const double ref_value = cycles * virial_ref[i][j];
-        const double test_value = virial_test[i][j];
-        const double diff = fabs(test_value - ref_value);
-        max_diff = fmax(max_diff, diff);
-        max_value = fmax(max_value, fabs(test_value));
-      }
-    }
+    //// compare forces
+    // for (int i = 0; i < 2; i++) {
+    //  for (int j = 0; j < 3; j++) {
+    //    const double ref_value = cycles * forces_ref[i][j];
+    //    const double test_value = forces_test[i][j];
+    //    const double diff = fabs(test_value - ref_value);
+    //    max_diff = fmax(max_diff, diff);
+    //    max_value = fmax(max_value, fabs(test_value));
+    //  }
+    //}
+    //// compare virial
+    // for (int i = 0; i < 3; i++) {
+    //  for (int j = 0; j < 3; j++) {
+    //    const double ref_value = cycles * virial_ref[i][j];
+    //    const double test_value = virial_test[i][j];
+    //    const double diff = fabs(test_value - ref_value);
+    //    max_diff = fmax(max_diff, diff);
+    //    max_value = fmax(max_value, fabs(test_value));
+    //  }
+    //}
   }
   printf("Task: %-62s   %9s %-7s   Cycles: %e   Max value: %le   Max "
          "diff: %le   Time: %le sec\n",
          filename, collocate ? "Collocate" : "Integrate",
-         batch ? "Batched" : "PGF-Ref", (float)cycles, max_value, max_diff, delta_sec);
+         batch ? "Batched" : "PGF-Ref", (float)cycles, max_value, max_diff,
+         delta_sec);
 
   free(grid_ref);
   free(grid_test);
