@@ -33,7 +33,7 @@ void grid_collocate_record(
  * \param batch             When false grid_collocate_pgf_product_cpu is called.
  *                          When true grid_collocate_task_list is called.
  * \param cycles_per_block  Number of cycles per matrix block decontraction.
- * \returns                 The maximum difference for an individual grid point.
+ * \returns                 The maximum relative difference.
  *
  * \author Ole Schuett
  ******************************************************************************/

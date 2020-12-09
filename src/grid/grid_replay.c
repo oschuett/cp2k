@@ -410,7 +410,7 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
                            1e-9 * (end_time.tv_nsec - start_time.tv_nsec);
 
   double max_value = 0.0;
-  double max_diff = 0.0;
+  double max_rel_diff = 0.0;
   if (collocate) {
     // collocate
     // compate grid
@@ -418,7 +418,8 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
       const double ref_value = cycles * grid_ref[i];
       const double test_value = grid_test[i];
       const double diff = fabs(test_value - ref_value);
-      max_diff = fmax(max_diff, diff);
+      const double rel_diff = diff / fmax(1.0, fabs(ref_value));
+      max_rel_diff = fmax(max_rel_diff, rel_diff);
       max_value = fmax(max_value, fabs(test_value));
     }
   } else {
@@ -429,12 +430,13 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
         const double ref_value = cycles * hab_ref[i][j];
         const double test_value = hab_test[i][j];
         const double diff = fabs(test_value - ref_value);
-        max_diff = fmax(max_diff, diff);
+        const double rel_diff = diff / fmax(1.0, fabs(ref_value));
+        max_rel_diff = fmax(max_rel_diff, rel_diff);
         max_value = fmax(max_value, fabs(test_value));
         // if (ref_value != 0.0 || test_value != 0.0) {
-        //  printf("%i %i ref: %le test: %le ratio:%le diff:%le\n", i, j,
-        //  ref_value,
-        //         test_value, ref_value / test_value, diff);
+        //  printf("%i %i ref: %le test: %le ratio:%le diff:%le rel_diff:
+        //  %le\n", i, j, ref_value,
+        //         test_value, ref_value / test_value, diff, rel_diff);
         //}
       }
     }
@@ -459,10 +461,10 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
     //  }
     //}
   }
-  printf("Task: %-62s   %9s %-7s   Cycles: %e   Max value: %le   Max "
-         "diff: %le   Time: %le sec\n",
+  printf("Task: %-55s   %9s %-7s   Cycles: %e   Max value: %le   "
+         "Max rel diff: %le   Time: %le sec\n",
          filename, collocate ? "Collocate" : "Integrate",
-         batch ? "Batched" : "PGF-Ref", (float)cycles, max_value, max_diff,
+         batch ? "Batched" : "PGF-Ref", (float)cycles, max_value, max_rel_diff,
          delta_sec);
 
   free(grid_ref);
@@ -478,7 +480,7 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
     exit(1);
   }
 
-  return max_diff;
+  return max_rel_diff;
 }
 
 // EOF
