@@ -431,9 +431,10 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
         const double diff = fabs(test_value - ref_value);
         max_diff = fmax(max_diff, diff);
         max_value = fmax(max_value, fabs(test_value));
-        //if (ref_value != 0.0 || test_value != 0.0) {
-        //  printf("%i %i ref: %le test: %le ratio:%le\n", i, j, ref_value,
-        //         test_value, ref_value / test_value);
+        // if (ref_value != 0.0 || test_value != 0.0) {
+        //  printf("%i %i ref: %le test: %le ratio:%le diff:%le\n", i, j,
+        //  ref_value,
+        //         test_value, ref_value / test_value, diff);
         //}
       }
     }

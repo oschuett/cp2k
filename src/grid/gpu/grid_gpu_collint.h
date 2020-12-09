@@ -163,8 +163,6 @@ typedef struct {
   // angular momentum range BEFORE prepare_pab is applied
   int la_max_pab;
   int lb_max_pab;
-  int la_min_pab;
-  int lb_min_pab;
   // angular momentum range AFTER prepare_pab is applied
   int la_max;
   int lb_max;
@@ -506,6 +504,9 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
 
   // TODO: Maybe we can transpose alpha to index it directly with ico and jco.
 
+  const int ico_start = (task->la_min > 0) ? ncoset(task->la_min - 1) : 0;
+  const int jco_start = (task->lb_min > 0) ? ncoset(task->lb_min - 1) : 0;
+
 #if (GRID_DO_COLLOCATE)
   // collocate
   for (int lzp = threadIdx.z; lzp <= task->lp; lzp += blockDim.z) {
@@ -513,17 +514,19 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
       for (int lxp = threadIdx.x; lxp <= task->lp - lzp - lyp;
            lxp += blockDim.x) {
         double reg = 0.0; // accumulate into a register
-        for (int jco = 0; jco < ncoset(task->lb_max); jco++) {
+        for (int jco = jco_start; jco < ncoset(task->lb_max); jco++) {
           const orbital b = coset_inv[jco];
-          for (int ico = 0; ico < ncoset(task->la_max); ico++) {
+          for (int ico = ico_start; ico < ncoset(task->la_max); ico++) {
             const orbital a = coset_inv[ico];
 #else
   // integrate
-  if (threadIdx.x == 0)
+  if (threadIdx.x != 0)
     return; // TODO: How bad is this?
-  for (int jco = threadIdx.y; jco < ncoset(task->lb_max); jco += blockDim.y) {
+  for (int jco = jco_start + threadIdx.y; jco < ncoset(task->lb_max);
+       jco += blockDim.y) {
     const orbital b = coset_inv[jco];
-    for (int ico = threadIdx.z; ico < ncoset(task->la_max); ico += blockDim.z) {
+    for (int ico = ico_start + threadIdx.z; ico < ncoset(task->la_max);
+         ico += blockDim.z) {
       const orbital a = coset_inv[ico];
       double reg = 0.0; // accumulate into a register
       for (int lzp = 0; lzp <= task->lp; lzp++) {
@@ -551,7 +554,7 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
 #else
         // integrate
       }
-      cab[jco * task->n1_cab + ico] = reg; // overwrite - no zeroing needed.
+      cab[jco * task->n1_cab + ico] = reg; // partial loop coverage -> zero it
 #endif
     }
   }
@@ -620,8 +623,6 @@ __device__ static void fill_smem_task(const kernel_params *params,
     // angular momentum range BEFORE prepare_pab is applied
     task->la_max_pab = ibasis.lmax[iset];
     task->lb_max_pab = jbasis.lmax[jset];
-    task->la_min_pab = ibasis.lmin[iset];
-    task->lb_min_pab = jbasis.lmin[jset];
 
     // angular momentum range AFTER prepare_pab is applied
 #if (GRID_DO_COLLOCATE)
@@ -633,6 +634,8 @@ __device__ static void fill_smem_task(const kernel_params *params,
 #else
     task->la_max = ibasis.lmax[iset];
     task->lb_max = jbasis.lmax[jset];
+    task->la_min = ibasis.lmin[iset];
+    task->lb_min = jbasis.lmin[jset];
     task->lp = task->la_max + task->lb_max;
 #endif
 

@@ -42,8 +42,6 @@ __device__ static void store_hab(const kernel_params *params,
           const double sphia = task->sphia[j * task->maxcoa + l];
           block_val += cab[k * task->ncoseta + l] * sphia * sphib;
         }
-        // assert(false && "Look here first");
-        // block_val *= 0.5; // TODO This belongs somewhere else
         if (task->block_transposed) {
           atomicAddDouble(&task->hab_block[j * task->nsgfb + i], block_val);
         } else {
@@ -52,7 +50,7 @@ __device__ static void store_hab(const kernel_params *params,
       }
     }
   }
-  //__syncthreads(); // TODO: not really neded because of concurrent writes to
+  __syncthreads(); // TODO: not really neded because of concurrent writes to
   // cab
 }
 
@@ -82,17 +80,25 @@ __global__ static void integrate_kernel(const kernel_params params) {
 
   cxyz_to_grid(&params, &task, smem_cxyz, params.grid);
 
+  memset(smem_cab, 0, task.n1_cab * task.n2_cab * sizeof(double));
+  __syncthreads();
+
   compute_alpha(&params, &task, smem_alpha);
   cab_to_cxyz(&params, &task, smem_alpha, smem_cab, smem_cxyz);
 
   store_hab(&params, &task, smem_cab);
 
-  // if (threadIdx.x==0 && threadIdx.y==0 &&  threadIdx.z == 0 ){
-  //    for (int k = 0; k < task.ncosetb; k++) {
-  //      for (int l = 0; l < task.ncoseta; l++) {
-  //          printf("cab %i %i %le\n", k, l, smem_cab[k * task.ncoseta + l]);
-  //      }
-  //    }
+  // if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+  //  printf("la_min: %i %lb_min: %i, ncoset: %i, %i \n",
+  //      task.la_min, task.lb_min,
+  //      ncoset(task.la_min-1), ncoset(task.lb_min-1));
+  //  //    for (int k = 0; k < task.ncosetb; k++) {
+  //  //      for (int l = 0; l < task.ncoseta; l++) {
+  //  //          printf("cab %i %i %le\n", k, l, smem_cab[k * task.ncoseta +
+  //  l]);
+  //  //      }
+  //  //    }
+  //  // printf("cxyz %i %i %le\n",0, 0, smem_cxyz[0]);
   //}
 }
 
@@ -125,14 +131,14 @@ void grid_gpu_integrate_one_grid_level(
   const int cab_len = ncoset(lmax) * ncoset(lmax);
   const int alpha_len = 3 * (lmax + 1) * (lmax + 1) * (lp_max + 1);
   const int cxyz_len = ncoset(lp_max);
-  const int alpha_cxyz_len = alpha_len + cxyz_len;
-  const size_t smem_per_block = (cab_len + alpha_cxyz_len) * sizeof(double);
+  const size_t smem_per_block =
+      (cab_len + alpha_len + cxyz_len) * sizeof(double);
 
   if (smem_per_block > 48 * 1024) {
     fprintf(stderr, "ERROR: Not enough shared memory.\n");
-    fprintf(stderr, "alpha_len: %i, ", alpha_len);
-    fprintf(stderr, "cxyz_len: %i, ", alpha_cxyz_len);
     fprintf(stderr, "cab_len: %i, ", cab_len);
+    fprintf(stderr, "alpha_len: %i, ", alpha_len);
+    fprintf(stderr, "cxyz_len: %i, ", cxyz_len);
     fprintf(stderr, "total smem_per_block: %f kb\n\n", smem_per_block / 1024.0);
     abort();
   }
