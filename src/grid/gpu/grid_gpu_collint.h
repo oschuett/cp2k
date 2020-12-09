@@ -67,7 +67,11 @@ cxyz_to_gridpoint(const double dx, const double dy, const double dz,
   const double gaussian = exp(-zetp * r2);
 
 #if (GRID_DO_COLLOCATE)
+  // collocate
   double reg = 0.0; // accumulate into register
+#else
+  // integrate
+  const double reg = *gridpoint; // load into register
 #endif
 
   double pow_dz = 1.0;
@@ -83,7 +87,7 @@ cxyz_to_gridpoint(const double dx, const double dy, const double dz,
         reg += cxyz[coset(lxp, lyp, lzp)] * p;
 #else
         // integrate
-        atomicAddDouble(&cxyz[coset(lxp, lyp, lzp)], *gridpoint * p);
+        atomicAddDouble(&cxyz[coset(lxp, lyp, lzp)], reg * p);
 #endif
         pow_dx *= dx; // pow_dx = pow(dx, lxp)
       }
@@ -314,7 +318,7 @@ ortho_cxyz_to_grid(const kernel_params *params, const smem_task *task,
       }
     }
   }
-  __syncthreads(); // because of concurrent writes to grid
+  __syncthreads(); // because of concurrent writes to grid / cxyz
 }
 
 /*******************************************************************************
@@ -416,7 +420,7 @@ general_cxyz_to_grid(const kernel_params *params, const smem_task *task,
       }
     }
   }
-  __syncthreads(); // because of concurrent writes to grid
+  __syncthreads(); // because of concurrent writes to grid / cxyz
 }
 
 /*******************************************************************************
@@ -501,39 +505,57 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
   const int s1 = (task->lb_max + 1) * s2;
 
   // TODO: Maybe we can transpose alpha to index it directly with ico and jco.
+
+#if (GRID_DO_COLLOCATE)
+  // collocate
   for (int lzp = threadIdx.z; lzp <= task->lp; lzp += blockDim.z) {
     for (int lyp = threadIdx.y; lyp <= task->lp - lzp; lyp += blockDim.y) {
       for (int lxp = threadIdx.x; lxp <= task->lp - lzp - lyp;
            lxp += blockDim.x) {
-#if (GRID_DO_COLLOCATE)
         double reg = 0.0; // accumulate into a register
-#endif
         for (int jco = 0; jco < ncoset(task->lb_max); jco++) {
           const orbital b = coset_inv[jco];
           for (int ico = 0; ico < ncoset(task->la_max); ico++) {
             const orbital a = coset_inv[ico];
+#else
+  // integrate
+  if (threadIdx.x == 0)
+    return; // TODO: How bad is this?
+  for (int jco = threadIdx.y; jco < ncoset(task->lb_max); jco += blockDim.y) {
+    const orbital b = coset_inv[jco];
+    for (int ico = threadIdx.z; ico < ncoset(task->la_max); ico += blockDim.z) {
+      const orbital a = coset_inv[ico];
+      double reg = 0.0; // accumulate into a register
+      for (int lzp = 0; lzp <= task->lp; lzp++) {
+        for (int lyp = 0; lyp <= task->lp - lzp; lyp++) {
+          for (int lxp = 0; lxp <= task->lp - lzp - lyp; lxp++) {
+#endif
+
             const double p = task->prefactor *
                              alpha[0 * s1 + b.l[0] * s2 + a.l[0] * s3 + lxp] *
                              alpha[1 * s1 + b.l[1] * s2 + a.l[1] * s3 + lyp] *
                              alpha[2 * s1 + b.l[2] * s2 + a.l[2] * s3 + lzp];
-            const int cab_index = jco * task->n1_cab + ico; // [jco, ico]
 
 #if (GRID_DO_COLLOCATE)
-            // collocate
-            reg += p * cab[cab_index];
+            reg += p * cab[jco * task->n1_cab + ico]; // collocate
 #else
-            // integrate
-            atomicAddDouble(&cab[cab_index], p * cxyz[coset(lxp, lyp, lzp)]);
+            reg += p * cxyz[coset(lxp, lyp, lzp)]; // integrate
 #endif
           }
         }
+
 #if (GRID_DO_COLLOCATE)
+        // collocate
         cxyz[coset(lxp, lyp, lzp)] = reg; // overwrite - no zeroing needed.
-#endif
       }
+#else
+        // integrate
+      }
+      cab[jco * task->n1_cab + ico] = reg; // overwrite - no zeroing needed.
+#endif
     }
   }
-  __syncthreads(); // because of concurrent writes to cxyz
+  __syncthreads(); // because of concurrent writes to cxyz / cab
 }
 
 /*******************************************************************************
@@ -587,11 +609,13 @@ __device__ static void fill_smem_task(const kernel_params *params,
       }
     }
 
-    const double rscale = (iatom == jatom) ? 1.0 : 2.0;
-    task->prefactor = rscale * exp(-task->zeta * f * task->rab2);
     task->border_mask = glb_task->border_mask;
     task->radius = glb_task->radius;
     task->radius2 = task->radius * task->radius;
+    task->prefactor = exp(-task->zeta * f * task->rab2);
+#if (GRID_DO_COLLOCATE)
+    task->prefactor *= (iatom == jatom) ? 1.0 : 2.0;
+#endif
 
     // angular momentum range BEFORE prepare_pab is applied
     task->la_max_pab = ibasis.lmax[iset];

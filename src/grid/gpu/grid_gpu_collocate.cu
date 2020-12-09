@@ -32,6 +32,62 @@ __device__ static inline void prep_term(const orbital a, const orbital b,
   atomicAddDouble(&cab[idx(b) * n + idx(a)], value);
 }
 
+// /*******************************************************************************
+//  * \brief Transforms coefficients C_ab into C_xyz.
+//  * \author Ole Schuett
+//  ******************************************************************************/
+// __device__ static void cab_to_cxyz(const kernel_params *params,
+//                                    const smem_task *task, const double
+//                                    *alpha, GRID_CONST_WHEN_COLLOCATE double
+//                                    *cab, GRID_CONST_WHEN_INTEGRATE double
+//                                    *cxyz) {
+//
+//   //   *** initialise the coefficient matrix, we transform the sum
+//   //
+//   // sum_{lxa,lya,lza,lxb,lyb,lzb} P_{lxa,lya,lza,lxb,lyb,lzb} *
+//   //         (x-a_x)**lxa (y-a_y)**lya (z-a_z)**lza (x-b_x)**lxb (y-a_y)**lya
+//   //         (z-a_z)**lza
+//   //
+//   // into
+//   //
+//   // sum_{lxp,lyp,lzp} P_{lxp,lyp,lzp} (x-p_x)**lxp (y-p_y)**lyp (z-p_z)**lzp
+//   //
+//   // where p is center of the product gaussian, and lp = la_max + lb_max
+//   // (current implementation is l**7)
+//
+//   // strides for accessing alpha
+//   const int s3 = (task->lp + 1);
+//   const int s2 = (task->la_max + 1) * s3;
+//   const int s1 = (task->lb_max + 1) * s2;
+//
+//   // TODO: Maybe we can transpose alpha to index it directly with ico and
+//   jco. for (int lzp = threadIdx.z; lzp <= task->lp; lzp += blockDim.z) {
+//     for (int lyp = threadIdx.y; lyp <= task->lp - lzp; lyp += blockDim.y) {
+//       for (int lxp = threadIdx.x; lxp <= task->lp - lzp - lyp;
+//            lxp += blockDim.x) {
+//
+//         double reg = 0.0; // accumulate into a register
+//         for (int jco = 0; jco < ncoset(task->lb_max); jco++) {
+//           const orbital b = coset_inv[jco];
+//           for (int ico = 0; ico < ncoset(task->la_max); ico++) {
+//             const orbital a = coset_inv[ico];
+//
+//             const double p = task->prefactor *
+//                              alpha[0 * s1 + b.l[0] * s2 + a.l[0] * s3 + lxp]
+//                              * alpha[1 * s1 + b.l[1] * s2 + a.l[1] * s3 +
+//                              lyp] * alpha[2 * s1 + b.l[2] * s2 + a.l[2] * s3
+//                              + lzp];
+//             const int cab_index = jco * task->n1_cab + ico; // [jco, ico]
+//             reg += p * cab[cab_index];
+//           }
+//         }
+//         cxyz[coset(lxp, lyp, lzp)] = reg; // overwrite - no zeroing needed.
+//       }
+//     }
+//   }
+//   __syncthreads(); // because of concurrent writes to cxyz
+// }
+//
 /*******************************************************************************
  * \brief Decontracts the subblock, going from spherical to cartesian harmonics.
  * \author Ole Schuett

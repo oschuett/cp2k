@@ -31,17 +31,6 @@ __device__ static void store_hab(const kernel_params *params,
   // The spherical index runs over angular momentum and then over contractions.
   // The carthesian index runs over exponents and then over angular momentum.
 
-  //// Zero cab.
-  // if (threadIdx.z == 0) {
-  //  for (int i = threadIdx.y; i < task->n2_cab; i += blockDim.y) {
-  //    for (int j = threadIdx.x; j < task->n1_cab; j += blockDim.x) {
-  //      cab[i * task->n1_cab + j] = 0.0;
-  //    }
-  //  }
-  //}
-  //__syncthreads(); // because of concurrent writes to cab
-  //
-
   // This is a double matrix product. Since the block can be quite large the
   // two products are fused to conserve shared memory.
   for (int i = threadIdx.x; i < task->nsgf_setb; i += blockDim.x) {
@@ -53,8 +42,8 @@ __device__ static void store_hab(const kernel_params *params,
           const double sphia = task->sphia[j * task->maxcoa + l];
           block_val += cab[k * task->ncoseta + l] * sphia * sphib;
         }
-        assert(false && "Look here first");
-        block_val *= 0.5; // TODO This belongs somewhere else
+        // assert(false && "Look here first");
+        // block_val *= 0.5; // TODO This belongs somewhere else
         if (task->block_transposed) {
           atomicAddDouble(&task->hab_block[j * task->nsgfb + i], block_val);
         } else {
@@ -64,7 +53,7 @@ __device__ static void store_hab(const kernel_params *params,
     }
   }
   //__syncthreads(); // TODO: not really neded because of concurrent writes to
-  //cab
+  // cab
 }
 
 /*******************************************************************************
@@ -92,11 +81,8 @@ __global__ static void integrate_kernel(const kernel_params params) {
   __syncthreads();
 
   cxyz_to_grid(&params, &task, smem_cxyz, params.grid);
+
   compute_alpha(&params, &task, smem_alpha);
-
-  memset(smem_cab, 0, task.n1_cab * task.n2_cab * sizeof(double));
-  __syncthreads();
-
   cab_to_cxyz(&params, &task, smem_alpha, smem_cab, smem_cxyz);
 
   store_hab(&params, &task, smem_cab);
