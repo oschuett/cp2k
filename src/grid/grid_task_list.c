@@ -173,13 +173,12 @@ void grid_collocate_task_list(
 
   // Perform validation if enabled.
   if (grid_library_get_config().validate) {
-    // Create empty reference grid array.
+    // Allocate space for reference results.
     double *grid_ref[nlevels];
     for (int level = 0; level < nlevels; level++) {
       const size_t sizeof_grid = sizeof(double) * npts_local[level][0] *
                                  npts_local[level][1] * npts_local[level][2];
       grid_ref[level] = malloc(sizeof_grid);
-      memset(grid_ref[level], 0, sizeof_grid);
     }
 
     // Call reference implementation.
@@ -199,7 +198,7 @@ void grid_collocate_task_list(
             const double diff = fabs(grid[level][idx] - ref_value);
             const double rel_diff = diff / fmax(1.0, fabs(ref_value));
             if (rel_diff > tolerance) {
-              fprintf(stderr, "Error: Grid validation failure\n");
+              fprintf(stderr, "Error: Validation failure in collocate\n");
               fprintf(stderr, "   diff:     %le\n", diff);
               fprintf(stderr, "   rel_diff: %le\n", rel_diff);
               fprintf(stderr, "   value:    %le\n", ref_value);
@@ -263,6 +262,43 @@ void grid_integrate_task_list(
     printf("Error: Unknown grid backend: %i.\n", task_list->backend);
     abort();
     break;
+  }
+
+  // Perform validation if enabled.
+  if (grid_library_get_config().validate) {
+    // Allocate space for reference results.
+    const int hab_length = hab_blocks->size / sizeof(double);
+    grid_buffer *hab_blocks_ref = NULL;
+    grid_create_buffer(hab_length, &hab_blocks_ref);
+    double forces_ref[natoms][3], virial_ref[3][3];
+
+    // Call reference implementation.
+    grid_ref_integrate_task_list(
+        task_list->ref, orthorhombic, compute_tau, calculate_forces, natoms,
+        nlevels, npts_global, npts_local, shift_local, border_width, dh, dh_inv,
+        pab_blocks, grid, hab_blocks_ref, forces_ref, virial_ref);
+
+    // Compare results.
+    double max_rel_diff = 0.0;
+    const double tolerance = 1e-12;
+    for (int i = 0; i < hab_length; i++) {
+      const double ref_value = hab_blocks_ref->host_buffer[i];
+      const double test_value = hab_blocks->host_buffer[i];
+      const double diff = fabs(test_value - ref_value);
+      const double rel_diff = diff / fmax(1.0, fabs(ref_value));
+      max_rel_diff = fmax(max_rel_diff, rel_diff);
+      if (rel_diff > tolerance) {
+        fprintf(stderr, "Error: Validation failure in integrate\n");
+        fprintf(stderr, "   diff:     %le\n", diff);
+        fprintf(stderr, "   rel_diff: %le\n", rel_diff);
+        fprintf(stderr, "   value:    %le\n", ref_value);
+        fprintf(stderr, "   i:        %i\n", i);
+        abort();
+      }
+    }
+    printf("Max rel. diff: %le\n", max_rel_diff);
+    // TODO compate forces and virial
+    grid_free_buffer(hab_blocks_ref);
   }
 }
 

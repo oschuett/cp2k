@@ -48,7 +48,8 @@ typedef struct {
   int nkinds;
   int nblocks;
   int *tasks_per_level;
-  cudaStream_t *streams;
+  cudaStream_t *level_streams;
+  cudaStream_t main_stream;
   int lmax;
   // device pointers
   int *block_offsets_dev;
