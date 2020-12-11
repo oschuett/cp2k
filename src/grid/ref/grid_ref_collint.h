@@ -124,7 +124,7 @@ ortho_cx_to_grid(const int lp, const int kg1, const int kg2, const int jg1,
     const int ig2 = map[0][i2 + cmax];
 
     // In all likelihood the compiler will keep these variables in registers.
-    double reg[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    double reg[8] = {0.0};
 
 #if (GRID_DO_COLLOCATE)
     // collocate

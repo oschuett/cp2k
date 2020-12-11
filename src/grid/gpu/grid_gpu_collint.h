@@ -270,11 +270,12 @@ ortho_cxyz_to_grid(const kernel_params *params, const smem_task *task,
     cubecenter[i] = (int)floor(task->gp[i]);
   }
 
+  double reg[8] = {0.0};
+
   // The cube contains an even number of grid points in each direction and
   // collocation is always performed on a pair of two opposing grid points.
   // Hence, the points with index 0 and 1 are both assigned distance zero via
   // the formular distance=(2*index-1)/2.
-
   const int kmin = ceil(-1e-8 - disr_radius * params->dh_inv[2][2]);
   for (int k = threadIdx.z + kmin; k <= 1 - kmin; k += blockDim.z) {
     const int ka = cubecenter[2] + k - params->shift_local[2];
@@ -316,6 +317,14 @@ ortho_cxyz_to_grid(const kernel_params *params, const smem_task *task,
       }
     }
   }
+
+#if (!GRID_DO_COLLOCATE)
+  // integrate
+  for (int i=0; i<8; i++) {
+    atomicAddDouble(&cxyz[i], reg[i]);
+  }
+#endif
+
   __syncthreads(); // because of concurrent writes to grid / cxyz
 }
 
