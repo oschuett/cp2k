@@ -143,8 +143,8 @@ void grid_gpu_integrate_one_grid_level(
     abort();
   }
 
-  assert(compute_tau == false);
-  assert(calculate_forces == false);
+  // assert(compute_tau == false);
+  // assert(calculate_forces == false);
 
   // kernel parameters
   kernel_params params;

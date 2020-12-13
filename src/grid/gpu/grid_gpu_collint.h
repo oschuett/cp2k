@@ -68,10 +68,10 @@ cxyz_to_gridpoint(const double dx, const double dy, const double dz,
 
 #if (GRID_DO_COLLOCATE)
   // collocate
-  double reg = 0.0; // accumulate into register
+  double gridpoint_reg = 0.0; // accumulate into register
 #else
   // integrate
-  const double reg = *gridpoint; // load into register
+  const double gridpoint_reg = *gridpoint; // load into register
 #endif
 
   double pow_dz = 1.0;
@@ -82,12 +82,13 @@ cxyz_to_gridpoint(const double dx, const double dy, const double dz,
       for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
         const double p = gaussian * pow_dx * pow_dy * pow_dz;
 
+        const int cxyz_index = coset(lxp, lyp, lzp);
 #if (GRID_DO_COLLOCATE)
         // collocate
-        reg += cxyz[coset(lxp, lyp, lzp)] * p;
+        gridpoint_reg += cxyz[cxyz_index] * p;
 #else
         // integrate
-        atomicAddDouble(&cxyz[coset(lxp, lyp, lzp)], reg * p);
+        atomicAddDouble(&cxyz[cxyz_index], gridpoint_reg * p);
 #endif
         pow_dx *= dx; // pow_dx = pow(dx, lxp)
       }
@@ -97,7 +98,7 @@ cxyz_to_gridpoint(const double dx, const double dy, const double dz,
   }
 
 #if (GRID_DO_COLLOCATE)
-  atomicAddDouble(gridpoint, reg);
+  atomicAddDouble(gridpoint, gridpoint_reg);
 #endif
 }
 
@@ -270,8 +271,6 @@ ortho_cxyz_to_grid(const kernel_params *params, const smem_task *task,
     cubecenter[i] = (int)floor(task->gp[i]);
   }
 
-  double reg[8] = {0.0};
-
   // The cube contains an even number of grid points in each direction and
   // collocation is always performed on a pair of two opposing grid points.
   // Hence, the points with index 0 and 1 are both assigned distance zero via
@@ -317,13 +316,6 @@ ortho_cxyz_to_grid(const kernel_params *params, const smem_task *task,
       }
     }
   }
-
-#if (!GRID_DO_COLLOCATE)
-  // integrate
-  for (int i=0; i<8; i++) {
-    atomicAddDouble(&cxyz[i], reg[i]);
-  }
-#endif
 
   __syncthreads(); // because of concurrent writes to grid / cxyz
 }

@@ -172,7 +172,7 @@ void grid_collocate_task_list(
   }
 
   // Perform validation if enabled.
-  if (true || grid_library_get_config().validate) {
+  if (grid_library_get_config().validate) {
     // Allocate space for reference results.
     double *grid_ref[nlevels];
     for (int level = 0; level < nlevels; level++) {
@@ -268,7 +268,7 @@ void grid_integrate_task_list(
   }
 
   // Perform validation if enabled.
-  if (true || grid_library_get_config().validate) {
+  if (grid_library_get_config().validate) {
     // Allocate space for reference results.
     const int hab_length = hab_blocks->size / sizeof(double);
     grid_buffer *hab_blocks_ref = NULL;
