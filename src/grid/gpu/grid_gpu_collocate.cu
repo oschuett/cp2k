@@ -109,6 +109,8 @@ __device__ static void block_to_cab(const kernel_params *params,
   }
   __syncthreads(); // because of concurrent writes to cab
 
+  // TODO user [ij]co_start here as well?
+
   // Decontract block, apply prepare_pab, and store in cab.
   // This is a double matrix product. Since the pab block can be quite large the
   // two products are fused to conserve shared memory.

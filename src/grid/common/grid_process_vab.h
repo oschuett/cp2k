@@ -118,6 +118,88 @@ process_normal(const orbital a, const orbital b, const double f,
 }
 
 /*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+GRID_DEVICE static inline double extract_force_a(const orbital a,
+                                                 const orbital b, const int i,
+                                                 const double zeta, const int n,
+                                                 const double *cab) {
+  const double aip1 = get_term(up(i, a), b, n, cab);
+  const double aim1 = get_term(down(i, a), b, n, cab);
+  return 2.0 * zeta * aip1 - a.l[i] * aim1;
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+GRID_DEVICE static inline double
+extract_force_b(const orbital a, const orbital b, const int i,
+                const double zetb, const double rab[3], const int n,
+                const double *cab) {
+  const double axpm0 = get_term(a, b, n, cab);
+  const double aip1 = get_term(up(i, a), b, n, cab);
+  const double bim1 = get_term(a, down(i, b), n, cab);
+  return 2.0 * zetb * (aip1 - rab[i] * axpm0) - b.l[i] * bim1;
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+GRID_DEVICE static inline double
+extract_virial_a(const orbital a, const orbital b, const int i, const int j,
+                 const double zeta, const int n, const double *cab) {
+
+  return 2.0 * zeta * get_term(up(i, up(j, a)), b, n, cab) -
+         a.l[j] * get_term(up(i, down(j, a)), b, n, cab);
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+GRID_DEVICE static inline double
+extract_virial_b(const orbital a, const orbital b, const int i, const int j,
+                 const double zetb, const double rab[3], const int n,
+                 const double *cab) {
+
+  return 2.0 * zetb *
+             (get_term(up(i, up(j, a)), b, n, cab) -
+              get_term(up(i, a), b, n, cab) * rab[j] -
+              get_term(up(j, a), b, n, cab) * rab[i] +
+              get_term(a, b, n, cab) * rab[j] * rab[i]) -
+         b.l[j] * get_term(a, up(i, down(j, b)), n, cab);
+}
+
+/*******************************************************************************
+ * \brief Contracts given matrix elements to obtain forces and virials for tau.
+ * \author Ole Schuett
+ ******************************************************************************/
+GRID_DEVICE static inline double
+extract_hab_tau(const orbital a, const orbital b, const double zeta,
+                const double zetb, const int n, const double *cab) {
+  double hab = 0.0;
+  for (int i = 0; i < 3; i++) {
+    hab += 0.5 * a.l[i] * b.l[i] * get_term(down(i, a), down(i, b), n, cab);
+    hab -= zeta * b.l[i] * get_term(up(i, a), down(i, b), n, cab);
+    hab -= a.l[i] * zetb * get_term(down(i, a), up(i, b), n, cab);
+    hab += 2.0 * zeta * zetb * get_term(up(i, a), up(i, b), n, cab);
+  }
+  return hab;
+}
+
+/*******************************************************************************
+ * \brief Contracts given matrix elements to obtain forces and virials for tau.
+ * \author Ole Schuett
+ ******************************************************************************/
+GRID_DEVICE static inline double extract_hab(const orbital a, const orbital b,
+                                             const int n, const double *cab) {
+  return get_term(a, b, n, cab);
+}
+
+/*******************************************************************************
  * \brief Contracts given matrix elements to obtain forces and virials for tau.
  * \author Ole Schuett
  ******************************************************************************/

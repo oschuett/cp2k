@@ -135,7 +135,6 @@ typedef struct {
   enum grid_func func;
 #else
   // integrate
-  bool compute_tau;
   bool calculate_forces;
   double *hab_blocks;
   double *forces;
@@ -162,6 +161,7 @@ typedef struct {
   double zetb;
   double zetp;
   double prefactor;
+  double non_diagonals_twice;
   double dh_max;
   // angular momentum range of actual collocate / integrate operation
   int la_max;
@@ -196,6 +196,8 @@ typedef struct {
 #if (!GRID_DO_COLLOCATE)
   // integrate
   double *hab_block;
+  double *forces_a;
+  double *forces_b;
 #endif
 } smem_task;
 
@@ -621,8 +623,10 @@ __device__ static void fill_smem_task(const kernel_params *params,
     task->radius = glb_task->radius;
     task->radius2 = task->radius * task->radius;
     task->prefactor = exp(-task->zeta * f * task->rab2);
+    task->non_diagonals_twice = (iatom == jatom) ? 1.0 : 2.0;
 #if (GRID_DO_COLLOCATE)
-    task->prefactor *= (iatom == jatom) ? 1.0 : 2.0;
+    task->prefactor *=
+        (iatom == jatom) ? 1.0 : 2.0; // TODO move into block_to_cab
 #endif
 
     // angular momentum range of basis set
@@ -691,6 +695,8 @@ __device__ static void fill_smem_task(const kernel_params *params,
       task->hab_block =
           &params->hab_blocks[block_offset + sgfb * task->nsgfa + sgfa];
     }
+    task->forces_a = &params->forces[3 * iatom];
+    task->forces_b = &params->forces[3 * jatom];
 #endif
   }
   __syncthreads(); // because of concurrent writes to task
