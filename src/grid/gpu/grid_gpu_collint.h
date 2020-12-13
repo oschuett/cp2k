@@ -124,17 +124,19 @@ typedef struct {
   const int *block_offsets;
   const double *pab_blocks;
   const double *atom_positions;
+  GRID_CONST_WHEN_INTEGRATE double *grid;
+  int la_min_diff;
+  int lb_min_diff;
+  int la_max_diff;
+  int lb_max_diff;
 
 #if (GRID_DO_COLLOCATE)
   // collocate
   enum grid_func func;
-  prepare_ldiffs ldiffs;
-  double *grid;
 #else
   // integrate
   bool compute_tau;
   bool calculate_forces;
-  const double *grid;
   double *hab_blocks;
   double *forces;
   double *virial;
@@ -161,27 +163,29 @@ typedef struct {
   double zetp;
   double prefactor;
   double dh_max;
-  // angular momentum range BEFORE prepare_pab is applied
-  int la_max_pab;
-  int lb_max_pab;
-  // angular momentum range AFTER prepare_pab is applied
+  // angular momentum range of actual collocate / integrate operation
   int la_max;
   int lb_max;
   int la_min;
   int lb_min;
   int lp;
+  // angular momentum range of basis set
+  int la_max_basis; // TODO are these really needed?
+  int lb_max_basis;
+  int la_min_basis;
+  int lb_min_basis;
+  // size of the cab matrix
+  int n1_cab;
+  int n2_cab;
   // size of entire spherical basis
   int nsgfa;
   int nsgfb;
   // size of spherical set
   int nsgf_seta;
   int nsgf_setb;
-  // size of intermediate pab matrix
+  // size of decontracted set, ie. pab and hab
   int ncoseta;
   int ncosetb;
-  // size of final cab matrix
-  int n1_cab;
-  int n2_cab;
   // strides of the sphi transformation matrices
   int maxcoa;
   int maxcob;
@@ -621,24 +625,22 @@ __device__ static void fill_smem_task(const kernel_params *params,
     task->prefactor *= (iatom == jatom) ? 1.0 : 2.0;
 #endif
 
-    // angular momentum range BEFORE prepare_pab is applied
-    task->la_max_pab = ibasis.lmax[iset];
-    task->lb_max_pab = jbasis.lmax[jset];
+    // angular momentum range of basis set
+    task->la_max_basis = ibasis.lmax[iset];
+    task->lb_max_basis = jbasis.lmax[jset];
+    task->la_min_basis = ibasis.lmin[iset];
+    task->lb_min_basis = jbasis.lmin[jset];
 
-    // angular momentum range AFTER prepare_pab is applied
-#if (GRID_DO_COLLOCATE)
-    task->la_max = ibasis.lmax[iset] + params->ldiffs.la_max_diff;
-    task->lb_max = jbasis.lmax[jset] + params->ldiffs.lb_max_diff;
-    task->la_min = imax(ibasis.lmin[iset] + params->ldiffs.la_min_diff, 0);
-    task->lb_min = imax(jbasis.lmin[jset] + params->ldiffs.lb_min_diff, 0);
+    // angular momentum range for the actual collocate/integrate opteration.
+    task->la_max = task->la_max_basis + params->la_max_diff;
+    task->lb_max = task->lb_max_basis + params->lb_max_diff;
+    task->la_min = imax(task->la_min_basis + params->la_min_diff, 0);
+    task->lb_min = imax(task->lb_min_basis + params->lb_min_diff, 0);
     task->lp = task->la_max + task->lb_max;
-#else
-    task->la_max = ibasis.lmax[iset];
-    task->lb_max = jbasis.lmax[jset];
-    task->la_min = ibasis.lmin[iset];
-    task->lb_min = jbasis.lmin[jset];
-    task->lp = task->la_max + task->lb_max;
-#endif
+
+    // size of the cab matrix
+    task->n1_cab = ncoset(task->la_max);
+    task->n2_cab = ncoset(task->lb_max);
 
     // size of entire spherical basis
     task->nsgfa = ibasis.nsgf;
@@ -648,13 +650,9 @@ __device__ static void fill_smem_task(const kernel_params *params,
     task->nsgf_seta = ibasis.nsgf_set[iset];
     task->nsgf_setb = jbasis.nsgf_set[jset];
 
-    // size of intermediate pab matrix
-    task->ncoseta = ncoset(task->la_max_pab);
-    task->ncosetb = ncoset(task->lb_max_pab);
-
-    // size of final cab matrix
-    task->n1_cab = ncoset(task->la_max);
-    task->n2_cab = ncoset(task->lb_max);
+    // size of decontracted set, ie. pab and hab
+    task->ncoseta = ncoset(task->la_max_basis);
+    task->ncosetb = ncoset(task->lb_max_basis);
 
     // strides of the sphi transformation matrices
     task->maxcoa = ibasis.maxco;

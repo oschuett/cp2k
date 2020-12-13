@@ -5,6 +5,8 @@
 /*  SPDX-License-Identifier: GPL-2.0-or-later                                 */
 /*----------------------------------------------------------------------------*/
 
+#include <stdbool.h>
+
 #if defined(__CUDACC__)
 #define GRID_DEVICE __device__
 #else
@@ -12,17 +14,27 @@
 #endif
 
 /*******************************************************************************
+ * \brief Returns matrix element cab[idx(b)][idx(a)].
+ * \author Ole Schuett
+ ******************************************************************************/
+GRID_DEVICE static inline double get_term(const orbital a, const orbital b,
+                                          const int n, const double *cab) {
+  return cab[idx(b) * n + idx(a)];
+}
+
+/*******************************************************************************
  * \brief Contracts given matrix elements to obtain the forces for atom a.
  * \author Ole Schuett
  ******************************************************************************/
-GRID_DEVICE static inline void
-process_force_a(const orbital a, const orbital b, const double pab,
-                const double ftza, const int m1, const int m2,
-                const double vab[m2][m1], double force_a[3]) {
+GRID_DEVICE static inline void process_force_a(const orbital a, const orbital b,
+                                               const double pab,
+                                               const double ftza, const int n,
+                                               const double *cab,
+                                               double force_a[3]) {
 
   for (int i = 0; i < 3; i++) {
-    const double aip1 = vab[idx(b)][idx(up(i, a))];
-    const double aim1 = vab[idx(b)][idx(down(i, a))];
+    const double aip1 = get_term(up(i, a), b, n, cab);
+    const double aim1 = get_term(down(i, a), b, n, cab);
     force_a[i] += pab * (ftza * aip1 - a.l[i] * aim1);
   }
 }
@@ -33,13 +45,13 @@ process_force_a(const orbital a, const orbital b, const double pab,
  ******************************************************************************/
 GRID_DEVICE static inline void
 process_force_b(const orbital a, const orbital b, const double pab,
-                const double ftzb, const double rab[3], const int m1,
-                const int m2, const double vab[m2][m1], double force_b[3]) {
+                const double ftzb, const double rab[3], const int n,
+                const double *cab, double force_b[3]) {
 
-  const double axpm0 = vab[idx(b)][idx(a)];
+  const double axpm0 = get_term(a, b, n, cab);
   for (int i = 0; i < 3; i++) {
-    const double aip1 = vab[idx(b)][idx(up(i, a))];
-    const double bim1 = vab[idx(down(i, b))][idx(a)];
+    const double aip1 = get_term(up(i, a), b, n, cab);
+    const double bim1 = get_term(a, down(i, b), n, cab);
     force_b[i] += pab * (ftzb * (aip1 - rab[i] * axpm0) - b.l[i] * bim1);
   }
 }
@@ -50,13 +62,13 @@ process_force_b(const orbital a, const orbital b, const double pab,
  ******************************************************************************/
 GRID_DEVICE static inline void
 process_virial_a(const orbital a, const orbital b, const double pab,
-                 const double ftza, const int m1, const int m2,
-                 const double vab[m2][m1], double virial_a[3][3]) {
+                 const double ftza, const int n, const double *cab,
+                 double virial_a[3][3]) {
 
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
-      virial_a[i][j] += pab * ftza * vab[idx(b)][idx(up(i, up(j, a)))] -
-                        pab * a.l[j] * vab[idx(b)][idx(up(i, down(j, a)))];
+      virial_a[i][j] += pab * ftza * get_term(up(i, up(j, a)), b, n, cab) -
+                        pab * a.l[j] * get_term(up(i, down(j, a)), b, n, cab);
     }
   }
 }
@@ -67,18 +79,17 @@ process_virial_a(const orbital a, const orbital b, const double pab,
  ******************************************************************************/
 GRID_DEVICE static inline void
 process_virial_b(const orbital a, const orbital b, const double pab,
-                 const double ftzb, const double rab[3], const int m1,
-                 const int m2, const double vab[m2][m1],
-                 double virial_b[3][3]) {
+                 const double ftzb, const double rab[3], const int n,
+                 const double *cab, double virial_b[3][3]) {
 
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       virial_b[i][j] += pab * ftzb *
-                            (vab[idx(b)][idx(up(i, up(j, a)))] -
-                             vab[idx(b)][idx(up(i, a))] * rab[j] -
-                             vab[idx(b)][idx(up(j, a))] * rab[i] +
-                             vab[idx(b)][idx(a)] * rab[j] * rab[i]) -
-                        pab * b.l[j] * vab[idx(up(i, down(j, b)))][idx(a)];
+                            (get_term(up(i, up(j, a)), b, n, cab) -
+                             get_term(up(i, a), b, n, cab) * rab[j] -
+                             get_term(up(j, a), b, n, cab) * rab[i] +
+                             get_term(a, b, n, cab) * rab[j] * rab[i]) -
+                        pab * b.l[j] * get_term(a, up(i, down(j, b)), n, cab);
     }
   }
 }
@@ -90,20 +101,19 @@ process_virial_b(const orbital a, const orbital b, const double pab,
 GRID_DEVICE static void
 process_normal(const orbital a, const orbital b, const double f,
                const double ftza, const double ftzb, const double rab[3],
-               const int m1, const int m2, const double vab[m2][m1],
-               const double pab, double *hab, double forces[2][3],
-               double virials[2][3][3]) {
+               const int n, const double *cab, const double pab, double *hab,
+               double forces[2][3], double virials[2][3][3]) {
 
-  *hab += f * vab[idx(b)][idx(a)];
+  *hab += f * get_term(a, b, n, cab);
 
   if (forces != NULL) {
-    process_force_a(a, b, f * pab, ftza, m1, m2, vab, forces[0]);
-    process_force_b(a, b, f * pab, ftzb, rab, m1, m2, vab, forces[1]);
+    process_force_a(a, b, f * pab, ftza, n, cab, forces[0]);
+    process_force_b(a, b, f * pab, ftzb, rab, n, cab, forces[1]);
   }
 
   if (virials != NULL) {
-    process_virial_a(a, b, f * pab, ftza, m1, m2, vab, virials[0]);
-    process_virial_b(a, b, f * pab, ftzb, rab, m1, m2, vab, virials[1]);
+    process_virial_a(a, b, f * pab, ftza, n, cab, virials[0]);
+    process_virial_b(a, b, f * pab, ftzb, rab, n, cab, virials[1]);
   }
 }
 
@@ -111,22 +121,69 @@ process_normal(const orbital a, const orbital b, const double f,
  * \brief Contracts given matrix elements to obtain forces and virials for tau.
  * \author Ole Schuett
  ******************************************************************************/
-GRID_DEVICE static void
-process_tau(const orbital a, const orbital b, const double ftza,
-            const double ftzb, const double rab[3], const int m1, const int m2,
-            const double vab[m2][m1], const double pab, double *hab,
-            double forces[2][3], double virials[2][3][3]) {
+GRID_DEVICE static void process_tau(const orbital a, const orbital b,
+                                    const double ftza, const double ftzb,
+                                    const double rab[3], const int n,
+                                    const double *cab, const double pab,
+                                    double *hab, double forces[2][3],
+                                    double virials[2][3][3]) {
 
   for (int i = 0; i < 3; i++) {
     process_normal(down(i, a), down(i, b), 0.5 * a.l[i] * b.l[i], ftza, ftzb,
-                   rab, m1, m2, vab, pab, hab, forces, virials);
+                   rab, n, cab, pab, hab, forces, virials);
     process_normal(up(i, a), down(i, b), -0.5 * ftza * b.l[i], ftza, ftzb, rab,
-                   m1, m2, vab, pab, hab, forces, virials);
+                   n, cab, pab, hab, forces, virials);
     process_normal(down(i, a), up(i, b), -0.5 * a.l[i] * ftzb, ftza, ftzb, rab,
-                   m1, m2, vab, pab, hab, forces, virials);
-    process_normal(up(i, a), up(i, b), 0.5 * ftza * ftzb, ftza, ftzb, rab, m1,
-                   m2, vab, pab, hab, forces, virials);
+                   n, cab, pab, hab, forces, virials);
+    process_normal(up(i, a), up(i, b), 0.5 * ftza * ftzb, ftza, ftzb, rab, n,
+                   cab, pab, hab, forces, virials);
   }
+}
+
+/*******************************************************************************
+ * \brief Differences in angular momentum.
+ * \author Ole Schuett
+ ******************************************************************************/
+typedef struct {
+  int la_max_diff;
+  int la_min_diff;
+  int lb_max_diff;
+  int lb_min_diff;
+} process_ldiffs;
+
+/*******************************************************************************
+ * \brief Returns difference in angular momentum range for given flags.
+ * \author Ole Schuett
+ ******************************************************************************/
+static process_ldiffs process_get_ldiffs(bool calculate_forces,
+                                         bool calculate_virial,
+                                         bool compute_tau) {
+  process_ldiffs ldiffs;
+
+  ldiffs.la_max_diff = 0;
+  ldiffs.lb_max_diff = 0;
+  ldiffs.la_min_diff = 0;
+  ldiffs.lb_min_diff = 0;
+
+  if (calculate_forces) {
+    ldiffs.la_max_diff += 1; // for deriv. of gaussian, unimportant which one
+    ldiffs.la_min_diff -= 1;
+    ldiffs.lb_min_diff -= 1;
+  }
+
+  if (calculate_virial) {
+    ldiffs.la_max_diff += 1;
+    ldiffs.lb_max_diff += 1;
+  }
+
+  if (compute_tau) {
+    ldiffs.la_max_diff += 1;
+    ldiffs.lb_max_diff += 1;
+    ldiffs.la_min_diff -= 1;
+    ldiffs.lb_min_diff -= 1;
+  }
+
+  return ldiffs;
 }
 
 // EOF

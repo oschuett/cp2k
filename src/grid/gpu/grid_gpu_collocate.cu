@@ -223,14 +223,14 @@ void grid_gpu_collocate_one_grid_level(
   const int cab_len = ncoset(lb_max) * ncoset(la_max);
   const int alpha_len = 3 * (lb_max + 1) * (la_max + 1) * (lp_max + 1);
   const int cxyz_len = ncoset(lp_max);
-  const int alpha_cxyz_len = alpha_len + cxyz_len;
-  const size_t smem_per_block = (cab_len + alpha_cxyz_len) * sizeof(double);
+  const size_t smem_per_block =
+      (cab_len + alpha_len + cxyz_len) * sizeof(double);
 
   if (smem_per_block > 48 * 1024) {
     fprintf(stderr, "ERROR: Not enough shared memory.\n");
-    fprintf(stderr, "alpha_len: %i, ", alpha_len);
-    fprintf(stderr, "cxyz_len: %i, ", alpha_cxyz_len);
     fprintf(stderr, "cab_len: %i, ", cab_len);
+    fprintf(stderr, "alpha_len: %i, ", alpha_len);
+    fprintf(stderr, "cxyz_len: %i, ", cxyz_len);
     fprintf(stderr, "total smem_per_block: %f kb\n\n", smem_per_block / 1024.0);
     abort();
   }
@@ -244,7 +244,10 @@ void grid_gpu_collocate_one_grid_level(
   params.orthorhombic = orthorhombic;
   params.func = func;
   params.grid = grid_dev;
-  params.ldiffs = ldiffs;
+  params.la_min_diff = ldiffs.la_min_diff;
+  params.lb_min_diff = ldiffs.lb_min_diff;
+  params.la_max_diff = ldiffs.la_max_diff;
+  params.lb_max_diff = ldiffs.lb_max_diff;
   params.tasks = task_list->tasks_dev;
   params.atom_kinds = task_list->atom_kinds_dev;
   params.basis_sets = task_list->basis_sets_dev;

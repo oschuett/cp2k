@@ -18,6 +18,7 @@
 
 #define GRID_DO_COLLOCATE 0
 #include "../common/grid_common.h"
+#include "../common/grid_process_vab.h"
 #include "grid_gpu_collint.h"
 #include "grid_gpu_integrate.h"
 
@@ -33,14 +34,35 @@ __device__ static void store_hab(const kernel_params *params,
 
   // This is a double matrix product. Since the block can be quite large the
   // two products are fused to conserve shared memory.
+  const int ico_start =
+      (task->la_min_basis > 0) ? ncoset(task->la_min_basis - 1) : 0;
+  const int jco_start =
+      (task->lb_min_basis > 0) ? ncoset(task->lb_min_basis - 1) : 0;
+
   for (int i = threadIdx.x; i < task->nsgf_setb; i += blockDim.x) {
     for (int j = threadIdx.y; j < task->nsgf_seta; j += blockDim.y) {
-      for (int k = threadIdx.z; k < task->ncosetb; k += blockDim.z) {
+      for (int jco = jco_start + threadIdx.z; jco < ncoset(task->lb_max_basis);
+           jco += blockDim.z) {
+        const orbital b = coset_inv[jco];
         double block_val = 0.0;
-        const double sphib = task->sphib[i * task->maxcob + k];
-        for (int l = 0; l < task->ncoseta; l++) {
-          const double sphia = task->sphia[j * task->maxcoa + l];
-          block_val += cab[k * task->ncoseta + l] * sphia * sphib;
+        const double sphib = task->sphib[i * task->maxcob + jco];
+        for (int ico = ico_start; ico < ncoset(task->la_max_basis); ico++) {
+          const orbital a = coset_inv[ico];
+          double habval = 0.0;
+          const double ftza = 2.0 * task->zeta; // TODO precompute
+          const double ftzb = 2.0 * task->zetb;
+          if (params->compute_tau) {
+            // TODO refactor into extract_normal_hab, extract_tau_hab
+            // allso create extract_virial(i,j)  to extract only one value
+            process_tau(a, b, ftza, ftzb, task->rab, task->n1_cab, cab, NULL,
+                        &habval, NULL, NULL);
+          } else {
+            process_normal(a, b, 1.0, ftza, ftzb, task->rab, task->n1_cab, cab,
+                           NULL, &habval, NULL, NULL);
+          }
+
+          const double sphia = task->sphia[j * task->maxcoa + ico];
+          block_val += habval * sphia * sphib;
         }
         if (task->block_transposed) {
           atomicAddDouble(&task->hab_block[j * task->nsgfb + i], block_val);
@@ -126,10 +148,13 @@ void grid_gpu_integrate_one_grid_level(
   // Compute required shared memory.
   // TODO: Currently, cab's indicies run over 0...ncoset[lmax],
   //       however only ncoset(lmin)...ncoset(lmax) are actually needed.
-  const int lmax = task_list->lmax;
-  const int lp_max = 2 * lmax;
-  const int cab_len = ncoset(lmax) * ncoset(lmax);
-  const int alpha_len = 3 * (lmax + 1) * (lmax + 1) * (lp_max + 1);
+  const process_ldiffs ldiffs =
+      process_get_ldiffs(calculate_forces, calculate_forces, compute_tau);
+  const int la_max = task_list->lmax + ldiffs.la_max_diff;
+  const int lb_max = task_list->lmax + ldiffs.lb_max_diff;
+  const int lp_max = la_max + lb_max;
+  const int cab_len = ncoset(lb_max) * ncoset(la_max);
+  const int alpha_len = 3 * (lb_max + 1) * (la_max + 1) * (lp_max + 1);
   const int cxyz_len = ncoset(lp_max);
   const size_t smem_per_block =
       (cab_len + alpha_len + cxyz_len) * sizeof(double);
@@ -165,6 +190,10 @@ void grid_gpu_integrate_one_grid_level(
   params.hab_blocks = hab_blocks_dev;
   params.forces = forces_dev;
   params.virial = virial_dev;
+  params.la_min_diff = ldiffs.la_min_diff;
+  params.lb_min_diff = ldiffs.lb_min_diff;
+  params.la_max_diff = ldiffs.la_max_diff;
+  params.lb_max_diff = ldiffs.lb_max_diff;
   memcpy(params.dh, dh, 9 * sizeof(double));
   memcpy(params.dh_inv, dh_inv, 9 * sizeof(double));
   memcpy(params.npts_global, npts_global, 3 * sizeof(int));

@@ -33,42 +33,31 @@ void grid_ref_integrate_pgf_product(
     const double pab[n2][n1], double forces[2][3], double virials[2][3][3],
     double hdab[n2][n1][3], double a_hdab[n2][n1][3][3]) {
 
-  int la_max_local = la_max;
-  int la_min_local = la_min;
-  int lb_min_local = lb_min;
-  int lb_max_local = lb_max;
-  if (forces != NULL || hdab != NULL || virials != NULL || a_hdab != NULL) {
-    la_max_local += 1; // for deriv. of gaussian, unimportant which one
-    la_min_local -= 1;
-    lb_min_local -= 1;
-  }
-  if (virials != NULL || a_hdab != NULL) {
-    la_max_local += 1;
-    lb_max_local += 1;
-  }
-  if (compute_tau) {
-    la_max_local += 1;
-    lb_max_local += 1;
-    la_min_local -= 1;
-    lb_min_local -= 1;
-  }
-  la_min_local = imax(la_min_local, 0);
-  lb_min_local = imax(lb_min_local, 0);
+  const bool calculate_forces =
+      (forces != NULL || hdab != NULL || virials != NULL || a_hdab != NULL);
+  const bool calculate_virial = (virials != NULL || a_hdab != NULL);
+  const process_ldiffs ldiffs =
+      process_get_ldiffs(calculate_forces, calculate_virial, compute_tau);
 
-  const int m1 = ncoset(la_max_local);
-  const int m2 = ncoset(lb_max_local);
-  double vab_mutable[m2 * m1];
-  memset(vab_mutable, 0, m2 * m1 * sizeof(double));
+  int la_min_cab = imax(la_min + ldiffs.la_min_diff, 0);
+  int lb_min_cab = imax(lb_min + ldiffs.lb_min_diff, 0);
+  int la_max_cab = la_max + ldiffs.la_max_diff;
+  int lb_max_cab = lb_max + ldiffs.lb_max_diff;
+  const int n1_cab = ncoset(la_max_cab);
+  const int n2_cab = ncoset(lb_max_cab);
+
+  const size_t cab_size = n2_cab * n1_cab;
+  double cab_mutable[cab_size];
+  memset(cab_mutable, 0, cab_size * sizeof(double));
 
   const double rscale = 1.0; // TODO: remove rscale from cab_to_grid
-  cab_to_grid(orthorhombic, border_mask, la_max_local, la_min_local,
-              lb_max_local, lb_min_local, zeta, zetb, rscale, dh, dh_inv, ra,
-              rab, npts_global, npts_local, shift_local, border_width, radius,
-              vab_mutable, grid);
+  cab_to_grid(orthorhombic, border_mask, la_max_cab, la_min_cab, lb_max_cab,
+              lb_min_cab, zeta, zetb, rscale, dh, dh_inv, ra, rab, npts_global,
+              npts_local, shift_local, border_width, radius, cab_mutable, grid);
 
-  //  vab contains all the information needed to find the elements of hab
+  //  cab contains all the information needed to find the elements of hab
   //  and optionally of derivatives of these elements
-  const double(*vab)[m1] = (const double(*)[m1])vab_mutable;
+  const double(*cab)[n1_cab] = (const double(*)[n1_cab])cab_mutable;
 
   const double ftza = 2.0 * zeta;
   const double ftzb = 2.0 * zetb;
@@ -90,22 +79,22 @@ void grid_ref_integrate_pgf_product(
 
               // Fill hab, forces, and virials.
               if (compute_tau) {
-                process_tau(a, b, ftza, ftzb, rab, m1, m2, vab, pabval, habval,
-                            forces, virials);
+                process_tau(a, b, ftza, ftzb, rab, n1_cab, (double *)cab,
+                            pabval, habval, forces, virials);
               } else {
-                process_normal(a, b, 1.0, ftza, ftzb, rab, m1, m2, vab, pabval,
-                               habval, forces, virials);
+                process_normal(a, b, 1.0, ftza, ftzb, rab, n1_cab,
+                               (double *)cab, pabval, habval, forces, virials);
               }
 
               // Fill hdab and a_hdab.
               if (hdab != NULL) {
                 assert(!compute_tau);
-                process_force_a(a, b, 1.0, ftza, m1, m2, vab,
+                process_force_a(a, b, 1.0, ftza, n1_cab, (double *)cab,
                                 hdab[o2 + idx(b)][o1 + idx(a)]);
               }
               if (a_hdab != NULL) {
                 assert(!compute_tau);
-                process_virial_a(a, b, 1.0, ftza, m1, m2, vab,
+                process_virial_a(a, b, 1.0, ftza, n1_cab, (double *)cab,
                                  a_hdab[o2 + idx(b)][o1 + idx(a)]);
               }
             }
