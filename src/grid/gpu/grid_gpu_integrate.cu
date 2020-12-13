@@ -54,10 +54,10 @@ __device__ static void store_hab(const kernel_params *params,
           if (params->compute_tau) {
             // TODO refactor into extract_normal_hab, extract_tau_hab
             // allso create extract_virial(i,j)  to extract only one value
-            process_tau(a, b, ftza, ftzb, task->rab, task->n1_cab, cab, NULL,
+            process_tau(a, b, ftza, ftzb, task->rab, task->n1, cab, NULL,
                         &habval, NULL, NULL);
           } else {
-            process_normal(a, b, 1.0, ftza, ftzb, task->rab, task->n1_cab, cab,
+            process_normal(a, b, 1.0, ftza, ftzb, task->rab, task->n1, cab,
                            NULL, &habval, NULL, NULL);
           }
 
@@ -102,7 +102,7 @@ __global__ static void integrate_kernel(const kernel_params params) {
 
   cxyz_to_grid(&params, &task, smem_cxyz, params.grid);
 
-  memset(smem_cab, 0, task.n1_cab * task.n2_cab * sizeof(double));
+  memset(smem_cab, 0, task.n1 * task.n2 * sizeof(double));
   __syncthreads();
 
   compute_alpha(&params, &task, smem_alpha);

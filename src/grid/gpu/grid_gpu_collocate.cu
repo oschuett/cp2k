@@ -77,7 +77,7 @@ __device__ static inline void prep_term(const orbital a, const orbital b,
 //                              * alpha[1 * s1 + b.l[1] * s2 + a.l[1] * s3 +
 //                              lyp] * alpha[2 * s1 + b.l[2] * s2 + a.l[2] * s3
 //                              + lzp];
-//             const int cab_index = jco * task->n1_cab + ico; // [jco, ico]
+//             const int cab_index = jco * task->n1 + ico; // [jco, ico]
 //             reg += p * cab[cab_index];
 //           }
 //         }
@@ -101,9 +101,9 @@ __device__ static void block_to_cab(const kernel_params *params,
 
   // Zero cab.
   if (threadIdx.z == 0) {
-    for (int i = threadIdx.y; i < task->n2_cab; i += blockDim.y) {
-      for (int j = threadIdx.x; j < task->n1_cab; j += blockDim.x) {
-        cab[i * task->n1_cab + j] = 0.0;
+    for (int i = threadIdx.y; i < task->n2; i += blockDim.y) {
+      for (int j = threadIdx.x; j < task->n1; j += blockDim.x) {
+        cab[i * task->n1 + j] = 0.0;
       }
     }
   }
@@ -141,7 +141,7 @@ __device__ static void block_to_cab(const kernel_params *params,
             const double sphib = task->sphib[i * task->maxcob + idx(b)];
             const double pab_val = block_val * sphia * sphib;
             prepare_pab(params->func, a, b, task->zeta, task->zetb, pab_val,
-                        task->n1_cab, cab);
+                        task->n1, cab);
           }
         }
       }

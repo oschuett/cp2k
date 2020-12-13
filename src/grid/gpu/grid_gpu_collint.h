@@ -175,8 +175,8 @@ typedef struct {
   int la_min_basis;
   int lb_min_basis;
   // size of the cab matrix
-  int n1_cab;
-  int n2_cab;
+  int n1;
+  int n2;
   // size of entire spherical basis
   int nsgfa;
   int nsgfb;
@@ -545,7 +545,7 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
                              alpha[2 * s1 + b.l[2] * s2 + a.l[2] * s3 + lzp];
 
 #if (GRID_DO_COLLOCATE)
-            reg += p * cab[jco * task->n1_cab + ico]; // collocate
+            reg += p * cab[jco * task->n1 + ico]; // collocate
 #else
             reg += p * cxyz[coset(lxp, lyp, lzp)]; // integrate
 #endif
@@ -559,7 +559,7 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
 #else
         // integrate
       }
-      cab[jco * task->n1_cab + ico] = reg; // partial loop coverage -> zero it
+      cab[jco * task->n1 + ico] = reg; // partial loop coverage -> zero it
 #endif
     }
   }
@@ -639,8 +639,8 @@ __device__ static void fill_smem_task(const kernel_params *params,
     task->lp = task->la_max + task->lb_max;
 
     // size of the cab matrix
-    task->n1_cab = ncoset(task->la_max);
-    task->n2_cab = ncoset(task->lb_max);
+    task->n1 = ncoset(task->la_max);
+    task->n2 = ncoset(task->lb_max);
 
     // size of entire spherical basis
     task->nsgfa = ibasis.nsgf;
