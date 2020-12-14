@@ -32,7 +32,10 @@
  * \brief Atomic add for doubles that also works prior to compute capability 6.
  * \author Ole Schuett
  ******************************************************************************/
-__device__ static double atomicAddDouble(double *address, double val) {
+__device__ static void atomicAddDouble(double *address, double val) {
+  if (val == 0.0)
+    return;
+
 #if __CUDA_ARCH__ >= 600
   atomicAdd(address, val); // part of cuda library
 #else
@@ -48,7 +51,6 @@ __device__ static double atomicAddDouble(double *address, double val) {
     // Uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
   } while (assumed != old);
 
-  return __longlong_as_double(old);
 #endif
 }
 
@@ -161,7 +163,7 @@ typedef struct {
   double zetb;
   double zetp;
   double prefactor;
-  double non_diagonals_twice;
+  double off_diagonals_twice;
   double dh_max;
   // angular momentum range of actual collocate / integrate operation
   int la_max;
@@ -511,8 +513,9 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
 
   // TODO: Maybe we can transpose alpha to index it directly with ico and jco.
 
-  const int ico_start = (task->la_min > 0) ? ncoset(task->la_min - 1) : 0;
-  const int jco_start = (task->lb_min > 0) ? ncoset(task->lb_min - 1) : 0;
+  // TODO: these can probably be removed.
+  const int ico_start = 0; //(task->la_min > 0) ? ncoset(task->la_min - 1) : 0;
+  const int jco_start = 0; //(task->lb_min > 0) ? ncoset(task->lb_min - 1) : 0;
 
 #if (GRID_DO_COLLOCATE)
   // collocate
@@ -527,18 +530,17 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
             const orbital a = coset_inv[ico];
 #else
   // integrate
-  if (threadIdx.x != 0)
-    return; // TODO: How bad is this?
-  for (int jco = jco_start + threadIdx.y; jco < ncoset(task->lb_max);
-       jco += blockDim.y) {
-    const orbital b = coset_inv[jco];
-    for (int ico = ico_start + threadIdx.z; ico < ncoset(task->la_max);
-         ico += blockDim.z) {
-      const orbital a = coset_inv[ico];
-      double reg = 0.0; // accumulate into a register
-      for (int lzp = 0; lzp <= task->lp; lzp++) {
-        for (int lyp = 0; lyp <= task->lp - lzp; lyp++) {
-          for (int lxp = 0; lxp <= task->lp - lzp - lyp; lxp++) {
+  if (threadIdx.x == 0) { // TODO: How bad is this?
+    for (int jco = jco_start + threadIdx.y; jco < ncoset(task->lb_max);
+         jco += blockDim.y) {
+      const orbital b = coset_inv[jco];
+      for (int ico = ico_start + threadIdx.z; ico < ncoset(task->la_max);
+           ico += blockDim.z) {
+        const orbital a = coset_inv[ico];
+        double reg = 0.0; // accumulate into a register
+        for (int lzp = 0; lzp <= task->lp; lzp++) {
+          for (int lyp = 0; lyp <= task->lp - lzp; lyp++) {
+            for (int lxp = 0; lxp <= task->lp - lzp - lyp; lxp++) {
 #endif
 
             const double p = task->prefactor *
@@ -549,7 +551,7 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
 #if (GRID_DO_COLLOCATE)
             reg += p * cab[jco * task->n1 + ico]; // collocate
 #else
-            reg += p * cxyz[coset(lxp, lyp, lzp)]; // integrate
+              reg += p * cxyz[coset(lxp, lyp, lzp)]; // integrate
 #endif
           }
         }
@@ -559,9 +561,10 @@ __device__ static void cab_to_cxyz(const kernel_params *params,
         cxyz[coset(lxp, lyp, lzp)] = reg; // overwrite - no zeroing needed.
       }
 #else
-        // integrate
+          // integrate
+        }
+        cab[jco * task->n1 + ico] = reg; // partial loop coverage -> zero it
       }
-      cab[jco * task->n1 + ico] = reg; // partial loop coverage -> zero it
 #endif
     }
   }
@@ -623,7 +626,7 @@ __device__ static void fill_smem_task(const kernel_params *params,
     task->radius = glb_task->radius;
     task->radius2 = task->radius * task->radius;
     task->prefactor = exp(-task->zeta * f * task->rab2);
-    task->non_diagonals_twice = (iatom == jatom) ? 1.0 : 2.0;
+    task->off_diagonals_twice = (iatom == jatom) ? 1.0 : 2.0;
 #if (GRID_DO_COLLOCATE)
     task->prefactor *=
         (iatom == jatom) ? 1.0 : 2.0; // TODO move into block_to_cab

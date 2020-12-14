@@ -111,13 +111,23 @@ __device__ static void store_forces(const kernel_params *params,
           const orbital a = coset_inv[ico];
           for (int k = 0; k < 3; k++) {
             const double force_a =
-                pabval * task->non_diagonals_twice *
+                pabval * task->off_diagonals_twice *
                 extract_force_a(a, b, k, task->zeta, task->n1, cab);
             atomicAddDouble(&task->forces_a[k], force_a);
             const double force_b =
-                pabval * task->non_diagonals_twice *
+                pabval * task->off_diagonals_twice *
                 extract_force_b(a, b, k, task->zetb, task->rab, task->n1, cab);
             atomicAddDouble(&task->forces_b[k], force_b);
+            // if (force_a != 0.0 || force_b != 0.0) {
+            //  const double aip1 = get_term(up(k, a), b, task->n1, cab);
+            //  const double aim1 = get_term(down(k, a), b, task->n1, cab);
+            //  const double foo =  2.0 * task->zeta * aip1 - a.l[k] * aim1;
+            //  const double foo2 = extract_force_a(a, b, k, task->zeta,
+            //  task->n1, cab);
+            // printf(" k: %i, force_a: %le pabval: %le, aip1: %le, aim1: %le
+            // foo: %le foo2: %le\n",
+            //    k, force_a, pabval, aip1, aim1, foo, foo2);
+            //}
           }
         }
       }
@@ -126,40 +136,6 @@ __device__ static void store_forces(const kernel_params *params,
   __syncthreads(); // TODO: Probably not needed
 }
 
-///*******************************************************************************
-// * \brief TODO.
-// * \author Ole Schuett
-// ******************************************************************************/
-// template <bool COMPUTE_TAU>
-//__device__ static void store_forces(const kernel_params *params,
-//                                    const smem_task *task, const double *cab)
-//                                    {
-//
-//  const int ico_start =
-//      (task->la_min_basis > 0) ? ncoset(task->la_min_basis - 1) : 0;
-//  const int jco_start =
-//      (task->lb_min_basis > 0) ? ncoset(task->lb_min_basis - 1) : 0;
-//
-//  for (int jco = jco_start + threadIdx.x; jco < ncoset(task->lb_max_basis);
-//       jco += blockDim.x) {
-//    const orbital b = coset_inv[jco];
-//    for (int ico = ico_start + threadIdx.y; ico < ncoset(task->la_max_basis);
-//         ico += blockDim.y) {
-//      const orbital a = coset_inv[ico];
-//      for (int i = threadIdx.z; i < 3; i += blockDim.z) {
-//        const double pabval = 0.0; // pab[o2 + idx(b)][o1 + idx(a)];//TODO
-//        const double force_a =
-//            extract_force_a(a, b, i, task->zeta, pabval, task->n1, cab);
-//        atomicAddDouble(&task->forces_a[i], force_a);
-//        const double force_b = extract_force_b(a, b, i, task->zetb, pabval,
-//                                               task->rab, task->n1, cab);
-//        atomicAddDouble(&task->forces_b[i], force_b);
-//      }
-//    }
-//  }
-//  __syncthreads();
-//}
-//
 /*******************************************************************************
  * \brief Cuda kernel for integrating all tasks of one grid level.
  * \author Ole Schuett
@@ -272,8 +248,7 @@ void grid_gpu_integrate_one_grid_level(
     abort();
   }
 
-  // assert(compute_tau == false);
-  // assert(calculate_forces == false);
+  assert(compute_tau == false);
 
   // kernel parameters
   kernel_params params;
@@ -307,6 +282,7 @@ void grid_gpu_integrate_one_grid_level(
   // Launch !
   const int nblocks = ntasks;
   const dim3 threads_per_block(4, 8, 8);
+  // const dim3 threads_per_block(1,1,1);
 
   if (compute_tau) {
     integrate_kernel_tau<<<nblocks, threads_per_block, smem_per_block,

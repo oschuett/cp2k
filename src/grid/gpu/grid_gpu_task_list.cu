@@ -389,19 +389,22 @@ void grid_gpu_integrate_task_list(
   CHECK(cudaMemcpyAsync(hab_blocks->host_buffer, hab_blocks->device_buffer,
                         hab_blocks->size, cudaMemcpyDeviceToHost,
                         task_list->main_stream));
-
-  // clean up
-  CHECK(cudaEventDestroy(input_ready_event));
-
   if (calculate_forces) {
-    CHECK(cudaMemcpy(forces, forces_dev, forces_size, cudaMemcpyDeviceToHost));
-    CHECK(cudaMemcpy(virial, virial_dev, virial_size, cudaMemcpyDeviceToHost));
-    CHECK(cudaFree(forces_dev));
-    CHECK(cudaFree(virial_dev));
+    CHECK(cudaMemcpyAsync(forces, forces_dev, forces_size,
+                          cudaMemcpyDeviceToHost, task_list->main_stream));
+    CHECK(cudaMemcpyAsync(virial, virial_dev, virial_size,
+                          cudaMemcpyDeviceToHost, task_list->main_stream));
   }
 
   // wait for all the streams to finish
   CHECK(cudaDeviceSynchronize());
+
+  // clean up
+  CHECK(cudaEventDestroy(input_ready_event));
+  if (calculate_forces) {
+    CHECK(cudaFree(forces_dev));
+    CHECK(cudaFree(virial_dev));
+  }
 }
 
 #endif // __GRID_CUDA
