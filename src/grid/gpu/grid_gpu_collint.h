@@ -137,7 +137,6 @@ typedef struct {
   enum grid_func func;
 #else
   // integrate
-  bool calculate_forces;
   double *hab_blocks;
   double *forces;
   double *virial;
@@ -698,8 +697,11 @@ __device__ static void fill_smem_task(const kernel_params *params,
       task->hab_block =
           &params->hab_blocks[block_offset + sgfb * task->nsgfa + sgfa];
     }
-    task->forces_a = &params->forces[3 * iatom];
-    task->forces_b = &params->forces[3 * jatom];
+    // TODO maybe move into store_forces
+    if (params->forces != NULL) {
+      task->forces_a = &params->forces[3 * iatom];
+      task->forces_b = &params->forces[3 * jatom];
+    }
 #endif
   }
   __syncthreads(); // because of concurrent writes to task

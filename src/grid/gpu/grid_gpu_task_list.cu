@@ -319,6 +319,7 @@ void grid_gpu_integrate_task_list(
     grid_buffer *hab_blocks, double forces[][3], double virial[3][3]) {
 
   assert(task_list->nlevels == nlevels);
+  const bool calculate_virial = calculate_forces; // TODO
 
   // Prepare shared buffers using the main stream
   double *forces_dev = NULL;
@@ -328,13 +329,15 @@ void grid_gpu_integrate_task_list(
   const size_t virial_size = 9 * sizeof(double);
   if (calculate_forces) {
     CHECK(cudaMalloc(&forces_dev, forces_size));
-    CHECK(cudaMalloc(&virial_dev, virial_size));
     CHECK(cudaMemsetAsync(forces_dev, 0, forces_size, task_list->main_stream));
-    CHECK(cudaMemsetAsync(virial_dev, 0, virial_size, task_list->main_stream));
     CHECK(cudaMemcpyAsync(pab_blocks->device_buffer, pab_blocks->host_buffer,
                           pab_blocks->size, cudaMemcpyHostToDevice,
                           task_list->main_stream));
     pab_blocks_dev = pab_blocks->device_buffer;
+  }
+  if (calculate_virial) {
+    CHECK(cudaMalloc(&virial_dev, virial_size));
+    CHECK(cudaMemsetAsync(virial_dev, 0, virial_size, task_list->main_stream));
   }
 
   // zero device hab blocks buffers
@@ -370,10 +373,10 @@ void grid_gpu_integrate_task_list(
     CHECK(cudaStreamWaitEvent(level_stream, input_ready_event, 0));
     grid_gpu_integrate_one_grid_level(
         task_list, first_task, last_task, orthorhombic, compute_tau,
-        calculate_forces, npts_global[level], npts_local[level],
-        shift_local[level], border_width[level], dh[level], dh_inv[level],
-        level_stream, pab_blocks_dev, task_list->grid_dev[level],
-        hab_blocks->device_buffer, forces_dev, virial_dev);
+        npts_global[level], npts_local[level], shift_local[level],
+        border_width[level], dh[level], dh_inv[level], level_stream,
+        pab_blocks_dev, task_list->grid_dev[level], hab_blocks->device_buffer,
+        forces_dev, virial_dev);
 
     // Have main stream wait for level to complete before downloading results.
     cudaEvent_t level_done_event;
@@ -392,6 +395,8 @@ void grid_gpu_integrate_task_list(
   if (calculate_forces) {
     CHECK(cudaMemcpyAsync(forces, forces_dev, forces_size,
                           cudaMemcpyDeviceToHost, task_list->main_stream));
+  }
+  if (calculate_virial) {
     CHECK(cudaMemcpyAsync(virial, virial_dev, virial_size,
                           cudaMemcpyDeviceToHost, task_list->main_stream));
   }
@@ -403,6 +408,8 @@ void grid_gpu_integrate_task_list(
   CHECK(cudaEventDestroy(input_ready_event));
   if (calculate_forces) {
     CHECK(cudaFree(forces_dev));
+  }
+  if (calculate_virial) {
     CHECK(cudaFree(virial_dev));
   }
 }

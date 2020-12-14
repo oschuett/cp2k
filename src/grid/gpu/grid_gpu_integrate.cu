@@ -35,6 +35,7 @@ __device__ static void store_hab(const kernel_params *params,
 
   // This is a double matrix product. Since the block can be quite large the
   // two products are fused to conserve shared memory.
+  //TODO: move into smem_task
   const int ico_start =
       (task->la_min_basis > 0) ? ncoset(task->la_min_basis - 1) : 0;
   const int jco_start =
@@ -77,8 +78,9 @@ __device__ static void store_hab(const kernel_params *params,
  * \author Ole Schuett
  ******************************************************************************/
 template <bool COMPUTE_TAU>
-__device__ static void store_forces(const kernel_params *params,
-                                    const smem_task *task, const double *cab) {
+__device__ static void store_forces_and_virial(const kernel_params *params,
+                                               const smem_task *task,
+                                               const double *cab) {
 
   // The spherical index runs over angular momentum and then over contractions.
   // The carthesian index runs over exponents and then over angular momentum.
@@ -87,6 +89,7 @@ __device__ static void store_forces(const kernel_params *params,
   // This is a double matrix product. Since the pab block can be quite large the
   // two products are fused to conserve shared memory.
 
+  //TODO: move into smem_task
   const int ico_start =
       (task->la_min_basis > 0) ? ncoset(task->la_min_basis - 1) : 0;
   const int jco_start =
@@ -106,7 +109,6 @@ __device__ static void store_forces(const kernel_params *params,
         for (int ico = ico_start; ico < task->ncoseta; ico++) {
           const double sphia = task->sphia[j * task->maxcoa + ico];
           const double pabval = block_val * sphia * sphib;
-
           const orbital b = coset_inv[jco];
           const orbital a = coset_inv[ico];
           for (int k = 0; k < 3; k++) {
@@ -118,16 +120,19 @@ __device__ static void store_forces(const kernel_params *params,
                 pabval * task->off_diagonals_twice *
                 extract_force_b(a, b, k, task->zetb, task->rab, task->n1, cab);
             atomicAddDouble(&task->forces_b[k], force_b);
-            // if (force_a != 0.0 || force_b != 0.0) {
-            //  const double aip1 = get_term(up(k, a), b, task->n1, cab);
-            //  const double aim1 = get_term(down(k, a), b, task->n1, cab);
-            //  const double foo =  2.0 * task->zeta * aip1 - a.l[k] * aim1;
-            //  const double foo2 = extract_force_a(a, b, k, task->zeta,
-            //  task->n1, cab);
-            // printf(" k: %i, force_a: %le pabval: %le, aip1: %le, aim1: %le
-            // foo: %le foo2: %le\n",
-            //    k, force_a, pabval, aip1, aim1, foo, foo2);
-            //}
+          }
+          if (params->virial != NULL) {
+            for (int k = 0; k < 3; k++) {
+              for (int l = 0; l < 3; l++) {
+                const double virial_a =
+                    extract_virial_a(a, b, k, l, task->zeta, task->n1, cab);
+                const double virial_b = extract_virial_b(
+                    a, b, k, l, task->zetb, task->rab, task->n1, cab);
+                const double virial =
+                    pabval * task->off_diagonals_twice * (virial_a + virial_b);
+                atomicAddDouble(&params->virial[k * 3 + l], virial);
+              }
+            }
           }
         }
       }
@@ -140,7 +145,7 @@ __device__ static void store_forces(const kernel_params *params,
  * \brief Cuda kernel for integrating all tasks of one grid level.
  * \author Ole Schuett
  ******************************************************************************/
-template <bool COMPUTE_TAU>
+template <bool COMPUTE_TAU, bool CALCULATE_FORCES>
 __device__ static void integrate_kernel(const kernel_params *params) {
 
   // Copy task from global to shared memory and precompute some stuff.
@@ -171,8 +176,9 @@ __device__ static void integrate_kernel(const kernel_params *params) {
 
   store_hab<COMPUTE_TAU>(params, &task, smem_cab);
 
-  // TODO make this call depend on template variable.
-  store_forces<COMPUTE_TAU>(params, &task, smem_cab);
+  if (CALCULATE_FORCES) {
+    store_forces_and_virial<COMPUTE_TAU>(params, &task, smem_cab);
+  }
 
   // if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
   //  printf("la_min: %i %lb_min: %i, ncoset: %i, %i \n",
@@ -189,19 +195,35 @@ __device__ static void integrate_kernel(const kernel_params *params) {
 }
 
 /*******************************************************************************
- * \brief Specialized Cuda kernel that can only integrate compute_tau==false.
+ * \brief Specialized Cuda kernel for compute_tau=false & calculate_forces=false
  * \author Ole Schuett
  ******************************************************************************/
-__global__ static void integrate_kernel_density(const kernel_params params) {
-  integrate_kernel<false>(&params);
+__global__ static void integrate_density(const kernel_params params) {
+  integrate_kernel<false, false>(&params);
 }
 
 /*******************************************************************************
- * \brief Specialized Cuda kernel that can only integrate compute_tau==true.
+ * \brief Specialized Cuda kernel for compute_tau=true & calculate_forces=false.
  * \author Ole Schuett
  ******************************************************************************/
-__global__ static void integrate_kernel_tau(const kernel_params params) {
-  integrate_kernel<true>(&params);
+__global__ static void integrate_tau(const kernel_params params) {
+  integrate_kernel<true, false>(&params);
+}
+
+/*******************************************************************************
+ * \brief Specialized Cuda kernel for compute_tau=false & calculate_forces=true.
+ * \author Ole Schuett
+ ******************************************************************************/
+__global__ static void integrate_density_forces(const kernel_params params) {
+  integrate_kernel<false, true>(&params);
+}
+
+/*******************************************************************************
+ * \brief Specialized Cuda kernel for compute_tau=true & calculate_forces=true.
+ * \author Ole Schuett
+ ******************************************************************************/
+__global__ static void integrate_tau_forces(const kernel_params params) {
+  integrate_kernel<true, true>(&params);
 }
 
 /*******************************************************************************
@@ -211,8 +233,7 @@ __global__ static void integrate_kernel_tau(const kernel_params params) {
 void grid_gpu_integrate_one_grid_level(
     const grid_gpu_task_list *task_list, const int first_task,
     const int last_task, const bool orthorhombic, const bool compute_tau,
-    const bool calculate_forces, const int npts_global[3],
-    const int npts_local[3], const int shift_local[3],
+    const int npts_global[3], const int npts_local[3], const int shift_local[3],
     const int border_width[3], const double dh[3][3], const double dh_inv[3][3],
     const cudaStream_t stream, const double *pab_blocks_dev,
     const double *grid_dev, double *hab_blocks_dev, double *forces_dev,
@@ -228,8 +249,10 @@ void grid_gpu_integrate_one_grid_level(
   // Compute required shared memory.
   // TODO: Currently, cab's indicies run over 0...ncoset[lmax],
   //       however only ncoset(lmin)...ncoset(lmax) are actually needed.
+  const bool calculate_forces = forces_dev != NULL;
+  const bool calculate_virial = virial_dev != NULL;
   const process_ldiffs ldiffs =
-      process_get_ldiffs(calculate_forces, calculate_forces, compute_tau);
+      process_get_ldiffs(calculate_forces, calculate_virial, compute_tau);
   const int la_max = task_list->lmax + ldiffs.la_max_diff;
   const int lb_max = task_list->lmax + ldiffs.lb_max_diff;
   const int lp_max = la_max + lb_max;
@@ -248,7 +271,7 @@ void grid_gpu_integrate_one_grid_level(
     abort();
   }
 
-  assert(compute_tau == false);
+  // assert(compute_tau == false);
 
   // kernel parameters
   kernel_params params;
@@ -257,7 +280,6 @@ void grid_gpu_integrate_one_grid_level(
   params.smem_cxyz_offset = params.smem_alpha_offset + alpha_len;
   params.first_task = first_task;
   params.orthorhombic = orthorhombic;
-  params.calculate_forces = calculate_forces;
   params.grid = grid_dev;
   params.tasks = task_list->tasks_dev;
   params.atom_kinds = task_list->atom_kinds_dev;
@@ -282,14 +304,19 @@ void grid_gpu_integrate_one_grid_level(
   // Launch !
   const int nblocks = ntasks;
   const dim3 threads_per_block(4, 8, 8);
-  // const dim3 threads_per_block(1,1,1);
 
-  if (compute_tau) {
-    integrate_kernel_tau<<<nblocks, threads_per_block, smem_per_block,
-                           stream>>>(params);
-  } else {
-    integrate_kernel_density<<<nblocks, threads_per_block, smem_per_block,
+  if (!compute_tau && !calculate_forces) {
+    integrate_density<<<nblocks, threads_per_block, smem_per_block, stream>>>(
+        params);
+  } else if (compute_tau && !calculate_forces) {
+    integrate_tau<<<nblocks, threads_per_block, smem_per_block, stream>>>(
+        params);
+  } else if (!compute_tau && calculate_forces) {
+    integrate_density_forces<<<nblocks, threads_per_block, smem_per_block,
                                stream>>>(params);
+  } else if (compute_tau && calculate_forces) {
+    integrate_tau_forces<<<nblocks, threads_per_block, smem_per_block,
+                           stream>>>(params);
   }
 }
 

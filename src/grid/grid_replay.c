@@ -454,16 +454,21 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
         //}
       }
     }
-    //// compare virial
-    // for (int i = 0; i < 3; i++) {
-    //  for (int j = 0; j < 3; j++) {
-    //    const double ref_value = cycles * virial_ref[i][j];
-    //    const double test_value = virial_test[i][j];
-    //    const double diff = fabs(test_value - ref_value);
-    //    max_diff = fmax(max_diff, diff);
-    //    max_value = fmax(max_value, fabs(test_value));
-    //  }
-    //}
+    // compare virial
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        const double ref_value = cycles * virial_ref[i][j];
+        const double test_value = virial_test[i][j];
+        const double diff = fabs(test_value - ref_value);
+        const double rel_diff = diff / fmax(1.0, fabs(ref_value));
+        max_rel_diff = fmax(max_rel_diff, rel_diff);
+        max_value = fmax(max_value, fabs(test_value));
+        // if (ref_value != 0.0 || test_value != 0.0) {
+        //  printf("%i %i ref: %le test: %le diff:%le rel_diff: %le\n", i, j,
+        //         ref_value, test_value, diff, rel_diff);
+        //}
+      }
+    }
   }
   printf("Task: %-55s   %9s %-7s   Cycles: %e   Max value: %le   "
          "Max rel diff: %le   Time: %le sec\n",
