@@ -229,7 +229,7 @@ void grid_gpu_collocate_one_grid_level(
       (cab_len + alpha_len + cxyz_len) * sizeof(double);
 
   if (smem_per_block > 48 * 1024) {
-    fprintf(stderr, "ERROR: Not enough shared memory.\n");
+    fprintf(stderr, "ERROR: Not enough shared memory in grid_gpu_collocate.\n");
     fprintf(stderr, "cab_len: %i, ", cab_len);
     fprintf(stderr, "alpha_len: %i, ", alpha_len);
     fprintf(stderr, "cxyz_len: %i, ", cxyz_len);

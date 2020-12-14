@@ -35,7 +35,7 @@ __device__ static void store_hab(const kernel_params *params,
 
   // This is a double matrix product. Since the block can be quite large the
   // two products are fused to conserve shared memory.
-  //TODO: move into smem_task
+  // TODO: move into smem_task
   const int ico_start =
       (task->la_min_basis > 0) ? ncoset(task->la_min_basis - 1) : 0;
   const int jco_start =
@@ -89,7 +89,7 @@ __device__ static void store_forces_and_virial(const kernel_params *params,
   // This is a double matrix product. Since the pab block can be quite large the
   // two products are fused to conserve shared memory.
 
-  //TODO: move into smem_task
+  // TODO: move into smem_task
   const int ico_start =
       (task->la_min_basis > 0) ? ncoset(task->la_min_basis - 1) : 0;
   const int jco_start =
@@ -263,7 +263,7 @@ void grid_gpu_integrate_one_grid_level(
       (cab_len + alpha_len + cxyz_len) * sizeof(double);
 
   if (smem_per_block > 48 * 1024) {
-    fprintf(stderr, "ERROR: Not enough shared memory.\n");
+    fprintf(stderr, "ERROR: Not enough shared memory in grid_gpu_integrate.\n");
     fprintf(stderr, "cab_len: %i, ", cab_len);
     fprintf(stderr, "alpha_len: %i, ", alpha_len);
     fprintf(stderr, "cxyz_len: %i, ", cxyz_len);
