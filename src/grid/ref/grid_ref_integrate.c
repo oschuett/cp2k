@@ -33,8 +33,7 @@ void grid_ref_integrate_pgf_product(
     const double pab[n2][n1], double forces[2][3], double virials[2][3][3],
     double hdab[n2][n1][3], double a_hdab[n2][n1][3][3]) {
 
-  const bool calculate_forces =
-      (forces != NULL || hdab != NULL || virials != NULL || a_hdab != NULL);
+  const bool calculate_forces = (forces != NULL || hdab != NULL);
   const bool calculate_virial = (virials != NULL || a_hdab != NULL);
   const process_ldiffs ldiffs =
       process_get_ldiffs(calculate_forces, calculate_virial, compute_tau);

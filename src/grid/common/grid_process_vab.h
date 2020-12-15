@@ -247,7 +247,7 @@ static process_ldiffs process_get_ldiffs(bool calculate_forces,
   ldiffs.la_min_diff = 0;
   ldiffs.lb_min_diff = 0;
 
-  if (calculate_forces) {
+  if (calculate_forces || calculate_virial) {
     ldiffs.la_max_diff += 1; // for deriv. of gaussian, unimportant which one
     ldiffs.la_min_diff -= 1;
     ldiffs.lb_min_diff -= 1;
