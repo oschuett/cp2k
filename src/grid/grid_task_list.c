@@ -237,10 +237,10 @@ void grid_integrate_task_list(
   switch (task_list->backend) {
 #ifdef __GRID_CUDA
   case GRID_BACKEND_GPU:
-    grid_gpu_integrate_task_list(
-        task_list->gpu, orthorhombic, compute_tau, natoms,
-        nlevels, npts_global, npts_local, shift_local, border_width, dh,
-        dh_inv, pab_blocks, grid, hab_blocks, forces, virial);
+    grid_gpu_integrate_task_list(task_list->gpu, orthorhombic, compute_tau,
+                                 natoms, nlevels, npts_global, npts_local,
+                                 shift_local, border_width, dh, dh_inv,
+                                 pab_blocks, grid, hab_blocks, forces, virial);
     break;
   case GRID_BACKEND_HYBRID:
     // grid_hybrid_integrate_task_list(
@@ -277,9 +277,9 @@ void grid_integrate_task_list(
 
     // Call reference implementation.
     grid_ref_integrate_task_list(
-        task_list->ref, orthorhombic, compute_tau, calculate_forces, natoms,
-        nlevels, npts_global, npts_local, shift_local, border_width, dh, dh_inv,
-        pab_blocks, grid, hab_blocks_ref, forces_ref, virial_ref);
+        task_list->ref, orthorhombic, compute_tau, natoms, nlevels, npts_global,
+        npts_local, shift_local, border_width, dh, dh_inv, pab_blocks, grid,
+        hab_blocks_ref, forces_ref, virial_ref);
 
     // Compare results.
     const double tolerance = 1e-12;

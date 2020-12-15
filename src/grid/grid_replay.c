@@ -355,10 +355,9 @@ double grid_replay(const char *filename, const int cycles, const bool collocate,
           (const double(*)[3][3])dh_inv, pab_blocks, grids_array);
     } else {
       // integrate
-      const bool compute_forces = true;
       double *grids_array[1] = {grid_ref};
       grid_integrate_task_list(
-          task_list, orthorhombic, compute_tau, compute_forces, natoms, nlevels,
+          task_list, orthorhombic, compute_tau, natoms, nlevels,
           (const int(*)[3])npts_global, (const int(*)[3])npts_local,
           (const int(*)[3])shift_local, (const int(*)[3])border_width,
           (const double(*)[3][3])dh, (const double(*)[3][3])dh_inv, pab_blocks,
