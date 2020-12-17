@@ -28,6 +28,9 @@
 #define GRID_CONST_WHEN_INTEGRATE const
 #endif
 
+// With 20 registers we can do lp=3 and we stay below 128 registers per thread.
+#define NCXYZ_REGS 20
+
 /*******************************************************************************
  * \brief Atomic add for doubles that also works prior to compute capability 6.
  * \author Ole Schuett
@@ -58,23 +61,50 @@ __device__ static void atomicAddDouble(double *address, double val) {
  * \brief Compute value of a single grid point with distance d{xyz} from center.
  * \author Ole Schuett
  ******************************************************************************/
-__device__ static void
-cxyz_to_gridpoint(const double dx, const double dy, const double dz,
-                  const double zetp, const int lp,
-                  GRID_CONST_WHEN_COLLOCATE double *cxyz,
-                  GRID_CONST_WHEN_INTEGRATE double *gridpoint) {
+__device__ static void cxyz_to_gridpoint(const double dx, const double dy,
+                                         const double dz, const double zetp,
+                                         const int lp, const double *cxyz,
+                                         double *gridpoint) {
 
   // Squared distance of point from center.
   const double r2 = dx * dx + dy * dy + dz * dz;
   const double gaussian = exp(-zetp * r2);
 
-#if (GRID_DO_COLLOCATE)
-  // collocate
   double gridpoint_reg = 0.0; // accumulate into register
-#else
-  // integrate
-  const double gridpoint_reg = *gridpoint; // load into register
-#endif
+
+  double pow_dz = 1.0;
+  for (int lzp = 0; lzp <= lp; lzp++) {
+    double pow_dy = 1.0;
+    for (int lyp = 0; lyp <= lp - lzp; lyp++) {
+      double pow_dx = 1.0;
+      for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
+
+        const double p = gaussian * pow_dx * pow_dy * pow_dz;
+        const int cxyz_index = coset(lxp, lyp, lzp);
+        gridpoint_reg += cxyz[cxyz_index] * p;
+
+        pow_dx *= dx; // pow_dx = pow(dx, lxp)
+      }
+      pow_dy *= dy; // pow_dy = pow(dy, lyp)
+    }
+    pow_dz *= dz; // pow_dz = pow(dz, lzp)
+  }
+
+  atomicAddDouble(gridpoint, gridpoint_reg);
+}
+
+/*******************************************************************************
+ * \brief Computes contributions of a single grid point to cxyz.
+ * \author Ole Schuett
+ ******************************************************************************/
+__device__ static void gridpoint_to_cxyz(const double dx, const double dy,
+                                         const double dz, const double zetp,
+                                         const int lp, const double gridpoint,
+                                         double *cxyz, double *cxyz_regs) {
+
+  // Squared distance of point from center.
+  const double r2 = dx * dx + dy * dy + dz * dz;
+  const double gaussian = exp(-zetp * r2);
 
   double pow_dz = 1.0;
   for (int lzp = 0; lzp <= lp; lzp++) {
@@ -83,25 +113,26 @@ cxyz_to_gridpoint(const double dx, const double dy, const double dz,
       double pow_dx = 1.0;
       for (int lxp = 0; lxp <= lp - lzp - lyp; lxp++) {
         const double p = gaussian * pow_dx * pow_dy * pow_dz;
-
         const int cxyz_index = coset(lxp, lyp, lzp);
-#if (GRID_DO_COLLOCATE)
-        // collocate
-        gridpoint_reg += cxyz[cxyz_index] * p;
-#else
-        // integrate
-        atomicAddDouble(&cxyz[cxyz_index], gridpoint_reg * p);
-#endif
+
+        if (cxyz_index < NCXYZ_REGS) {
+// The unroll is neded to get constant offsets into cxyz_regs,
+// otherwise the compiler will put it onto the stack, which is slow.
+#pragma unroll
+          for (int i = 0; i < NCXYZ_REGS; i++) {
+            if (cxyz_index == i)
+              cxyz_regs[i] += gridpoint * p;
+          }
+        } else {
+          atomicAddDouble(&cxyz[cxyz_index], gridpoint * p);
+        }
+
         pow_dx *= dx; // pow_dx = pow(dx, lxp)
       }
       pow_dy *= dy; // pow_dy = pow(dy, lyp)
     }
     pow_dz *= dz; // pow_dz = pow(dz, lzp)
   }
-
-#if (GRID_DO_COLLOCATE)
-  atomicAddDouble(gridpoint, gridpoint_reg);
-#endif
 }
 
 /*******************************************************************************
@@ -278,6 +309,10 @@ ortho_cxyz_to_grid(const kernel_params *params, const smem_task *task,
     cubecenter[i] = (int)floor(task->gp[i]);
   }
 
+#if (!GRID_DO_COLLOCATE)
+  double cxyz_regs[NCXYZ_REGS] = {0.0};
+#endif
+
   // The cube contains an even number of grid points in each direction and
   // collocation is always performed on a pair of two opposing grid points.
   // Hence, the points with index 0 and 1 are both assigned distance zero via
@@ -318,11 +353,24 @@ ortho_cxyz_to_grid(const kernel_params *params, const smem_task *task,
             kg * params->npts_local[1] * params->npts_local[0] +
             jg * params->npts_local[0] + ig;
 
+#if (GRID_DO_COLLOCATE)
+        // collocate
         cxyz_to_gridpoint(dx, dy, dz, task->zetp, task->lp, cxyz,
                           &grid[grid_index]);
+#else
+        // integrate
+        gridpoint_to_cxyz(dx, dy, dz, task->zetp, task->lp, grid[grid_index],
+                          cxyz, cxyz_regs);
+#endif
       }
     }
   }
+
+#if (!GRID_DO_COLLOCATE)
+  for (int i = 0; i < NCXYZ_REGS; i++) {
+    atomicAddDouble(&cxyz[i], cxyz_regs[i]);
+  }
+#endif
 
   __syncthreads(); // because of concurrent writes to grid / cxyz
 }
@@ -379,6 +427,10 @@ general_cxyz_to_grid(const kernel_params *params, const smem_task *task,
   if (task->border_mask & (1 << 5))
     bounds_k[1] -= params->border_width[2];
 
+#if (!GRID_DO_COLLOCATE)
+  double cxyz_regs[NCXYZ_REGS] = {0.0};
+#endif
+
   // Go over the grid
   const int k_start = threadIdx.z + index_min[2];
   for (int k = k_start; k <= index_max[2]; k += blockDim.z) {
@@ -421,11 +473,26 @@ general_cxyz_to_grid(const kernel_params *params, const smem_task *task,
 
         const int stride = params->npts_local[1] * params->npts_local[0];
         const int grid_index = kg * stride + jg * params->npts_local[0] + ig;
+
+#if (GRID_DO_COLLOCATE)
+        // collocate
         cxyz_to_gridpoint(dx, dy, dz, task->zetp, task->lp, cxyz,
                           &grid[grid_index]);
+#else
+        // integrate
+        gridpoint_to_cxyz(dx, dy, dz, task->zetp, task->lp, grid[grid_index],
+                          cxyz, cxyz_regs);
+#endif
       }
     }
   }
+
+#if (!GRID_DO_COLLOCATE)
+  for (int i = 0; i < NCXYZ_REGS; i++) {
+    atomicAddDouble(&cxyz[i], cxyz_regs[i]);
+  }
+#endif
+
   __syncthreads(); // because of concurrent writes to grid / cxyz
 }
 

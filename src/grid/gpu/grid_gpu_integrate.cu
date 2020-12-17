@@ -198,7 +198,7 @@ __device__ static void integrate_kernel(const kernel_params *params) {
  * \brief Specialized Cuda kernel for compute_tau=false & calculate_forces=false
  * \author Ole Schuett
  ******************************************************************************/
-__global__ static void integrate_density(const kernel_params params) {
+__global__ static void grid_integrate_density(const kernel_params params) {
   integrate_kernel<false, false>(&params);
 }
 
@@ -206,7 +206,7 @@ __global__ static void integrate_density(const kernel_params params) {
  * \brief Specialized Cuda kernel for compute_tau=true & calculate_forces=false.
  * \author Ole Schuett
  ******************************************************************************/
-__global__ static void integrate_tau(const kernel_params params) {
+__global__ static void grid_integrate_tau(const kernel_params params) {
   integrate_kernel<true, false>(&params);
 }
 
@@ -214,7 +214,8 @@ __global__ static void integrate_tau(const kernel_params params) {
  * \brief Specialized Cuda kernel for compute_tau=false & calculate_forces=true.
  * \author Ole Schuett
  ******************************************************************************/
-__global__ static void integrate_density_forces(const kernel_params params) {
+__global__ static void
+grid_integrate_density_forces(const kernel_params params) {
   integrate_kernel<false, true>(&params);
 }
 
@@ -222,7 +223,7 @@ __global__ static void integrate_density_forces(const kernel_params params) {
  * \brief Specialized Cuda kernel for compute_tau=true & calculate_forces=true.
  * \author Ole Schuett
  ******************************************************************************/
-__global__ static void integrate_tau_forces(const kernel_params params) {
+__global__ static void grid_integrate_tau_forces(const kernel_params params) {
   integrate_kernel<true, true>(&params);
 }
 
@@ -305,18 +306,19 @@ void grid_gpu_integrate_one_grid_level(
   const int nblocks = ntasks;
   const dim3 threads_per_block(4, 8, 8);
 
+  // TODO remove templates - we use plenty of register in cxyz_to_gridpoint
   if (!compute_tau && !calculate_forces) {
-    integrate_density<<<nblocks, threads_per_block, smem_per_block, stream>>>(
-        params);
+    grid_integrate_density<<<nblocks, threads_per_block, smem_per_block,
+                             stream>>>(params);
   } else if (compute_tau && !calculate_forces) {
-    integrate_tau<<<nblocks, threads_per_block, smem_per_block, stream>>>(
+    grid_integrate_tau<<<nblocks, threads_per_block, smem_per_block, stream>>>(
         params);
   } else if (!compute_tau && calculate_forces) {
-    integrate_density_forces<<<nblocks, threads_per_block, smem_per_block,
-                               stream>>>(params);
+    grid_integrate_density_forces<<<nblocks, threads_per_block, smem_per_block,
+                                    stream>>>(params);
   } else if (compute_tau && calculate_forces) {
-    integrate_tau_forces<<<nblocks, threads_per_block, smem_per_block,
-                           stream>>>(params);
+    grid_integrate_tau_forces<<<nblocks, threads_per_block, smem_per_block,
+                                stream>>>(params);
   }
 }
 
