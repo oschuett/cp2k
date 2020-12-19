@@ -50,14 +50,8 @@ __device__ static void store_hab(const kernel_params *params,
         const double sphib = task->sphib[i * task->maxcob + jco];
         for (int ico = ico_start; ico < ncoset(task->la_max_basis); ico++) {
           const orbital a = coset_inv[ico];
-          double hab = 0.0;
-          if (COMPUTE_TAU) {
-            // Since process_tau is a register hog we use it only when needed.
-            hab = extract_hab_tau(a, b, task->zeta, task->zetb, task->n1, cab);
-          } else {
-            // fast path for common case
-            hab = extract_hab(a, b, task->n1, cab);
-          }
+          const double hab = extract_hab(a, b, task->zeta, task->zetb, task->n1,
+                                         cab, COMPUTE_TAU);
 
           const double sphia = task->sphia[j * task->maxcoa + ico];
           block_val += hab * sphia * sphib;
@@ -114,20 +108,24 @@ __device__ static void store_forces_and_virial(const kernel_params *params,
           for (int k = 0; k < 3; k++) {
             const double force_a =
                 pabval * task->off_diagonals_twice *
-                extract_force_a(a, b, k, task->zeta, task->n1, cab);
+                extract_force_a(a, b, k, task->zeta, task->zetb, task->n1, cab,
+                                COMPUTE_TAU);
             coalescedAtomicAdd(&task->forces_a[k], force_a);
             const double force_b =
                 pabval * task->off_diagonals_twice *
-                extract_force_b(a, b, k, task->zetb, task->rab, task->n1, cab);
+                extract_force_b(a, b, k, task->zeta, task->zetb, task->rab,
+                                task->n1, cab, COMPUTE_TAU);
             coalescedAtomicAdd(&task->forces_b[k], force_b);
           }
           if (params->virial != NULL) {
             for (int k = 0; k < 3; k++) {
               for (int l = 0; l < 3; l++) {
                 const double virial_a =
-                    extract_virial_a(a, b, k, l, task->zeta, task->n1, cab);
-                const double virial_b = extract_virial_b(
-                    a, b, k, l, task->zetb, task->rab, task->n1, cab);
+                    extract_virial_a(a, b, k, l, task->zeta, task->zetb,
+                                     task->n1, cab, COMPUTE_TAU);
+                const double virial_b =
+                    extract_virial_b(a, b, k, l, task->zeta, task->zetb,
+                                     task->rab, task->n1, cab, COMPUTE_TAU);
                 const double virial =
                     pabval * task->off_diagonals_twice * (virial_a + virial_b);
                 coalescedAtomicAdd(&params->virial[k * 3 + l], virial);
@@ -183,19 +181,6 @@ __device__ static void integrate_kernel(const kernel_params *params) {
   if (CALCULATE_FORCES) {
     store_forces_and_virial<COMPUTE_TAU>(params, &task, smem_cab);
   }
-
-  // if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-  //  printf("la_min: %i %lb_min: %i, ncoset: %i, %i \n",
-  //      task.la_min, task.lb_min,
-  //      ncoset(task.la_min-1), ncoset(task.lb_min-1));
-  //  //    for (int k = 0; k < task.ncosetb; k++) {
-  //  //      for (int l = 0; l < task.ncoseta; l++) {
-  //  //          printf("cab %i %i %le\n", k, l, smem_cab[k * task.ncoseta +
-  //  l]);
-  //  //      }
-  //  //    }
-  //  // printf("cxyz %i %i %le\n",0, 0, smem_cxyz[0]);
-  //}
 }
 
 /*******************************************************************************
@@ -256,6 +241,8 @@ void grid_gpu_integrate_one_grid_level(
   //       however only ncoset(lmin)...ncoset(lmax) are actually needed.
   const bool calculate_forces = forces_dev != NULL;
   const bool calculate_virial = virial_dev != NULL;
+  assert(!calculate_virial || calculate_forces);
+
   const process_ldiffs ldiffs =
       process_get_ldiffs(calculate_forces, calculate_virial, compute_tau);
   const int la_max = task_list->lmax + ldiffs.la_max_diff;
@@ -275,8 +262,6 @@ void grid_gpu_integrate_one_grid_level(
     fprintf(stderr, "total smem_per_block: %f kb\n\n", smem_per_block / 1024.0);
     abort();
   }
-
-  assert(compute_tau == false);
 
   // kernel parameters
   kernel_params params;
