@@ -141,15 +141,15 @@ extract_force_a(const orbital a, const orbital b, const int i,
     return extract_force_a_normal(a, b, i, zeta, n, cab);
   } else {
     double force = 0.0;
-    for (int i = 0; i < 3; i++) {
-      force += 0.5 * a.l[i] * b.l[i] *
-               extract_force_a_normal(down(i, a), down(i, b), i, zeta, n, cab);
-      force -= zeta * b.l[i] *
-               extract_force_a_normal(up(i, a), down(i, b), i, zeta, n, cab);
-      force -= a.l[i] * zetb *
-               extract_force_a_normal(down(i, a), up(i, b), i, zeta, n, cab);
+    for (int k = 0; k < 3; k++) {
+      force += 0.5 * a.l[k] * b.l[k] *
+               extract_force_a_normal(down(k, a), down(k, b), i, zeta, n, cab);
+      force -= zeta * b.l[k] *
+               extract_force_a_normal(up(k, a), down(k, b), i, zeta, n, cab);
+      force -= a.l[k] * zetb *
+               extract_force_a_normal(down(k, a), up(k, b), i, zeta, n, cab);
       force += 2.0 * zeta * zetb *
-               extract_force_a_normal(up(i, a), up(i, b), i, zeta, n, cab);
+               extract_force_a_normal(up(k, a), up(k, b), i, zeta, n, cab);
     }
     return force;
   }
@@ -181,18 +181,18 @@ extract_force_b(const orbital a, const orbital b, const int i,
     return extract_force_b_normal(a, b, i, zetb, rab, n, cab);
   } else {
     double force = 0.0;
-    for (int i = 0; i < 3; i++) {
+    for (int k = 0; k < 3; k++) {
       force +=
-          0.5 * a.l[i] * b.l[i] *
-          extract_force_b_normal(down(i, a), down(i, b), i, zetb, rab, n, cab);
+          0.5 * a.l[k] * b.l[k] *
+          extract_force_b_normal(down(k, a), down(k, b), i, zetb, rab, n, cab);
       force -=
-          zeta * b.l[i] *
-          extract_force_b_normal(up(i, a), down(i, b), i, zetb, rab, n, cab);
+          zeta * b.l[k] *
+          extract_force_b_normal(up(k, a), down(k, b), i, zetb, rab, n, cab);
       force -=
-          a.l[i] * zetb *
-          extract_force_b_normal(down(i, a), up(i, b), i, zetb, rab, n, cab);
+          a.l[k] * zetb *
+          extract_force_b_normal(down(k, a), up(k, b), i, zetb, rab, n, cab);
       force += 2.0 * zeta * zetb *
-               extract_force_b_normal(up(i, a), up(i, b), i, zetb, rab, n, cab);
+               extract_force_b_normal(up(k, a), up(k, b), i, zetb, rab, n, cab);
     }
     return force;
   }
@@ -223,18 +223,18 @@ extract_virial_a(const orbital a, const orbital b, const int i, const int j,
     return extract_virial_a_normal(a, b, i, j, zeta, n, cab);
   } else {
     double virial = 0.0;
-    for (int i = 0; i < 3; i++) {
+    for (int k = 0; k < 3; k++) {
       virial +=
-          0.5 * a.l[i] * b.l[i] *
-          extract_virial_a_normal(down(i, a), down(i, b), i, j, zeta, n, cab);
+          0.5 * a.l[k] * b.l[k] *
+          extract_virial_a_normal(down(k, a), down(k, b), i, j, zeta, n, cab);
       virial -=
-          zeta * b.l[i] *
-          extract_virial_a_normal(up(i, a), down(i, b), i, j, zeta, n, cab);
+          zeta * b.l[k] *
+          extract_virial_a_normal(up(k, a), down(k, b), i, j, zeta, n, cab);
       virial -=
-          a.l[i] * zetb *
-          extract_virial_a_normal(down(i, a), up(i, b), i, j, zeta, n, cab);
+          a.l[k] * zetb *
+          extract_virial_a_normal(down(k, a), up(k, b), i, j, zeta, n, cab);
       virial += 2.0 * zeta * zetb *
-                extract_virial_a_normal(up(i, a), up(i, b), i, j, zeta, n, cab);
+                extract_virial_a_normal(up(k, a), up(k, b), i, j, zeta, n, cab);
     }
     return virial;
   }
@@ -270,19 +270,19 @@ extract_virial_b(const orbital a, const orbital b, const int i, const int j,
     return extract_virial_b_normal(a, b, i, j, zetb, rab, n, cab);
   } else {
     double virial = 0.0;
-    for (int i = 0; i < 3; i++) {
-      virial += 0.5 * a.l[i] * b.l[i] *
-                extract_virial_b_normal(down(i, a), down(i, b), i, j, zetb, rab,
+    for (int k = 0; k < 3; k++) {
+      virial += 0.5 * a.l[k] * b.l[k] *
+                extract_virial_b_normal(down(k, a), down(k, b), i, j, zetb, rab,
                                         n, cab);
-      virial -= zeta * b.l[i] *
-                extract_virial_b_normal(up(i, a), down(i, b), i, j, zetb, rab,
+      virial -= zeta * b.l[k] *
+                extract_virial_b_normal(up(k, a), down(k, b), i, j, zetb, rab,
                                         n, cab);
-      virial -= a.l[i] * zetb *
-                extract_virial_b_normal(down(i, a), up(i, b), i, j, zetb, rab,
+      virial -= a.l[k] * zetb *
+                extract_virial_b_normal(down(k, a), up(k, b), i, j, zetb, rab,
                                         n, cab);
       virial +=
           2.0 * zeta * zetb *
-          extract_virial_b_normal(up(i, a), up(i, b), i, j, zetb, rab, n, cab);
+          extract_virial_b_normal(up(k, a), up(k, b), i, j, zetb, rab, n, cab);
     }
     return virial;
   }
@@ -301,11 +301,11 @@ GRID_DEVICE static inline double extract_hab(const orbital a, const orbital b,
     return get_term(a, b, n, cab);
   } else {
     double hab = 0.0;
-    for (int i = 0; i < 3; i++) {
-      hab += 0.5 * a.l[i] * b.l[i] * get_term(down(i, a), down(i, b), n, cab);
-      hab -= zeta * b.l[i] * get_term(up(i, a), down(i, b), n, cab);
-      hab -= a.l[i] * zetb * get_term(down(i, a), up(i, b), n, cab);
-      hab += 2.0 * zeta * zetb * get_term(up(i, a), up(i, b), n, cab);
+    for (int k = 0; k < 3; k++) {
+      hab += 0.5 * a.l[k] * b.l[k] * get_term(down(k, a), down(k, b), n, cab);
+      hab -= zeta * b.l[k] * get_term(up(k, a), down(k, b), n, cab);
+      hab -= a.l[k] * zetb * get_term(down(k, a), up(k, b), n, cab);
+      hab += 2.0 * zeta * zetb * get_term(up(k, a), up(k, b), n, cab);
     }
     return hab;
   }

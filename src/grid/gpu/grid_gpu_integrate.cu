@@ -106,16 +106,15 @@ __device__ static void store_forces_and_virial(const kernel_params *params,
           const orbital b = coset_inv[jco];
           const orbital a = coset_inv[ico];
           for (int k = 0; k < 3; k++) {
-            const double force_a =
-                pabval * task->off_diagonals_twice *
-                extract_force_a(a, b, k, task->zeta, task->zetb, task->n1, cab,
-                                COMPUTE_TAU);
-            coalescedAtomicAdd(&task->forces_a[k], force_a);
+            const double force_a = extract_force_a(
+                a, b, k, task->zeta, task->zetb, task->n1, cab, COMPUTE_TAU);
+            coalescedAtomicAdd(&task->forces_a[k],
+                               force_a * pabval * task->off_diagonals_twice);
             const double force_b =
-                pabval * task->off_diagonals_twice *
                 extract_force_b(a, b, k, task->zeta, task->zetb, task->rab,
                                 task->n1, cab, COMPUTE_TAU);
-            coalescedAtomicAdd(&task->forces_b[k], force_b);
+            coalescedAtomicAdd(&task->forces_b[k],
+                               force_b * pabval * task->off_diagonals_twice);
           }
           if (params->virial != NULL) {
             for (int k = 0; k < 3; k++) {
