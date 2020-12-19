@@ -6,7 +6,7 @@ clean:
 	rm -fv *.o */*.o *.x
 
 CFLAGS := -fopenmp -g -O3 -std=c99 -march=native -Wall -Wextra -I${CUDA_PATH}/include -D__GRID_CUDA
-NVFLAGS := -g -O3 -arch sm_50 -Wno-deprecated-gpu-targets -Xcompiler "-fopenmp -Wall -Wextra" -D__GRID_CUDA
+NVFLAGS := -g -O3 -lineinfo -arch sm_50 -Wno-deprecated-gpu-targets -Xcompiler "-fopenmp -Wall -Wextra" -D__GRID_CUDA
 
 LIBS := -lm -lblas -lcudart -lcuda -lcublas -L${CUDA_PATH}/lib64
 

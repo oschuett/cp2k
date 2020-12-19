@@ -115,11 +115,11 @@ __device__ static void store_forces_and_virial(const kernel_params *params,
             const double force_a =
                 pabval * task->off_diagonals_twice *
                 extract_force_a(a, b, k, task->zeta, task->n1, cab);
-            atomicAddDouble(&task->forces_a[k], force_a);
+            coalescedAtomicAdd(&task->forces_a[k], force_a);
             const double force_b =
                 pabval * task->off_diagonals_twice *
                 extract_force_b(a, b, k, task->zetb, task->rab, task->n1, cab);
-            atomicAddDouble(&task->forces_b[k], force_b);
+            coalescedAtomicAdd(&task->forces_b[k], force_b);
           }
           if (params->virial != NULL) {
             for (int k = 0; k < 3; k++) {
@@ -130,7 +130,7 @@ __device__ static void store_forces_and_virial(const kernel_params *params,
                     a, b, k, l, task->zetb, task->rab, task->n1, cab);
                 const double virial =
                     pabval * task->off_diagonals_twice * (virial_a + virial_b);
-                atomicAddDouble(&params->virial[k * 3 + l], virial);
+                coalescedAtomicAdd(&params->virial[k * 3 + l], virial);
               }
             }
           }
@@ -163,12 +163,16 @@ __device__ static void integrate_kernel(const kernel_params *params) {
   double *smem_alpha = &shared_memory[params->smem_alpha_offset];
   double *smem_cxyz = &shared_memory[params->smem_cxyz_offset];
 
-  memset(smem_cxyz, 0, ncoset(task.lp) * sizeof(double));
+  if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+    memset(smem_cxyz, 0, ncoset(task.lp) * sizeof(double));
+  }
   __syncthreads();
 
   cxyz_to_grid(params, &task, smem_cxyz, params->grid);
 
-  memset(smem_cab, 0, task.n1 * task.n2 * sizeof(double));
+  if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+    memset(smem_cab, 0, task.n1 * task.n2 * sizeof(double));
+  }
   __syncthreads();
 
   compute_alpha(params, &task, smem_alpha);
@@ -272,7 +276,7 @@ void grid_gpu_integrate_one_grid_level(
     abort();
   }
 
-  // assert(compute_tau == false);
+  assert(compute_tau == false);
 
   // kernel parameters
   kernel_params params;
