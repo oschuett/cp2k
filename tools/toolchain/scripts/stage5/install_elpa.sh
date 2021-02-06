@@ -123,7 +123,10 @@ case "$with_elpa" in
             cd ..
             write_checksums "${install_lock_file}" "${SCRIPT_DIR}/stage5/$(basename ${SCRIPT_NAME})"
         fi
-        ELPA_CFLAGS="-I'${pkg_install_dir}/IF_CUDA(gpu|cpu)/include/elpa_openmp-${elpa_ver}/modules' -I'${pkg_install_dir}/IF_CUDA(gpu|cpu)/include/elpa_openmp-${elpa_ver}/elpa'"
+        # To use ELPA's GPU kernels it has to be build without OpenMP.
+        # See https://gitlab.mpcdf.mpg.de/elpa/elpa/-/blob/master/INSTALL.md
+        ELPA_CFLAGS="-I'${pkg_install_dir}/IF_CUDA(gpu|cpu)/include/IF_CUDA(elpa|elpa_openmp)-${elpa_ver}/modules'"
+        ELPA_CFLAGS+=" -I'${pkg_install_dir}/IF_CUDA(gpu|cpu)/include/IF_CUDA(elap|elpa_openmp)-${elpa_ver}/elpa'"
         ELPA_LDFLAGS="-L'${pkg_install_dir}/IF_CUDA(gpu|cpu)/lib' -Wl,-rpath='${pkg_install_dir}/IF_CUDA(gpu|cpu)/lib'"
         ;;
     __SYSTEM__)
@@ -162,7 +165,7 @@ case "$with_elpa" in
         ;;
 esac
 if [ "$with_elpa" != "__DONTUSE__" ] ; then
-    ELPA_LIBS="-lelpa_openmp"
+    ELPA_LIBS="IF_CUDA(-lelpa|-lelpa_openmp)"
     cat <<EOF > "${BUILDDIR}/setup_elpa"
 prepend_path CPATH "$elpa_include"
 EOF
