@@ -213,9 +213,21 @@ CONTAINS
 
          elpa_obj => elpa_allocate()
          IF (elpa_obj%can_set("gpu", 1) == ELPA_OK) THEN
-            CPWARN("ELPA GPU kernel is available, but not enabled automatically.")
-            !TODO: Enable GPU kernel automatically once the segfaults have been fixed.
-            !elpa_kernel = ELPA_2STAGE_REAL_GPU  ! Select GPU over CPU kernel when available.
+            ! Unfortunately, there is no simple way to check if the non-OpenMP ELPA was linked.
+            ! Since the OpenMP ELPA will crash when the GPU kernel is used we have to be careful.
+            IF (elpa_obj%can_set("omp_threads", 2) == ELPA_OK) THEN
+               CALL cp_warn(__LOCATION__, "ELPA's GPU kernel is available, but it can not "// &
+                            "be used because the OpenMP version of ELPA was linked. "// &
+                            "Please re-build CP2K with the non-OpenMP version of ELPA.")
+            ELSE IF (omp_get_max_threads() == 1) THEN
+               CALL cp_warn(__LOCATION__, "ELPA's GPU kernel is available, but it can not "// &
+                            "be used because with a single OpenMP thread we can not be sure "// &
+                            "that the non-OpenMP version of ELPA was linked. "// &
+                            "Please re-run with more than one OpenMP thread.")
+            ELSE
+               ! We're sure the non-OpenMP version of ELPA was linked, let's use the GPU kernel.
+               elpa_kernel = ELPA_2STAGE_REAL_GPU
+            ENDIF
          ENDIF
          CALL elpa_deallocate(elpa_obj)
 
@@ -470,9 +482,11 @@ CONTAINS
          CPASSERT(success == elpa_ok)
       ENDIF
 
-      ! synchronize the number of threads used by ELPA to the number of threads available
-      CALL elpa_obj%set("omp_threads", omp_get_max_threads(), success)
-      CPASSERT(success == elpa_ok)
+      ! Set number of threads only when ELPA was build with OpenMP support.
+      IF (elpa_obj%can_set("omp_threads", omp_get_max_threads()) == ELPA_OK) THEN
+         CALL elpa_obj%set("omp_threads", omp_get_max_threads(), success)
+         CPASSERT(success == elpa_ok)
+      ENDIF
 
       CALL elpa_obj%eigenvectors(matrix%local_data, eval, eigenvectors%local_data, success)
       IF (success /= elpa_ok) &
