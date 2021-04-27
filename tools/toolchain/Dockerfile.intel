@@ -1,0 +1,55 @@
+FROM ubuntu:20.04
+ARG LIBINT_LMAX=5
+
+# author: Ole Schuett
+
+# Installs toolchain with Intel compilers and libraries.
+# WARNING: The resulting image will violate the GPL and must not be distributed.
+
+# Install Ubuntu packages.
+COPY ./install_requirements_ubuntu.sh .
+RUN ./install_requirements_ubuntu.sh
+
+RUN apt-get update -qq && apt-get install -qq --no-install-recommends gnupg && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Intel software.
+RUN wget -q https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB -O- | apt-key add - \
+    && echo 'deb https://apt.repos.intel.com/oneapi all main' > /etc/apt/sources.list.d/intel_oneAPI.list \
+    && apt-get update -qq \
+    && apt-get install --yes --no-install-recommends \
+                       intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic \
+                       intel-oneapi-compiler-fortran \
+                       intel-oneapi-mkl-devel \
+                       intel-oneapi-mpi-devel \
+     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/cp2k-toolchain
+COPY ./scripts ./scripts
+COPY ./install_cp2k_toolchain.sh .
+RUN ln -fs bash /bin/sh
+ENV  F77=ifort FC=ifort CC=icc CXX=icc
+ENV MPIF77=mpiifort MPIFC=mpiifort MPICC=mpiicc MPICXX=mpiicc
+
+# Build CP2K Toolchain.
+RUN source /opt/intel/oneapi/setvars.sh && ./install_cp2k_toolchain.sh  \
+    --math-mode=mkl              \
+    --with-reflapack=no          \
+    --with-scalapack=no          \
+    --with-sirius=no             \
+    --with-cosma=no              \
+    --with-elpa=no               \
+    --with-libint=no             \
+    && rm -rf ./build
+
+
+RUN git clone --quiet --recursive --single-branch -b master https://github.com/cp2k/cp2k.git /workspace/cp2k
+WORKDIR /workspace/cp2k/arch
+RUN ln -s /opt/cp2k-toolchain/install/arch/* .
+WORKDIR /workspace/cp2k
+RUN source /opt/intel/oneapi/setvars.sh \
+    && source /opt/cp2k-toolchain/install/setup \
+    && make -j VERSION=pdbg cp2k
+
+
+#EOF
