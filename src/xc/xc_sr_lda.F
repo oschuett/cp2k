@@ -172,6 +172,13 @@ CONTAINS
          CPABORT("derivatives bigger than 1 not implemented")
       END IF
 
+      !CPASSERT(IS_CONTIGUOUS(rho))
+      !CPASSERT(IS_CONTIGUOUS(e_0))
+      !CPASSERT(IS_CONTIGUOUS(e_rho))
+      !CPASSERT(SIZE(rho) == npoints)
+      !CPASSERT(SIZE(e_0) == npoints)
+      !CPASSERT(SIZE(e_rho) == npoints)
+
       CALL sr_lda_calc(rho, omega, rho_cutoff, e_0, e_rho, &
                        npoints, order, sx, sc)
 
@@ -207,20 +214,28 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
+
+!      MARK_USED(rho_cutoff)
+!     WRITE (*,*) "OLE sr_lda_calc MAXVAL(rho)", MAXVAL(rho(1:npoints))
+     !WRITE (*,*) "OLE sr_lda_calc MAXVAL(rho)", MAXVAL(rho(1:npoints)), "order:", order
       IF (sc /= 0.0_dp .OR. sx /= 0.0_dp) THEN
-!$OMP PARALLEL DO PRIVATE (k, ed, my_rho, rs) DEFAULT(NONE)&
+
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE (k, ed, my_rho, rs) &
 !$OMP SHARED(npoints,rho,rho_cutoff,omega,e_0,e_rho,order,sc,sx)
          DO k = 1, npoints
 
             my_rho = rho(k)
-            IF (rho(k) > rho_cutoff) THEN
+            IF (rho(k) > 0.3805_dp) THEN
+
+               !WRITE (*,*) "OLE k: ", k, "rho:", rho(k)
                rs = (3.0_dp/4.0_dp/pi/my_rho)**(1.0_dp/3.0_dp)
 
                CALL ldasr(rs, omega, ed(0), ed(1), sx, sc)
+               !WRITE (*,*) "OLE k: ", k, "rho:", rho(k), "ed:", ed
 
-               IF (order >= 0) THEN
-                  e_0(k) = e_0(k) + ed(0)*my_rho
-               END IF
+               !IF (order >= 0) THEN
+               !   e_0(k) = e_0(k) + ed(0)*my_rho
+               !END IF
                IF (order >= 1 .OR. order == -1) THEN
                   e_rho(k) = e_rho(k) + ed(1)
                END IF
@@ -306,7 +321,18 @@ CONTAINS
          CPABORT("derivatives bigger than 1 not implemented")
       END IF
 
-      CALL sr_lsd_calc(a, b, omega, rho_cutoff, e_0, ea, eb, npoints, order, sx, sc)
+      !CPASSERT(IS_CONTIGUOUS(a))
+      !CPASSERT(IS_CONTIGUOUS(b))
+      !CPASSERT(IS_CONTIGUOUS(e_0))
+      !CPASSERT(IS_CONTIGUOUS(ea))
+      !CPASSERT(IS_CONTIGUOUS(eb))
+      !CPASSERT(SIZE(a) == npoints)
+      !CPASSERT(SIZE(b) == npoints)
+      !CPASSERT(SIZE(e_0) == npoints)
+      !CPASSERT(SIZE(ea) == npoints)
+      !CPASSERT(SIZE(eb) == npoints)
+
+      !CALL sr_lsd_calc(a, b, omega, rho_cutoff, e_0, ea, eb, npoints, order, sx, sc)
 
       CALL timestop(handle)
 

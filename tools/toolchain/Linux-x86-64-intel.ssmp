@@ -11,7 +11,8 @@ LD        = ifort
 AR        = ar -r
 
 # Only one test input (CH4-rsLDA.inp) gives wrong results with inlining enabled
-CFLAGS    = -O2 -fno-inline -fopenmp -fp-model precise -funroll-loops -g -qopenmp-simd -traceback -xHost
+#CFLAGS    = -O2 -fno-inline -fopenmp -fp-model precise -funroll-loops -g -qopenmp-simd -traceback -xHost
+CFLAGS    = -O2 -fopenmp -fp-model precise -funroll-loops -g -qopenmp-simd -traceback -xHost
 
 LIBINT_DIR  = /opt/libint-v2.6.0-cp2k-lmax-4/install
 
