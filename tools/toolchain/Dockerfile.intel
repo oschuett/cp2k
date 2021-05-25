@@ -30,18 +30,18 @@ RUN ln -fs bash /bin/sh
 ENV  F77=ifort FC=ifort CC=icc CXX=icc
 ENV MPIF77=mpiifort MPIFC=mpiifort MPICC=mpiicc MPICXX=mpiicc
 
-WORKDIR /opt
-RUN wget -q https://github.com/cp2k/libint-cp2k/releases/download/v2.6.0/libint-v2.6.0-cp2k-lmax-4.tgz \
-    && echo "7c8d28bfb03920936231228b79686ba0fd87ea922c267199789bc131cf21ac08  libint-v2.6.0-cp2k-lmax-4.tgz" | sha256sum --check \
-    && tar -xzf libint-v2.6.0-cp2k-lmax-4.tgz
-
-WORKDIR /opt/libint-v2.6.0-cp2k-lmax-4
-RUN source /opt/intel/oneapi/setvars.sh \
-    && ./configure --prefix=${PWD}/install --enable-fortran &> configure.log \
-    && sed -i 's|default:: fortran_example|default:: libint_f.o|' ./fortran/Makefile \
-    && make -j &> make.log \
-    && make install &> install.log
-
+#WORKDIR /opt
+#RUN wget -q https://github.com/cp2k/libint-cp2k/releases/download/v2.6.0/libint-v2.6.0-cp2k-lmax-4.tgz \
+#    && echo "7c8d28bfb03920936231228b79686ba0fd87ea922c267199789bc131cf21ac08  libint-v2.6.0-cp2k-lmax-4.tgz" | sha256sum --check \
+#    && tar -xzf libint-v2.6.0-cp2k-lmax-4.tgz
+#
+#WORKDIR /opt/libint-v2.6.0-cp2k-lmax-4
+#RUN source /opt/intel/oneapi/setvars.sh \
+#    && ./configure --prefix=${PWD}/install --enable-fortran &> configure.log \
+#    && sed -i 's|default:: fortran_example|default:: libint_f.o|' ./fortran/Makefile \
+#    && make -j &> make.log \
+#    && make install &> install.log
+#
 #TODO: libint's make install is broken :-(
 
 #WORKDIR /workspace/cp2k
@@ -53,14 +53,14 @@ RUN source /opt/intel/oneapi/setvars.sh \
 #    && make ARCH=Linux-x86-64-intel-minimal VERSION=psmp test TESTOPTS="-maxtasks 32"
 
 
-WORKDIR /workspace/cp2k
-COPY Linux-x86-64-intel.ssmp arch/
-RUN source /opt/intel/oneapi/setvars.sh \
-    && make -j ARCH=Linux-x86-64-intel VERSION=ssmp
-RUN source /opt/intel/oneapi/setvars.sh \
-    && ulimit -s unlimited \
-    && (( $(df --output=size  /dev/shm | tail -1)  > 1000000 )) \
-    && make ARCH=Linux-x86-64-intel VERSION=ssmp test TESTOPTS="-maxtasks 32"
+#WORKDIR /workspace/cp2k
+#COPY Linux-x86-64-intel.ssmp arch/
+#RUN source /opt/intel/oneapi/setvars.sh \
+#    && make -j ARCH=Linux-x86-64-intel VERSION=ssmp
+#RUN source /opt/intel/oneapi/setvars.sh \
+#    && ulimit -s unlimited \
+#    && (( $(df --output=size  /dev/shm | tail -1)  > 1000000 )) \
+#    && make ARCH=Linux-x86-64-intel VERSION=ssmp test TESTOPTS="-maxtasks 32"
 # Failing tests: QMMM/QS/regtest-4/acn-conn-1.inp and QS/regtest-hfx-wfn-fitting/CH4-rsLDA.inp
 
 
@@ -124,25 +124,35 @@ RUN source /opt/intel/oneapi/setvars.sh \
 #SPGLIB 1.16.0,
 #LIBVORI 210412
 #
-## Build CP2K Toolchain.
-#RUN source /opt/intel/oneapi/setvars.sh && ./install_cp2k_toolchain.sh  \
-#    --math-mode=mkl              \
-#    --with-reflapack=no          \
-#    --with-scalapack=no          \
-#    --with-sirius=no             \
-#    --with-cosma=no              \
-#    --with-elpa=no               \
-#    --with-libint=no             \
-#    && rm -rf ./build
-#
-#
+# Build CP2K Toolchain.
+WORKDIR /opt/cp2k-toolchain
+COPY ./scripts ./scripts
+COPY ./install_cp2k_toolchain.sh .
+RUN source /opt/intel/oneapi/setvars.sh \
+    && ./install_cp2k_toolchain.sh  \
+    --math-mode=mkl              \
+    --with-reflapack=no          \
+    --with-scalapack=no          \
+    --with-sirius=no             \
+    --with-cosma=no              \
+    --with-elpa=no               \
+    && rm -rf ./build
+
 #RUN git clone --quiet --recursive --single-branch -b master https://github.com/cp2k/cp2k.git /workspace/cp2k
-#WORKDIR /workspace/cp2k/arch
-#RUN ln -s /opt/cp2k-toolchain/install/arch/* .
-#WORKDIR /workspace/cp2k
+WORKDIR /workspace/cp2k/arch
+RUN ln -s /opt/cp2k-toolchain/install/arch/* .
+
+WORKDIR /workspace/cp2k
+RUN source /opt/intel/oneapi/setvars.sh \
+    && source /opt/cp2k-toolchain/install/setup \
+    && ulimit -s unlimited \
+    && (( $(df --output=size  /dev/shm | tail -1)  > 1000000 )) \
+    && make -j VERSION=pdbg cp2k
+
 #RUN source /opt/intel/oneapi/setvars.sh \
 #    && source /opt/cp2k-toolchain/install/setup \
-#    && make -j VERSION=pdbg cp2k
-
-
+#    && ulimit -s unlimited \
+#    && (( $(df --output=size  /dev/shm | tail -1)  > 1000000 )) \
+#    && make VERSION=pdbg test TESTOPTS="-nobuild"
+#
 #EOF

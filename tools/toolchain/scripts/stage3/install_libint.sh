@@ -86,8 +86,11 @@ case "$with_libint" in
         --libdir="${pkg_install_dir}/lib" \
         > configure.log 2>&1
 
+      # Workaround for linking Fortran example binaries with C linker.
+      sed -i 's|default:: fortran_example|default:: libint_f.o|' ./fortran/Makefile
+
       make -j $(get_nprocs) > make.log 2>&1
-      make install > install.log 2>&1
+      make install #> install.log 2>&1
 
       cd ..
       write_checksums "${install_lock_file}" "${SCRIPT_DIR}/stage3/$(basename ${SCRIPT_NAME})"
