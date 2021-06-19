@@ -10,8 +10,8 @@
 MODULE dbs_tensor_index
    !! tensor index and mapping to DBCSR index
    USE dbs_allocate_wrap, ONLY: allocate_any
-   USE dbs_kinds, ONLY: int_8
-#include "base/dbs_base_uses.f90"
+   USE kinds, ONLY: int_8
+#include "../../base/base_uses.f90"
 #:include "dbs_tensor.fypp"
 
    IMPLICIT NONE

@@ -18,7 +18,7 @@ MODULE dbs_array_list_methods
    USE dbs_tensor_index, ONLY: dbs_t_inverse_order
    USE dbs_allocate_wrap, ONLY: allocate_any
 
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
    IMPLICIT NONE
    PRIVATE
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_array_list_methods'
@@ -92,7 +92,7 @@ CONTAINS
 
 #:for dim in range(1, maxdim+1)
       IF (ndata .GE. ${dim}$) THEN
-         DBCSR_ASSERT(PRESENT(data_${dim}$))
+         CPASSERT(PRESENT(data_${dim}$))
          size_all = size_all + SIZE(data_${dim}$)
       ENDIF
 #:endfor
@@ -180,7 +180,7 @@ CONTAINS
       INTEGER, DIMENSION(array_size), INTENT(OUT)     :: array
 
       ASSOCIATE (ptr => list%ptr, col_data => list%col_data)
-         DBCSR_ASSERT(i <= number_of_arrays(list))
+         CPASSERT(i <= number_of_arrays(list))
 
          array(:) = col_data(ptr(i):ptr(i + 1) - 1)
 
@@ -195,7 +195,7 @@ CONTAINS
       INTEGER, DIMENSION(:), ALLOCATABLE, INTENT(OUT) :: array
 
       ASSOCIATE (ptr => list%ptr, col_data => list%col_data)
-         DBCSR_ASSERT(i <= number_of_arrays(list))
+         CPASSERT(i <= number_of_arrays(list))
 
          CALL allocate_any(array, source=col_data(ptr(i):ptr(i + 1) - 1))
       END ASSOCIATE

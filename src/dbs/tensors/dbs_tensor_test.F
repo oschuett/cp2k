@@ -14,7 +14,7 @@ MODULE dbs_tensor_test
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
-   USE dbs_api, ONLY: ${uselist(dtype_float_param)}$
+   USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
    USE dbs_tas_base, ONLY: dbs_tas_info
    USE dbs_tensor, ONLY: &
       dbs_t_copy, dbs_t_get_block, dbs_t_iterator_type, dbs_t_iterator_blocks_left, &
@@ -29,10 +29,10 @@ MODULE dbs_tensor_test
       dbs_t_default_distvec
    USE dbs_tensor_io, ONLY: &
       dbs_t_write_blocks, dbs_t_write_block_indices
-   USE dbs_kinds, ONLY: ${uselist(dtype_float_prec)}$, &
+   USE kinds, ONLY: ${uselist(dtype_float_prec)}$, &
                           default_string_length, &
                           int_8
-   USE dbs_mpiwrap, ONLY: mp_environ, &
+   USE message_passing, ONLY: mp_environ, &
                             mp_bcast, &
                             mp_comm_free, &
                             mp_comm_free, &
@@ -42,10 +42,10 @@ MODULE dbs_tensor_test
    USE dbs_tensor_index, ONLY: &
       combine_tensor_index, get_2d_indices_tensor, dbs_t_get_mapping_info
    USE dbs_tas_test, ONLY: dbs_tas_checksum
-   USE dbs_data_types, ONLY: dbs_scalar_type
-   USE dbs_blas_operations, ONLY: &
-      dbs_lapack_larnv, set_larnv_seed
-#include "base/dbs_base_uses.f90"
+   USE dbcsr_data_types, ONLY: dbcsr_scalar_type
+   USE dbcsr_blas_operations, ONLY: &
+      dbcsr_lapack_larnv, set_larnv_seed
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -96,9 +96,9 @@ CONTAINS
       DO WHILE (dbs_t_iterator_blocks_left(iter))
          CALL dbs_t_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
          CALL dbs_t_get_block(tensor1, ind_nd, blk_data1, found)
-         DBCSR_ASSERT(found)
+         CPASSERT(found)
          CALL dbs_t_get_block(tensor2_tmp, ind_nd, blk_data2, found)
-         DBCSR_ASSERT(found)
+         CPASSERT(found)
 
          IF (.NOT. blocks_equal(blk_data1, blk_data2)) THEN
             dbs_t_equal = .FALSE.
@@ -310,7 +310,7 @@ CONTAINS
             IF (ndims == ${ndim}$) THEN
                CALL dbs_t_distribution_new(dist2, comm_nd, ${varlist("dist2", nmax=ndim)}$)
                CALL dbs_t_create(tensor2, "Ref", dist2, map1_ref, map2_ref, &
-                                   dbs_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
+                                   dbcsr_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
                CALL dbs_t_setup_test_tensor(tensor2, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
             ENDIF
 #:endfor
@@ -321,7 +321,7 @@ CONTAINS
             IF (ndims == ${ndim}$) THEN
                CALL dbs_t_distribution_new(dist1, comm_nd, ${varlist("dist1", nmax=ndim)}$)
                CALL dbs_t_create(tensor1, tensor_name, dist1, map1, map2, &
-                                   dbs_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
+                                   dbcsr_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
                CALL dbs_t_setup_test_tensor(tensor1, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
             ENDIF
 #:endfor
@@ -332,7 +332,7 @@ CONTAINS
 
             IF (.NOT. eql) THEN
                IF (io_unit > 0) WRITE (io_unit, '(A,1X,A)') TRIM(tensor_name), 'Test failed!'
-               DBCSR_ABORT('')
+               CPABORT('')
             ELSE
                IF (io_unit > 0) WRITE (io_unit, '(A,1X,A)') TRIM(tensor_name), 'Test passed!'
             ENDIF
@@ -383,7 +383,7 @@ CONTAINS
       CALL mp_environ(numnodes, mynode, mp_comm)
 
       IF (.NOT. enumerate) THEN
-         DBCSR_ASSERT(randmat_counter .NE. 0)
+         CPASSERT(randmat_counter .NE. 0)
 
          randmat_counter = randmat_counter + 1
       ENDIF
@@ -507,7 +507,7 @@ CONTAINS
       INTEGER, DIMENSION(ndims_tensor(tensor))                  :: blk_start, blk_end
       LOGICAL                                                    :: found
 
-      DBCSR_ASSERT(ndims_tensor(tensor) .EQ. ${ndim}$)
+      CPASSERT(ndims_tensor(tensor) .EQ. ${ndim}$)
       CALL dbs_t_get_info(tensor, nfull_total=dims_nd)
       CALL allocate_any(array, shape_spec=dims_nd)
       array(${shape_colon(ndim)}$) = 0.0_${dprec}$
@@ -516,7 +516,7 @@ CONTAINS
       DO WHILE (dbs_t_iterator_blocks_left(iterator))
          CALL dbs_t_iterator_next_block(iterator, ind_nd, blk, blk_size=blk_size, blk_offset=blk_offset)
          CALL dbs_t_get_block(tensor, ind_nd, block, found)
-         DBCSR_ASSERT(found)
+         CPASSERT(found)
 
          DO idim = 1, ndims_tensor(tensor)
             blk_start(idim) = blk_offset(idim)
@@ -545,9 +545,9 @@ CONTAINS
       !! @note for testing/debugging, simply replace a call to dbs_t_contract with a call to this routine
       !! @endnote
 
-      TYPE(dbs_scalar_type), INTENT(IN) :: alpha
+      TYPE(dbcsr_scalar_type), INTENT(IN) :: alpha
       TYPE(dbs_t_type), INTENT(INOUT)    :: tensor_1, tensor_2, tensor_3
-      TYPE(dbs_scalar_type), INTENT(IN) :: beta
+      TYPE(dbcsr_scalar_type), INTENT(IN) :: beta
       INTEGER, DIMENSION(:), INTENT(IN)    :: contract_1, contract_2, &
                                               notcontract_1, notcontract_2, &
                                               map_1, map_2
@@ -740,7 +740,7 @@ CONTAINS
 
       IF (.NOT. eql .OR. .NOT. notzero) THEN
          IF (io_unit > 0) WRITE (io_unit, *) 'Test failed!', eql_diff
-         DBCSR_ABORT('')
+         CPABORT('')
       ELSE
          IF (io_unit > 0) WRITE (io_unit, *) 'Test passed!', eql_diff
       ENDIF

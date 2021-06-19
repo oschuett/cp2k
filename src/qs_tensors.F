@@ -30,12 +30,12 @@ MODULE qs_tensors
                                               dbcsr_get_block_p,&
                                               dbcsr_has_symmetry,&
                                               dbcsr_type
-   USE dbcsr_tensor_api,                ONLY: &
-        dbcsr_t_blk_sizes, dbcsr_t_clear, dbcsr_t_copy, dbcsr_t_create, dbcsr_t_destroy, &
-        dbcsr_t_filter, dbcsr_t_get_block, dbcsr_t_get_info, dbcsr_t_get_nze_total, &
-        dbcsr_t_get_stored_coordinates, dbcsr_t_iterator_blocks_left, dbcsr_t_iterator_next_block, &
-        dbcsr_t_iterator_start, dbcsr_t_iterator_stop, dbcsr_t_iterator_type, dbcsr_t_ndims, &
-        dbcsr_t_put_block, dbcsr_t_reserve_blocks, dbcsr_t_type
+   USE dbs_tensor_api,                ONLY: &
+        dbs_t_blk_sizes, dbs_t_clear, dbs_t_copy, dbs_t_create, dbs_t_destroy, &
+        dbs_t_filter, dbs_t_get_block, dbs_t_get_info, dbs_t_get_nze_total, &
+        dbs_t_get_stored_coordinates, dbs_t_iterator_blocks_left, dbs_t_iterator_next_block, &
+        dbs_t_iterator_start, dbs_t_iterator_stop, dbs_t_iterator_type, dbs_t_ndims, &
+        dbs_t_put_block, dbs_t_reserve_blocks, dbs_t_type
    USE distribution_1d_types,           ONLY: distribution_1d_type
    USE distribution_2d_types,           ONLY: distribution_2d_type
    USE gamma,                           ONLY: init_md_ftable
@@ -604,7 +604,7 @@ CONTAINS
 !> \param do_kpoints ...
 ! **************************************************************************************************
    SUBROUTINE alloc_block_3c(t3c, nl_3c, basis_i, basis_j, basis_k, qs_env, potential_parameter, op_pos, do_kpoints)
-      TYPE(dbcsr_t_type), DIMENSION(:, :), INTENT(INOUT) :: t3c
+      TYPE(dbs_t_type), DIMENSION(:, :), INTENT(INOUT) :: t3c
       TYPE(neighbor_list_3c_type), INTENT(INOUT)         :: nl_3c
       TYPE(gto_basis_set_p_type), DIMENSION(:)           :: basis_i, basis_j, basis_k
       TYPE(qs_environment_type), POINTER                 :: qs_env
@@ -799,14 +799,14 @@ CONTAINS
          DO j_img = 1, nimg
             IF (ALLOCATED(alloc_i(i_img, j_img)%array)) THEN
                DO i = 1, SIZE(alloc_i(i_img, j_img)%array)
-                  CALL dbcsr_t_get_stored_coordinates(t3c(i_img, j_img), &
+                  CALL dbs_t_get_stored_coordinates(t3c(i_img, j_img), &
                                                       [alloc_i(i_img, j_img)%array(i), alloc_j(i_img, j_img)%array(i), &
                                                        alloc_k(i_img, j_img)%array(i)], &
                                                       iproc)
                   CPASSERT(iproc .EQ. para_env%mepos)
                ENDDO
 
-               CALL dbcsr_t_reserve_blocks(t3c(i_img, j_img), &
+               CALL dbs_t_reserve_blocks(t3c(i_img, j_img), &
                                            alloc_i(i_img, j_img)%array, &
                                            alloc_j(i_img, j_img)%array, &
                                            alloc_k(i_img, j_img)%array)
@@ -847,7 +847,7 @@ CONTAINS
                                  int_eps, &
                                  op_pos, do_kpoints, desymmetrize, &
                                  bounds_i, bounds_j, bounds_k)
-      TYPE(dbcsr_t_type), DIMENSION(:, :), INTENT(INOUT) :: t3c
+      TYPE(dbs_t_type), DIMENSION(:, :), INTENT(INOUT) :: t3c
       REAL(KIND=dp), INTENT(IN)                          :: filter_eps
       TYPE(qs_environment_type), POINTER                 :: qs_env
       TYPE(neighbor_list_3c_type), INTENT(INOUT)         :: nl_3c
@@ -889,7 +889,7 @@ CONTAINS
       TYPE(cp_2d_r_p_type), DIMENSION(:, :), POINTER     :: spi, spk, tspj
       TYPE(cp_libint_t)                                  :: lib
       TYPE(cp_para_env_type), POINTER                    :: para_env
-      TYPE(dbcsr_t_type)                                 :: t_3c_tmp
+      TYPE(dbs_t_type)                                 :: t_3c_tmp
       TYPE(dft_control_type), POINTER                    :: dft_control
       TYPE(gto_basis_set_type), POINTER                  :: basis_set
       TYPE(kpoint_type), POINTER                         :: kpoints
@@ -1151,7 +1151,7 @@ CONTAINS
             max_contraction_k(kset) = MAXVAL((/(SUM(ABS(sphi_k(:, i))), i=sgfk, sgfk + nsgfk(kset) - 1)/))
          ENDDO
 
-         CALL dbcsr_t_blk_sizes(t3c(jcell, kcell), [iatom, jatom, katom], blk_size)
+         CALL dbs_t_blk_sizes(t3c(jcell, kcell), [iatom, jatom, katom], blk_size)
 
          ALLOCATE (block_t(blk_size(2), blk_size(3), blk_size(1)))
 
@@ -1235,7 +1235,7 @@ CONTAINS
          IF (block_not_zero) THEN
             CALL timeset(routineN//"_put_dbcsr", handle2)
             IF (debug) THEN
-               CALL dbcsr_t_get_block(t3c(jcell, kcell), &
+               CALL dbs_t_get_block(t3c(jcell, kcell), &
                                       [iatom, jatom, katom], dummy_block_t, found=found)
                CPASSERT(found)
             ENDIF
@@ -1243,7 +1243,7 @@ CONTAINS
 
             sp([2, 3, 1]) = sp
 
-            CALL dbcsr_t_put_block(t3c(jcell, kcell), &
+            CALL dbs_t_put_block(t3c(jcell, kcell), &
                                    [iatom, jatom, katom], sp, RESHAPE(block_t, SHAPE=sp, ORDER=[2, 3, 1]), summation=.TRUE.)
 
             CALL timestop(handle2)
@@ -1262,33 +1262,33 @@ CONTAINS
          DO jcell = 1, nimg
             DO kcell = 1, nimg
                ! need half of filter eps because afterwards we add transposed tensor
-               CALL dbcsr_t_filter(t3c(jcell, kcell), filter_eps/2)
+               CALL dbs_t_filter(t3c(jcell, kcell), filter_eps/2)
             ENDDO
          ENDDO
 
          IF (desymmetrize_prv) THEN
             ! add transposed of overlap integrals
-            CALL dbcsr_t_create(t3c(1, 1), t_3c_tmp)
+            CALL dbs_t_create(t3c(1, 1), t_3c_tmp)
             DO jcell = 1, nimg
                DO kcell = 1, jcell
-                  CALL dbcsr_t_copy(t3c(jcell, kcell), t_3c_tmp)
-                  CALL dbcsr_t_copy(t_3c_tmp, t3c(kcell, jcell), order=[1, 3, 2], summation=.TRUE., move_data=.TRUE.)
-                  CALL dbcsr_t_filter(t3c(kcell, jcell), filter_eps)
+                  CALL dbs_t_copy(t3c(jcell, kcell), t_3c_tmp)
+                  CALL dbs_t_copy(t_3c_tmp, t3c(kcell, jcell), order=[1, 3, 2], summation=.TRUE., move_data=.TRUE.)
+                  CALL dbs_t_filter(t3c(kcell, jcell), filter_eps)
                ENDDO
             ENDDO
             DO jcell = 1, nimg
                DO kcell = jcell + 1, nimg
-                  CALL dbcsr_t_copy(t3c(jcell, kcell), t_3c_tmp)
-                  CALL dbcsr_t_copy(t_3c_tmp, t3c(kcell, jcell), order=[1, 3, 2], summation=.FALSE., move_data=.TRUE.)
-                  CALL dbcsr_t_filter(t3c(kcell, jcell), filter_eps)
+                  CALL dbs_t_copy(t3c(jcell, kcell), t_3c_tmp)
+                  CALL dbs_t_copy(t_3c_tmp, t3c(kcell, jcell), order=[1, 3, 2], summation=.FALSE., move_data=.TRUE.)
+                  CALL dbs_t_filter(t3c(kcell, jcell), filter_eps)
                ENDDO
             ENDDO
-            CALL dbcsr_t_destroy(t_3c_tmp)
+            CALL dbs_t_destroy(t_3c_tmp)
          ENDIF
       ELSEIF (nl_3c%sym == symmetric_none) THEN
          DO jcell = 1, nimg
             DO kcell = 1, nimg
-               CALL dbcsr_t_filter(t3c(jcell, kcell), filter_eps)
+               CALL dbs_t_filter(t3c(jcell, kcell), filter_eps)
             ENDDO
          ENDDO
       ELSE
@@ -1566,7 +1566,7 @@ CONTAINS
 !> \param memory ...
 ! **************************************************************************************************
    SUBROUTINE compress_tensor(tensor, compressed, eps, memory)
-      TYPE(dbcsr_t_type), INTENT(INOUT)                  :: tensor
+      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor
       TYPE(hfx_compression_type), INTENT(INOUT)          :: compressed
       REAL(dp), INTENT(IN)                               :: eps
       REAL(dp), INTENT(INOUT)                            :: memory
@@ -1581,7 +1581,7 @@ CONTAINS
       REAL(dp)                                           :: spherical_estimate
       REAL(dp), ALLOCATABLE, DIMENSION(:, :, :), TARGET  :: blk_data
       REAL(dp), DIMENSION(:), POINTER                    :: blk_data_1d
-      TYPE(dbcsr_t_iterator_type)                        :: iter
+      TYPE(dbs_t_iterator_type)                        :: iter
       TYPE(hfx_cache_type), DIMENSION(:), POINTER        :: integral_caches
       TYPE(hfx_cache_type), POINTER                      :: maxval_cache
       TYPE(hfx_container_type), DIMENSION(:), POINTER    :: integral_containers
@@ -1601,10 +1601,10 @@ CONTAINS
       maxval_cache => compressed%maxval_cache(1)
       integral_caches => compressed%integral_caches(:, 1)
 
-      CALL dbcsr_t_iterator_start(iter, tensor)
-      DO WHILE (dbcsr_t_iterator_blocks_left(iter))
-         CALL dbcsr_t_iterator_next_block(iter, ind, blk)
-         CALL dbcsr_t_get_block(tensor, ind, blk_data, found)
+      CALL dbs_t_iterator_start(iter, tensor)
+      DO WHILE (dbs_t_iterator_blocks_left(iter))
+         CALL dbs_t_iterator_next_block(iter, ind, blk)
+         CALL dbs_t_get_block(tensor, ind, blk_data, found)
          CPASSERT(found)
          nints = SIZE(blk_data)
          blk_data_1d(1:nints) => blk_data
@@ -1643,9 +1643,9 @@ CONTAINS
 
          NULLIFY (blk_data_1d); DEALLOCATE (blk_data)
       ENDDO
-      CALL dbcsr_t_iterator_stop(iter)
+      CALL dbs_t_iterator_stop(iter)
 
-      CALL dbcsr_t_clear(tensor)
+      CALL dbs_t_clear(tensor)
 
       storage_counter_integrals = memory_usage*cache_size
       memory = memory + REAL(storage_counter_integrals, dp)/1024/128
@@ -1676,7 +1676,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE decompress_tensor(tensor, blk_indices, compressed, eps)
 
-      TYPE(dbcsr_t_type), INTENT(INOUT)                  :: tensor
+      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor
       INTEGER, DIMENSION(:, :)                           :: blk_indices
       TYPE(hfx_compression_type), INTENT(INOUT)          :: compressed
       REAL(dp), INTENT(IN)                               :: eps
@@ -1689,7 +1689,7 @@ CONTAINS
       REAL(dp)                                           :: spherical_estimate
       REAL(dp), ALLOCATABLE, DIMENSION(:), TARGET        :: blk_data
       REAL(dp), DIMENSION(:, :, :), POINTER              :: blk_data_3d
-      TYPE(dbcsr_t_iterator_type)                        :: iter
+      TYPE(dbs_t_iterator_type)                        :: iter
       TYPE(hfx_cache_type), DIMENSION(:), POINTER        :: integral_caches
       TYPE(hfx_cache_type), POINTER                      :: maxval_cache
       TYPE(hfx_container_type), DIMENSION(:), POINTER    :: integral_containers
@@ -1709,10 +1709,10 @@ CONTAINS
                                          memory_usage, .FALSE.)
       ENDDO
 
-      CALL dbcsr_t_reserve_blocks(tensor, blk_indices)
-      CALL dbcsr_t_iterator_start(iter, tensor)
-      DO WHILE (dbcsr_t_iterator_blocks_left(iter))
-         CALL dbcsr_t_iterator_next_block(iter, ind, blk, blk_size=blk_size)
+      CALL dbs_t_reserve_blocks(tensor, blk_indices)
+      CALL dbs_t_iterator_start(iter, tensor)
+      DO WHILE (dbs_t_iterator_blocks_left(iter))
+         CALL dbs_t_iterator_next_block(iter, ind, blk, blk_size=blk_size)
          nints = PRODUCT(blk_size)
          CALL hfx_get_single_cache_element( &
             estimate_to_store_int, 6, &
@@ -1741,11 +1741,11 @@ CONTAINS
          ENDDO
 
          blk_data_3d(1:blk_size(1), 1:blk_size(2), 1:blk_size(3)) => blk_data
-         CALL dbcsr_t_put_block(tensor, ind, blk_size, blk_data_3d)
+         CALL dbs_t_put_block(tensor, ind, blk_size, blk_data_3d)
          NULLIFY (blk_data_3d); DEALLOCATE (blk_data)
       ENDDO
 
-      CALL dbcsr_t_iterator_stop(iter)
+      CALL dbs_t_iterator_stop(iter)
 
       CALL hfx_reset_cache_and_container(maxval_cache, maxval_container, memory_usage, .FALSE.)
       DO i = 1, 64
@@ -1761,14 +1761,14 @@ CONTAINS
 !> \param occ ...
 ! **************************************************************************************************
    SUBROUTINE get_tensor_occupancy(tensor, nze, occ)
-      TYPE(dbcsr_t_type), INTENT(IN)                     :: tensor
+      TYPE(dbs_t_type), INTENT(IN)                     :: tensor
       INTEGER(int_8), INTENT(OUT)                        :: nze
       REAL(dp), INTENT(OUT)                              :: occ
 
-      INTEGER, DIMENSION(dbcsr_t_ndims(tensor))          :: dims
+      INTEGER, DIMENSION(dbs_t_ndims(tensor))          :: dims
 
-      nze = dbcsr_t_get_nze_total(tensor)
-      CALL dbcsr_t_get_info(tensor, nfull_total=dims)
+      nze = dbs_t_get_nze_total(tensor)
+      CALL dbs_t_get_info(tensor, nfull_total=dims)
       occ = REAL(nze, dp)/PRODUCT(REAL(dims, dp))
 
    END SUBROUTINE

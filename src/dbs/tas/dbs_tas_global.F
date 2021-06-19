@@ -14,9 +14,9 @@ MODULE dbs_tas_global
    !! given row or column. Hence global array data such as distribution and block sizes are specified as
    !! function objects, leaving up to the caller how to efficiently store global data.
 
-   USE dbs_kinds, ONLY: int_8, dp
-   USE dbs_toollib, ONLY: sort
-#include "base/dbs_base_uses.f90"
+   USE kinds, ONLY: int_8, dp
+   USE util, ONLY: sort
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE

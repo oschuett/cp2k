@@ -16,18 +16,18 @@ MODULE dbs_tensor_block
 
    USE dbs_allocate_wrap, ONLY: &
       allocate_any
-   USE dbs_api, ONLY: &
-      ${uselist(dtype_float_param)}$, dbs_iterator_type, dbs_iterator_blocks_left, &
-      dbs_iterator_next_block, dbs_iterator_start, dbs_iterator_stop, dbs_type, &
-      dbs_reserve_blocks, dbs_scalar_type, dbs_finalize, dbs_get_num_blocks, &
-      dbs_type_no_symmetry, dbs_get_matrix_type, dbs_desymmetrize, dbs_release, &
-      dbs_has_symmetry
+   USE dbcsr_api, ONLY: &
+      ${uselist(dtype_float_param)}$, dbcsr_iterator_type, dbcsr_iterator_blocks_left, &
+      dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_type, &
+      dbcsr_reserve_blocks, dbcsr_scalar_type, dbcsr_finalize, dbcsr_get_num_blocks, &
+      dbcsr_type_no_symmetry, dbcsr_get_matrix_type, dbcsr_desymmetrize, dbcsr_release, &
+      dbcsr_has_symmetry
    USE dbs_tas_types, ONLY: &
       dbs_tas_iterator
    USE dbs_tas_base, ONLY: &
       dbs_tas_iterator_next_block, dbs_tas_iterator_blocks_left, dbs_tas_iterator_start, &
       dbs_tas_iterator_stop, dbs_tas_get_block_p, dbs_tas_put_block, dbs_tas_reserve_blocks
-   USE dbs_kinds, ONLY: &
+   USE kinds, ONLY: &
       ${uselist(dtype_float_prec)}$, int_8
    USE dbs_tensor_index, ONLY: &
       nd_to_2d_mapping, ndims_mapping, get_nd_indices_tensor, destroy_nd_to_2d_mapping, get_2d_indices_tensor, &
@@ -38,11 +38,11 @@ MODULE dbs_tensor_block
    USE dbs_tensor_types, ONLY: &
       dbs_t_type, ndims_tensor, dbs_t_get_data_type, dbs_t_blk_sizes, dbs_t_get_num_blocks, &
       dbs_t_finalize, ndims_matrix_row, ndims_matrix_column
-   USE dbs_dist_operations, ONLY: &
+   USE dbcsr_dist_operations, ONLY: &
       checker_tr
-   USE dbs_toollib, ONLY: &
+   USE dbcsr_toollib, ONLY: &
       swap
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -172,7 +172,7 @@ CONTAINS
       TYPE(dbs_t_iterator_type), INTENT(OUT)           :: iterator
       TYPE(dbs_t_type), INTENT(IN)                     :: tensor
 
-      DBCSR_ASSERT(tensor%valid)
+      CPASSERT(tensor%valid)
 
       CALL dbs_tas_iterator_start(iterator%iter, tensor%matrix_rep)
       iterator%nd_index_blk = tensor%nd_index_blk
@@ -274,7 +274,7 @@ CONTAINS
       CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_reserve_blocks_index'
 
       CALL timeset(routineN, handle)
-      DBCSR_ASSERT(tensor%valid)
+      CPASSERT(tensor%valid)
 
       CALL create_array_list(blks, ndims_tensor(tensor), &
                              ${varlist("blk_ind")}$)
@@ -315,39 +315,39 @@ CONTAINS
 
    SUBROUTINE dbs_t_reserve_blocks_matrix_to_tensor(matrix_in, tensor_out)
       !! reserve tensor blocks using matrix template
-      TYPE(dbs_type), TARGET, INTENT(IN) :: matrix_in
+      TYPE(dbcsr_type), TARGET, INTENT(IN) :: matrix_in
       TYPE(dbs_t_type), INTENT(INOUT)  :: tensor_out
-      TYPE(dbs_type), POINTER          :: matrix_in_desym
+      TYPE(dbcsr_type), POINTER          :: matrix_in_desym
 
       INTEGER                            :: blk, iblk, nblk
       INTEGER, ALLOCATABLE, DIMENSION(:) :: blk_ind_1, blk_ind_2
       INTEGER, DIMENSION(2)              :: ind_2d
-      TYPE(dbs_iterator_type)          :: iter
+      TYPE(dbcsr_iterator_type)          :: iter
       INTEGER                            :: handle
       CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_reserve_blocks_matrix_to_tensor'
 
       CALL timeset(routineN, handle)
 
-      IF (dbs_has_symmetry(matrix_in)) THEN
+      IF (dbcsr_has_symmetry(matrix_in)) THEN
          ALLOCATE (matrix_in_desym)
-         CALL dbs_desymmetrize(matrix_in, matrix_in_desym)
+         CALL dbcsr_desymmetrize(matrix_in, matrix_in_desym)
       ELSE
          matrix_in_desym => matrix_in
       ENDIF
 
-      nblk = dbs_get_num_blocks(matrix_in_desym)
+      nblk = dbcsr_get_num_blocks(matrix_in_desym)
       ALLOCATE (blk_ind_1(nblk), blk_ind_2(nblk))
-      CALL dbs_iterator_start(iter, matrix_in_desym)
+      CALL dbcsr_iterator_start(iter, matrix_in_desym)
       DO iblk = 1, nblk
-         CALL dbs_iterator_next_block(iter, ind_2d(1), ind_2d(2), blk)
+         CALL dbcsr_iterator_next_block(iter, ind_2d(1), ind_2d(2), blk)
          blk_ind_1(iblk) = ind_2d(1); blk_ind_2(iblk) = ind_2d(2)
       ENDDO
-      CALL dbs_iterator_stop(iter)
+      CALL dbcsr_iterator_stop(iter)
 
       CALL dbs_t_reserve_blocks(tensor_out, blk_ind_1, blk_ind_2)
 
-      IF (dbs_has_symmetry(matrix_in)) THEN
-         CALL dbs_release(matrix_in_desym)
+      IF (dbcsr_has_symmetry(matrix_in)) THEN
+         CALL dbcsr_release(matrix_in_desym)
          DEALLOCATE (matrix_in_desym)
       ENDIF
 
@@ -358,7 +358,7 @@ CONTAINS
       !! reserve matrix blocks using tensor template
 
       TYPE(dbs_t_type), INTENT(IN)        :: tensor_in
-      TYPE(dbs_type), INTENT(INOUT)       :: matrix_out
+      TYPE(dbcsr_type), INTENT(INOUT)     :: matrix_out
       TYPE(dbs_t_iterator_type)           :: iter
       INTEGER, ALLOCATABLE, DIMENSION(:) :: blk_ind_1, blk_ind_2
 
@@ -375,7 +375,7 @@ CONTAINS
       iblk = 0
       DO WHILE (dbs_t_iterator_blocks_left(iter))
          CALL dbs_t_iterator_next_block(iter, ind_2d, blk)
-         IF (dbs_has_symmetry(matrix_out)) THEN
+         IF (dbcsr_has_symmetry(matrix_out)) THEN
             IF (checker_tr(ind_2d(1), ind_2d(2))) CYCLE
             IF (ind_2d(1) > ind_2d(2)) CALL swap(ind_2d(1), ind_2d(2))
          ENDIF
@@ -385,8 +385,8 @@ CONTAINS
       ENDDO
       CALL dbs_t_iterator_stop(iter)
 
-      CALL dbs_reserve_blocks(matrix_out, blk_ind_1(:iblk), blk_ind_2(:iblk))
-      CALL dbs_finalize(matrix_out)
+      CALL dbcsr_reserve_blocks(matrix_out, blk_ind_1(:iblk), blk_ind_2(:iblk))
+      CALL dbcsr_finalize(matrix_out)
 
       CALL timestop(handle)
    END SUBROUTINE
@@ -399,7 +399,7 @@ CONTAINS
       INTEGER, DIMENSION(ndims_tensor(tensor))  :: ind_nd
       INTEGER, DIMENSION(dbs_t_get_num_blocks(tensor), ndims_tensor(tensor)), INTENT(OUT) :: blk_ind
 
-      DBCSR_ASSERT(tensor%valid)
+      CPASSERT(tensor%valid)
 
       nblk = dbs_t_get_num_blocks(tensor)
 
@@ -476,7 +476,7 @@ CONTAINS
          !! block to put
       LOGICAL, INTENT(IN), OPTIONAL                :: summation
          !! whether block should be summed to existing block
-      TYPE(dbs_scalar_type), INTENT(IN), OPTIONAL :: scale
+      TYPE(dbcsr_scalar_type), INTENT(IN), OPTIONAL :: scale
          !! scaling factor
 
       SELECT CASE (block%data_type)
@@ -575,7 +575,7 @@ CONTAINS
 
       IF (debug) THEN
          CALL dbs_t_get_block(tensor, ind, sizes, block_check, found=found)
-         DBCSR_ASSERT(found)
+         CPASSERT(found)
       ENDIF
 
       ASSOCIATE (map_nd => tensor%nd_index_blk%map_nd, &
@@ -661,7 +661,7 @@ CONTAINS
                  map2_2d => tensor%nd_index_blk%map2_2d)
 
          CALL dbs_tas_get_block_p(tensor%matrix_rep, ind_2d(1), ind_2d(2), block_2d_ptr, tr, found)
-         DBCSR_ASSERT(.NOT. tr)
+         CPASSERT(.NOT. tr)
 
          IF (found) THEN
             IF (ALL([map1_2d, map2_2d] == (/(i, i=1, ${ndim}$)/))) THEN

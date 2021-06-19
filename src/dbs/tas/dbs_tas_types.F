@@ -13,11 +13,11 @@ MODULE dbs_tas_types
 
    USE dbs_tas_global, ONLY: &
       dbs_tas_distribution, dbs_tas_rowcol_data
-   USE dbs_types, ONLY: &
-      dbs_distribution_obj, dbs_iterator, dbs_type
-   USE dbs_kinds, ONLY: int_8
-   USE dbs_data_types, ONLY: dbs_scalar_type
-#include "base/dbs_base_uses.f90"
+   USE dbcsr_types, ONLY: &
+      dbcsr_distribution_obj, dbcsr_iterator, dbcsr_type
+   USE kinds, ONLY: int_8
+   USE dbcsr_data_types, ONLY: dbcsr_scalar_type
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -50,7 +50,7 @@ MODULE dbs_tas_types
 
    TYPE dbs_tas_distribution_type
       TYPE(dbs_tas_split_info) :: info
-      TYPE(dbs_distribution_obj) :: dbs_dist
+      TYPE(dbcsr_distribution_obj) :: dbcsr_dist
       CLASS(dbs_tas_distribution), ALLOCATABLE :: row_dist
       CLASS(dbs_tas_distribution), ALLOCATABLE :: col_dist
       INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:) :: local_rowcols
@@ -62,7 +62,7 @@ MODULE dbs_tas_types
       TYPE(dbs_tas_type), POINTER :: store_batched_repl => NULL() ! intermediate replicated matrix
       LOGICAL :: batched_out ! whether replicated matrix has been changed in mm and should be copied to actual matrix
       LOGICAL :: batched_trans
-      TYPE(dbs_scalar_type) :: batched_beta
+      TYPE(dbcsr_scalar_type) :: batched_beta
    END TYPE
 
    ! type for tall-and-skinny matrices
@@ -71,7 +71,7 @@ MODULE dbs_tas_types
       CLASS(dbs_tas_rowcol_data), ALLOCATABLE :: row_blk_size
       CLASS(dbs_tas_rowcol_data), ALLOCATABLE :: col_blk_size
 
-      TYPE(dbs_type) :: matrix ! matrix on subgroup
+      TYPE(dbcsr_type) :: matrix ! matrix on subgroup
       INTEGER(KIND=int_8) :: nblkrows ! total number of rows
       INTEGER(KIND=int_8) :: nblkcols ! total number of columns
       INTEGER(KIND=int_8) :: nblkrowscols_split ! nblkrows or nblkcols depending on which is splitted
@@ -88,7 +88,7 @@ MODULE dbs_tas_types
    TYPE dbs_tas_iterator
       TYPE(dbs_tas_split_info) :: info
       TYPE(dbs_tas_distribution_type) :: dist
-      TYPE(dbs_iterator) :: iter
+      TYPE(dbcsr_iterator) :: iter
    END TYPE dbs_tas_iterator
 
 END MODULE

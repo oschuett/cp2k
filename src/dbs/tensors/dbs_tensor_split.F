@@ -44,10 +44,10 @@ MODULE dbs_tensor_split
                                  ndims_matrix_column, &
                                  dbs_t_filter, &
                                  dbs_t_copy_contraction_storage
-   USE dbs_api, ONLY: ${uselist(dtype_float_param)}$
-   USE dbs_kinds, ONLY: ${uselist(dtype_float_prec)}$, dp
+   USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
+   USE kinds, ONLY: ${uselist(dtype_float_prec)}$, dp
 
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
    IMPLICIT NONE
    PRIVATE
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tensor_split'
@@ -132,7 +132,7 @@ CONTAINS
                dist_split_d(isplit_sum) = dist_d(i)
                splitsum = splitsum + blk_size_split_d(isplit_sum)
             ENDDO
-            DBCSR_ASSERT(splitsum == blk_size_d(i))
+            CPASSERT(splitsum == blk_size_d(i))
 #:for idim in range(1, maxdim+1)
             IF (idim == ${idim}$) THEN
                blk_nsplit_${idim}$ (i) = nsplit
@@ -227,7 +227,7 @@ CONTAINS
 #:for ndim in ndims
             IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
                CALL dbs_t_get_block(tensor_in, blk_index, block_${dsuffix}$_${ndim}$d, found)
-               DBCSR_ASSERT(found)
+               CPASSERT(found)
             ENDIF
 #:endfor
          ENDIF
@@ -367,7 +367,7 @@ CONTAINS
 #:endfor
 
       CALL timeset(routineN, handle)
-      DBCSR_ASSERT(tensor_out%valid)
+      CPASSERT(tensor_out%valid)
       IF (PRESENT(summation)) THEN
          IF (.NOT. summation) CALL dbs_t_clear(tensor_out)
       ELSE
@@ -404,7 +404,7 @@ CONTAINS
 #:endfor
                splitsum = splitsum + blk_size_split_d(isplit_sum)
             ENDDO
-            DBCSR_ASSERT(splitsum == blk_size_d(iblk))
+            CPASSERT(splitsum == blk_size_d(iblk))
             last_split_d(iblk) = isplit_sum
          ENDDO
 #:for idim in range(1, maxdim+1)

@@ -11,26 +11,26 @@ MODULE dbs_tas_reshape_ops
    !! communication routines to reshape / replicate / merge tall-and-skinny matrices.
 #:include "dbs_tas.fypp"
 
-   USE dbs_block_access, ONLY: &
-      dbs_put_block, dbs_reserve_blocks
-   USE dbs_data_methods, ONLY: &
-      dbs_data_clear_pointer, dbs_data_init, dbs_data_new, dbs_data_release, &
-      dbs_type_1d_to_2d, dbs_data_get_sizes, dbs_data_set_pointer
-   USE dbs_data_methods_low, ONLY: &
-      internal_data_allocate, internal_data_deallocate, dbs_get_data_p_2d_d, dbs_get_data_p_2d_s, &
-      dbs_get_data_p_2d_z, dbs_get_data_p_2d_c
-   USE dbs_data_types, ONLY: &
-      dbs_data_obj, dbs_type_real_8, dbs_type_real_4, dbs_type_complex_8, dbs_type_complex_4
-   USE dbs_dist_methods, ONLY: &
-      dbs_distribution_col_dist, dbs_distribution_row_dist
-   USE dbs_dist_operations, ONLY: &
-      dbs_get_stored_coordinates
-   USE dbs_iterator_operations, ONLY: &
-      dbs_iterator_blocks_left, dbs_iterator_next_block, dbs_iterator_start, dbs_iterator_stop
-   USE dbs_methods, ONLY: &
-      dbs_blk_column_size, dbs_blk_row_size
-   USE dbs_operations, ONLY: &
-      dbs_get_info, dbs_clear
+   USE dbcsr_block_access, ONLY: &
+      dbcsr_put_block, dbcsr_reserve_blocks
+   USE dbcsr_data_methods, ONLY: &
+      dbcsr_data_clear_pointer, dbcsr_data_init, dbcsr_data_new, dbcsr_data_release, &
+      dbcsr_type_1d_to_2d, dbcsr_data_get_sizes, dbcsr_data_set_pointer
+   USE dbcsr_data_methods_low, ONLY: &
+      internal_data_allocate, internal_data_deallocate, dbcsr_get_data_p_2d_d, dbcsr_get_data_p_2d_s, &
+      dbcsr_get_data_p_2d_z, dbcsr_get_data_p_2d_c
+   USE dbcsr_data_types, ONLY: &
+      dbcsr_data_obj, dbcsr_type_real_8, dbcsr_type_real_4, dbcsr_type_complex_8, dbcsr_type_complex_4
+   USE dbcsr_dist_methods, ONLY: &
+      dbcsr_distribution_col_dist, dbcsr_distribution_row_dist
+   USE dbcsr_dist_operations, ONLY: &
+      dbcsr_get_stored_coordinates
+   USE dbcsr_iterator_operations, ONLY: &
+      dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop
+   USE dbcsr_methods, ONLY: &
+      dbcsr_blk_column_size, dbcsr_blk_row_size
+   USE dbcsr_operations, ONLY: &
+      dbcsr_get_info, dbcsr_clear
    USE dbs_tas_base, ONLY: &
       dbs_tas_blk_sizes, dbs_tas_create, dbs_tas_distribution_new, dbs_tas_finalize, &
       dbs_tas_get_data_type, dbs_tas_get_stored_coordinates, dbs_tas_info, &
@@ -44,17 +44,17 @@ MODULE dbs_tas_reshape_ops
       dbs_tas_distribution, dbs_tas_rowcol_data
    USE dbs_tas_split, ONLY: &
       colsplit, dbs_tas_get_split_info, rowsplit
-   USE dbs_types, ONLY: &
-      dbs_distribution_obj, dbs_iterator, dbs_type
-   USE dbs_work_operations, ONLY: &
-      dbs_finalize
-   USE dbs_kinds, ONLY: &
+   USE dbcsr_types, ONLY: &
+      dbcsr_distribution_obj, dbcsr_iterator, dbcsr_type
+   USE dbcsr_work_operations, ONLY: &
+      dbcsr_finalize
+   USE kinds, ONLY: &
       int_8, real_8, real_4
-   USE dbs_mpiwrap, ONLY: &
+   USE message_passing, ONLY: &
       mp_alltoall, mp_environ, mp_isend, mp_irecv, mp_waitall
    USE dbs_tas_util, ONLY: &
       swap, index_unique
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -115,16 +115,16 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: blk_size
       LOGICAL                                            :: tr, tr_in, move_prv
       TYPE(block_buffer_type), ALLOCATABLE, DIMENSION(:) :: buffer_recv, buffer_send
-      TYPE(dbs_data_obj)                               :: block
+      TYPE(dbcsr_data_obj)                               :: block
       TYPE(dbs_tas_iterator)                           :: iter
       TYPE(dbs_tas_split_info)                         :: info
 
       CALL timeset(routineN, handle)
 
       IF (PRESENT(summation)) THEN
-         IF (.NOT. summation) CALL dbs_clear(matrix_out%matrix)
+         IF (.NOT. summation) CALL dbcsr_clear(matrix_out%matrix)
       ELSE
-         CALL dbs_clear(matrix_out%matrix)
+         CALL dbcsr_clear(matrix_out%matrix)
       ENDIF
 
       IF (PRESENT(move_data)) THEN
@@ -140,7 +140,7 @@ CONTAINS
       ENDIF
 
       IF (.NOT. matrix_out%valid) THEN
-         DBCSR_ABORT("can not reshape into invalid matrix")
+         CPABORT("can not reshape into invalid matrix")
       ENDIF
 
       info = dbs_tas_info(matrix_in)
@@ -194,14 +194,14 @@ CONTAINS
 
       ENDDO
 
-      CALL dbs_data_init(block)
-      CALL dbs_data_new(block, dbs_type_1d_to_2d(dbs_tas_get_data_type(matrix_in))) ! need to convert to 2d data type
+      CALL dbcsr_data_init(block)
+      CALL dbcsr_data_new(block, dbcsr_type_1d_to_2d(dbs_tas_get_data_type(matrix_in))) ! need to convert to 2d data type
       CALL dbs_tas_iterator_start(iter, matrix_in)
       DO WHILE (dbs_tas_iterator_blocks_left(iter))
          CALL dbs_tas_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
                                             row_size=blk_size(1), col_size=blk_size(2))
 
-         DBCSR_ASSERT(tr .EQV. .FALSE.)
+         CPASSERT(tr .EQV. .FALSE.)
 
          IF (tr_in) THEN
             CALL dbs_tas_get_stored_coordinates(matrix_out, blk_index(2), blk_index(1), iproc)
@@ -211,7 +211,7 @@ CONTAINS
          CALL block_buffer_add_block(buffer_send(iproc), blk_index, block, transposed=tr_in)
       ENDDO
       CALL dbs_tas_iterator_stop(iter)
-      CALL dbs_data_clear_pointer(block)
+      CALL dbcsr_data_clear_pointer(block)
 
       IF (move_prv) CALL dbs_tas_clear(matrix_in)
 
@@ -254,8 +254,8 @@ CONTAINS
          ENDDO
          CALL block_buffer_destroy(buffer_recv(iproc))
       ENDDO
-      CALL dbs_data_clear_pointer(block)
-      CALL dbs_data_release(block)
+      CALL dbcsr_data_clear_pointer(block)
+      CALL dbcsr_data_release(block)
 
       CALL timestop(handle2)
 
@@ -267,7 +267,7 @@ CONTAINS
    SUBROUTINE dbs_tas_replicate(matrix_in, info, matrix_out, nodata, move_data)
       !! Replicate matrix_in such that each submatrix of matrix_out is an exact copy of matrix_in
 
-      TYPE(dbs_type), INTENT(INOUT)                    :: matrix_in
+      TYPE(dbcsr_type), INTENT(INOUT)                    :: matrix_in
       TYPE(dbs_tas_split_info), INTENT(IN)             :: info
       TYPE(dbs_tas_type), INTENT(OUT)                  :: matrix_out
       LOGICAL, INTENT(IN), OPTIONAL                      :: nodata
@@ -279,7 +279,7 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: pcoord, pdims
       INTEGER, DIMENSION(:), POINTER                     :: col_blk_size, col_dist, &
                                                             row_blk_size, row_dist
-      TYPE(dbs_distribution_obj)                       :: dbs_dist
+      TYPE(dbcsr_distribution_obj)                       :: dbcsr_dist
       TYPE(dbs_tas_dist_arb), TARGET                     :: dir_dist
       TYPE(dbs_tas_dist_repl), TARGET                    :: repl_dist
 
@@ -297,14 +297,14 @@ CONTAINS
       INTEGER, DIMENSION(2) :: blk_size
       INTEGER, DIMENSION(2) :: blk_index
       INTEGER(KIND=int_8), DIMENSION(2) :: blk_index_i8
-      TYPE(dbs_iterator) :: iter
+      TYPE(dbcsr_iterator) :: iter
       INTEGER :: nblock, i, iproc, bcount, nblk
       INTEGER, DIMENSION(:), ALLOCATABLE :: iprocs
       LOGICAL :: tr, nodata_prv, move_prv
       INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:, :) :: index_recv
       INTEGER :: ndata
 
-      TYPE(dbs_data_obj) :: block
+      TYPE(dbcsr_data_obj) :: block
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_replicate'
 
@@ -326,11 +326,11 @@ CONTAINS
          move_prv = .FALSE.
       ENDIF
 
-      CALL dbs_get_info(matrix_in, distribution=dbs_dist, data_type=data_type, &
+      CALL dbcsr_get_info(matrix_in, distribution=dbcsr_dist, data_type=data_type, &
                           nblkrows_total=nblkrows, nblkcols_total=nblkcols, &
                           row_blk_size=row_blk_size, col_blk_size=col_blk_size)
-      row_dist => dbs_distribution_row_dist(dbs_dist)
-      col_dist => dbs_distribution_col_dist(dbs_dist)
+      row_dist => dbcsr_distribution_row_dist(dbcsr_dist)
+      col_dist => dbcsr_distribution_col_dist(dbcsr_dist)
 
       mp_comm = info%mp_comm
 
@@ -380,9 +380,9 @@ CONTAINS
       ALLOCATE (req_array(1:numnodes, 4))
 
       ALLOCATE (iprocs(info%ngroup))
-      CALL dbs_iterator_start(iter, matrix_in)
-      DO WHILE (dbs_iterator_blocks_left(iter))
-         CALL dbs_iterator_next_block(iter, blk_index(1), blk_index(2), nblock, transposed=tr, &
+      CALL dbcsr_iterator_start(iter, matrix_in)
+      DO WHILE (dbcsr_iterator_blocks_left(iter))
+         CALL dbcsr_iterator_next_block(iter, blk_index(1), blk_index(2), nblock, transposed=tr, &
                                         row_size=blk_size(1), col_size=blk_size(2))
          CALL dbs_repl_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iprocs)
          DO i = 1, SIZE(iprocs)
@@ -390,7 +390,7 @@ CONTAINS
             num_send(2*iprocs(i) + 1) = num_send(2*iprocs(i) + 1) + 1
          ENDDO
       ENDDO
-      CALL dbs_iterator_stop(iter)
+      CALL dbcsr_iterator_stop(iter)
 
       CALL timeset(routineN//"_alltoall", handle2)
       CALL mp_alltoall(num_send, num_rec, 2, mp_comm)
@@ -410,21 +410,21 @@ CONTAINS
 
       ENDDO
 
-      CALL dbs_data_init(block)
-      CALL dbs_data_new(block, dbs_type_1d_to_2d(data_type))
-      CALL dbs_iterator_start(iter, matrix_in)
-      DO WHILE (dbs_iterator_blocks_left(iter))
-         CALL dbs_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
+      CALL dbcsr_data_init(block)
+      CALL dbcsr_data_new(block, dbcsr_type_1d_to_2d(data_type))
+      CALL dbcsr_iterator_start(iter, matrix_in)
+      DO WHILE (dbcsr_iterator_blocks_left(iter))
+         CALL dbcsr_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
                                         row_size=blk_size(1), col_size=blk_size(2))
          CALL dbs_repl_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iprocs)
          DO i = 1, SIZE(iprocs)
             CALL block_buffer_add_block(buffer_send(iprocs(i)), INT(blk_index, KIND=int_8), block)
          ENDDO
       ENDDO
-      CALL dbs_iterator_stop(iter)
-      CALL dbs_data_clear_pointer(block)
+      CALL dbcsr_iterator_stop(iter)
+      CALL dbcsr_data_clear_pointer(block)
 
-      IF (move_prv) CALL dbs_clear(matrix_in)
+      IF (move_prv) CALL dbcsr_clear(matrix_in)
 
       CALL timeset(routineN//"_communicate_buffer", handle2)
       CALL dbs_tas_communicate_buffer(mp_comm, buffer_recv, buffer_send, req_array)
@@ -446,7 +446,7 @@ CONTAINS
          DEALLOCATE (index_recv)
       ENDDO
 
-      CALL dbs_reserve_blocks(matrix_out%matrix, blks_to_allocate(:, 1), blks_to_allocate(:, 2))
+      CALL dbcsr_reserve_blocks(matrix_out%matrix, blks_to_allocate(:, 1), blks_to_allocate(:, 2))
       DEALLOCATE (blks_to_allocate)
 
       DO iproc = 0, numnodes - 1
@@ -456,14 +456,14 @@ CONTAINS
             CALL dbs_tas_blk_sizes(matrix_out, blk_index_i8(1), blk_index_i8(2), blk_size(1), blk_size(2))
             CALL internal_data_allocate(block%d, blk_size)
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8, block)
-            CALL dbs_put_block(matrix_out%matrix, INT(blk_index_i8(1)), INT(blk_index_i8(2)), block)
+            CALL dbcsr_put_block(matrix_out%matrix, INT(blk_index_i8(1)), INT(blk_index_i8(2)), block)
             CALL internal_data_deallocate(block%d)
          ENDDO
 
          CALL block_buffer_destroy(buffer_recv(iproc))
       ENDDO
-      CALL dbs_data_clear_pointer(block)
-      CALL dbs_data_release(block)
+      CALL dbcsr_data_clear_pointer(block)
+      CALL dbcsr_data_release(block)
 
       CALL dbs_tas_finalize(matrix_out)
 
@@ -474,7 +474,7 @@ CONTAINS
    SUBROUTINE dbs_tas_merge(matrix_out, matrix_in, summation, move_data)
       !! Merge submatrices of matrix_in to matrix_out by sum
 
-      TYPE(dbs_type), INTENT(INOUT)                    :: matrix_out
+      TYPE(dbcsr_type), INTENT(INOUT)                    :: matrix_out
       TYPE(dbs_tas_type), INTENT(INOUT)                  :: matrix_in
       LOGICAL, INTENT(IN), OPTIONAL                      :: summation
       LOGICAL, INTENT(IN), OPTIONAL                      :: move_data
@@ -492,16 +492,16 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: blk_index, blk_size
       LOGICAL                                            :: tr, move_prv
       TYPE(block_buffer_type), ALLOCATABLE, DIMENSION(:) :: buffer_recv, buffer_send
-      TYPE(dbs_data_obj)                               :: block
-      TYPE(dbs_iterator)                               :: iter
+      TYPE(dbcsr_data_obj)                               :: block
+      TYPE(dbcsr_iterator)                               :: iter
       TYPE(dbs_tas_split_info)                         :: info
 
       CALL timeset(routineN, handle)
 
       IF (PRESENT(summation)) THEN
-         IF (.NOT. summation) CALL dbs_clear(matrix_out)
+         IF (.NOT. summation) CALL dbcsr_clear(matrix_out)
       ELSE
-         CALL dbs_clear(matrix_out)
+         CALL dbcsr_clear(matrix_out)
       ENDIF
 
       IF (PRESENT(move_data)) THEN
@@ -529,15 +529,15 @@ CONTAINS
 
       ALLOCATE (iprocs(info%ngroup))
 
-      CALL dbs_iterator_start(iter, matrix_in%matrix)
-      DO WHILE (dbs_iterator_blocks_left(iter))
-         CALL dbs_iterator_next_block(iter, blk_index(1), blk_index(2), nblock, transposed=tr, &
+      CALL dbcsr_iterator_start(iter, matrix_in%matrix)
+      DO WHILE (dbcsr_iterator_blocks_left(iter))
+         CALL dbcsr_iterator_next_block(iter, blk_index(1), blk_index(2), nblock, transposed=tr, &
                                         row_size=blk_size(1), col_size=blk_size(2))
-         CALL dbs_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iproc)
+         CALL dbcsr_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iproc)
          num_send(2*iproc) = num_send(2*iproc) + PRODUCT(blk_size)
          num_send(2*iproc + 1) = num_send(2*iproc + 1) + 1
       ENDDO
-      CALL dbs_iterator_stop(iter)
+      CALL dbcsr_iterator_stop(iter)
 
       CALL timeset(routineN//"_alltoall", handle2)
       CALL mp_alltoall(num_send, num_rec, 2, mp_comm)
@@ -557,17 +557,17 @@ CONTAINS
 
       ENDDO
 
-      CALL dbs_data_init(block)
-      CALL dbs_data_new(block, dbs_type_1d_to_2d(data_type))
-      CALL dbs_iterator_start(iter, matrix_in%matrix)
-      DO WHILE (dbs_iterator_blocks_left(iter))
-         CALL dbs_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
+      CALL dbcsr_data_init(block)
+      CALL dbcsr_data_new(block, dbcsr_type_1d_to_2d(data_type))
+      CALL dbcsr_iterator_start(iter, matrix_in%matrix)
+      DO WHILE (dbcsr_iterator_blocks_left(iter))
+         CALL dbcsr_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
                                         row_size=blk_size(1), col_size=blk_size(2))
-         CALL dbs_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iproc)
+         CALL dbcsr_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iproc)
          CALL block_buffer_add_block(buffer_send(iproc), INT(blk_index, KIND=int_8), block)
       ENDDO
 
-      CALL dbs_iterator_stop(iter)
+      CALL dbcsr_iterator_stop(iter)
 
       IF (move_prv) CALL dbs_tas_clear(matrix_in)
 
@@ -593,26 +593,26 @@ CONTAINS
 
       CALL index_unique(blks_to_allocate, blks_to_allocate_u)
 
-      CALL dbs_reserve_blocks(matrix_out, blks_to_allocate_u(:, 1), blks_to_allocate_u(:, 2))
+      CALL dbcsr_reserve_blocks(matrix_out, blks_to_allocate_u(:, 1), blks_to_allocate_u(:, 2))
       DEALLOCATE (blks_to_allocate, blks_to_allocate_u)
 
       DO iproc = 0, numnodes - 1
          ! First, we need to get the index to create block
          DO WHILE (block_buffer_blocks_left(buffer_recv(iproc)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8)
-            blk_size(1) = dbs_blk_row_size(matrix_out, INT(blk_index_i8(1)))
-            blk_size(2) = dbs_blk_column_size(matrix_out, INT(blk_index_i8(2)))
+            blk_size(1) = dbcsr_blk_row_size(matrix_out, INT(blk_index_i8(1)))
+            blk_size(2) = dbcsr_blk_column_size(matrix_out, INT(blk_index_i8(2)))
             CALL internal_data_allocate(block%d, blk_size)
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8, block)
-            CALL dbs_put_block(matrix_out, INT(blk_index_i8(1)), INT(blk_index_i8(2)), block, summation=.TRUE.)
+            CALL dbcsr_put_block(matrix_out, INT(blk_index_i8(1)), INT(blk_index_i8(2)), block, summation=.TRUE.)
             CALL internal_data_deallocate(block%d)
          ENDDO
          CALL block_buffer_destroy(buffer_recv(iproc))
       ENDDO
-      CALL dbs_data_clear_pointer(block)
-      CALL dbs_data_release(block)
+      CALL dbcsr_data_clear_pointer(block)
+      CALL dbcsr_data_release(block)
 
-      CALL dbs_finalize(matrix_out)
+      CALL dbcsr_finalize(matrix_out)
 
       CALL timestop(handle)
    END SUBROUTINE
@@ -683,7 +683,7 @@ CONTAINS
       TYPE(block_buffer_type), INTENT(INOUT)      :: buffer
       INTEGER(KIND=int_8), DIMENSION(2), &
          INTENT(IN)                               :: index
-      TYPE(dbs_data_obj), INTENT(IN)         :: block
+      TYPE(dbcsr_data_obj), INTENT(IN)         :: block
       LOGICAL, INTENT(IN), OPTIONAL :: transposed
 
 #:for dparam, dtype, dsuffix in dtype_float_list
@@ -693,7 +693,7 @@ CONTAINS
       SELECT CASE (buffer%data_type)
 #:for dparam, dtype, dsuffix, dsuffix_dbcsr in dtype_float_list_dbcsr
       CASE (${dparam}$)
-         block_${dsuffix}$ => dbs_get_data_p_2d_${dsuffix_dbcsr}$ (block)
+         block_${dsuffix}$ => dbcsr_get_data_p_2d_${dsuffix_dbcsr}$ (block)
          CALL block_buffer_add_block_${dsuffix}$ (buffer, index, block_${dsuffix}$, transposed)
 #:endfor
       END SELECT
@@ -704,7 +704,7 @@ CONTAINS
       INTEGER, INTENT(OUT)                        :: ndata
       INTEGER(KIND=int_8), DIMENSION(2), &
          INTENT(OUT)                              :: index
-      TYPE(dbs_data_obj), INTENT(INOUT), OPTIONAL           :: block
+      TYPE(dbcsr_data_obj), INTENT(INOUT), OPTIONAL           :: block
       LOGICAL, INTENT(IN), OPTIONAL               :: advance_iter
       LOGICAL :: valid
       INTEGER, DIMENSION(2) :: sizes
@@ -713,8 +713,8 @@ CONTAINS
 #:endfor
 
       IF (PRESENT(block)) THEN
-         CALL dbs_data_get_sizes(block, sizes, valid)
-         DBCSR_ASSERT(valid)
+         CALL dbcsr_data_get_sizes(block, sizes, valid)
+         CPASSERT(valid)
          CALL internal_data_deallocate(block%d)
       ENDIF
 
@@ -724,7 +724,7 @@ CONTAINS
          IF (PRESENT(block)) THEN
             ALLOCATE (data_${dsuffix}$ (sizes(1), sizes(2)))
             CALL block_buffer_get_next_block_${dsuffix}$ (buffer, ndata, index, data_${dsuffix}$, advance_iter=advance_iter)
-            CALL dbs_data_set_pointer(block, data_${dsuffix}$)
+            CALL dbcsr_data_set_pointer(block, data_${dsuffix}$)
          ELSE
             CALL block_buffer_get_next_block_${dsuffix}$ (buffer, ndata, index, advance_iter=advance_iter)
          ENDIF
@@ -762,7 +762,7 @@ CONTAINS
       ENDIF
       ndata = PRODUCT(SHAPE(block))
 
-      DBCSR_ASSERT(buffer%data_type .EQ. ${dparam}$)
+      CPASSERT(buffer%data_type .EQ. ${dparam}$)
       p = buffer%endpos
       IF (p .EQ. 0) THEN
          p_data = 0
@@ -805,7 +805,7 @@ CONTAINS
          do_advance = .TRUE.
       ENDIF
 
-      DBCSR_ASSERT(buffer%data_type .EQ. ${dparam}$)
+      CPASSERT(buffer%data_type .EQ. ${dparam}$)
 
       p = buffer%endpos
       IF (p .EQ. 0) THEN

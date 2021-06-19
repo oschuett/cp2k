@@ -27,16 +27,16 @@ MODULE dbs_tensor_reshape
                                  ndims_tensor, &
                                  dbs_t_get_stored_coordinates, &
                                  dbs_t_clear
-   USE dbs_kinds, ONLY: default_string_length
-   USE dbs_kinds, ONLY: ${uselist(dtype_float_prec)}$
-   USE dbs_api, ONLY: ${uselist(dtype_float_param)}$
-   USE dbs_mpiwrap, ONLY: mp_alltoall, &
+   USE kinds, ONLY: default_string_length
+   USE kinds, ONLY: ${uselist(dtype_float_prec)}$
+   USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
+   USE message_passing, ONLY: mp_alltoall, &
                             mp_environ, &
                             mp_irecv, &
                             mp_isend, &
                             mp_waitall
 
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -97,7 +97,7 @@ CONTAINS
          move_prv = .FALSE.
       ENDIF
 
-      DBCSR_ASSERT(tensor_out%valid)
+      CPASSERT(tensor_out%valid)
 
       IF (.NOT. summation_prv) CALL dbs_t_clear(tensor_out)
 
@@ -137,7 +137,7 @@ CONTAINS
       DO WHILE (dbs_t_iterator_blocks_left(iter))
          CALL dbs_t_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
          CALL dbs_t_get_block(tensor_in, ind_nd, blk_data, found)
-         DBCSR_ASSERT(found)
+         CPASSERT(found)
          CALL dbs_t_get_stored_coordinates(tensor_out, ind_nd, iproc)
          CALL block_buffer_add_anyd_block(buffer_send(iproc), ind_nd, blk_data)
          CALL destroy_block(blk_data)
@@ -358,7 +358,7 @@ CONTAINS
       ${dtype}$, DIMENSION(ndata), INTENT(IN)              :: block
       INTEGER, DIMENSION(ndims_buffer(buffer)), INTENT(IN) :: index
       INTEGER                                              :: p, ndims, p_data
-      DBCSR_ASSERT(buffer%data_type .EQ. ${dparam}$)
+      CPASSERT(buffer%data_type .EQ. ${dparam}$)
       ndims = ndims_buffer(buffer)
       p = buffer%endpos
       IF (p .EQ. 0) THEN
@@ -397,7 +397,7 @@ CONTAINS
          do_advance = .TRUE.
       ENDIF
 
-      DBCSR_ASSERT(buffer%data_type .EQ. ${dparam}$)
+      CPASSERT(buffer%data_type .EQ. ${dparam}$)
       ndims = ndims_buffer(buffer)
       p = buffer%endpos
       IF (p .EQ. 0) THEN

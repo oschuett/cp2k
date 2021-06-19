@@ -14,17 +14,17 @@ MODULE dbs_tas_io
       dbs_tas_type, dbs_tas_split_info
    USE dbs_tas_global, ONLY: &
       dbs_tas_rowcol_data, dbs_tas_distribution
-   USE dbs_kinds, ONLY: &
+   USE kinds, ONLY: &
       int_8, real_8, default_string_length
    USE dbs_tas_base, ONLY: &
       dbs_tas_get_info, dbs_tas_get_num_blocks, dbs_tas_get_num_blocks_total, dbs_tas_get_nze_total, &
       dbs_tas_get_nze, dbs_tas_nblkrows_total, dbs_tas_nblkcols_total, dbs_tas_info
    USE dbs_tas_split, ONLY: &
       dbs_tas_get_split_info, rowsplit, colsplit
-   USE dbs_mpiwrap, ONLY: &
+   USE message_passing, ONLY: &
       mp_environ, mp_sum, mp_max
-   USE dbs_dist_methods, ONLY: &
-      dbs_distribution_row_dist, dbs_distribution_col_dist
+   USE dbcsr_dist_methods, ONLY: &
+      dbcsr_distribution_row_dist, dbcsr_distribution_col_dist
 
    IMPLICIT NONE
    PRIVATE
@@ -151,8 +151,8 @@ CONTAINS
       occupation = -1.0_real_8
       IF (nblock_tot .NE. 0) occupation = 100.0_real_8*REAL(nblock_p_sum, real_8)/REAL(nblock_tot, real_8)
 
-      rowdist => dbs_distribution_row_dist(matrix%matrix%dist)
-      coldist => dbs_distribution_col_dist(matrix%matrix%dist)
+      rowdist => dbcsr_distribution_row_dist(matrix%matrix%dist)
+      coldist => dbcsr_distribution_col_dist(matrix%matrix%dist)
 
       IF (unit_nr_prv > 0) THEN
          WRITE (unit_nr_prv, "(T2,A)") &

@@ -40,14 +40,14 @@ MODULE xas_tdp_atom
         dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, dbcsr_p_type, &
         dbcsr_put_block, dbcsr_release, dbcsr_replicate_all, dbcsr_type, dbcsr_type_antisymmetric, &
         dbcsr_type_symmetric
-   USE dbcsr_tensor_api,                ONLY: dbcsr_t_destroy,&
-                                              dbcsr_t_get_block,&
-                                              dbcsr_t_iterator_blocks_left,&
-                                              dbcsr_t_iterator_next_block,&
-                                              dbcsr_t_iterator_start,&
-                                              dbcsr_t_iterator_stop,&
-                                              dbcsr_t_iterator_type,&
-                                              dbcsr_t_type
+   USE dbs_tensor_api,                ONLY: dbs_t_destroy,&
+                                              dbs_t_get_block,&
+                                              dbs_t_iterator_blocks_left,&
+                                              dbs_t_iterator_next_block,&
+                                              dbs_t_iterator_start,&
+                                              dbs_t_iterator_stop,&
+                                              dbs_t_iterator_type,&
+                                              dbs_t_type
    USE input_constants,                 ONLY: do_potential_id
    USE input_section_types,             ONLY: section_vals_get_subs_vals,&
                                               section_vals_type
@@ -867,8 +867,8 @@ CONTAINS
       TYPE(cp_para_env_type), POINTER                    :: para_env
       TYPE(dbcsr_distribution_type), POINTER             :: dbcsr_dist
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: overlap, rho_ao
-      TYPE(dbcsr_t_iterator_type)                        :: iter
-      TYPE(dbcsr_t_type)                                 :: pqX
+      TYPE(dbs_t_iterator_type)                        :: iter
+      TYPE(dbs_t_type)                                 :: pqX
       TYPE(dbcsr_type)                                   :: ri_sinv
       TYPE(dbcsr_type), POINTER                          :: ri_mats
       TYPE(gto_basis_set_p_type), DIMENSION(:), POINTER  :: basis_set_orb, basis_set_ri
@@ -992,10 +992,10 @@ CONTAINS
 
          !Do the actual contraction: coeff_y = sum_pq sum_x P_pq (phi_p phi_q xi_x) S_xy^-1
 
-         CALL dbcsr_t_iterator_start(iter, pqX)
-         DO WHILE (dbcsr_t_iterator_blocks_left(iter))
-            CALL dbcsr_t_iterator_next_block(iter, ind, blk)
-            CALL dbcsr_t_get_block(pqX, ind, t_block, tensor_found)
+         CALL dbs_t_iterator_start(iter, pqX)
+         DO WHILE (dbs_t_iterator_blocks_left(iter))
+            CALL dbs_t_iterator_next_block(iter, ind, blk)
+            CALL dbs_t_get_block(pqX, ind, t_block, tensor_found)
 
             iatom = ind(1)
             jatom = ind(2)
@@ -1062,11 +1062,11 @@ CONTAINS
 
             DEALLOCATE (t_block)
          END DO !iter
-         CALL dbcsr_t_iterator_stop(iter)
+         CALL dbs_t_iterator_stop(iter)
 
          !clean-up
          CALL dbcsr_release(ri_sinv)
-         CALL dbcsr_t_destroy(pqX)
+         CALL dbs_t_destroy(pqX)
          CALL release_neighbor_list_sets(ab_list)
          CALL release_neighbor_list_sets(ac_list)
          DEALLOCATE (neighbors, idx_to_nb)

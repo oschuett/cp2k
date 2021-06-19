@@ -23,12 +23,12 @@ MODULE dbs_tensor
    USE dbs_array_list_methods, ONLY: &
       get_arrays, reorder_arrays, get_ith_array, array_list, array_sublist, check_equal, array_eq_i, &
       create_array_list, destroy_array_list, sizes_of_arrays
-   USE dbs_api, ONLY: &
-      dbs_type, dbs_iterator_type, dbs_iterator_blocks_left, &
-      dbs_iterator_next_block, dbs_iterator_start, dbs_iterator_stop, &
-      dbs_transpose, dbs_no_transpose, dbs_scalar, dbs_put_block, &
-      ${uselist(dtype_float_param)}$, dbs_clear, &
-      dbs_release, dbs_desymmetrize, dbs_has_symmetry
+   USE dbcsr_api, ONLY: &
+      dbcsr_type, dbcsr_iterator_type, dbcsr_iterator_blocks_left, &
+      dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, &
+      dbcsr_transpose, dbcsr_no_transpose, dbcsr_scalar, dbcsr_put_block, &
+      ${uselist(dtype_float_param)}$, dbcsr_clear, &
+      dbcsr_release, dbcsr_desymmetrize, dbcsr_has_symmetry
    USE dbs_tas_types, ONLY: &
       dbs_tas_split_info
    USE dbs_tas_base, ONLY: &
@@ -52,29 +52,29 @@ MODULE dbs_tensor
       dbs_t_get_num_blocks_total, dbs_t_get_info, ndims_matrix_row, ndims_matrix_column, &
       dbs_t_max_nblks_local, dbs_t_default_distvec, dbs_t_contraction_storage, dbs_t_nblks_total, &
       dbs_t_distribution_new, dbs_t_copy_contraction_storage, dbs_t_pgrid_destroy
-   USE dbs_kinds, ONLY: &
+   USE kinds, ONLY: &
       ${uselist(dtype_float_prec)}$, default_string_length, int_8, dp
-   USE dbs_mpiwrap, ONLY: &
+   USE message_passing, ONLY: &
       mp_environ, mp_max, mp_sum, mp_comm_free, mp_cart_create, mp_sync
-   USE dbs_toollib, ONLY: &
+   USE util, ONLY: &
       sort
    USE dbs_tensor_reshape, ONLY: &
       dbs_t_reshape
    USE dbs_tas_split, ONLY: &
       dbs_tas_mp_comm, rowsplit, colsplit, dbs_tas_info_hold, dbs_tas_release_info, default_nsplit_accept_ratio, &
       default_pdims_accept_ratio, dbs_tas_create_split
-   USE dbs_data_types, ONLY: &
-      dbs_scalar_type
+   USE dbcsr_data_types, ONLY: &
+      dbcsr_scalar_type
    USE dbs_tensor_split, ONLY: &
       dbs_t_split_copyback, dbs_t_make_compatible_blocks, dbs_t_crop
    USE dbs_tensor_io, ONLY: &
       dbs_t_write_tensor_info, dbs_t_write_tensor_dist, prep_output_unit, dbs_t_write_split_info
-   USE dbs_dist_operations, ONLY: &
+   USE dbcsr_dist_operations, ONLY: &
       checker_tr
-   USE dbs_toollib, ONLY: &
+   USE dbcsr_toollib, ONLY: &
       swap
 
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -161,7 +161,7 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
-      DBCSR_ASSERT(tensor_out%valid)
+      CPASSERT(tensor_out%valid)
 
       unit_nr_prv = prep_output_unit(unit_nr)
 
@@ -291,7 +291,7 @@ CONTAINS
       INTEGER :: handle
 
       CALL timeset(routineN, handle)
-      DBCSR_ASSERT(tensor_out%valid)
+      CPASSERT(tensor_out%valid)
 
       IF (PRESENT(summation)) THEN
          IF (.NOT. summation) CALL dbs_t_clear(tensor_out)
@@ -305,7 +305,7 @@ CONTAINS
       DO WHILE (dbs_t_iterator_blocks_left(iter))
          CALL dbs_t_iterator_next_block(iter, ind_nd, blk)
          CALL dbs_t_get_block(tensor_in, ind_nd, blk_data, found)
-         DBCSR_ASSERT(found)
+         CPASSERT(found)
          CALL dbs_t_put_block(tensor_out, ind_nd, blk_data, summation=summation)
          CALL destroy_block(blk_data)
       ENDDO
@@ -317,29 +317,29 @@ CONTAINS
    SUBROUTINE dbs_t_copy_matrix_to_tensor(matrix_in, tensor_out, summation)
       !! copy matrix to tensor.
 
-      TYPE(dbs_type), TARGET, INTENT(IN)               :: matrix_in
+      TYPE(dbcsr_type), TARGET, INTENT(IN)               :: matrix_in
       TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor_out
       LOGICAL, INTENT(IN), OPTIONAL                      :: summation
          !! tensor_out = tensor_out + matrix_in
-      TYPE(dbs_type), POINTER                          :: matrix_in_desym
+      TYPE(dbcsr_type), POINTER                          :: matrix_in_desym
 
       INTEGER, DIMENSION(2)                              :: ind_2d
       REAL(KIND=real_8), ALLOCATABLE, DIMENSION(:, :)    :: block_arr
       REAL(KIND=real_8), DIMENSION(:, :), POINTER        :: block
-      TYPE(dbs_iterator_type)                          :: iter
+      TYPE(dbcsr_iterator_type)                          :: iter
       LOGICAL                                            :: tr
 
       INTEGER                                            :: handle
       CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_copy_matrix_to_tensor'
 
       CALL timeset(routineN, handle)
-      DBCSR_ASSERT(tensor_out%valid)
+      CPASSERT(tensor_out%valid)
 
       NULLIFY (block)
 
-      IF (dbs_has_symmetry(matrix_in)) THEN
+      IF (dbcsr_has_symmetry(matrix_in)) THEN
          ALLOCATE (matrix_in_desym)
-         CALL dbs_desymmetrize(matrix_in, matrix_in_desym)
+         CALL dbcsr_desymmetrize(matrix_in, matrix_in_desym)
       ELSE
          matrix_in_desym => matrix_in
       ENDIF
@@ -352,17 +352,17 @@ CONTAINS
 
       CALL dbs_t_reserve_blocks(matrix_in_desym, tensor_out)
 
-      CALL dbs_iterator_start(iter, matrix_in_desym)
-      DO WHILE (dbs_iterator_blocks_left(iter))
-         CALL dbs_iterator_next_block(iter, ind_2d(1), ind_2d(2), block, tr)
+      CALL dbcsr_iterator_start(iter, matrix_in_desym)
+      DO WHILE (dbcsr_iterator_blocks_left(iter))
+         CALL dbcsr_iterator_next_block(iter, ind_2d(1), ind_2d(2), block, tr)
          CALL allocate_any(block_arr, source=block)
          CALL dbs_t_put_block(tensor_out, ind_2d, SHAPE(block_arr), block_arr, summation=summation)
          DEALLOCATE (block_arr)
       ENDDO
-      CALL dbs_iterator_stop(iter)
+      CALL dbcsr_iterator_stop(iter)
 
-      IF (dbs_has_symmetry(matrix_in)) THEN
-         CALL dbs_release(matrix_in_desym)
+      IF (dbcsr_has_symmetry(matrix_in)) THEN
+         CALL dbcsr_release(matrix_in_desym)
          DEALLOCATE (matrix_in_desym)
       ENDIF
 
@@ -374,7 +374,7 @@ CONTAINS
       !! copy tensor to matrix
 
       TYPE(dbs_t_type), INTENT(INOUT)      :: tensor_in
-      TYPE(dbs_type), INTENT(INOUT)        :: matrix_out
+      TYPE(dbcsr_type), INTENT(INOUT)        :: matrix_out
       LOGICAL, INTENT(IN), OPTIONAL          :: summation
          !! matrix_out = matrix_out + tensor_in
       TYPE(dbs_t_iterator_type)            :: iter
@@ -387,9 +387,9 @@ CONTAINS
       CALL timeset(routineN, handle)
 
       IF (PRESENT(summation)) THEN
-         IF (.NOT. summation) CALL dbs_clear(matrix_out)
+         IF (.NOT. summation) CALL dbcsr_clear(matrix_out)
       ELSE
-         CALL dbs_clear(matrix_out)
+         CALL dbcsr_clear(matrix_out)
       ENDIF
 
       CALL dbs_t_reserve_blocks(tensor_in, matrix_out)
@@ -397,15 +397,15 @@ CONTAINS
       CALL dbs_t_iterator_start(iter, tensor_in)
       DO WHILE (dbs_t_iterator_blocks_left(iter))
          CALL dbs_t_iterator_next_block(iter, ind_2d, blk)
-         IF (dbs_has_symmetry(matrix_out) .AND. checker_tr(ind_2d(1), ind_2d(2))) CYCLE
+         IF (dbcsr_has_symmetry(matrix_out) .AND. checker_tr(ind_2d(1), ind_2d(2))) CYCLE
 
          CALL dbs_t_get_block(tensor_in, ind_2d, block, found)
-         DBCSR_ASSERT(found)
+         CPASSERT(found)
 
-         IF (dbs_has_symmetry(matrix_out) .AND. ind_2d(1) > ind_2d(2)) THEN
-            CALL dbs_put_block(matrix_out, ind_2d(2), ind_2d(1), TRANSPOSE(block), summation=summation)
+         IF (dbcsr_has_symmetry(matrix_out) .AND. ind_2d(1) > ind_2d(2)) THEN
+            CALL dbcsr_put_block(matrix_out, ind_2d(2), ind_2d(1), TRANSPOSE(block), summation=summation)
          ELSE
-            CALL dbs_put_block(matrix_out, ind_2d(1), ind_2d(2), block, summation=summation)
+            CALL dbcsr_put_block(matrix_out, ind_2d(1), ind_2d(2), block, summation=summation)
          ENDIF
          DEALLOCATE (block)
       ENDDO
@@ -450,12 +450,12 @@ CONTAINS
       !! bounds_2, bounds_3 give the index ranges of the batches.
       !! @endnote
 
-      TYPE(dbs_scalar_type), INTENT(IN)            :: alpha
+      TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
       TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_1
          !! first tensor (in)
       TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_2
          !! second tensor (in)
-      TYPE(dbs_scalar_type), INTENT(IN)            :: beta
+      TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
          !! indices of tensor_1 to contract
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
@@ -546,10 +546,10 @@ CONTAINS
                                       filter_eps, flop, move_data, retain_sparsity, &
                                       nblks_local, result_index, unit_nr, log_verbose)
       !! expert routine for tensor contraction. For internal use only.
-      TYPE(dbs_scalar_type), INTENT(IN)            :: alpha
+      TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
       TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_1
       TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_2
-      TYPE(dbs_scalar_type), INTENT(IN)            :: beta
+      TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
       INTEGER, DIMENSION(:), INTENT(IN)              :: map_1
@@ -624,30 +624,30 @@ CONTAINS
 
       CALL timeset(routineN, handle)
 
-      DBCSR_ASSERT(tensor_1%valid)
-      DBCSR_ASSERT(tensor_2%valid)
-      DBCSR_ASSERT(tensor_3%valid)
+      CPASSERT(tensor_1%valid)
+      CPASSERT(tensor_2%valid)
+      CPASSERT(tensor_3%valid)
 
       assert_stmt = SIZE(contract_1) .EQ. SIZE(contract_2)
-      DBCSR_ASSERT(assert_stmt)
+      CPASSERT(assert_stmt)
 
       assert_stmt = SIZE(map_1) .EQ. SIZE(notcontract_1)
-      DBCSR_ASSERT(assert_stmt)
+      CPASSERT(assert_stmt)
 
       assert_stmt = SIZE(map_2) .EQ. SIZE(notcontract_2)
-      DBCSR_ASSERT(assert_stmt)
+      CPASSERT(assert_stmt)
 
       assert_stmt = SIZE(notcontract_1) + SIZE(contract_1) .EQ. ndims_tensor(tensor_1)
-      DBCSR_ASSERT(assert_stmt)
+      CPASSERT(assert_stmt)
 
       assert_stmt = SIZE(notcontract_2) + SIZE(contract_2) .EQ. ndims_tensor(tensor_2)
-      DBCSR_ASSERT(assert_stmt)
+      CPASSERT(assert_stmt)
 
       assert_stmt = SIZE(map_1) + SIZE(map_2) .EQ. ndims_tensor(tensor_3)
-      DBCSR_ASSERT(assert_stmt)
+      CPASSERT(assert_stmt)
 
       assert_stmt = dbs_t_get_data_type(tensor_1) .EQ. dbs_t_get_data_type(tensor_2)
-      DBCSR_ASSERT(assert_stmt)
+      CPASSERT(assert_stmt)
 
       unit_nr_prv = prep_output_unit(unit_nr)
 
@@ -794,7 +794,7 @@ CONTAINS
          CASE (3)
             CALL index_linked_sort(map_1_mod, notcontract_1_mod)
          CASE DEFAULT
-            DBCSR_ABORT("should not happen")
+            CPABORT("should not happen")
          END SELECT
 
          CALL reshape_mm_compatible(tensor_algn_1, tensor_algn_3, tensor_contr_1, tensor_contr_3, &
@@ -827,7 +827,7 @@ CONTAINS
          CASE (2)
             CALL index_linked_sort(contract_2_mod, contract_1_mod)
          CASE DEFAULT
-            DBCSR_ABORT("should not happen")
+            CPABORT("should not happen")
          END SELECT
 
          CALL reshape_mm_compatible(tensor_algn_1, tensor_algn_2, tensor_contr_1, tensor_contr_2, &
@@ -860,7 +860,7 @@ CONTAINS
          CASE (3)
             CALL index_linked_sort(map_2_mod, notcontract_2_mod)
          CASE DEFAULT
-            DBCSR_ABORT("should not happen")
+            CPABORT("should not happen")
          END SELECT
 
          CALL reshape_mm_compatible(tensor_algn_2, tensor_algn_3, tensor_contr_2, tensor_contr_3, &
@@ -910,7 +910,7 @@ CONTAINS
          nblk = SIZE(result_index_2d, 1)
          IF (PRESENT(nblks_local)) nblks_local = nblk
          IF (SIZE(result_index, 1) < nblk) THEN
-            CALL dbs_abort(__LOCATION__, &
+            CALL cp_abort(__LOCATION__, &
         "allocated size of `result_index` is too small. This error occurs due to a high load imbalance of distributed tensor data.")
          ENDIF
 
@@ -974,7 +974,7 @@ CONTAINS
       IF (new_1 .OR. new_2 .OR. new_3) tensors_remapped = .TRUE.
 
       IF (tensors_remapped .AND. do_batched) THEN
-         CALL dbs_warn(__LOCATION__, &
+         CALL cp_warn(__LOCATION__, &
                          "Internal process grid optimization disabled because tensors are not in contraction-compatible format")
       ENDIF
 
@@ -984,7 +984,7 @@ CONTAINS
       do_change_pgrid(:) = .FALSE.
       IF ((.NOT. tensors_remapped) .AND. do_batched) THEN
          ASSOCIATE (storage => tensor_small%contraction_storage)
-            DBCSR_ASSERT(storage%static)
+            CPASSERT(storage%static)
             split = dbs_tas_info(tensor_large%matrix_rep)
             do_change_pgrid(:) = &
                update_contraction_storage(storage, split_opt, split)
@@ -1319,7 +1319,7 @@ CONTAINS
                CALL dbs_t_remap(tensor2, ind2_free, ind2_linked, tensor2_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
                                   dist2=dist_list, mp_dims_2=mp_dims, nodata=nodata2, move_data=move_data_2)
             ELSE
-               DBCSR_ABORT("should not happen")
+               CPABORT("should not happen")
             ENDIF
             compat2 = compat1
          ELSE
@@ -1358,7 +1358,7 @@ CONTAINS
                CALL dbs_t_remap(tensor1, ind1_free, ind1_linked, tensor1_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
                                   dist2=dist_list, mp_dims_2=mp_dims, nodata=nodata1, move_data=move_data_1)
             ELSE
-               DBCSR_ABORT("should not happen")
+               CPABORT("should not happen")
             ENDIF
             compat1 = compat2
          ELSE
@@ -1369,20 +1369,20 @@ CONTAINS
 
       SELECT CASE (compat1)
       CASE (1)
-         trans1 = dbs_no_transpose
+         trans1 = dbcsr_no_transpose
       CASE (2)
-         trans1 = dbs_transpose
+         trans1 = dbcsr_transpose
       CASE DEFAULT
-         DBCSR_ABORT("should not happen")
+         CPABORT("should not happen")
       END SELECT
 
       SELECT CASE (compat2)
       CASE (1)
-         trans2 = dbs_no_transpose
+         trans2 = dbcsr_no_transpose
       CASE (2)
-         trans2 = dbs_transpose
+         trans2 = dbcsr_transpose
       CASE DEFAULT
-         DBCSR_ABORT("should not happen")
+         CPABORT("should not happen")
       END SELECT
 
       IF (unit_nr_prv > 0) THEN
@@ -1477,11 +1477,11 @@ CONTAINS
       ENDIF
 
       IF (compat1 == 1 .AND. compat2 == 2) THEN
-         trans = dbs_no_transpose
+         trans = dbcsr_no_transpose
       ELSEIF (compat1 == 2 .AND. compat2 == 1) THEN
-         trans = dbs_transpose
+         trans = dbcsr_transpose
       ELSE
-         DBCSR_ABORT("this should not happen")
+         CPABORT("this should not happen")
       ENDIF
 
       IF (unit_nr_prv > 0) THEN
@@ -1513,7 +1513,7 @@ CONTAINS
       REAL(kind=real_8) :: change_criterion, pdims_ratio
       INTEGER :: nsplit_opt, nsplit
 
-      DBCSR_ASSERT(ALLOCATED(split_opt%ngroup_opt))
+      CPASSERT(ALLOCATED(split_opt%ngroup_opt))
       nsplit_opt = split_opt%ngroup_opt
       nsplit = split%ngroup
 
@@ -1567,10 +1567,10 @@ CONTAINS
    SUBROUTINE invert_transpose_flag(trans_flag)
       CHARACTER(LEN=1), INTENT(INOUT)                    :: trans_flag
 
-      IF (trans_flag == dbs_transpose) THEN
-         trans_flag = dbs_no_transpose
-      ELSEIF (trans_flag == dbs_no_transpose) THEN
-         trans_flag = dbs_transpose
+      IF (trans_flag == dbcsr_transpose) THEN
+         trans_flag = dbcsr_no_transpose
+      ELSEIF (trans_flag == dbcsr_no_transpose) THEN
+         trans_flag = dbcsr_transpose
       ENDIF
    END SUBROUTINE
 
@@ -1632,11 +1632,11 @@ CONTAINS
          name_tmp = tensor_in%name
       ENDIF
       IF (PRESENT(dist1)) THEN
-         DBCSR_ASSERT(PRESENT(mp_dims_1))
+         CPASSERT(PRESENT(mp_dims_1))
       ENDIF
 
       IF (PRESENT(dist2)) THEN
-         DBCSR_ASSERT(PRESENT(mp_dims_2))
+         CPASSERT(PRESENT(mp_dims_2))
       ENDIF
 
       IF (PRESENT(comm_2d)) THEN
@@ -1789,10 +1789,10 @@ CONTAINS
       !! performing contraction.
       !! this is an estimate based on block norm multiplication.
       !! See documentation of dbs_t_contract.
-      TYPE(dbs_scalar_type), INTENT(IN)            :: alpha
+      TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
       TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_1
       TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_2
-      TYPE(dbs_scalar_type), INTENT(IN)            :: beta
+      TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
       INTEGER, DIMENSION(:), INTENT(IN)              :: map_1
@@ -2151,7 +2151,7 @@ CONTAINS
 #:for ndim in ndims
       IF (ndims_tensor(tensor) == ${ndim}$) THEN
          CALL dbs_t_distribution_new(dist, pgrid, ${varlist("dist", nmax=ndim)}$)
-         CALL dbs_t_create(t_tmp, name, dist, map1, map2, dbs_type_real_8, ${varlist("bs", nmax=ndim)}$)
+         CALL dbs_t_create(t_tmp, name, dist, map1, map2, dbcsr_type_real_8, ${varlist("bs", nmax=ndim)}$)
       ENDIF
 #:endfor
       CALL dbs_t_distribution_destroy(dist)

@@ -18,10 +18,10 @@ MODULE dbs_tensor_types
    USE dbs_array_list_methods, ONLY: &
       array_list, array_offsets, create_array_list, destroy_array_list, get_array_elements, &
       sizes_of_arrays, sum_of_arrays, array_sublist, get_arrays, get_ith_array, array_eq_i
-   USE dbs_api, ONLY: &
-      dbs_distribution_get, dbs_distribution_type, dbs_get_info, dbs_type, &
+   USE dbcsr_api, ONLY: &
+      dbcsr_distribution_get, dbcsr_distribution_type, dbcsr_get_info, dbcsr_type, &
       ${uselist(dtype_float_param)}$
-   USE dbs_kinds, ONLY: &
+   USE kinds, ONLY: &
       ${uselist(dtype_float_prec)}$, &
       default_string_length
    USE dbs_tas_base, ONLY: &
@@ -40,15 +40,15 @@ MODULE dbs_tensor_types
    USE dbs_tas_split, ONLY: &
       dbs_tas_create_split_rows_or_cols, dbs_tas_release_info, dbs_tas_info_hold, &
       dbs_tas_create_split, dbs_tas_get_split_info, dbs_tas_set_strict_split
-   USE dbs_kinds, ONLY: default_string_length, int_8, dp
-   USE dbs_mpiwrap, ONLY: &
+   USE kinds, ONLY: default_string_length, int_8, dp
+   USE message_passing, ONLY: &
       mp_cart_create, mp_cart_rank, mp_environ, mp_dims_create, mp_comm_free, mp_comm_dup, mp_sum, mp_max
    USE dbs_tas_global, ONLY: dbs_tas_distribution, dbs_tas_rowcol_data, dbs_tas_default_distvec
    USE dbs_allocate_wrap, ONLY: allocate_any
-   USE dbs_data_types, ONLY: dbs_scalar_type
-   USE dbs_operations, ONLY: dbs_scale
-   USE dbs_toollib, ONLY: sort
-#include "base/dbs_base_uses.f90"
+   USE dbcsr_data_types, ONLY: dbcsr_scalar_type
+   USE dbcsr_operations, ONLY: dbcsr_scale
+   USE util, ONLY: sort
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -236,7 +236,7 @@ CONTAINS
                                        dims_2d=grid_dims, &
                                        dims2_2d=new_dbs_tas_dist_t%dims_grid)
       ELSE
-         DBCSR_ABORT("Unknown value for which_dim")
+         CPABORT("Unknown value for which_dim")
       ENDIF
 
       new_dbs_tas_dist_t%nd_dist = array_sublist(nd_dist, index_map)
@@ -348,7 +348,7 @@ CONTAINS
                                        map2_2d=index_map, &
                                        dims2_2d=new_dbs_tas_blk_size_t%dims)
       ELSE
-         DBCSR_ABORT("Unknown value for which_dim")
+         CPABORT("Unknown value for which_dim")
       ENDIF
 
       new_dbs_tas_blk_size_t%blk_size = array_sublist(blk_size, index_map)
@@ -443,8 +443,8 @@ CONTAINS
          dims_nd_prv(map1_2d) = dims1_nd_prv
          dims_nd_prv(map2_2d) = dims2_nd_prv
       ELSE
-         DBCSR_ASSERT(PRODUCT(dims_nd(map1_2d)) == dims_2d(1))
-         DBCSR_ASSERT(PRODUCT(dims_nd(map2_2d)) == dims_2d(2))
+         CPASSERT(PRODUCT(dims_nd(map1_2d)) == dims_2d(1))
+         CPASSERT(PRODUCT(dims_nd(map2_2d)) == dims_2d(2))
          dims_nd_prv = dims_nd
       ENDIF
 
@@ -610,7 +610,7 @@ CONTAINS
 
       CALL timeset(routineN, handle)
       ndims = SIZE(map1_2d) + SIZE(map2_2d)
-      DBCSR_ASSERT(ndims .GE. 2 .AND. ndims .LE. ${maxdim}$)
+      CPASSERT(ndims .GE. 2 .AND. ndims .LE. ${maxdim}$)
 
       CALL create_array_list(nd_dist, ndims, ${varlist("nd_dist")}$)
 
@@ -621,7 +621,7 @@ CONTAINS
          CALL dbs_t_get_mapping_info(pgrid%nd_index_grid, map1_2d=map1_2d_check, map2_2d=map2_2d_check)
          IF (own_comm) THEN
             IF (.NOT. array_eq_i(map1_2d_check, map1_2d) .OR. .NOT. array_eq_i(map2_2d_check, map2_2d)) THEN
-               DBCSR_ABORT("map1_2d / map2_2d are not consistent with pgrid")
+               CPABORT("map1_2d / map2_2d are not consistent with pgrid")
             ENDIF
             pgrid_prv = pgrid
             need_pgrid_remap = .FALSE.
@@ -648,7 +648,7 @@ CONTAINS
 
       CALL mp_environ(comm_2d, 2, pdims_2d_check, task_coor_2d, periods_2d)
       IF (ANY(pdims_2d_check .NE. pdims_2d)) THEN
-         DBCSR_ABORT("inconsistent process grid dimensions")
+         CPABORT("inconsistent process grid dimensions")
       ENDIF
 
       IF (ALLOCATED(pgrid_prv%tas_split_info)) THEN
@@ -698,7 +698,7 @@ CONTAINS
       ENDIF
 
       IF (abort) THEN
-         DBCSR_ABORT("can not destroy non-existing tensor distribution")
+         CPABORT("can not destroy non-existing tensor distribution")
       ENDIF
 
       dist%refcount = dist%refcount - 1
@@ -721,7 +721,7 @@ CONTAINS
       INTEGER, POINTER                            :: ref
 
       IF (dist%refcount < 1) THEN
-         DBCSR_ABORT("can not hold non-existing tensor distribution")
+         CPABORT("can not hold non-existing tensor distribution")
       ENDIF
       ref => dist%refcount
       ref = ref + 1
@@ -863,7 +863,7 @@ CONTAINS
       INTEGER, POINTER :: ref
 
       IF (tensor%refcount < 1) THEN
-         DBCSR_ABORT("can not hold non-existing tensor")
+         CPABORT("can not hold non-existing tensor")
       ENDIF
       ref => tensor%refcount
       ref = ref + 1
@@ -961,7 +961,7 @@ CONTAINS
 
    SUBROUTINE dbs_t_create_matrix(matrix_in, tensor, order, name)
       !! Create 2-rank tensor from matrix.
-      TYPE(dbs_type), INTENT(IN)                :: matrix_in
+      TYPE(dbcsr_type), INTENT(IN)                :: matrix_in
       TYPE(dbs_t_type), INTENT(OUT)             :: tensor
       INTEGER, DIMENSION(2), INTENT(IN), OPTIONAL :: order
       CHARACTER(len=*), INTENT(IN), OPTIONAL      :: name
@@ -969,7 +969,7 @@ CONTAINS
       CHARACTER(len=default_string_length)        :: name_in
       INTEGER, DIMENSION(2)                       :: order_in
       INTEGER                                     :: comm_2d, data_type
-      TYPE(dbs_distribution_type)                :: matrix_dist
+      TYPE(dbcsr_distribution_type)                :: matrix_dist
       TYPE(dbs_t_distribution_type)             :: dist
       INTEGER, DIMENSION(:), POINTER              :: row_blk_size, col_blk_size
       INTEGER, DIMENSION(:), POINTER              :: col_dist, row_dist
@@ -984,7 +984,7 @@ CONTAINS
       IF (PRESENT(name)) THEN
          name_in = name
       ELSE
-         CALL dbs_get_info(matrix_in, name=name_in)
+         CALL dbcsr_get_info(matrix_in, name=name_in)
       ENDIF
 
       IF (PRESENT(order)) THEN
@@ -993,8 +993,8 @@ CONTAINS
          order_in = [1, 2]
       ENDIF
 
-      CALL dbs_get_info(matrix_in, distribution=matrix_dist)
-      CALL dbs_distribution_get(matrix_dist, group=comm_2d, row_dist=row_dist, col_dist=col_dist, &
+      CALL dbcsr_get_info(matrix_in, distribution=matrix_dist)
+      CALL dbcsr_distribution_get(matrix_dist, group=comm_2d, row_dist=row_dist, col_dist=col_dist, &
                                   nprows=pdims_2d(1), npcols=pdims_2d(2))
       comm_nd = dbs_t_nd_mp_comm(comm_2d, [order_in(1)], [order_in(2)], pdims_2d=pdims_2d)
 
@@ -1004,7 +1004,7 @@ CONTAINS
          [order_in(1)], [order_in(2)], &
          row_dist, col_dist, own_comm=.TRUE.)
 
-      CALL dbs_get_info(matrix_in, &
+      CALL dbcsr_get_info(matrix_in, &
                           data_type=data_type, &
                           row_blk_size=row_blk_size, &
                           col_blk_size=col_blk_size)
@@ -1053,7 +1053,7 @@ CONTAINS
       ENDIF
 
       IF (abort) THEN
-         DBCSR_ABORT("can not destroy non-existing tensor")
+         CPABORT("can not destroy non-existing tensor")
       ENDIF
 
       tensor%refcount = tensor%refcount - 1
@@ -1086,7 +1086,7 @@ CONTAINS
       INTEGER, DIMENSION(ndims_tensor(tensor)), &
          INTENT(OUT)                              :: dims
 
-      DBCSR_ASSERT(tensor%valid)
+      CPASSERT(tensor%valid)
       dims = tensor%nd_index%dims_nd
    END SUBROUTINE
 
@@ -1096,7 +1096,7 @@ CONTAINS
       INTEGER, DIMENSION(ndims_tensor(tensor)), &
          INTENT(OUT)                              :: dims
 
-      DBCSR_ASSERT(tensor%valid)
+      CPASSERT(tensor%valid)
       dims = tensor%nd_index_blk%dims_nd
    END SUBROUTINE
 
@@ -1130,7 +1130,7 @@ CONTAINS
          INTENT(OUT)                              :: blk_offset
          !! block offset
 
-      DBCSR_ASSERT(tensor%valid)
+      CPASSERT(tensor%valid)
       blk_offset(:) = get_array_elements(tensor%blk_offsets, ind)
    END SUBROUTINE
 
@@ -1218,7 +1218,7 @@ CONTAINS
       CALL mp_cart_create(mp_comm, 2, pdims_2d, pos, pgrid%mp_comm_2d)
 
       IF (PRESENT(nsplit)) THEN
-         DBCSR_ASSERT(PRESENT(dimsplit))
+         CPASSERT(PRESENT(dimsplit))
          CALL dbs_tas_create_split(info, pgrid%mp_comm_2d, dimsplit, nsplit, opt_nsplit=.FALSE.)
          ALLOCATE (pgrid%tas_split_info, SOURCE=info)
       ENDIF
@@ -1292,7 +1292,7 @@ CONTAINS
       TYPe(nd_to_2d_mapping)                  :: nd_index_grid
       INTEGER, DIMENSION(2)                   :: pdims_2d
 
-      DBCSR_ASSERT(ALL(pdims > 0))
+      CPASSERT(ALL(pdims > 0))
       CALL dbs_tas_get_split_info(pgrid%tas_split_info, nsplit=nsplit, split_rowcol=dimsplit)
       CALL dbs_t_get_mapping_info(pgrid%nd_index_grid, map1_2d=map1_2d, map2_2d=map2_2d)
       CALL create_nd_to_2d_mapping(nd_index_grid, pdims, map1_2d, map2_2d, base=0, col_major=.FALSE.)
@@ -1475,8 +1475,8 @@ CONTAINS
    SUBROUTINE dbs_t_scale(tensor, alpha)
       !! as dbs_scale
       TYPE(dbs_t_type), INTENT(INOUT) :: tensor
-      TYPE(dbs_scalar_type), INTENT(IN) :: alpha
-      CALL dbs_scale(tensor%matrix_rep%matrix, alpha)
+      TYPE(dbcsr_scalar_type), INTENT(IN) :: alpha
+      CALL dbcsr_scale(tensor%matrix_rep%matrix, alpha)
    END SUBROUTINE
 
    PURE FUNCTION dbs_t_get_nze(tensor)

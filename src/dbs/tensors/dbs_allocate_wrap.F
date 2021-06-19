@@ -16,9 +16,9 @@ MODULE dbs_allocate_wrap
 #:include "dbs_tensor.fypp"
 #:set maxdim = fortran_max_ndim
 
-   USE dbs_kinds, ONLY: ${uselist(dtype_float_prec)}$
+   USE kinds, ONLY: ${uselist(dtype_float_prec)}$
 
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
    IMPLICIT NONE
    PRIVATE
 
@@ -65,7 +65,7 @@ CONTAINS
             shape_prv = SHAPE(source)
          ENDIF
       ELSE
-         DBCSR_ABORT("either source or shape_spec must be present")
+         CPABORT("either source or shape_spec must be present")
       ENDIF
 
       IF (PRESENT(source)) THEN

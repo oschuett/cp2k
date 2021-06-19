@@ -11,22 +11,23 @@ MODULE dbs_tas_util
 
    !! often used utilities for tall-and-skinny matrices
 
-   USE dbs_mp_methods, ONLY: dbs_mp_new
-   USE dbs_types, ONLY: dbs_mp_obj, &
-                          dbs_transpose, &
-                          dbs_no_transpose
-   USE dbs_kinds, ONLY: int_8
-   USE dbs_mpiwrap, ONLY: mp_cart_rank, &
+   USE dbcsr_mp_methods, ONLY: dbcsr_mp_new
+   USE dbcsr_types, ONLY: dbcsr_mp_obj, &
+                          dbcsr_transpose, &
+                          dbcsr_no_transpose
+   USE kinds, ONLY: int_8
+   USE message_passing, ONLY: mp_cart_rank, &
                             mp_environ
-   USE dbs_index_operations, ONLY: dbs_sort_indices
+   USE dbcsr_index_operations, ONLY: dbcsr_sort_indices
 
-#include "base/dbs_base_uses.f90"
-#if TO_VERSION(1, 11) <= TO_VERSION(LIBXSMM_CONFIG_VERSION_MAJOR, LIBXSMM_CONFIG_VERSION_MINOR)
-   USE libxsmm, ONLY: libxsmm_diff
-#  define PURE_ARRAY_EQ
-#else
+#include "../../base/base_uses.f90"
+
+! #if TO_VERSION(1, 11) <= TO_VERSION(LIBXSMM_CONFIG_VERSION_MAJOR, LIBXSMM_CONFIG_VERSION_MINOR)
+!    USE libxsmm, ONLY: libxsmm_diff
+! #  define PURE_ARRAY_EQ
+! #else
 #  define PURE_ARRAY_EQ PURE
-#endif
+! #endif
 
    IMPLICIT NONE
    PRIVATE
@@ -54,7 +55,7 @@ CONTAINS
    FUNCTION dbs_mp_environ(mp_comm)
       !! Create a dbcsr mp environment from communicator
       INTEGER, INTENT(IN)                                :: mp_comm
-      TYPE(dbs_mp_obj)                                 :: dbs_mp_environ
+      TYPE(dbcsr_mp_obj)                                 :: dbs_mp_environ
 
       INTEGER                                            :: mynode, numnodes, pcol, prow
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: pgrid
@@ -70,9 +71,9 @@ CONTAINS
          ENDDO
       ENDDO
 
-      DBCSR_ASSERT(mynode == pgrid(mycoord(1), mycoord(2)))
+      CPASSERT(mynode == pgrid(mycoord(1), mycoord(2)))
 
-      CALL dbs_mp_new(dbs_mp_environ, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
+      CALL dbcsr_mp_new(dbs_mp_environ, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
    END FUNCTION
 
    SUBROUTINE swap_i8(arr)
@@ -110,7 +111,7 @@ CONTAINS
       orig_size = SIZE(index_in, 1)
       ALLOCATE (index_tmp(orig_size, 2))
       index_sorted(:, :) = index_in(:, :)
-      CALL dbs_sort_indices(orig_size, index_sorted(:, 1), index_sorted(:, 2))
+      CALL dbcsr_sort_indices(orig_size, index_sorted(:, 1), index_sorted(:, 2))
       count = 0
       prev_index(:) = [0, 0]
       DO blk = 1, orig_size
@@ -128,33 +129,33 @@ CONTAINS
    SUBROUTINE invert_transpose_flag(trans_flag)
       CHARACTER(LEN=1), INTENT(INOUT)                    :: trans_flag
 
-      IF (trans_flag == dbs_transpose) THEN
-         trans_flag = dbs_no_transpose
-      ELSEIF (trans_flag == dbs_no_transpose) THEN
-         trans_flag = dbs_transpose
+      IF (trans_flag == dbcsr_transpose) THEN
+         trans_flag = dbcsr_no_transpose
+      ELSEIF (trans_flag == dbcsr_no_transpose) THEN
+         trans_flag = dbcsr_transpose
       ENDIF
    END SUBROUTINE
 
    PURE_ARRAY_EQ FUNCTION array_eq_i(arr1, arr2)
       INTEGER, DIMENSION(:), INTENT(IN)                  :: arr1, arr2
       LOGICAL                                            :: array_eq_i
-#if TO_VERSION(1, 11) <= TO_VERSION(LIBXSMM_CONFIG_VERSION_MAJOR, LIBXSMM_CONFIG_VERSION_MINOR)
-      array_eq_i = .NOT. libxsmm_diff(arr1, arr2)
-#else
+! #if TO_VERSION(1, 11) <= TO_VERSION(LIBXSMM_CONFIG_VERSION_MAJOR, LIBXSMM_CONFIG_VERSION_MINOR)
+!       array_eq_i = .NOT. libxsmm_diff(arr1, arr2)
+! #else
       array_eq_i = .FALSE.
       IF (SIZE(arr1) .EQ. SIZE(arr2)) array_eq_i = ALL(arr1 == arr2)
-#endif
+! #endif
    END FUNCTION
 
    PURE_ARRAY_EQ FUNCTION array_eq_i8(arr1, arr2)
       INTEGER(KIND=int_8), DIMENSION(:), INTENT(IN)      :: arr1, arr2
       LOGICAL                                            :: array_eq_i8
-#if TO_VERSION(1, 11) <= TO_VERSION(LIBXSMM_CONFIG_VERSION_MAJOR, LIBXSMM_CONFIG_VERSION_MINOR)
-      array_eq_i8 = .NOT. libxsmm_diff(arr1, arr2)
-#else
+! #if TO_VERSION(1, 11) <= TO_VERSION(LIBXSMM_CONFIG_VERSION_MAJOR, LIBXSMM_CONFIG_VERSION_MINOR)
+!       array_eq_i8 = .NOT. libxsmm_diff(arr1, arr2)
+! #else
       array_eq_i8 = .FALSE.
       IF (SIZE(arr1) .EQ. SIZE(arr2)) array_eq_i8 = ALL(arr1 == arr2)
-#endif
+! #endif
    END FUNCTION
 
 END MODULE

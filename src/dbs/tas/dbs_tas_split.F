@@ -17,15 +17,15 @@ MODULE dbs_tas_split
       dbs_tas_distribution
    USE dbs_tas_util, ONLY: &
       swap
-   USE dbs_toollib, ONLY: &
+   USE util, ONLY: &
       sort
-   USE dbs_kinds, ONLY: &
+   USE kinds, ONLY: &
       int_8
-   USE dbs_mpiwrap, ONLY: &
+   USE message_passing, ONLY: &
       mp_bcast, mp_cart_create, mp_comm_dup, mp_comm_free, mp_comm_split_direct, mp_dims_create, mp_environ
-   USE dbs_kinds, ONLY: &
+   USE kinds, ONLY: &
       real_8
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -111,7 +111,7 @@ CONTAINS
 
       IF (iproc == 0) THEN
          to_assert = MOD(numproc_group, pdims(MOD(split_rowcol, 2) + 1)) == 0
-         DBCSR_ASSERT(to_assert)
+         CPASSERT(to_assert)
          split_info%pgrid_split_size = numproc_group/pdims(MOD(split_rowcol, 2) + 1)
       ENDIF
       CALL mp_bcast(split_info%pgrid_split_size, 0, split_info%mp_comm)
@@ -123,14 +123,14 @@ CONTAINS
       CALL world_to_group_proc_map(iproc, pdims, split_rowcol, split_info%pgrid_split_size, igroup_check, pdims_group, iproc_group)
 
       IF (igroup_check .NE. split_info%igroup) THEN
-         DBCSR_ABORT('inconsistent subgroups')
+         CPABORT('inconsistent subgroups')
       ENDIF
 
       CALL mp_cart_create(mp_comm_group, 2, pdims_group, pcoord_group, split_info%mp_comm_group)
 
       CALL mp_environ(numproc_group_check, iproc_group_check, split_info%mp_comm_group)
 
-      DBCSR_ASSERT(iproc_group_check .EQ. iproc_group)
+      CPASSERT(iproc_group_check .EQ. iproc_group)
 
       CALL mp_comm_free(mp_comm_group)
 
@@ -219,10 +219,10 @@ CONTAINS
                                                     minpos, get_opt_nsplit
       INTEGER, DIMENSION(2)                      :: dims_sub
 
-      DBCSR_ASSERT(nsplit > 0)
+      CPASSERT(nsplit > 0)
 
       IF (split_pgrid) THEN
-         DBCSR_ASSERT(PRESENT(pdim_nonsplit))
+         CPASSERT(PRESENT(pdim_nonsplit))
       ENDIF
 
       lb = CEILING(REAL(nsplit, real_8)/default_nsplit_accept_ratio)
@@ -331,7 +331,7 @@ CONTAINS
          opt_nsplit_prv = .TRUE.
       ENDIF
 
-      DBCSR_ASSERT(nsplit > 0)
+      CPASSERT(nsplit > 0)
 
       CALL mp_environ(numproc, iproc, mp_comm)
       CALL mp_environ(numproc, pdims, pcoord, mp_comm)
@@ -349,7 +349,7 @@ CONTAINS
          nsplit_opt = get_opt_nsplit(pdim_split, nsplit, split_pgrid=.TRUE., pdim_nonsplit=pdim_nonsplit)
       ELSE
          IF (MOD(pdims(split_rowcol), nsplit) .NE. 0) THEN
-            DBCSR_ABORT("Split factor does not divide process grid dimension")
+            CPABORT("Split factor does not divide process grid dimension")
          ENDIF
          nsplit_opt = nsplit
       ENDIF
@@ -429,7 +429,7 @@ CONTAINS
       ENDIF
 
       IF (abort) THEN
-         DBCSR_ABORT("can not destroy non-existing split_info")
+         CPABORT("can not destroy non-existing split_info")
       ENDIF
 
       split_info%refcount = split_info%refcount - 1
@@ -451,7 +451,7 @@ CONTAINS
       INTEGER, POINTER                                   :: ref
 
       IF (split_info%refcount < 1) THEN
-         DBCSR_ABORT("can not hold non-existing split_info")
+         CPABORT("can not hold non-existing split_info")
       ENDIF
       ref => split_info%refcount
       ref = ref + 1
@@ -478,7 +478,7 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: pcoord, pcoord_group
 
       IF (PRESENT(iproc_group)) THEN
-         DBCSR_ASSERT(PRESENT(pdims_group))
+         CPASSERT(PRESENT(pdims_group))
       ENDIF
 
       pcoord = [iproc/pdims(2), MOD(iproc, pdims(2))]

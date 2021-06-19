@@ -18,14 +18,14 @@ MODULE dbs_tensor_io
       dbs_t_get_info, dbs_t_type, ndims_tensor, dbs_t_get_num_blocks, dbs_t_get_num_blocks_total, &
       blk_dims_tensor, dbs_t_get_stored_coordinates, dbs_t_get_nze, dbs_t_get_nze_total, &
       dbs_t_pgrid_type, dbs_t_nblks_total
-   USE dbs_kinds, ONLY: default_string_length, int_8, real_8
-   USE dbs_mpiwrap, ONLY: mp_environ, mp_sum, mp_max
+   USE kinds, ONLY: default_string_length, int_8, real_8
+   USE message_passing, ONLY: mp_environ, mp_sum, mp_max
    USE dbs_tensor_block, ONLY: &
       dbs_t_iterator_type, dbs_t_iterator_next_block, dbs_t_iterator_start, &
       dbs_t_iterator_blocks_left, dbs_t_iterator_stop, dbs_t_get_block
    USE dbs_tas_io, ONLY: dbs_tas_write_split_info
 
-#include "base/dbs_base_uses.f90"
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -186,11 +186,11 @@ CONTAINS
          CALL dbs_t_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size)
          CALL dbs_t_get_stored_coordinates(tensor, blk_index, proc)
          CALL mp_environ(numnodes, mynode, tensor%pgrid%mp_comm_2d)
-         DBCSR_ASSERT(proc .EQ. mynode)
+         CPASSERT(proc .EQ. mynode)
 #:for ndim in ndims
          IF (ndims_tensor(tensor) == ${ndim}$) THEN
             CALL dbs_t_get_block(tensor, blk_index, blk_values_${ndim}$, found)
-            DBCSR_ASSERT(found)
+            CPASSERT(found)
             CALL dbs_t_write_block(tensor%name, blk_size, blk_index, proc, io_unit_all, &
                                      blk_values_${ndim}$=blk_values_${ndim}$, write_int=write_int)
             DEALLOCATE (blk_values_${ndim}$)
@@ -274,7 +274,7 @@ CONTAINS
          CALL dbs_t_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size)
          CALL dbs_t_get_stored_coordinates(tensor, blk_index, proc)
          CALL mp_environ(numnodes, mynode, tensor%pgrid%mp_comm_2d)
-         DBCSR_ASSERT(proc .EQ. mynode)
+         CPASSERT(proc .EQ. mynode)
 #:for ndim in ndims
          IF (ndims_tensor(tensor) == ${ndim}$) THEN
             WRITE (io_unit_all, '(T7,A,T16,A,${ndim}$I3,1X,A,1X,I3,A2,${ndim}$I3)') &
