@@ -1,0 +1,94 @@
+!--------------------------------------------------------------------------------------------------!
+! Copyright (C) by the DBCSR developers group - All rights reserved                                !
+! This file is part of the DBCSR library.                                                          !
+!                                                                                                  !
+! For information on the license, see the LICENSE file.                                            !
+! For further information please visit https://dbcsr.cp2k.org                                      !
+! SPDX-License-Identifier: GPL-2.0+                                                                !
+!--------------------------------------------------------------------------------------------------!
+
+MODULE dbs_tas_types
+   !! DBCSR tall-and-skinny base types.
+   !! Mostly wrappers around existing DBCSR routines.
+
+   USE dbs_tas_global, ONLY: &
+      dbs_tas_distribution, dbs_tas_rowcol_data
+   USE dbs_types, ONLY: &
+      dbs_distribution_obj, dbs_iterator, dbs_type
+   USE dbs_kinds, ONLY: int_8
+   USE dbs_data_types, ONLY: dbs_scalar_type
+#include "base/dbs_base_uses.f90"
+
+   IMPLICIT NONE
+   PRIVATE
+
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tas_types'
+
+   PUBLIC :: &
+      dbs_tas_distribution_type, &
+      dbs_tas_iterator, &
+      dbs_tas_split_info, &
+      dbs_tas_type, &
+      dbs_tas_mm_storage
+
+   ! info on MPI Cartesian grid that is split on MPI subgroups.
+   ! info on distribution of matrix rows / columns to different subgroups.
+   TYPE dbs_tas_split_info
+      INTEGER :: mp_comm ! global communicator
+      INTEGER, DIMENSION(2) :: pdims ! dimensions of process grid
+      INTEGER :: igroup ! which subgroup do I belong to
+      INTEGER :: ngroup ! how many groups in total
+      INTEGER :: split_rowcol ! split row or column?
+      INTEGER :: pgrid_split_size ! how many process rows/cols in subgroups
+      INTEGER :: group_size ! group size (how many cores) of subgroups
+      INTEGER :: mp_comm_group ! sub communicator
+      INTEGER, ALLOCATABLE :: ngroup_opt ! optimal number of groups (split factor)
+      LOGICAL, DIMENSION(2) :: strict_split = [.FALSE., .FALSE.]
+      ! if .true., split factor should not be modified (2 parameters for current and general settings)
+      INTEGER, POINTER :: refcount => NULL() ! lightweight reference counting for communicators
+   END TYPE
+
+   TYPE dbs_tas_distribution_type
+      TYPE(dbs_tas_split_info) :: info
+      TYPE(dbs_distribution_obj) :: dbs_dist
+      CLASS(dbs_tas_distribution), ALLOCATABLE :: row_dist
+      CLASS(dbs_tas_distribution), ALLOCATABLE :: col_dist
+      INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:) :: local_rowcols
+   END TYPE
+
+   ! storage for batched matrix multiplication
+   TYPE dbs_tas_mm_storage
+      TYPE(dbs_tas_type), POINTER :: store_batched => NULL() ! intermediate replicated matrix
+      TYPE(dbs_tas_type), POINTER :: store_batched_repl => NULL() ! intermediate replicated matrix
+      LOGICAL :: batched_out ! whether replicated matrix has been changed in mm and should be copied to actual matrix
+      LOGICAL :: batched_trans
+      TYPE(dbs_scalar_type) :: batched_beta
+   END TYPE
+
+   ! type for tall-and-skinny matrices
+   TYPE dbs_tas_type
+      TYPE(dbs_tas_distribution_type)  :: dist
+      CLASS(dbs_tas_rowcol_data), ALLOCATABLE :: row_blk_size
+      CLASS(dbs_tas_rowcol_data), ALLOCATABLE :: col_blk_size
+
+      TYPE(dbs_type) :: matrix ! matrix on subgroup
+      INTEGER(KIND=int_8) :: nblkrows ! total number of rows
+      INTEGER(KIND=int_8) :: nblkcols ! total number of columns
+      INTEGER(KIND=int_8) :: nblkrowscols_split ! nblkrows or nblkcols depending on which is splitted
+      INTEGER(KIND=int_8) :: nfullrows ! total number of full (not blocked) rows
+      INTEGER(KIND=int_8) :: nfullcols ! total number of full (not blocked) columns
+      LOGICAL :: valid = .FALSE. ! has been created?
+
+      ! storage and flags for batched matrix multiplication
+      INTEGER :: do_batched = 0 ! state flag for batched multiplication
+      TYPE(dbs_tas_mm_storage), ALLOCATABLE :: mm_storage ! storage for batched processing of matrix matrix multiplication.
+      LOGICAL :: has_opt_pgrid = .FALSE. ! whether pgrid was automatically optimized
+   END TYPE
+
+   TYPE dbs_tas_iterator
+      TYPE(dbs_tas_split_info) :: info
+      TYPE(dbs_tas_distribution_type) :: dist
+      TYPE(dbs_iterator) :: iter
+   END TYPE dbs_tas_iterator
+
+END MODULE
