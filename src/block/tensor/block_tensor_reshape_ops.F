@@ -7,7 +7,7 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE block_tensor_transform
+MODULE block_tensor_reshape_ops
    !! Routines to reshape / redistribute tensors
 
 #:include "block_tensor.fypp"
@@ -40,7 +40,7 @@ MODULE block_tensor_transform
 
    IMPLICIT NONE
    PRIVATE
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor_transform'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor_reshape_ops'
 
    PUBLIC :: &
       block_tensor_reshape
@@ -419,4 +419,4 @@ CONTAINS
    END SUBROUTINE
 #:endfor
 
-END MODULE block_tensor_transform
+END MODULE block_tensor_reshape_ops

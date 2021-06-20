@@ -60,7 +60,7 @@ MODULE block_tensor
       mp_environ, mp_max, mp_sum, mp_comm_free, mp_cart_create, mp_sync
    USE util, ONLY: &
       sort
-   USE block_tensor_transform, ONLY: &
+   USE block_tensor_reshape_ops, ONLY: &
       block_tensor_reshape
    USE block_tas_split, ONLY: &
       block_tas_mp_comm, rowsplit, colsplit, block_tas_info_hold, block_tas_release_info, default_nsplit_accept_ratio, &
