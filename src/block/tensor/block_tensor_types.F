@@ -15,11 +15,12 @@ MODULE block_tensor_types
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
+   USE dbcsr_api, ONLY: dbcsr_type, dbcsr_get_info, dbcsr_distribution_type, dbcsr_distribution_get
    USE block_array_list_methods, ONLY: &
       array_list, array_offsets, create_array_list, destroy_array_list, get_array_elements, &
       sizes_of_arrays, sum_of_arrays, array_sublist, get_arrays, get_ith_array, array_eq_i
-   USE dbcsr_api, ONLY: &
-      dbcsr_distribution_get, dbcsr_distribution_type, dbcsr_get_info, dbcsr_type, &
+   USE block_matrix_api, ONLY: &
+      block_matrix_distribution_get, block_matrix_distribution_obj, block_matrix_get_info, block_matrix_type, &
       ${uselist(dtype_float_param)}$
    USE kinds, ONLY: &
       ${uselist(dtype_float_prec)}$, &
@@ -45,8 +46,8 @@ MODULE block_tensor_types
       mp_cart_create, mp_cart_rank, mp_environ, mp_dims_create, mp_comm_free, mp_comm_dup, mp_sum, mp_max
    USE block_tas_global, ONLY: block_tas_distribution, block_tas_rowcol_data, block_tas_default_distvec
    USE block_allocate_wrap, ONLY: allocate_any
-   USE dbcsr_data_types, ONLY: dbcsr_scalar_type
-   USE dbcsr_operations, ONLY: dbcsr_scale
+   USE block_matrix_api, ONLY: block_scalar_type
+   USE block_matrix_api, ONLY: block_matrix_scale
    USE util, ONLY: sort
 #include "../../base/base_uses.f90"
 
@@ -962,15 +963,15 @@ CONTAINS
    SUBROUTINE block_tensor_create_matrix(matrix_in, tensor, order, name)
       !! Create 2-rank tensor from matrix.
       TYPE(dbcsr_type), INTENT(IN)                :: matrix_in
-      TYPE(block_tensor_type), INTENT(OUT)             :: tensor
+      TYPE(block_tensor_type), INTENT(OUT)        :: tensor
       INTEGER, DIMENSION(2), INTENT(IN), OPTIONAL :: order
       CHARACTER(len=*), INTENT(IN), OPTIONAL      :: name
 
       CHARACTER(len=default_string_length)        :: name_in
       INTEGER, DIMENSION(2)                       :: order_in
       INTEGER                                     :: comm_2d, data_type
-      TYPE(dbcsr_distribution_type)                :: matrix_dist
-      TYPE(block_tensor_distribution_type)             :: dist
+      TYPE(dbcsr_distribution_type)               :: matrix_dist
+      TYPE(block_tensor_distribution_type)        :: dist
       INTEGER, DIMENSION(:), POINTER              :: row_blk_size, col_blk_size
       INTEGER, DIMENSION(:), POINTER              :: col_dist, row_dist
       INTEGER                                   :: handle
@@ -1475,8 +1476,8 @@ CONTAINS
    SUBROUTINE block_tensor_scale(tensor, alpha)
       !! as block_scale
       TYPE(block_tensor_type), INTENT(INOUT) :: tensor
-      TYPE(dbcsr_scalar_type), INTENT(IN) :: alpha
-      CALL dbcsr_scale(tensor%matrix_rep%matrix, alpha)
+      TYPE(block_scalar_type), INTENT(IN) :: alpha
+      CALL block_matrix_scale(tensor%matrix_rep%matrix, alpha)
    END SUBROUTINE
 
    PURE FUNCTION block_tensor_get_nze(tensor)

@@ -29,7 +29,7 @@ MODULE block_tensor_transform
                                  block_tensor_clear
    USE kinds, ONLY: default_string_length
    USE kinds, ONLY: ${uselist(dtype_float_prec)}$
-   USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
+   USE block_matrix_api, ONLY: ${uselist(dtype_float_param)}$
    USE message_passing, ONLY: mp_alltoall, &
                             mp_environ, &
                             mp_irecv, &

@@ -44,7 +44,7 @@ MODULE block_tensor_split
                                  ndims_matrix_column, &
                                  block_tensor_filter, &
                                  block_tensor_copy_contraction_storage
-   USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
+   USE block_matrix_api, ONLY: ${uselist(dtype_float_param)}$
    USE kinds, ONLY: ${uselist(dtype_float_prec)}$, dp
 
 #include "../../base/base_uses.f90"

@@ -10,12 +10,23 @@
 MODULE block_tas_test
 
    !! testing infrastructure for tall-and-skinny matrices
-   USE dbcsr_types, ONLY: dbcsr_type_real_8
-   USE dbcsr_data_methods, ONLY: dbcsr_scalar
-   USE dbcsr_methods, ONLY: &
-      dbcsr_release, dbcsr_nblkcols_total, dbcsr_nblkrows_total, dbcsr_row_block_sizes, dbcsr_col_block_sizes, &
-      dbcsr_mp_release, dbcsr_distribution_release
-   USE dbcsr_multiply_api, ONLY: dbcsr_multiply
+   USE block_matrix_api, ONLY: &
+      block_type_real_8, block_scalar, &
+      block_matrix_release, block_matrix_nblkcols_total, block_matrix_nblkrows_total, &
+      block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
+      block_matrix_mp_release, block_matrix_distribution_release, &
+      block_matrix_multiply, &
+      block_matrix_type, block_matrix_distribution_obj, block_mp_obj, &
+      block_matrix_no_transpose, block_matrix_transpose, &
+      block_matrix_type_no_symmetry, &
+      block_matrix_distribution_new, &
+      block_matrix_create, &
+      block_matrix_finalize, &
+      block_matrix_checksum, &
+      block_matrix_maxabs, &
+      block_matrix_add, &
+      block_matrix_complete_redistribute, &
+      block_matrix_lapack_larnv, block_matrix_set_larnv_seed
    USE block_tas_base, ONLY: &
       block_tas_convert_to_dbcsr, block_tas_create, block_tas_distribution_new, &
       block_tas_finalize, block_tas_get_stored_coordinates, block_tas_nblkcols_total, &
@@ -30,23 +41,12 @@ MODULE block_tas_test
                               block_tas_get_split_info
    USE block_tas_util, ONLY: block_mp_environ, &
                              invert_transpose_flag
-   USE dbcsr_types, ONLY: &
-      dbcsr_type, dbcsr_distribution_obj, dbcsr_mp_obj, dbcsr_no_transpose, dbcsr_transpose, &
-      dbcsr_type_no_symmetry
    USE kinds, ONLY: int_8, &
                           real_8
    USE message_passing, ONLY: mp_environ, &
                             mp_cart_create, &
                             mp_comm_free
-   USE dbcsr_dist_methods, ONLY: dbcsr_distribution_new
-   USE dbcsr_work_operations, ONLY: dbcsr_create, &
-                                    dbcsr_finalize
-   USE dbcsr_dist_util, ONLY: dbcsr_checksum
-   USE dbcsr_operations, ONLY: dbcsr_maxabs, &
-                               dbcsr_add
-   USE dbcsr_transformations, ONLY: dbcsr_complete_redistribute
-   USE dbcsr_blas_operations, ONLY: &
-      dbcsr_lapack_larnv, set_larnv_seed
+
 #include "../../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -125,7 +125,7 @@ CONTAINS
       cbsize_obj = block_tas_blk_size_arb(cbsizes)
 
       CALL block_tas_distribution_new(dist, mp_comm_out, row_dist_obj, col_dist_obj)
-      CALL block_tas_create(matrix, name, dist=dist, data_type=dbcsr_type_real_8, &
+      CALL block_tas_create(matrix, name, dist=dist, data_type=block_type_real_8, &
                             row_blk_size=rbsize_obj, col_blk_size=cbsize_obj, own_dist=.TRUE.)
 
       max_row_size = MAXVAL(rbsizes)
@@ -151,7 +151,7 @@ CONTAINS
                   row_size = rbsize_obj%data(row_s)
                   col_size = cbsize_obj%data(col_s)
                   nze = row_size*col_size
-                  CALL set_larnv_seed(INT(row_s), INT(nrow), INT(col_s), INT(ncol), randmat_counter, iseed)
+                  CALL block_matrix_set_larnv_seed(INT(row_s), INT(nrow), INT(col_s), INT(ncol), randmat_counter, iseed)
                   CALL dlarnv(1, iseed, max_nze, values)
                   CALL block_tas_put_block(matrix, row_s, col_s, values(1:row_size, 1:col_size))
                ENDIF
@@ -177,14 +177,14 @@ CONTAINS
       LOGICAL, INTENT(IN) :: compare_dbcsr
 
       INTEGER                                            :: handle1, handle2
-      TYPE(dbcsr_type)                                   :: dbcsr_a, dbcsr_b, dbcsr_c, &
-                                                            dbcsr_a_mm, dbcsr_b_mm, dbcsr_c_mm
+      TYPE(block_matrix_type)                                   :: block_matrix_a, block_matrix_b, block_matrix_c, &
+                                                            block_matrix_a_mm, block_matrix_b_mm, block_matrix_c_mm
       INTEGER                                            :: mp_comm, comm_dbcsr
-      TYPE(dbcsr_distribution_obj)                       :: dist_a, dist_b, dist_c
+      TYPE(block_matrix_distribution_obj)                       :: dist_a, dist_b, dist_c
       INTEGER, DIMENSION(2)                              :: npdims, myploc
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: cd_a, cd_b, cd_c, &
                                                             rd_a, rd_b, rd_c
-      TYPE(dbcsr_mp_obj)                                 :: mp_environ_tmp
+      TYPE(block_mp_obj)                                 :: mp_environ_tmp
 
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: row_blk_size, col_blk_size
 
@@ -194,8 +194,8 @@ CONTAINS
       ENDIF
       ENDIF
       CALL timeset("benchmark_tas_mm", handle1)
-      CALL block_tas_multiply(transa, transb, transc, dbcsr_scalar(1.0_real_8), matrix_a, matrix_b, &
-                              dbcsr_scalar(0.0_real_8), matrix_c, &
+      CALL block_tas_multiply(transa, transb, transc, block_scalar(1.0_real_8), matrix_a, matrix_b, &
+                              block_scalar(0.0_real_8), matrix_c, &
                               filter_eps=filter_eps, unit_nr=io_unit)
       CALL timestop(handle1)
       IF (PRESENT(io_unit)) THEN
@@ -205,60 +205,69 @@ CONTAINS
       ENDIF
 
       IF (compare_dbcsr) THEN
-         CALL block_tas_convert_to_dbcsr(matrix_a, dbcsr_a)
-         CALL block_tas_convert_to_dbcsr(matrix_b, dbcsr_b)
-         CALL block_tas_convert_to_dbcsr(matrix_c, dbcsr_c)
+         CALL block_tas_convert_to_dbcsr(matrix_a, block_matrix_a)
+         CALL block_tas_convert_to_dbcsr(matrix_b, block_matrix_b)
+         CALL block_tas_convert_to_dbcsr(matrix_c, block_matrix_c)
 
          CALL block_tas_get_split_info(block_tas_info(matrix_a), mp_comm=mp_comm)
          npdims(:) = 0
          CALL mp_cart_create(mp_comm, 2, npdims, myploc, comm_dbcsr)
 
-         ALLOCATE (rd_a(dbcsr_nblkrows_total(dbcsr_a))); ALLOCATE (cd_a(dbcsr_nblkcols_total(dbcsr_a)))
-         ALLOCATE (rd_b(dbcsr_nblkrows_total(dbcsr_b))); ALLOCATE (cd_b(dbcsr_nblkcols_total(dbcsr_b)))
-         ALLOCATE (rd_c(dbcsr_nblkrows_total(dbcsr_c))); ALLOCATE (cd_c(dbcsr_nblkcols_total(dbcsr_c)))
-         CALL block_tas_default_distvec(INT(dbcsr_nblkrows_total(dbcsr_a)), npdims(1), dbcsr_row_block_sizes(dbcsr_a), rd_a)
-         CALL block_tas_default_distvec(INT(dbcsr_nblkcols_total(dbcsr_a)), npdims(2), dbcsr_col_block_sizes(dbcsr_a), cd_a)
-         CALL block_tas_default_distvec(INT(dbcsr_nblkrows_total(dbcsr_b)), npdims(1), dbcsr_row_block_sizes(dbcsr_b), rd_b)
-         CALL block_tas_default_distvec(INT(dbcsr_nblkcols_total(dbcsr_b)), npdims(2), dbcsr_col_block_sizes(dbcsr_b), cd_b)
-         CALL block_tas_default_distvec(INT(dbcsr_nblkrows_total(dbcsr_c)), npdims(1), dbcsr_row_block_sizes(dbcsr_c), rd_c)
-         CALL block_tas_default_distvec(INT(dbcsr_nblkcols_total(dbcsr_c)), npdims(2), dbcsr_col_block_sizes(dbcsr_c), cd_c)
+         ALLOCATE (rd_a(block_matrix_nblkrows_total(block_matrix_a))); ALLOCATE (cd_a(block_matrix_nblkcols_total(block_matrix_a)))
+         ALLOCATE (rd_b(block_matrix_nblkrows_total(block_matrix_b))); ALLOCATE (cd_b(block_matrix_nblkcols_total(block_matrix_b)))
+         ALLOCATE (rd_c(block_matrix_nblkrows_total(block_matrix_c))); ALLOCATE (cd_c(block_matrix_nblkcols_total(block_matrix_c)))
+         CALL block_tas_default_distvec(INT(block_matrix_nblkrows_total(block_matrix_a)), &
+                                        npdims(1), block_matrix_row_block_sizes(block_matrix_a), rd_a)
+         CALL block_tas_default_distvec(INT(block_matrix_nblkcols_total(block_matrix_a)), &
+                                        npdims(2), block_matrix_col_block_sizes(block_matrix_a), cd_a)
+         CALL block_tas_default_distvec(INT(block_matrix_nblkrows_total(block_matrix_b)), &
+                                        npdims(1), block_matrix_row_block_sizes(block_matrix_b), rd_b)
+         CALL block_tas_default_distvec(INT(block_matrix_nblkcols_total(block_matrix_b)), &
+                                        npdims(2), block_matrix_col_block_sizes(block_matrix_b), cd_b)
+         CALL block_tas_default_distvec(INT(block_matrix_nblkrows_total(block_matrix_c)), &
+                                        npdims(1), block_matrix_row_block_sizes(block_matrix_c), rd_c)
+         CALL block_tas_default_distvec(INT(block_matrix_nblkcols_total(block_matrix_c)), &
+                                        npdims(2), block_matrix_col_block_sizes(block_matrix_c), cd_c)
 
          mp_environ_tmp = block_mp_environ(comm_dbcsr)
-         CALL dbcsr_distribution_new(dist_a, mp_environ_tmp, rd_a, cd_a, reuse_arrays=.TRUE.)
-         CALL dbcsr_distribution_new(dist_b, mp_environ_tmp, rd_b, cd_b, reuse_arrays=.TRUE.)
-         CALL dbcsr_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
-         CALL dbcsr_mp_release(mp_environ_tmp)
+         CALL block_matrix_distribution_new(dist_a, mp_environ_tmp, rd_a, cd_a, reuse_arrays=.TRUE.)
+         CALL block_matrix_distribution_new(dist_b, mp_environ_tmp, rd_b, cd_b, reuse_arrays=.TRUE.)
+         CALL block_matrix_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
+         CALL block_matrix_mp_release(mp_environ_tmp)
 
-         row_blk_size => dbcsr_row_block_sizes(dbcsr_a)
-         col_blk_size => dbcsr_col_block_sizes(dbcsr_a)
-         CALL dbcsr_create(matrix=dbcsr_a_mm, name=dbcsr_a%name, dist=dist_a, matrix_type=dbcsr_type_no_symmetry, &
+         row_blk_size => block_matrix_row_block_sizes(block_matrix_a)
+         col_blk_size => block_matrix_col_block_sizes(block_matrix_a)
+         CALL block_matrix_create(matrix=block_matrix_a_mm, name=block_matrix_a%name, &
+                           dist=dist_a, matrix_type=block_matrix_type_no_symmetry, &
                            row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                           data_type=dbcsr_type_real_8)
-         row_blk_size => dbcsr_row_block_sizes(dbcsr_b)
-         col_blk_size => dbcsr_col_block_sizes(dbcsr_b)
-         CALL dbcsr_create(matrix=dbcsr_b_mm, name=dbcsr_b%name, dist=dist_b, matrix_type=dbcsr_type_no_symmetry, &
+                           data_type=block_type_real_8)
+         row_blk_size => block_matrix_row_block_sizes(block_matrix_b)
+         col_blk_size => block_matrix_col_block_sizes(block_matrix_b)
+         CALL block_matrix_create(matrix=block_matrix_b_mm, name=block_matrix_b%name, &
+                           dist=dist_b, matrix_type=block_matrix_type_no_symmetry, &
                            row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                           data_type=dbcsr_type_real_8)
-         row_blk_size => dbcsr_row_block_sizes(dbcsr_c)
-         col_blk_size => dbcsr_col_block_sizes(dbcsr_c)
-         CALL dbcsr_create(matrix=dbcsr_c_mm, name=dbcsr_c%name, dist=dist_c, matrix_type=dbcsr_type_no_symmetry, &
+                           data_type=block_type_real_8)
+         row_blk_size => block_matrix_row_block_sizes(block_matrix_c)
+         col_blk_size => block_matrix_col_block_sizes(block_matrix_c)
+         CALL block_matrix_create(matrix=block_matrix_c_mm, name=block_matrix_c%name, &
+                           dist=dist_c, matrix_type=block_matrix_type_no_symmetry, &
                            row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                           data_type=dbcsr_type_real_8)
+                           data_type=block_type_real_8)
 
-         CALL dbcsr_finalize(dbcsr_a_mm)
-         CALL dbcsr_finalize(dbcsr_b_mm)
-         CALL dbcsr_finalize(dbcsr_c_mm)
+         CALL block_matrix_finalize(block_matrix_a_mm)
+         CALL block_matrix_finalize(block_matrix_b_mm)
+         CALL block_matrix_finalize(block_matrix_c_mm)
 
-         CALL dbcsr_complete_redistribute(dbcsr_a, dbcsr_a_mm)
-         CALL dbcsr_complete_redistribute(dbcsr_b, dbcsr_b_mm)
+         CALL block_matrix_complete_redistribute(block_matrix_a, block_matrix_a_mm)
+         CALL block_matrix_complete_redistribute(block_matrix_b, block_matrix_b_mm)
          IF (PRESENT(io_unit)) THEN
          IF (io_unit > 0) THEN
             WRITE (io_unit, "(A)") "starting dbcsr benchmark"
          ENDIF
          ENDIF
          CALL timeset("benchmark_block_mm", handle2)
-         CALL dbcsr_multiply(transa, transb, dbcsr_scalar(1.0_real_8), dbcsr_a_mm, dbcsr_b_mm, &
-                             dbcsr_scalar(0.0_real_8), dbcsr_c_mm, filter_eps=filter_eps)
+         CALL block_matrix_multiply(transa, transb, block_scalar(1.0_real_8), block_matrix_a_mm, block_matrix_b_mm, &
+                             block_scalar(0.0_real_8), block_matrix_c_mm, filter_eps=filter_eps)
          CALL timestop(handle2)
          IF (PRESENT(io_unit)) THEN
          IF (io_unit > 0) THEN
@@ -266,15 +275,15 @@ CONTAINS
          ENDIF
          ENDIF
 
-         CALL dbcsr_release(dbcsr_a)
-         CALL dbcsr_release(dbcsr_b)
-         CALL dbcsr_release(dbcsr_c)
-         CALL dbcsr_release(dbcsr_a_mm)
-         CALL dbcsr_release(dbcsr_b_mm)
-         CALL dbcsr_release(dbcsr_c_mm)
-         CALL dbcsr_distribution_release(dist_a)
-         CALL dbcsr_distribution_release(dist_b)
-         CALL dbcsr_distribution_release(dist_c)
+         CALL block_matrix_release(block_matrix_a)
+         CALL block_matrix_release(block_matrix_b)
+         CALL block_matrix_release(block_matrix_c)
+         CALL block_matrix_release(block_matrix_a_mm)
+         CALL block_matrix_release(block_matrix_b_mm)
+         CALL block_matrix_release(block_matrix_c_mm)
+         CALL block_matrix_distribution_release(dist_a)
+         CALL block_matrix_distribution_release(dist_b)
+         CALL block_matrix_distribution_release(dist_c)
 
          CALL mp_comm_free(comm_dbcsr)
       ENDIF
@@ -296,11 +305,11 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: cd_a, cd_b, cd_c, &
                                                             rd_a, rd_b, rd_c
       REAL(KIND=real_8)                                  :: norm, rc_cs, sq_cs
-      TYPE(dbcsr_distribution_obj)                       :: dist_a, dist_b, dist_c
-      TYPE(dbcsr_mp_obj)                                 :: mp_environ_tmp
-      TYPE(dbcsr_type)                                   :: dbcsr_a, dbcsr_a_mm, dbcsr_b, &
-                                                            dbcsr_b_mm, dbcsr_c, dbcsr_c_mm, &
-                                                            dbcsr_c_mm_check
+      TYPE(block_matrix_distribution_obj)                       :: dist_a, dist_b, dist_c
+      TYPE(block_mp_obj)                                 :: mp_environ_tmp
+      TYPE(block_matrix_type)                                   :: block_matrix_a, block_matrix_a_mm, block_matrix_b, &
+                                                            block_matrix_b_mm, block_matrix_c, block_matrix_c_mm, &
+                                                            block_matrix_c_mm_check
       REAL(KIND=real_8), PARAMETER :: test_tol = 1.0E-10_real_8
 
       CALL block_tas_get_split_info(block_tas_info(matrix_a), mp_comm=mp_comm)
@@ -308,74 +317,83 @@ CONTAINS
       io_unit = -1
       IF (mynode .EQ. 0) io_unit = unit_nr
 
-      CALL block_tas_multiply(transa, transb, transc, dbcsr_scalar(1.0_real_8), matrix_a, matrix_b, &
-                              dbcsr_scalar(0.0_real_8), matrix_c, &
+      CALL block_tas_multiply(transa, transb, transc, block_scalar(1.0_real_8), matrix_a, matrix_b, &
+                              block_scalar(0.0_real_8), matrix_c, &
                               filter_eps=filter_eps, unit_nr=io_unit, log_verbose=log_verbose, optimize_dist=.TRUE.)
 
-      CALL block_tas_convert_to_dbcsr(matrix_a, dbcsr_a)
-      CALL block_tas_convert_to_dbcsr(matrix_b, dbcsr_b)
-      CALL block_tas_convert_to_dbcsr(matrix_c, dbcsr_c)
+      CALL block_tas_convert_to_dbcsr(matrix_a, block_matrix_a)
+      CALL block_tas_convert_to_dbcsr(matrix_b, block_matrix_b)
+      CALL block_tas_convert_to_dbcsr(matrix_c, block_matrix_c)
 
       npdims(:) = 0
       CALL mp_cart_create(mp_comm, 2, npdims, myploc, comm_dbcsr)
 
-      ALLOCATE (rd_a(dbcsr_nblkrows_total(dbcsr_a))); ALLOCATE (cd_a(dbcsr_nblkcols_total(dbcsr_a)))
-      ALLOCATE (rd_b(dbcsr_nblkrows_total(dbcsr_b))); ALLOCATE (cd_b(dbcsr_nblkcols_total(dbcsr_b)))
-      ALLOCATE (rd_c(dbcsr_nblkrows_total(dbcsr_c))); ALLOCATE (cd_c(dbcsr_nblkcols_total(dbcsr_c)))
-      CALL block_tas_default_distvec(INT(dbcsr_nblkrows_total(dbcsr_a)), npdims(1), dbcsr_row_block_sizes(dbcsr_a), rd_a)
-      CALL block_tas_default_distvec(INT(dbcsr_nblkcols_total(dbcsr_a)), npdims(2), dbcsr_col_block_sizes(dbcsr_a), cd_a)
-      CALL block_tas_default_distvec(INT(dbcsr_nblkrows_total(dbcsr_b)), npdims(1), dbcsr_row_block_sizes(dbcsr_b), rd_b)
-      CALL block_tas_default_distvec(INT(dbcsr_nblkcols_total(dbcsr_b)), npdims(2), dbcsr_col_block_sizes(dbcsr_b), cd_b)
-      CALL block_tas_default_distvec(INT(dbcsr_nblkrows_total(dbcsr_c)), npdims(1), dbcsr_row_block_sizes(dbcsr_c), rd_c)
-      CALL block_tas_default_distvec(INT(dbcsr_nblkcols_total(dbcsr_c)), npdims(2), dbcsr_col_block_sizes(dbcsr_c), cd_c)
+      ALLOCATE (rd_a(block_matrix_nblkrows_total(block_matrix_a))); ALLOCATE (cd_a(block_matrix_nblkcols_total(block_matrix_a)))
+      ALLOCATE (rd_b(block_matrix_nblkrows_total(block_matrix_b))); ALLOCATE (cd_b(block_matrix_nblkcols_total(block_matrix_b)))
+      ALLOCATE (rd_c(block_matrix_nblkrows_total(block_matrix_c))); ALLOCATE (cd_c(block_matrix_nblkcols_total(block_matrix_c)))
+      CALL block_tas_default_distvec(INT(block_matrix_nblkrows_total(block_matrix_a)), &
+                                     npdims(1), block_matrix_row_block_sizes(block_matrix_a), rd_a)
+      CALL block_tas_default_distvec(INT(block_matrix_nblkcols_total(block_matrix_a)), &
+                                     npdims(2), block_matrix_col_block_sizes(block_matrix_a), cd_a)
+      CALL block_tas_default_distvec(INT(block_matrix_nblkrows_total(block_matrix_b)), &
+                                     npdims(1), block_matrix_row_block_sizes(block_matrix_b), rd_b)
+      CALL block_tas_default_distvec(INT(block_matrix_nblkcols_total(block_matrix_b)), &
+                                     npdims(2), block_matrix_col_block_sizes(block_matrix_b), cd_b)
+      CALL block_tas_default_distvec(INT(block_matrix_nblkrows_total(block_matrix_c)), &
+                                     npdims(1), block_matrix_row_block_sizes(block_matrix_c), rd_c)
+      CALL block_tas_default_distvec(INT(block_matrix_nblkcols_total(block_matrix_c)), &
+                                     npdims(2), block_matrix_col_block_sizes(block_matrix_c), cd_c)
 
       mp_environ_tmp = block_mp_environ(comm_dbcsr)
-      CALL dbcsr_distribution_new(dist_a, mp_environ_tmp, rd_a, cd_a, reuse_arrays=.TRUE.)
-      CALL dbcsr_distribution_new(dist_b, mp_environ_tmp, rd_b, cd_b, reuse_arrays=.TRUE.)
-      CALL dbcsr_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
-      CALL dbcsr_mp_release(mp_environ_tmp)
+      CALL block_matrix_distribution_new(dist_a, mp_environ_tmp, rd_a, cd_a, reuse_arrays=.TRUE.)
+      CALL block_matrix_distribution_new(dist_b, mp_environ_tmp, rd_b, cd_b, reuse_arrays=.TRUE.)
+      CALL block_matrix_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
+      CALL block_matrix_mp_release(mp_environ_tmp)
 
-      CALL dbcsr_create(matrix=dbcsr_a_mm, name="matrix a", dist=dist_a, matrix_type=dbcsr_type_no_symmetry, &
-                        row_blk_size_obj=dbcsr_a%row_blk_size, col_blk_size_obj=dbcsr_a%col_blk_size, &
-                        data_type=dbcsr_type_real_8)
+      CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, matrix_type=block_matrix_type_no_symmetry, &
+                        row_blk_size_obj=block_matrix_a%row_blk_size, col_blk_size_obj=block_matrix_a%col_blk_size, &
+                        data_type=block_type_real_8)
 
-      CALL dbcsr_create(matrix=dbcsr_b_mm, name="matrix b", dist=dist_b, matrix_type=dbcsr_type_no_symmetry, &
-                        row_blk_size_obj=dbcsr_b%row_blk_size, col_blk_size_obj=dbcsr_b%col_blk_size, &
-                        data_type=dbcsr_type_real_8)
+      CALL block_matrix_create(matrix=block_matrix_b_mm, name="matrix b", dist=dist_b, matrix_type=block_matrix_type_no_symmetry, &
+                        row_blk_size_obj=block_matrix_b%row_blk_size, col_blk_size_obj=block_matrix_b%col_blk_size, &
+                        data_type=block_type_real_8)
 
-      CALL dbcsr_create(matrix=dbcsr_c_mm, name="matrix c", dist=dist_c, matrix_type=dbcsr_type_no_symmetry, &
-                        row_blk_size_obj=dbcsr_c%row_blk_size, col_blk_size_obj=dbcsr_c%col_blk_size, &
-                        data_type=dbcsr_type_real_8)
+      CALL block_matrix_create(matrix=block_matrix_c_mm, name="matrix c", dist=dist_c, matrix_type=block_matrix_type_no_symmetry, &
+                        row_blk_size_obj=block_matrix_c%row_blk_size, col_blk_size_obj=block_matrix_c%col_blk_size, &
+                        data_type=block_type_real_8)
 
-      CALL dbcsr_create(matrix=dbcsr_c_mm_check, name="matrix c check", dist=dist_c, matrix_type=dbcsr_type_no_symmetry, &
-                        row_blk_size_obj=dbcsr_c%row_blk_size, col_blk_size_obj=dbcsr_c%col_blk_size, &
-                        data_type=dbcsr_type_real_8)
+      CALL block_matrix_create(matrix=block_matrix_c_mm_check, name="matrix c check", &
+                        dist=dist_c, matrix_type=block_matrix_type_no_symmetry, &
+                        row_blk_size_obj=block_matrix_c%row_blk_size, col_blk_size_obj=block_matrix_c%col_blk_size, &
+                        data_type=block_type_real_8)
 
-      CALL dbcsr_finalize(dbcsr_a_mm)
-      CALL dbcsr_finalize(dbcsr_b_mm)
-      CALL dbcsr_finalize(dbcsr_c_mm)
-      CALL dbcsr_finalize(dbcsr_c_mm_check)
+      CALL block_matrix_finalize(block_matrix_a_mm)
+      CALL block_matrix_finalize(block_matrix_b_mm)
+      CALL block_matrix_finalize(block_matrix_c_mm)
+      CALL block_matrix_finalize(block_matrix_c_mm_check)
 
-      CALL dbcsr_complete_redistribute(dbcsr_a, dbcsr_a_mm)
-      CALL dbcsr_complete_redistribute(dbcsr_b, dbcsr_b_mm)
-      CALL dbcsr_complete_redistribute(dbcsr_c, dbcsr_c_mm_check)
+      CALL block_matrix_complete_redistribute(block_matrix_a, block_matrix_a_mm)
+      CALL block_matrix_complete_redistribute(block_matrix_b, block_matrix_b_mm)
+      CALL block_matrix_complete_redistribute(block_matrix_c, block_matrix_c_mm_check)
 
       transa_prv = transa; transb_prv = transb
 
-      IF (transc == dbcsr_no_transpose) THEN
-         CALL dbcsr_multiply(transa_prv, transb_prv, dbcsr_scalar(1.0_real_8), &
-                             dbcsr_a_mm, dbcsr_b_mm, dbcsr_scalar(0.0_real_8), dbcsr_c_mm, filter_eps=filter_eps)
-      ELSEIF (transc == dbcsr_transpose) THEN
+      IF (transc == block_matrix_no_transpose) THEN
+         CALL block_matrix_multiply(transa_prv, transb_prv, block_scalar(1.0_real_8), &
+                             block_matrix_a_mm, block_matrix_b_mm, &
+                             block_scalar(0.0_real_8), block_matrix_c_mm, filter_eps=filter_eps)
+      ELSEIF (transc == block_matrix_transpose) THEN
          CALL invert_transpose_flag(transa_prv)
          CALL invert_transpose_flag(transb_prv)
-         CALL dbcsr_multiply(transb_prv, transa_prv, dbcsr_scalar(1.0_real_8), &
-                             dbcsr_b_mm, dbcsr_a_mm, dbcsr_scalar(0.0_real_8), dbcsr_c_mm, filter_eps=filter_eps)
+         CALL block_matrix_multiply(transb_prv, transa_prv, block_scalar(1.0_real_8), &
+                             block_matrix_b_mm, block_matrix_a_mm, &
+                             block_scalar(0.0_real_8), block_matrix_c_mm, filter_eps=filter_eps)
       ENDIF
 
-      sq_cs = dbcsr_checksum(dbcsr_c_mm)
-      rc_cs = dbcsr_checksum(dbcsr_c_mm_check)
-      CALL dbcsr_add(dbcsr_c_mm_check, dbcsr_c_mm, -1.0_real_8, 1.0_real_8)
-      norm = dbcsr_maxabs(dbcsr_c_mm_check)
+      sq_cs = block_matrix_checksum(block_matrix_c_mm)
+      rc_cs = block_matrix_checksum(block_matrix_c_mm_check)
+      CALL block_matrix_add(block_matrix_c_mm_check, block_matrix_c_mm, -1.0_real_8, 1.0_real_8)
+      norm = block_matrix_maxabs(block_matrix_c_mm_check)
 
       IF (io_unit > 0) THEN
       IF (ABS(norm) .GT. test_tol) THEN
@@ -392,32 +410,32 @@ CONTAINS
       ENDIF
       ENDIF
 
-      CALL dbcsr_release(dbcsr_a)
-      CALL dbcsr_release(dbcsr_a_mm)
-      CALL dbcsr_release(dbcsr_b)
-      CALL dbcsr_release(dbcsr_b_mm)
-      CALL dbcsr_release(dbcsr_c)
-      CALL dbcsr_release(dbcsr_c_mm)
-      CALL dbcsr_release(dbcsr_c_mm_check)
+      CALL block_matrix_release(block_matrix_a)
+      CALL block_matrix_release(block_matrix_a_mm)
+      CALL block_matrix_release(block_matrix_b)
+      CALL block_matrix_release(block_matrix_b_mm)
+      CALL block_matrix_release(block_matrix_c)
+      CALL block_matrix_release(block_matrix_c_mm)
+      CALL block_matrix_release(block_matrix_c_mm_check)
 
-      CALL dbcsr_distribution_release(dist_a)
-      CALL dbcsr_distribution_release(dist_b)
-      CALL dbcsr_distribution_release(dist_c)
+      CALL block_matrix_distribution_release(dist_a)
+      CALL block_matrix_distribution_release(dist_b)
+      CALL block_matrix_distribution_release(dist_c)
 
       CALL mp_comm_free(comm_dbcsr)
 
    END SUBROUTINE
 
    FUNCTION block_tas_checksum(matrix, local, pos)
-      !! Calculate checksum of tall-and-skinny matrix consistent with dbcsr_checksum
+      !! Calculate checksum of tall-and-skinny matrix consistent with block_matrix_checksum
       TYPE(block_tas_type), INTENT(IN) :: matrix
       LOGICAL, INTENT(IN), OPTIONAL  :: local, pos
-      TYPE(dbcsr_type)               :: dbcsr_m
+      TYPE(block_matrix_type)               :: block_matrix_m
       REAL(KIND=real_8)              :: block_tas_checksum
 
-      CALL block_tas_convert_to_dbcsr(matrix, dbcsr_m)
-      block_tas_checksum = dbcsr_checksum(dbcsr_m, local, pos)
-      CALL dbcsr_release(dbcsr_m)
+      CALL block_tas_convert_to_dbcsr(matrix, block_matrix_m)
+      block_tas_checksum = block_matrix_checksum(block_matrix_m, local, pos)
+      CALL block_matrix_release(block_matrix_m)
    END FUNCTION
 
    SUBROUTINE block_tas_random_bsizes(sizes, repeat, block_sizes)

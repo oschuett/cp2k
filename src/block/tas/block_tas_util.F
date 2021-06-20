@@ -11,14 +11,13 @@ MODULE block_tas_util
 
    !! often used utilities for tall-and-skinny matrices
 
-   USE dbcsr_mp_methods, ONLY: dbcsr_mp_new
-   USE dbcsr_types, ONLY: dbcsr_mp_obj, &
-                          dbcsr_transpose, &
-                          dbcsr_no_transpose
+   USE block_matrix_api, ONLY: block_mp_new, block_mp_obj, &
+                               block_matrix_transpose, &
+                               block_matrix_no_transpose, &
+                               block_matrix_sort_indices
+
    USE kinds, ONLY: int_8
-   USE message_passing, ONLY: mp_cart_rank, &
-                            mp_environ
-   USE dbcsr_index_operations, ONLY: dbcsr_sort_indices
+   USE message_passing, ONLY: mp_cart_rank, mp_environ
 
 #include "../../base/base_uses.f90"
 
@@ -55,7 +54,7 @@ CONTAINS
    FUNCTION block_mp_environ(mp_comm)
       !! Create a dbcsr mp environment from communicator
       INTEGER, INTENT(IN)                                :: mp_comm
-      TYPE(dbcsr_mp_obj)                                 :: block_mp_environ
+      TYPE(block_mp_obj)                                 :: block_mp_environ
 
       INTEGER                                            :: mynode, numnodes, pcol, prow
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: pgrid
@@ -73,7 +72,7 @@ CONTAINS
 
       CPASSERT(mynode == pgrid(mycoord(1), mycoord(2)))
 
-      CALL dbcsr_mp_new(block_mp_environ, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
+      CALL block_mp_new(block_mp_environ, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
    END FUNCTION
 
    SUBROUTINE swap_i8(arr)
@@ -111,7 +110,7 @@ CONTAINS
       orig_size = SIZE(index_in, 1)
       ALLOCATE (index_tmp(orig_size, 2))
       index_sorted(:, :) = index_in(:, :)
-      CALL dbcsr_sort_indices(orig_size, index_sorted(:, 1), index_sorted(:, 2))
+      CALL block_matrix_sort_indices(orig_size, index_sorted(:, 1), index_sorted(:, 2))
       count = 0
       prev_index(:) = [0, 0]
       DO blk = 1, orig_size
@@ -129,10 +128,10 @@ CONTAINS
    SUBROUTINE invert_transpose_flag(trans_flag)
       CHARACTER(LEN=1), INTENT(INOUT)                    :: trans_flag
 
-      IF (trans_flag == dbcsr_transpose) THEN
-         trans_flag = dbcsr_no_transpose
-      ELSEIF (trans_flag == dbcsr_no_transpose) THEN
-         trans_flag = dbcsr_transpose
+      IF (trans_flag == block_matrix_transpose) THEN
+         trans_flag = block_matrix_no_transpose
+      ELSEIF (trans_flag == block_matrix_no_transpose) THEN
+         trans_flag = block_matrix_transpose
       ENDIF
    END SUBROUTINE
 

@@ -1,4 +1,4 @@
 {
 "description": "block-sparse tensor framework on top of DBCSR",
-"requires": ["../tas", "../../base", "../../common", "../../mpiwrap"]
+"requires": ["../tas", "../matrix", "../../base", "../../common", "../../mpiwrap"]
 }

@@ -14,7 +14,10 @@ MODULE block_tensor_test
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
-   USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
+   USE block_matrix_api, ONLY: &
+      ${uselist(dtype_float_param)}$,&
+      block_scalar_type, &
+      block_matrix_lapack_larnv, block_matrix_set_larnv_seed
    USE block_tas_base, ONLY: block_tas_info
    USE block_tensor, ONLY: &
       block_tensor_copy, block_tensor_get_block, block_tensor_iterator_type, block_tensor_iterator_blocks_left, &
@@ -43,9 +46,7 @@ MODULE block_tensor_test
    USE block_tensor_index, ONLY: &
       combine_tensor_index, get_2d_indices_tensor, block_tensor_get_mapping_info
    USE block_tas_test, ONLY: block_tas_checksum
-   USE dbcsr_data_types, ONLY: dbcsr_scalar_type
-   USE dbcsr_blas_operations, ONLY: &
-      dbcsr_lapack_larnv, set_larnv_seed
+
 #include "../../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -311,7 +312,7 @@ CONTAINS
             IF (ndims == ${ndim}$) THEN
                CALL block_tensor_distribution_new(dist2, comm_nd, ${varlist("dist2", nmax=ndim)}$)
                CALL block_tensor_create(tensor2, "Ref", dist2, map1_ref, map2_ref, &
-                                   dbcsr_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
+                                   block_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
                CALL block_tensor_setup_test_tensor(tensor2, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
             ENDIF
 #:endfor
@@ -322,7 +323,7 @@ CONTAINS
             IF (ndims == ${ndim}$) THEN
                CALL block_tensor_distribution_new(dist1, comm_nd, ${varlist("dist1", nmax=ndim)}$)
                CALL block_tensor_create(tensor1, tensor_name, dist1, map1, map2, &
-                                   dbcsr_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
+                                   block_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
                CALL block_tensor_setup_test_tensor(tensor1, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
             ENDIF
 #:endfor
@@ -546,9 +547,9 @@ CONTAINS
       !! @note for testing/debugging, simply replace a call to block_tensor_contract with a call to this routine
       !! @endnote
 
-      TYPE(dbcsr_scalar_type), INTENT(IN) :: alpha
+      TYPE(block_scalar_type), INTENT(IN) :: alpha
       TYPE(block_tensor_type), INTENT(INOUT)    :: tensor_1, tensor_2, tensor_3
-      TYPE(dbcsr_scalar_type), INTENT(IN) :: beta
+      TYPE(block_scalar_type), INTENT(IN) :: beta
       INTEGER, DIMENSION(:), INTENT(IN)    :: contract_1, contract_2, &
                                               notcontract_1, notcontract_2, &
                                               map_1, map_2

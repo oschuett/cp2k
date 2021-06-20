@@ -1,0 +1,4 @@
+{
+"description": "block-sparse matrix framework",
+"requires": ["../../base"]
+}

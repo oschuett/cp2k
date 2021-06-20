@@ -14,14 +14,16 @@ MODULE block_tensor_block
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
+  USE dbcsr_api, ONLY: &
+      dbcsr_type, dbcsr_release, &
+      dbcsr_iterator_type, dbcsr_iterator_start, dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, &
+      dbcsr_has_symmetry, dbcsr_desymmetrize, dbcsr_get_num_blocks, dbcsr_iterator_stop, &
+      dbcsr_reserve_blocks, dbcsr_finalize
    USE block_allocate_wrap, ONLY: &
       allocate_any
-   USE dbcsr_api, ONLY: &
-      ${uselist(dtype_float_param)}$, dbcsr_iterator_type, dbcsr_iterator_blocks_left, &
-      dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_type, &
-      dbcsr_reserve_blocks, dbcsr_scalar_type, dbcsr_finalize, dbcsr_get_num_blocks, &
-      dbcsr_type_no_symmetry, dbcsr_get_matrix_type, dbcsr_desymmetrize, dbcsr_release, &
-      dbcsr_has_symmetry
+   USE block_matrix_api, ONLY: &
+      ${uselist(dtype_float_param)}$, &
+      block_scalar_type, checker_tr, swap
    USE block_tas_types, ONLY: &
       block_tas_iterator
    USE block_tas_base, ONLY: &
@@ -38,10 +40,7 @@ MODULE block_tensor_block
    USE block_tensor_types, ONLY: &
       block_tensor_type, ndims_tensor, block_tensor_get_data_type, block_tensor_blk_sizes, block_tensor_get_num_blocks, &
       block_tensor_finalize, ndims_matrix_row, ndims_matrix_column
-   USE dbcsr_dist_operations, ONLY: &
-      checker_tr
-   USE dbcsr_toollib, ONLY: &
-      swap
+
 #include "../../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -315,9 +314,9 @@ CONTAINS
 
    SUBROUTINE block_tensor_reserve_blocks_matrix_to_tensor(matrix_in, tensor_out)
       !! reserve tensor blocks using matrix template
-      TYPE(dbcsr_type), TARGET, INTENT(IN) :: matrix_in
+      TYPE(dbcsr_type), TARGET, INTENT(IN)    :: matrix_in
       TYPE(block_tensor_type), INTENT(INOUT)  :: tensor_out
-      TYPE(dbcsr_type), POINTER          :: matrix_in_desym
+      TYPE(dbcsr_type), POINTER               :: matrix_in_desym
 
       INTEGER                            :: blk, iblk, nblk
       INTEGER, ALLOCATABLE, DIMENSION(:) :: blk_ind_1, blk_ind_2
@@ -358,7 +357,7 @@ CONTAINS
       !! reserve matrix blocks using tensor template
 
       TYPE(block_tensor_type), INTENT(IN)        :: tensor_in
-      TYPE(dbcsr_type), INTENT(INOUT)     :: matrix_out
+      TYPE(dbcsr_type), INTENT(INOUT)            :: matrix_out
       TYPE(block_tensor_iterator_type)           :: iter
       INTEGER, ALLOCATABLE, DIMENSION(:) :: blk_ind_1, blk_ind_2
 
@@ -476,7 +475,7 @@ CONTAINS
          !! block to put
       LOGICAL, INTENT(IN), OPTIONAL                :: summation
          !! whether block should be summed to existing block
-      TYPE(dbcsr_scalar_type), INTENT(IN), OPTIONAL :: scale
+      TYPE(block_scalar_type), INTENT(IN), OPTIONAL :: scale
          !! scaling factor
 
       SELECT CASE (block%data_type)

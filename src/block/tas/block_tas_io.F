@@ -23,8 +23,8 @@ MODULE block_tas_io
       block_tas_get_split_info, rowsplit, colsplit
    USE message_passing, ONLY: &
       mp_environ, mp_sum, mp_max
-   USE dbcsr_dist_methods, ONLY: &
-      dbcsr_distribution_row_dist, dbcsr_distribution_col_dist
+   USE block_matrix_api, ONLY: &
+      block_matrix_distribution_row_dist, block_matrix_distribution_col_dist
 
    IMPLICIT NONE
    PRIVATE
@@ -151,8 +151,8 @@ CONTAINS
       occupation = -1.0_real_8
       IF (nblock_tot .NE. 0) occupation = 100.0_real_8*REAL(nblock_p_sum, real_8)/REAL(nblock_tot, real_8)
 
-      rowdist => dbcsr_distribution_row_dist(matrix%matrix%dist)
-      coldist => dbcsr_distribution_col_dist(matrix%matrix%dist)
+      rowdist => block_matrix_distribution_row_dist(matrix%matrix%dist)
+      coldist => block_matrix_distribution_col_dist(matrix%matrix%dist)
 
       IF (unit_nr_prv > 0) THEN
          WRITE (unit_nr_prv, "(T2,A)") &

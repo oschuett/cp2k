@@ -1,4 +1,4 @@
 {
 "description": "tall-and-skinny matrices",
-"requires": ["../../base", "../../common", "../../mpiwrap"]
+"requires": ["../matrix", "../../base", "../../common", "../../mpiwrap"]
 }

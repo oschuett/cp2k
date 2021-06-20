@@ -18,17 +18,19 @@ MODULE block_tensor
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
+   USE dbcsr_api, ONLY: &
+      dbcsr_type, dbcsr_release, &
+      dbcsr_iterator_type, dbcsr_iterator_start, dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, &
+      dbcsr_has_symmetry, dbcsr_desymmetrize, dbcsr_put_block, dbcsr_clear, dbcsr_iterator_stop
    USE block_allocate_wrap, ONLY: &
       allocate_any
    USE block_array_list_methods, ONLY: &
       get_arrays, reorder_arrays, get_ith_array, array_list, array_sublist, check_equal, array_eq_i, &
       create_array_list, destroy_array_list, sizes_of_arrays
-   USE dbcsr_api, ONLY: &
-      dbcsr_type, dbcsr_iterator_type, dbcsr_iterator_blocks_left, &
-      dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, &
-      dbcsr_transpose, dbcsr_no_transpose, dbcsr_scalar, dbcsr_put_block, &
-      ${uselist(dtype_float_param)}$, dbcsr_clear, &
-      dbcsr_release, dbcsr_desymmetrize, dbcsr_has_symmetry
+   USE block_matrix_api, ONLY: &
+      block_matrix_transpose, block_matrix_no_transpose, block_scalar, &
+      ${uselist(dtype_float_param)}$, block_matrix_clear, &
+      block_scalar_type, swap, checker_tr
    USE block_tas_types, ONLY: &
       block_tas_split_info
    USE block_tas_base, ONLY: &
@@ -63,16 +65,10 @@ MODULE block_tensor
    USE block_tas_split, ONLY: &
       block_tas_mp_comm, rowsplit, colsplit, block_tas_info_hold, block_tas_release_info, default_nsplit_accept_ratio, &
       default_pdims_accept_ratio, block_tas_create_split
-   USE dbcsr_data_types, ONLY: &
-      dbcsr_scalar_type
    USE block_tensor_split, ONLY: &
       block_tensor_split_copyback, block_tensor_make_compatible_blocks, block_tensor_crop
    USE block_tensor_io, ONLY: &
       block_tensor_write_tensor_info, block_tensor_write_tensor_dist, prep_output_unit, block_tensor_write_split_info
-   USE dbcsr_dist_operations, ONLY: &
-      checker_tr
-   USE dbcsr_toollib, ONLY: &
-      swap
 
 #include "../../base/base_uses.f90"
 
@@ -318,7 +314,7 @@ CONTAINS
       !! copy matrix to tensor.
 
       TYPE(dbcsr_type), TARGET, INTENT(IN)               :: matrix_in
-      TYPE(block_tensor_type), INTENT(INOUT)                  :: tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT)             :: tensor_out
       LOGICAL, INTENT(IN), OPTIONAL                      :: summation
          !! tensor_out = tensor_out + matrix_in
       TYPE(dbcsr_type), POINTER                          :: matrix_in_desym
@@ -374,7 +370,7 @@ CONTAINS
       !! copy tensor to matrix
 
       TYPE(block_tensor_type), INTENT(INOUT)      :: tensor_in
-      TYPE(dbcsr_type), INTENT(INOUT)        :: matrix_out
+      TYPE(dbcsr_type), INTENT(INOUT)             :: matrix_out
       LOGICAL, INTENT(IN), OPTIONAL          :: summation
          !! matrix_out = matrix_out + tensor_in
       TYPE(block_tensor_iterator_type)            :: iter
@@ -450,12 +446,12 @@ CONTAINS
       !! bounds_2, bounds_3 give the index ranges of the batches.
       !! @endnote
 
-      TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
+      TYPE(block_scalar_type), INTENT(IN)            :: alpha
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
          !! first tensor (in)
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
          !! second tensor (in)
-      TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
+      TYPE(block_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
          !! indices of tensor_1 to contract
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
@@ -546,10 +542,10 @@ CONTAINS
                                       filter_eps, flop, move_data, retain_sparsity, &
                                       nblks_local, result_index, unit_nr, log_verbose)
       !! expert routine for tensor contraction. For internal use only.
-      TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
+      TYPE(block_scalar_type), INTENT(IN)            :: alpha
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
-      TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
+      TYPE(block_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
       INTEGER, DIMENSION(:), INTENT(IN)              :: map_1
@@ -1369,18 +1365,18 @@ CONTAINS
 
       SELECT CASE (compat1)
       CASE (1)
-         trans1 = dbcsr_no_transpose
+         trans1 = block_matrix_no_transpose
       CASE (2)
-         trans1 = dbcsr_transpose
+         trans1 = block_matrix_transpose
       CASE DEFAULT
          CPABORT("should not happen")
       END SELECT
 
       SELECT CASE (compat2)
       CASE (1)
-         trans2 = dbcsr_no_transpose
+         trans2 = block_matrix_no_transpose
       CASE (2)
-         trans2 = dbcsr_transpose
+         trans2 = block_matrix_transpose
       CASE DEFAULT
          CPABORT("should not happen")
       END SELECT
@@ -1477,9 +1473,9 @@ CONTAINS
       ENDIF
 
       IF (compat1 == 1 .AND. compat2 == 2) THEN
-         trans = dbcsr_no_transpose
+         trans = block_matrix_no_transpose
       ELSEIF (compat1 == 2 .AND. compat2 == 1) THEN
-         trans = dbcsr_transpose
+         trans = block_matrix_transpose
       ELSE
          CPABORT("this should not happen")
       ENDIF
@@ -1567,10 +1563,10 @@ CONTAINS
    SUBROUTINE invert_transpose_flag(trans_flag)
       CHARACTER(LEN=1), INTENT(INOUT)                    :: trans_flag
 
-      IF (trans_flag == dbcsr_transpose) THEN
-         trans_flag = dbcsr_no_transpose
-      ELSEIF (trans_flag == dbcsr_no_transpose) THEN
-         trans_flag = dbcsr_transpose
+      IF (trans_flag == block_matrix_transpose) THEN
+         trans_flag = block_matrix_no_transpose
+      ELSEIF (trans_flag == block_matrix_no_transpose) THEN
+         trans_flag = block_matrix_transpose
       ENDIF
    END SUBROUTINE
 
@@ -1789,10 +1785,10 @@ CONTAINS
       !! performing contraction.
       !! this is an estimate based on block norm multiplication.
       !! See documentation of block_tensor_contract.
-      TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
+      TYPE(block_scalar_type), INTENT(IN)            :: alpha
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
-      TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
+      TYPE(block_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
       INTEGER, DIMENSION(:), INTENT(IN)              :: map_1
@@ -2151,7 +2147,7 @@ CONTAINS
 #:for ndim in ndims
       IF (ndims_tensor(tensor) == ${ndim}$) THEN
          CALL block_tensor_distribution_new(dist, pgrid, ${varlist("dist", nmax=ndim)}$)
-         CALL block_tensor_create(t_tmp, name, dist, map1, map2, dbcsr_type_real_8, ${varlist("bs", nmax=ndim)}$)
+         CALL block_tensor_create(t_tmp, name, dist, map1, map2, block_type_real_8, ${varlist("bs", nmax=ndim)}$)
       ENDIF
 #:endfor
       CALL block_tensor_distribution_destroy(dist)

@@ -13,10 +13,10 @@ MODULE block_tas_types
 
    USE block_tas_global, ONLY: &
       block_tas_distribution, block_tas_rowcol_data
-   USE dbcsr_types, ONLY: &
-      dbcsr_distribution_obj, dbcsr_iterator, dbcsr_type
+   USE block_matrix_api, ONLY: &
+      block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, block_scalar_type
    USE kinds, ONLY: int_8
-   USE dbcsr_data_types, ONLY: dbcsr_scalar_type
+
 #include "../../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -50,7 +50,7 @@ MODULE block_tas_types
 
    TYPE block_tas_distribution_type
       TYPE(block_tas_split_info) :: info
-      TYPE(dbcsr_distribution_obj) :: dbcsr_dist
+      TYPE(block_matrix_distribution_obj) :: block_matrix_dist
       CLASS(block_tas_distribution), ALLOCATABLE :: row_dist
       CLASS(block_tas_distribution), ALLOCATABLE :: col_dist
       INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:) :: local_rowcols
@@ -62,7 +62,7 @@ MODULE block_tas_types
       TYPE(block_tas_type), POINTER :: store_batched_repl => NULL() ! intermediate replicated matrix
       LOGICAL :: batched_out ! whether replicated matrix has been changed in mm and should be copied to actual matrix
       LOGICAL :: batched_trans
-      TYPE(dbcsr_scalar_type) :: batched_beta
+      TYPE(block_scalar_type) :: batched_beta
    END TYPE
 
    ! type for tall-and-skinny matrices
@@ -71,7 +71,7 @@ MODULE block_tas_types
       CLASS(block_tas_rowcol_data), ALLOCATABLE :: row_blk_size
       CLASS(block_tas_rowcol_data), ALLOCATABLE :: col_blk_size
 
-      TYPE(dbcsr_type) :: matrix ! matrix on subgroup
+      TYPE(block_matrix_type) :: matrix ! matrix on subgroup
       INTEGER(KIND=int_8) :: nblkrows ! total number of rows
       INTEGER(KIND=int_8) :: nblkcols ! total number of columns
       INTEGER(KIND=int_8) :: nblkrowscols_split ! nblkrows or nblkcols depending on which is splitted
@@ -88,7 +88,7 @@ MODULE block_tas_types
    TYPE block_tas_iterator
       TYPE(block_tas_split_info) :: info
       TYPE(block_tas_distribution_type) :: dist
-      TYPE(dbcsr_iterator) :: iter
+      TYPE(block_matrix_iterator) :: iter
    END TYPE block_tas_iterator
 
 END MODULE

@@ -19,15 +19,15 @@
 #:set dtype_float_prec = ['real_8', 'real_4', 'real_8', 'real_4']
 #:set dtype_float_type = ['REAL(kind=real_8)', 'REAL(kind=real_4)', 'COMPLEX(kind=real_8)', 'COMPLEX(kind=real_4)']
 #:set dtype_float_suffix = ['r_dp', 'r_sp', 'c_dp', 'c_sp']
-#:set dtype_float_param = ['dbcsr_type_real_8', 'dbcsr_type_real_4', 'dbcsr_type_complex_8', 'dbcsr_type_complex_4']
+#:set dtype_float_param = ['block_type_real_8', 'block_type_real_4', 'block_type_complex_8', 'block_type_complex_4']
 
 #:set dtype_int4_type = ['INTEGER']
 #:set dtype_int4_suffix = ['i']
-#:set dtype_int4_param = ['dbcsr_type_int_4']
+#:set dtype_int4_param = ['block_type_int_4']
 
 #:set dtype_int8_type = ['INTEGER(KIND=int_8)']
 #:set dtype_int8_suffix = ['i8']
-#:set dtype_int8_param = ['dbcsr_type_int_8']
+#:set dtype_int8_param = ['block_type_int_8']
 
 #:set dtype_all_type = dtype_float_type + dtype_int4_type
 #:set dtype_all_suffix = dtype_float_suffix + dtype_int4_suffix
