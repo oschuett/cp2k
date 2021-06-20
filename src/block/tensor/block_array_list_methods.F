@@ -7,21 +7,21 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_array_list_methods
+MODULE block_array_list_methods
    !! Representation of arbitrary number of 1d integer arrays with arbitrary sizes.
    !! This is needed for generic handling of dimension-specific tensor quantities (such as block index).
 
-#:include "dbs_tensor.fypp"
+#:include "block_tensor.fypp"
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
-   USE dbs_tensor_index, ONLY: dbs_t_inverse_order
-   USE dbs_allocate_wrap, ONLY: allocate_any
+   USE block_tensor_index, ONLY: block_tensor_inverse_order
+   USE block_allocate_wrap, ONLY: allocate_any
 
 #include "../../base/base_uses.f90"
    IMPLICIT NONE
    PRIVATE
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_array_list_methods'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_array_list_methods'
 
    PUBLIC  :: &
       array_eq_i, &
@@ -259,7 +259,7 @@ CONTAINS
 
 #:for ndim in ndims
       IF (number_of_arrays(list_in) == ${ndim}$) THEN
-         CALL get_arrays(list_in, ${varlist("data", nmax=ndim)}$, i_selected=dbs_t_inverse_order(order))
+         CALL get_arrays(list_in, ${varlist("data", nmax=ndim)}$, i_selected=block_tensor_inverse_order(order))
          CALL create_array_list(list_out, number_of_arrays(list_in), &
                                 ${varlist("data", nmax=ndim)}$)
       ENDIF
@@ -286,4 +286,4 @@ CONTAINS
 
    END FUNCTION
 
-END MODULE dbs_array_list_methods
+END MODULE block_array_list_methods

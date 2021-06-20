@@ -7,7 +7,7 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tas_global
+MODULE block_tas_global
    !! Global data (distribution and block sizes) for tall-and-skinny matrices
    !! For very sparse matrices with one very large dimension, storing array data of the same size
    !! as the matrix dimensions may require too much memory and we need to compute them on the fly for a
@@ -21,22 +21,22 @@ MODULE dbs_tas_global
    IMPLICIT NONE
    PRIVATE
 
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tas_global'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tas_global'
 
    PUBLIC :: &
-      dbs_tas_blk_size_arb, &
-      dbs_tas_blk_size_repl, &
-      dbs_tas_blk_size_one, &
-      dbs_tas_dist_arb, &
-      dbs_tas_dist_arb_default, &
-      dbs_tas_dist_cyclic, &
-      dbs_tas_dist_repl, &
-      dbs_tas_distribution, &
-      dbs_tas_rowcol_data, &
-      dbs_tas_default_distvec
+      block_tas_blk_size_arb, &
+      block_tas_blk_size_repl, &
+      block_tas_blk_size_one, &
+      block_tas_dist_arb, &
+      block_tas_dist_arb_default, &
+      block_tas_dist_cyclic, &
+      block_tas_dist_repl, &
+      block_tas_distribution, &
+      block_tas_rowcol_data, &
+      block_tas_default_distvec
 
    ! abstract type for distribution vectors along one dimension
-   TYPE, ABSTRACT :: dbs_tas_distribution
+   TYPE, ABSTRACT :: block_tas_distribution
       ! number of process rows / columns:
       INTEGER :: nprowcol
       ! number of matrix rows / columns:
@@ -51,7 +51,7 @@ MODULE dbs_tas_global
    ! type for cyclic (round robin) distribution:
    ! - may not be load balanced for arbitrary block sizes
    ! - memory efficient for large dimensions
-   TYPE, EXTENDS(dbs_tas_distribution) :: dbs_tas_dist_cyclic
+   TYPE, EXTENDS(block_tas_distribution) :: block_tas_dist_cyclic
       INTEGER :: split_size
    CONTAINS
       PROCEDURE :: dist => cyclic_dist
@@ -61,7 +61,7 @@ MODULE dbs_tas_global
    ! type for arbitrary distributions
    ! - stored as an array
    ! - not memory efficient for large dimensions
-   TYPE, EXTENDS(dbs_tas_distribution) :: dbs_tas_dist_arb
+   TYPE, EXTENDS(block_tas_distribution) :: block_tas_dist_arb
       INTEGER, DIMENSION(:), ALLOCATABLE :: dist_vec
    CONTAINS
       PROCEDURE :: dist => arb_dist
@@ -71,7 +71,7 @@ MODULE dbs_tas_global
    ! type for replicated distribution
    ! - a submatrix distribution replicated on all process groups
    ! - memory efficient for large dimensions
-   TYPE, EXTENDS(dbs_tas_distribution) :: dbs_tas_dist_repl
+   TYPE, EXTENDS(block_tas_distribution) :: block_tas_dist_repl
       INTEGER, DIMENSION(:), ALLOCATABLE :: dist_vec
       INTEGER :: nmrowcol_local
       INTEGER :: n_repl
@@ -82,7 +82,7 @@ MODULE dbs_tas_global
    END TYPE
 
    ! abstract type for integer data (e.g. block sizes) along one dimension
-   TYPE, ABSTRACT :: dbs_tas_rowcol_data
+   TYPE, ABSTRACT :: block_tas_rowcol_data
       ! number of matrix rows / columns (blocks):
       INTEGER(KIND=int_8) :: nmrowcol
       ! number of matrix rows / columns (elements):
@@ -95,7 +95,7 @@ MODULE dbs_tas_global
    ! type for arbitrary block sizes
    ! - stored as an array
    ! - not memory efficient for large dimensions
-   TYPE, EXTENDS(dbs_tas_rowcol_data) :: dbs_tas_blk_size_arb
+   TYPE, EXTENDS(block_tas_rowcol_data) :: block_tas_blk_size_arb
       INTEGER, DIMENSION(:), ALLOCATABLE :: blk_size_vec
    CONTAINS
       PROCEDURE :: DATA => blk_size_arb
@@ -104,7 +104,7 @@ MODULE dbs_tas_global
    ! type for replicated block sizes
    ! - submatrix block sizes replicated on all process groups
    ! - memory efficient for large dimensions
-   TYPE, EXTENDS(dbs_tas_rowcol_data) :: dbs_tas_blk_size_repl
+   TYPE, EXTENDS(block_tas_rowcol_data) :: block_tas_blk_size_repl
       INTEGER, DIMENSION(:), ALLOCATABLE :: blk_size_vec
       INTEGER :: nmrowcol_local
    CONTAINS
@@ -113,7 +113,7 @@ MODULE dbs_tas_global
 
    ! type for blocks of size one
    ! - memory efficient for large dimensions
-   TYPE, EXTENDS(dbs_tas_rowcol_data) :: dbs_tas_blk_size_one
+   TYPE, EXTENDS(block_tas_rowcol_data) :: block_tas_blk_size_one
    CONTAINS
       PROCEDURE :: DATA => blk_size_one
    END TYPE
@@ -121,64 +121,64 @@ MODULE dbs_tas_global
    ABSTRACT INTERFACE
       FUNCTION rowcol_dist(t, rowcol)
          !! map matrix rows/cols to distribution rows/cols:
-         IMPORT :: dbs_tas_distribution, int_8
-         CLASS(dbs_tas_distribution), INTENT(IN) :: t
+         IMPORT :: block_tas_distribution, int_8
+         CLASS(block_tas_distribution), INTENT(IN) :: t
          INTEGER(KIND=int_8), INTENT(IN) :: rowcol
          INTEGER :: rowcol_dist
       END FUNCTION
 
       FUNCTION dist_rowcols(t, dist)
          !! map distribution rows/cols to matrix rows/cols:
-         IMPORT :: dbs_tas_distribution, int_8
-         CLASS(dbs_tas_distribution), INTENT(IN) :: t
+         IMPORT :: block_tas_distribution, int_8
+         CLASS(block_tas_distribution), INTENT(IN) :: t
          INTEGER, INTENT(IN) :: dist
          INTEGER(KIND=int_8), DIMENSION(:), ALLOCATABLE :: dist_rowcols
       END FUNCTION
 
       FUNCTION rowcol_data(t, rowcol)
          !! integer data for each block row / col
-         IMPORT :: dbs_tas_rowcol_data, int_8
-         CLASS(dbs_tas_rowcol_data), INTENT(IN) :: t
+         IMPORT :: block_tas_rowcol_data, int_8
+         CLASS(block_tas_rowcol_data), INTENT(IN) :: t
          INTEGER(KIND=int_8), INTENT(IN) :: rowcol
          INTEGER :: rowcol_data
       END FUNCTION
 
    END INTERFACE
 
-   INTERFACE dbs_tas_dist_cyclic
-      MODULE PROCEDURE new_dbs_tas_dist_cyclic
+   INTERFACE block_tas_dist_cyclic
+      MODULE PROCEDURE new_block_tas_dist_cyclic
    END INTERFACE
 
-   INTERFACE dbs_tas_dist_arb
-      MODULE PROCEDURE new_dbs_tas_dist_arb
+   INTERFACE block_tas_dist_arb
+      MODULE PROCEDURE new_block_tas_dist_arb
    END INTERFACE
 
-   INTERFACE dbs_tas_dist_repl
-      MODULE PROCEDURE new_dbs_tas_dist_repl
+   INTERFACE block_tas_dist_repl
+      MODULE PROCEDURE new_block_tas_dist_repl
    END INTERFACE
 
-   INTERFACE dbs_tas_blk_size_arb
-      MODULE PROCEDURE new_dbs_tas_blk_size_arb
+   INTERFACE block_tas_blk_size_arb
+      MODULE PROCEDURE new_block_tas_blk_size_arb
    END INTERFACE
 
-   INTERFACE dbs_tas_blk_size_repl
-      MODULE PROCEDURE new_dbs_tas_blk_size_repl
+   INTERFACE block_tas_blk_size_repl
+      MODULE PROCEDURE new_block_tas_blk_size_repl
    END INTERFACE
 
-   INTERFACE dbs_tas_blk_size_one
-      MODULE PROCEDURE new_dbs_tas_blk_size_one
+   INTERFACE block_tas_blk_size_one
+      MODULE PROCEDURE new_block_tas_blk_size_one
    END INTERFACE
 
 CONTAINS
    FUNCTION blk_size_arb(t, rowcol)
-      CLASS(dbs_tas_blk_size_arb), INTENT(IN) :: t
+      CLASS(block_tas_blk_size_arb), INTENT(IN) :: t
       INTEGER(KIND=int_8), INTENT(IN) :: rowcol
       INTEGER :: blk_size_arb
       blk_size_arb = t%blk_size_vec(rowcol)
    END FUNCTION
 
    FUNCTION blk_size_repl(t, rowcol)
-      CLASS(dbs_tas_blk_size_repl), INTENT(IN) :: t
+      CLASS(block_tas_blk_size_repl), INTENT(IN) :: t
       INTEGER(KIND=int_8), INTENT(IN) :: rowcol
       INTEGER :: blk_size_repl
       INTEGER :: igroup
@@ -191,7 +191,7 @@ CONTAINS
    END FUNCTION
 
    FUNCTION blk_size_one(t, rowcol)
-      CLASS(dbs_tas_blk_size_one), INTENT(IN) :: t
+      CLASS(block_tas_blk_size_one), INTENT(IN) :: t
       INTEGER(KIND=int_8), INTENT(IN) :: rowcol
       INTEGER :: blk_size_one
 
@@ -200,38 +200,38 @@ CONTAINS
       blk_size_one = 1
    END FUNCTION
 
-   FUNCTION new_dbs_tas_blk_size_arb(blk_size_vec)
+   FUNCTION new_block_tas_blk_size_arb(blk_size_vec)
       INTEGER, DIMENSION(:), INTENT(IN)                  :: blk_size_vec
-      TYPE(dbs_tas_blk_size_arb)                         :: new_dbs_tas_blk_size_arb
+      TYPE(block_tas_blk_size_arb)                         :: new_block_tas_blk_size_arb
 
-      ALLOCATE (new_dbs_tas_blk_size_arb%blk_size_vec(SIZE(blk_size_vec)))
-      new_dbs_tas_blk_size_arb%blk_size_vec(:) = blk_size_vec(:)
-      new_dbs_tas_blk_size_arb%nmrowcol = SIZE(blk_size_vec)
-      new_dbs_tas_blk_size_arb%nfullrowcol = SUM(blk_size_vec)
+      ALLOCATE (new_block_tas_blk_size_arb%blk_size_vec(SIZE(blk_size_vec)))
+      new_block_tas_blk_size_arb%blk_size_vec(:) = blk_size_vec(:)
+      new_block_tas_blk_size_arb%nmrowcol = SIZE(blk_size_vec)
+      new_block_tas_blk_size_arb%nfullrowcol = SUM(blk_size_vec)
    END FUNCTION
 
-   FUNCTION new_dbs_tas_blk_size_repl(blk_size_vec, n_repl)
+   FUNCTION new_block_tas_blk_size_repl(blk_size_vec, n_repl)
       INTEGER, DIMENSION(:), INTENT(IN)                  :: blk_size_vec
       INTEGER, INTENT(IN)                                :: n_repl
-      TYPE(dbs_tas_blk_size_repl)                        :: new_dbs_tas_blk_size_repl
+      TYPE(block_tas_blk_size_repl)                        :: new_block_tas_blk_size_repl
 
-      new_dbs_tas_blk_size_repl%nmrowcol_local = SIZE(blk_size_vec)
-      ALLOCATE (new_dbs_tas_blk_size_repl%blk_size_vec(new_dbs_tas_blk_size_repl%nmrowcol_local))
-      new_dbs_tas_blk_size_repl%blk_size_vec(:) = blk_size_vec(:)
-      new_dbs_tas_blk_size_repl%nmrowcol = new_dbs_tas_blk_size_repl%nmrowcol_local*n_repl
-      new_dbs_tas_blk_size_repl%nfullrowcol = SUM(blk_size_vec)*n_repl
+      new_block_tas_blk_size_repl%nmrowcol_local = SIZE(blk_size_vec)
+      ALLOCATE (new_block_tas_blk_size_repl%blk_size_vec(new_block_tas_blk_size_repl%nmrowcol_local))
+      new_block_tas_blk_size_repl%blk_size_vec(:) = blk_size_vec(:)
+      new_block_tas_blk_size_repl%nmrowcol = new_block_tas_blk_size_repl%nmrowcol_local*n_repl
+      new_block_tas_blk_size_repl%nfullrowcol = SUM(blk_size_vec)*n_repl
    END FUNCTION
 
-   FUNCTION new_dbs_tas_blk_size_one(nrowcol)
+   FUNCTION new_block_tas_blk_size_one(nrowcol)
       INTEGER(KIND=int_8), INTENT(IN)      :: nrowcol
-      TYPE(dbs_tas_blk_size_one)         :: new_dbs_tas_blk_size_one
+      TYPE(block_tas_blk_size_one)         :: new_block_tas_blk_size_one
 
-      new_dbs_tas_blk_size_one%nmrowcol = nrowcol
-      new_dbs_tas_blk_size_one%nfullrowcol = nrowcol
+      new_block_tas_blk_size_one%nmrowcol = nrowcol
+      new_block_tas_blk_size_one%nfullrowcol = nrowcol
    END FUNCTION
 
    FUNCTION arb_dist(t, rowcol)
-      CLASS(dbs_tas_dist_arb), INTENT(IN) :: t
+      CLASS(block_tas_dist_arb), INTENT(IN) :: t
       INTEGER(KIND=int_8), INTENT(IN) :: rowcol
       INTEGER :: arb_dist
 
@@ -239,7 +239,7 @@ CONTAINS
    END FUNCTION
 
    FUNCTION repl_dist(t, rowcol)
-      CLASS(dbs_tas_dist_repl), INTENT(IN) :: t
+      CLASS(block_tas_dist_repl), INTENT(IN) :: t
       INTEGER(KIND=int_8), INTENT(IN) :: rowcol
       INTEGER :: repl_dist
       INTEGER :: rowcol_local
@@ -253,7 +253,7 @@ CONTAINS
    END FUNCTION
 
    FUNCTION repl_rowcols(t, dist)
-      CLASS(dbs_tas_dist_repl), INTENT(IN) :: t
+      CLASS(block_tas_dist_repl), INTENT(IN) :: t
       INTEGER, INTENT(IN) :: dist
       INTEGER :: nrowcols
       INTEGER(KIND=int_8), DIMENSION(:), ALLOCATABLE :: repl_rowcols, rowcols_tmp
@@ -282,7 +282,7 @@ CONTAINS
    END FUNCTION
 
    FUNCTION arb_rowcols(t, dist)
-      CLASS(dbs_tas_dist_arb), INTENT(IN) :: t
+      CLASS(block_tas_dist_arb), INTENT(IN) :: t
       INTEGER, INTENT(IN) :: dist
       INTEGER(KIND=int_8) :: rowcol, nrowcols
       INTEGER(KIND=int_8), DIMENSION(:), ALLOCATABLE :: arb_rowcols, rowcols_tmp
@@ -303,29 +303,29 @@ CONTAINS
       arb_rowcols(:) = rowcols_tmp(1:count)
    END FUNCTION
 
-   FUNCTION new_dbs_tas_dist_cyclic(split_size, nprowcol, nmrowcol)
+   FUNCTION new_block_tas_dist_cyclic(split_size, nprowcol, nmrowcol)
       INTEGER, INTENT(IN)                                :: split_size, nprowcol
       INTEGER(KIND=int_8), INTENT(IN)                    :: nmrowcol
-      TYPE(dbs_tas_dist_cyclic)                          :: new_dbs_tas_dist_cyclic
+      TYPE(block_tas_dist_cyclic)                          :: new_block_tas_dist_cyclic
 
-      new_dbs_tas_dist_cyclic%split_size = split_size
-      new_dbs_tas_dist_cyclic%nprowcol = nprowcol
-      new_dbs_tas_dist_cyclic%nmrowcol = nmrowcol
+      new_block_tas_dist_cyclic%split_size = split_size
+      new_block_tas_dist_cyclic%nprowcol = nprowcol
+      new_block_tas_dist_cyclic%nmrowcol = nmrowcol
    END FUNCTION
 
-   FUNCTION new_dbs_tas_dist_arb(dist_vec, nprowcol, nmrowcol)
+   FUNCTION new_block_tas_dist_arb(dist_vec, nprowcol, nmrowcol)
       INTEGER, DIMENSION(:), INTENT(IN)                  :: dist_vec
       INTEGER, INTENT(IN)                                :: nprowcol
       INTEGER(KIND=int_8), INTENT(IN)                    :: nmrowcol
-      TYPE(dbs_tas_dist_arb)                             :: new_dbs_tas_dist_arb
+      TYPE(block_tas_dist_arb)                             :: new_block_tas_dist_arb
 
-      ALLOCATE (new_dbs_tas_dist_arb%dist_vec(nmrowcol))
-      new_dbs_tas_dist_arb%dist_vec(:) = dist_vec(:)
-      new_dbs_tas_dist_arb%nprowcol = nprowcol
-      new_dbs_tas_dist_arb%nmrowcol = nmrowcol
+      ALLOCATE (new_block_tas_dist_arb%dist_vec(nmrowcol))
+      new_block_tas_dist_arb%dist_vec(:) = dist_vec(:)
+      new_block_tas_dist_arb%nprowcol = nprowcol
+      new_block_tas_dist_arb%nmrowcol = nmrowcol
    END FUNCTION
 
-   FUNCTION dbs_tas_dist_arb_default(nprowcol, nmrowcol, block_sizes)
+   FUNCTION block_tas_dist_arb_default(nprowcol, nmrowcol, block_sizes)
       !! Distribution that is more or less cyclic (round robin) and load balanced with different
       !! weights for each element.
       !! This is used for creating adhoc distributions whenever matrices are mapped to new grids.
@@ -333,8 +333,8 @@ CONTAINS
 
       INTEGER                           :: nprowcol
       INTEGER(KIND=int_8), INTENT(IN)   :: nmrowcol
-      CLASS(dbs_tas_rowcol_data), INTENT(IN) :: block_sizes
-      TYPE(dbs_tas_dist_arb)            :: dbs_tas_dist_arb_default
+      CLASS(block_tas_rowcol_data), INTENT(IN) :: block_sizes
+      TYPE(block_tas_dist_arb)            :: block_tas_dist_arb_default
       INTEGER, DIMENSION(nmrowcol) :: dist_vec, bsize_vec
       INTEGER(KIND=int_8) :: ind
 
@@ -342,12 +342,12 @@ CONTAINS
          bsize_vec(ind) = block_sizes%data(ind)
       ENDDO
 
-      CALL dbs_tas_default_distvec(INT(nmrowcol), nprowcol, bsize_vec, dist_vec)
-      dbs_tas_dist_arb_default = dbs_tas_dist_arb(dist_vec, nprowcol, nmrowcol)
+      CALL block_tas_default_distvec(INT(nmrowcol), nprowcol, bsize_vec, dist_vec)
+      block_tas_dist_arb_default = block_tas_dist_arb(dist_vec, nprowcol, nmrowcol)
 
    END FUNCTION
 
-   SUBROUTINE dbs_tas_default_distvec(nblk, nproc, blk_size, dist)
+   SUBROUTINE block_tas_default_distvec(nblk, nproc, blk_size, dist)
       !! get a load-balanced and randomized distribution along one tensor dimension
       INTEGER, INTENT(IN)                                :: nblk
          !! number of blocks (along one tensor dimension)
@@ -416,22 +416,22 @@ CONTAINS
 
    END SUBROUTINE
 
-   FUNCTION new_dbs_tas_dist_repl(dist_vec, nprowcol, nmrowcol, n_repl, dist_size)
+   FUNCTION new_block_tas_dist_repl(dist_vec, nprowcol, nmrowcol, n_repl, dist_size)
       INTEGER, DIMENSION(:), INTENT(IN)                  :: dist_vec
       INTEGER, INTENT(IN)                                :: nprowcol, nmrowcol, n_repl, dist_size
-      TYPE(dbs_tas_dist_repl)                            :: new_dbs_tas_dist_repl
+      TYPE(block_tas_dist_repl)                            :: new_block_tas_dist_repl
 
-      new_dbs_tas_dist_repl%n_repl = n_repl
-      new_dbs_tas_dist_repl%dist_size = dist_size
-      ALLOCATE (new_dbs_tas_dist_repl%dist_vec(nmrowcol))
-      new_dbs_tas_dist_repl%dist_vec(:) = MOD(dist_vec(:), dist_size)
-      new_dbs_tas_dist_repl%nprowcol = nprowcol
-      new_dbs_tas_dist_repl%nmrowcol_local = nmrowcol
-      new_dbs_tas_dist_repl%nmrowcol = nmrowcol*n_repl
+      new_block_tas_dist_repl%n_repl = n_repl
+      new_block_tas_dist_repl%dist_size = dist_size
+      ALLOCATE (new_block_tas_dist_repl%dist_vec(nmrowcol))
+      new_block_tas_dist_repl%dist_vec(:) = MOD(dist_vec(:), dist_size)
+      new_block_tas_dist_repl%nprowcol = nprowcol
+      new_block_tas_dist_repl%nmrowcol_local = nmrowcol
+      new_block_tas_dist_repl%nmrowcol = nmrowcol*n_repl
    END FUNCTION
 
    FUNCTION cyclic_dist(t, rowcol)
-      CLASS(dbs_tas_dist_cyclic), INTENT(IN) :: t
+      CLASS(block_tas_dist_cyclic), INTENT(IN) :: t
       INTEGER(KIND=int_8), INTENT(IN) :: rowcol
       INTEGER :: cyclic_dist
 
@@ -440,7 +440,7 @@ CONTAINS
    END FUNCTION
 
    FUNCTION cyclic_rowcols(t, dist)
-      CLASS(dbs_tas_dist_cyclic), INTENT(IN) :: t
+      CLASS(block_tas_dist_cyclic), INTENT(IN) :: t
       INTEGER, INTENT(IN) :: dist
       INTEGER(KIND=int_8), DIMENSION(:), ALLOCATABLE :: cyclic_rowcols
       INTEGER :: count, nsplit, isplit, irowcol, max_size

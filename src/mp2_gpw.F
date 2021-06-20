@@ -47,7 +47,7 @@ MODULE mp2_gpw
         dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, &
         dbcsr_p_type, dbcsr_release, dbcsr_reserve_all_blocks, dbcsr_type, dbcsr_type_no_symmetry, &
         dbcsr_type_real_default, dbcsr_type_symmetric
-   USE dbs_tensor_api,                ONLY: dbs_t_type
+   USE block_tensor_api,                ONLY: block_tensor_type
    USE distribution_1d_types,           ONLY: distribution_1d_release,&
                                               distribution_1d_type
    USE distribution_2d_types,           ONLY: distribution_2d_release,&
@@ -176,8 +176,8 @@ CONTAINS
       TYPE(dbcsr_p_type)                                 :: mat_munu, mat_P_global
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
       TYPE(dbcsr_p_type), DIMENSION(:, :), POINTER       :: matrix_s_kp
-      TYPE(dbs_t_type)                                 :: t_3c_M
-      TYPE(dbs_t_type), ALLOCATABLE, DIMENSION(:, :)   :: t_3c_O
+      TYPE(block_tensor_type)                                 :: t_3c_M
+      TYPE(block_tensor_type), ALLOCATABLE, DIMENSION(:, :)   :: t_3c_O
       TYPE(dbcsr_type), POINTER :: mo_coeff_all, mo_coeff_all_beta, mo_coeff_gw, mo_coeff_gw_beta, &
          mo_coeff_o, mo_coeff_o_beta, mo_coeff_v, mo_coeff_v_beta
       TYPE(dft_control_type), POINTER                    :: dft_control

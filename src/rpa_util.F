@@ -50,8 +50,8 @@ MODULE rpa_util
                                               dbcsr_release,&
                                               dbcsr_set,&
                                               dbcsr_type
-   USE dbs_tensor_api,                ONLY: dbs_t_destroy,&
-                                              dbs_t_type
+   USE block_tensor_api,                ONLY: block_tensor_destroy,&
+                                              block_tensor_type
    USE hfx_types,                       ONLY: block_ind_type,&
                                               dealloc_containers,&
                                               hfx_compression_type
@@ -158,7 +158,7 @@ CONTAINS
                                                             fm_mo_coeff_virt
       TYPE(cp_fm_p_type), DIMENSION(:, :), POINTER       :: fm_matrix_L_RI_metric
       TYPE(dbcsr_p_type), INTENT(IN)                     :: mat_P_global
-      TYPE(dbs_t_type), ALLOCATABLE, DIMENSION(:, :), &
+      TYPE(block_tensor_type), ALLOCATABLE, DIMENSION(:, :), &
          INTENT(INOUT)                                   :: t_3c_O
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrix_s
       TYPE(kpoint_type), POINTER                         :: kpoints
@@ -1086,8 +1086,8 @@ CONTAINS
                                                             fm_mo_coeff_virt_scaled
       TYPE(dbcsr_p_type), INTENT(INOUT)                  :: mat_dm, mat_L, mat_SinvVSinv
       TYPE(dbcsr_p_type), DIMENSION(:, :), POINTER       :: mat_P_omega, mat_P_omega_kp
-      TYPE(dbs_t_type)                                 :: t_3c_M
-      TYPE(dbs_t_type), ALLOCATABLE, DIMENSION(:, :)   :: t_3c_O
+      TYPE(block_tensor_type)                                 :: t_3c_M
+      TYPE(block_tensor_type), ALLOCATABLE, DIMENSION(:, :)   :: t_3c_O
       TYPE(hfx_compression_type), ALLOCATABLE, &
          DIMENSION(:, :, :), INTENT(INOUT)               :: t_3c_O_compressed
       TYPE(block_ind_type), ALLOCATABLE, &
@@ -1160,12 +1160,12 @@ CONTAINS
 
       DO i_size = 1, SIZE(t_3c_O, 1)
          DO j_size = 1, SIZE(t_3c_O, 2)
-            CALL dbs_t_destroy(t_3c_O(i_size, j_size))
+            CALL block_tensor_destroy(t_3c_O(i_size, j_size))
          ENDDO
       ENDDO
 
       DEALLOCATE (t_3c_O)
-      CALL dbs_t_destroy(t_3c_M)
+      CALL block_tensor_destroy(t_3c_M)
 
       DEALLOCATE (has_mat_P_blocks)
 

@@ -31,10 +31,10 @@ MODULE xas_tdp_integrals
    USE dbcsr_api,                       ONLY: dbcsr_distribution_get,&
                                               dbcsr_distribution_release,&
                                               dbcsr_distribution_type
-   USE dbs_tensor_api,                ONLY: &
-        dbs_t_create, dbs_t_distribution_destroy, dbs_t_distribution_new, &
-        dbs_t_distribution_type, dbs_t_finalize, dbs_t_pgrid_create, dbs_t_pgrid_destroy, &
-        dbs_t_pgrid_type, dbs_t_put_block, dbs_t_reserve_blocks, dbs_t_type
+   USE block_tensor_api,                ONLY: &
+        block_tensor_create, block_tensor_distribution_destroy, block_tensor_distribution_new, &
+        block_tensor_distribution_type, block_tensor_finalize, block_tensor_pgrid_create, block_tensor_pgrid_destroy, &
+        block_tensor_pgrid_type, block_tensor_put_block, block_tensor_reserve_blocks, block_tensor_type
    USE distribution_1d_types,           ONLY: distribution_1d_type
    USE distribution_2d_types,           ONLY: distribution_2d_create,&
                                               distribution_2d_type
@@ -126,7 +126,7 @@ CONTAINS
    SUBROUTINE create_pqX_tensor(pq_X, ab_nl, ac_nl, matrix_dist, blk_size_1, blk_size_2, &
                                 blk_size_3, only_bc_same_center)
 
-      TYPE(dbs_t_type), INTENT(OUT)                    :: pq_X
+      TYPE(block_tensor_type), INTENT(OUT)                    :: pq_X
       TYPE(neighbor_list_set_p_type), DIMENSION(:), &
          POINTER                                         :: ab_nl, ac_nl
       TYPE(dbcsr_distribution_type), INTENT(IN)          :: matrix_dist
@@ -143,8 +143,8 @@ CONTAINS
       INTEGER, DIMENSION(:, :), POINTER                  :: mat_pgrid
       LOGICAL                                            :: my_sort_bc, symmetric
       REAL(dp), DIMENSION(3)                             :: rab, rac, rbc
-      TYPE(dbs_t_distribution_type)                    :: t_dist
-      TYPE(dbs_t_pgrid_type)                           :: t_pgrid
+      TYPE(block_tensor_distribution_type)                    :: t_dist
+      TYPE(block_tensor_pgrid_type)                           :: t_pgrid
       TYPE(neighbor_list_iterator_p_type), &
          DIMENSION(:), POINTER                           :: ab_iter, ac_iter
 
@@ -164,14 +164,14 @@ CONTAINS
 
       !create the corresponding tensor proc grid and dist
       pdims(1) = SIZE(mat_pgrid, 1); pdims(2) = SIZE(mat_pgrid, 2); pdims(3) = 1
-      CALL dbs_t_pgrid_create(group, pdims, t_pgrid)
+      CALL block_tensor_pgrid_create(group, pdims, t_pgrid)
 
       nblk_3 = SIZE(blk_size_3)
-      CALL dbs_t_distribution_new(t_dist, t_pgrid, nd_dist_1=row_dist, nd_dist_2=col_dist, &
+      CALL block_tensor_distribution_new(t_dist, t_pgrid, nd_dist_1=row_dist, nd_dist_2=col_dist, &
                                     nd_dist_3=[(0, i=1, nblk_3)])
 
       !create the tensor itself.
-      CALL dbs_t_create(pq_X, name="(pq|X)", dist=t_dist, map1_2d=[1, 2], map2_2d=[3], &
+      CALL block_tensor_create(pq_X, name="(pq|X)", dist=t_dist, map1_2d=[1, 2], map2_2d=[3], &
                           blk_size_1=blk_size_1, blk_size_2=blk_size_2, blk_size_3=blk_size_3)
 
       !count the blocks to reserve !note: dbcsr takes care of only keeping unique indices
@@ -236,12 +236,12 @@ CONTAINS
       CALL neighbor_list_iterator_release(ab_iter)
       CALL neighbor_list_iterator_release(ac_iter)
 
-      CALL dbs_t_reserve_blocks(pq_X, idx1, idx2, idx3)
-      CALL dbs_t_finalize(pq_X)
+      CALL block_tensor_reserve_blocks(pq_X, idx1, idx2, idx3)
+      CALL block_tensor_finalize(pq_X)
 
       !clean-up
-      CALL dbs_t_distribution_destroy(t_dist)
-      CALL dbs_t_pgrid_destroy(t_pgrid)
+      CALL block_tensor_distribution_destroy(t_dist)
+      CALL block_tensor_pgrid_destroy(t_pgrid)
 
       CALL timestop(handle)
 
@@ -266,7 +266,7 @@ CONTAINS
                               basis_set_list_c, potential_parameter, qs_env, &
                               only_bc_same_center, eps_screen)
 
-      TYPE(dbs_t_type)                                 :: pq_X
+      TYPE(block_tensor_type)                                 :: pq_X
       TYPE(neighbor_list_set_p_type), DIMENSION(:), &
          POINTER                                         :: ab_nl, ac_nl
       TYPE(gto_basis_set_p_type), DIMENSION(:), POINTER  :: basis_set_list_a, basis_set_list_b, &
@@ -615,7 +615,7 @@ CONTAINS
 
          !Add the integral to the proper tensor block
 !$OMP CRITICAL
-         CALL dbs_t_put_block(pq_X, [iatom, jatom, katom], SHAPE(iabc), iabc, summation=.TRUE.)
+         CALL block_tensor_put_block(pq_X, [iatom, jatom, katom], SHAPE(iabc), iabc, summation=.TRUE.)
 !$OMP END CRITICAL
 
          DEALLOCATE (iabc)

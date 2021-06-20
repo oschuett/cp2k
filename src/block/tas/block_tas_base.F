@@ -7,11 +7,11 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tas_base
+MODULE block_tas_base
    !! Tall-and-skinny matrices: base routines similar to DBCSR API, mostly wrappers around existing
    !! DBCSR routines.
 
-#:include "dbs_tas.fypp"
+#:include "block_tas.fypp"
 
    USE dbcsr_block_access, ONLY: &
       dbcsr_get_block_p, dbcsr_put_block, dbcsr_reserve_blocks
@@ -31,16 +31,16 @@ MODULE dbs_tas_base
       dbcsr_get_data_size, dbcsr_get_num_blocks, dbcsr_get_nze
    USE dbcsr_operations, ONLY: &
       dbcsr_get_info, dbcsr_set, dbcsr_filter, dbcsr_clear
-   USE dbs_tas_types, ONLY: &
-      dbs_tas_distribution_type, dbs_tas_iterator, dbs_tas_split_info, dbs_tas_type
-   USE dbs_tas_global, ONLY: &
-      dbs_tas_blk_size_arb, dbs_tas_dist_arb, dbs_tas_distribution, dbs_tas_rowcol_data
-   USE dbs_tas_split, ONLY: &
+   USE block_tas_types, ONLY: &
+      block_tas_distribution_type, block_tas_iterator, block_tas_split_info, block_tas_type
+   USE block_tas_global, ONLY: &
+      block_tas_blk_size_arb, block_tas_dist_arb, block_tas_distribution, block_tas_rowcol_data
+   USE block_tas_split, ONLY: &
       block_index_global_to_local, block_index_local_to_global, colsplit, &
-      dbs_tas_info_hold, dbs_tas_release_info, dbs_tas_create_split, &
-      group_to_mrowcol, rowsplit, dbs_tas_get_split_info
-   USE dbs_tas_util, ONLY: &
-      dbs_mp_environ, index_unique
+      block_tas_info_hold, block_tas_release_info, block_tas_create_split, &
+      group_to_mrowcol, rowsplit, block_tas_get_split_info
+   USE block_tas_util, ONLY: &
+      block_mp_environ, index_unique
    USE dbcsr_types, ONLY: &
       dbcsr_distribution_obj, dbcsr_iterator, dbcsr_mp_obj, dbcsr_type, dbcsr_type_no_symmetry
    USE dbcsr_work_operations, ONLY: &
@@ -54,127 +54,127 @@ MODULE dbs_tas_base
    IMPLICIT NONE
    PRIVATE
 
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tas_base'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tas_base'
 
    PUBLIC :: &
       ! DBCSR wrappers / interface routines
-      dbs_tas_blk_sizes, &
-      dbs_tas_clear, &
-      dbs_tas_copy, &
-      dbs_tas_create, &
-      dbs_tas_destroy, &
-      dbs_tas_distribution_destroy, &
-      dbs_tas_distribution_new, &
-      dbs_tas_filter, &
-      dbs_tas_finalize, &
-      dbs_tas_get_block_p, &
-      dbs_tas_get_data_size, &
-      dbs_tas_get_data_type, &
-      dbs_tas_get_info, &
-      dbs_tas_get_num_blocks, &
-      dbs_tas_get_nze, &
-      dbs_tas_get_nze_total, &
-      dbs_tas_get_num_blocks_total, &
-      dbs_tas_get_stored_coordinates, &
-      dbs_tas_info, &
-      dbs_tas_iterator_blocks_left, &
-      dbs_tas_iterator_next_block, &
-      dbs_tas_iterator_start, &
-      dbs_tas_iterator_stop, &
-      dbs_tas_nblkcols_local, &
-      dbs_tas_nblkcols_total, &
-      dbs_tas_nblkrows_local, &
-      dbs_tas_nblkrows_total, &
-      dbs_tas_nfullrows_total, &
-      dbs_tas_nfullcols_total, &
-      dbs_tas_put_block, &
-      dbs_tas_reserve_blocks, &
-      dbs_tas_set, &
-      dbs_repl_get_stored_coordinates
+      block_tas_blk_sizes, &
+      block_tas_clear, &
+      block_tas_copy, &
+      block_tas_create, &
+      block_tas_destroy, &
+      block_tas_distribution_destroy, &
+      block_tas_distribution_new, &
+      block_tas_filter, &
+      block_tas_finalize, &
+      block_tas_get_block_p, &
+      block_tas_get_data_size, &
+      block_tas_get_data_type, &
+      block_tas_get_info, &
+      block_tas_get_num_blocks, &
+      block_tas_get_nze, &
+      block_tas_get_nze_total, &
+      block_tas_get_num_blocks_total, &
+      block_tas_get_stored_coordinates, &
+      block_tas_info, &
+      block_tas_iterator_blocks_left, &
+      block_tas_iterator_next_block, &
+      block_tas_iterator_start, &
+      block_tas_iterator_stop, &
+      block_tas_nblkcols_local, &
+      block_tas_nblkcols_total, &
+      block_tas_nblkrows_local, &
+      block_tas_nblkrows_total, &
+      block_tas_nfullrows_total, &
+      block_tas_nfullcols_total, &
+      block_tas_put_block, &
+      block_tas_reserve_blocks, &
+      block_tas_set, &
+      block_repl_get_stored_coordinates
    PUBLIC :: &
       ! conversion routines
-      dbs_tas_convert_to_dbcsr, &
-      dbs_tas_convert_to_tas
+      block_tas_convert_to_dbcsr, &
+      block_tas_convert_to_tas
 
-   INTERFACE dbs_tas_create
-      MODULE PROCEDURE dbs_tas_create_new
-      MODULE PROCEDURE dbs_tas_create_template
+   INTERFACE block_tas_create
+      MODULE PROCEDURE block_tas_create_new
+      MODULE PROCEDURE block_tas_create_template
    END INTERFACE
 
-   INTERFACE dbs_tas_get_block_p
-      MODULE PROCEDURE dbs_tas_get_block_p_area
+   INTERFACE block_tas_get_block_p
+      MODULE PROCEDURE block_tas_get_block_p_area
    END INTERFACE
 
-   INTERFACE dbs_tas_put_block
-      MODULE PROCEDURE dbs_tas_put_block_area
+   INTERFACE block_tas_put_block
+      MODULE PROCEDURE block_tas_put_block_area
    END INTERFACE
 
-   INTERFACE dbs_tas_reserve_blocks
-      MODULE PROCEDURE dbs_tas_reserve_blocks_template
-      MODULE PROCEDURE dbs_tas_reserve_blocks_index
+   INTERFACE block_tas_reserve_blocks
+      MODULE PROCEDURE block_tas_reserve_blocks_template
+      MODULE PROCEDURE block_tas_reserve_blocks_index
    END INTERFACE
 
-   INTERFACE dbs_tas_iterator_next_block
-      MODULE PROCEDURE dbs_tas_iterator_next_area_block
-      MODULE PROCEDURE dbs_tas_iterator_next_block_index
+   INTERFACE block_tas_iterator_next_block
+      MODULE PROCEDURE block_tas_iterator_next_area_block
+      MODULE PROCEDURE block_tas_iterator_next_block_index
    END INTERFACE
 
-   INTERFACE dbs_tas_iterator_next_block
+   INTERFACE block_tas_iterator_next_block
 #:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE dbs_tas_iterator_next_block_${dsuffix}$
+      MODULE PROCEDURE block_tas_iterator_next_block_${dsuffix}$
 #:endfor
    END INTERFACE
 
-   INTERFACE dbs_tas_put_block
+   INTERFACE block_tas_put_block
 #:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE dbs_tas_put_block_${dsuffix}$
+      MODULE PROCEDURE block_tas_put_block_${dsuffix}$
 #:endfor
    END INTERFACE
 
-   INTERFACE dbs_tas_get_block_p
+   INTERFACE block_tas_get_block_p
 #:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE dbs_tas_get_block_p_${dsuffix}$
+      MODULE PROCEDURE block_tas_get_block_p_${dsuffix}$
 #:endfor
    END INTERFACE
 
-   INTERFACE dbs_tas_set
+   INTERFACE block_tas_set
 #:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE dbs_tas_set_${dsuffix}$
+      MODULE PROCEDURE block_tas_set_${dsuffix}$
 #:endfor
    END INTERFACE
 
-   INTERFACE dbs_tas_filter
+   INTERFACE block_tas_filter
 #:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE dbs_tas_filter_${dsuffix}$
+      MODULE PROCEDURE block_tas_filter_${dsuffix}$
 #:endfor
    END INTERFACE
 
 CONTAINS
 
-   SUBROUTINE dbs_tas_create_new(matrix, name, dist, data_type, &
+   SUBROUTINE block_tas_create_new(matrix, name, dist, data_type, &
                                    row_blk_size, col_blk_size, own_dist)
       !! Create new tall-and-skinny matrix.
-      !! Exactly like dbs_create_new but with custom types for row_blk_size and col_blk_size instead of
+      !! Exactly like block_create_new but with custom types for row_blk_size and col_blk_size instead of
       !! arrays.
 
-      TYPE(dbs_tas_type), INTENT(OUT)              :: matrix
+      TYPE(block_tas_type), INTENT(OUT)              :: matrix
       CHARACTER(len=*), INTENT(IN)                   :: name
-      TYPE(dbs_tas_distribution_type), INTENT(INOUT) :: dist
+      TYPE(block_tas_distribution_type), INTENT(INOUT) :: dist
       INTEGER, INTENT(IN), OPTIONAL                  :: data_type
-      CLASS(dbs_tas_rowcol_data), INTENT(IN)       :: row_blk_size, col_blk_size
+      CLASS(block_tas_rowcol_data), INTENT(IN)       :: row_blk_size, col_blk_size
       LOGICAL, INTENT(IN), OPTIONAL                  :: own_dist
          !! whether matrix should own distribution
 
-      TYPE(dbs_tas_split_info)                     :: info
+      TYPE(block_tas_split_info)                     :: info
 
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS     :: row_blk_size_vec, col_blk_size_vec
       INTEGER                                        :: nrows, ncols, irow, col, icol, row
-      CHARACTER(LEN=*), PARAMETER                    :: routineN = 'dbs_tas_create_new'
+      CHARACTER(LEN=*), PARAMETER                    :: routineN = 'block_tas_create_new'
       INTEGER                                        :: handle
 
       CALL timeset(routineN, handle)
 
-      CALL dbs_tas_copy_distribution(dist, matrix%dist, own_dist)
+      CALL block_tas_copy_distribution(dist, matrix%dist, own_dist)
       matrix%nblkrows = row_blk_size%nmrowcol
       matrix%nblkcols = col_blk_size%nmrowcol
 
@@ -187,7 +187,7 @@ CONTAINS
       ALLOCATE (matrix%row_blk_size, source=row_blk_size)
       ALLOCATE (matrix%col_blk_size, source=col_blk_size)
 
-      info = dbs_tas_info(matrix)
+      info = block_tas_info(matrix)
 
       SELECT CASE (info%split_rowcol)
       CASE (rowsplit)
@@ -236,10 +236,10 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_create_template(matrix_in, matrix, name, data_type)
+   SUBROUTINE block_tas_create_template(matrix_in, matrix, name, data_type)
       !! Create matrix from template
-      TYPE(dbs_tas_type), INTENT(INOUT)                  :: matrix_in
-      TYPE(dbs_tas_type), INTENT(OUT)                    :: matrix
+      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix_in
+      TYPE(block_tas_type), INTENT(OUT)                    :: matrix
       CHARACTER(len=*), INTENT(IN), OPTIONAL               :: name
       INTEGER, INTENT(IN), OPTIONAL                        :: data_type
 
@@ -247,7 +247,7 @@ CONTAINS
                         data_type=data_type)
       CALL dbcsr_finalize(matrix%matrix)
 
-      CALL dbs_tas_copy_distribution(matrix_in%dist, matrix%dist)
+      CALL block_tas_copy_distribution(matrix_in%dist, matrix%dist)
       ALLOCATE (matrix%row_blk_size, source=matrix_in%row_blk_size)
       ALLOCATE (matrix%col_blk_size, source=matrix_in%col_blk_size)
       matrix%nblkrows = matrix_in%nblkrows
@@ -265,27 +265,27 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_destroy(matrix)
-      TYPE(dbs_tas_type), INTENT(INOUT)                  :: matrix
+   SUBROUTINE block_tas_destroy(matrix)
+      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix
 
       CALL dbcsr_release(matrix%matrix)
-      CALL dbs_tas_distribution_destroy(matrix%dist)
+      CALL block_tas_distribution_destroy(matrix%dist)
       DEALLOCATE (matrix%row_blk_size)
       DEALLOCATE (matrix%col_blk_size)
       matrix%valid = .FALSE.
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_copy(matrix_b, matrix_a, summation)
+   SUBROUTINE block_tas_copy(matrix_b, matrix_a, summation)
       !! Copy matrix_a to matrix_b
 
-      TYPE(dbs_tas_type), INTENT(INOUT)                  :: matrix_b
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix_a
+      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix_b
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix_a
       LOGICAL, INTENT(IN), OPTIONAL                      :: summation
          !! Whether to sum matrices b = a + b
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_copy'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_copy'
       INTEGER                                            :: handle
-      TYPE(dbs_tas_iterator)                             :: iter
+      TYPE(block_tas_iterator)                             :: iter
       TYPE(dbcsr_data_obj)                               :: block
       LOGICAL :: transposed
       INTEGER   :: data_type
@@ -294,77 +294,77 @@ CONTAINS
       CALL timeset(routineN, handle)
       CPASSERT(matrix_b%valid)
 
-      CALL dbs_tas_get_info(matrix_a, data_type=data_type)
+      CALL block_tas_get_info(matrix_a, data_type=data_type)
 
       IF (PRESENT(summation)) THEN
-         IF (.NOT. summation) CALL dbs_tas_clear(matrix_b)
+         IF (.NOT. summation) CALL block_tas_clear(matrix_b)
       ELSE
-         CALL dbs_tas_clear(matrix_b)
+         CALL block_tas_clear(matrix_b)
       ENDIF
 
-      CALL dbs_tas_reserve_blocks(matrix_a, matrix_b)
+      CALL block_tas_reserve_blocks(matrix_a, matrix_b)
 
       CALL dbcsr_data_init(block)
       CALL dbcsr_data_new(block, dbcsr_type_1d_to_2d(data_type))
-      CALL dbs_tas_iterator_start(iter, matrix_a)
-      DO WHILE (dbs_tas_iterator_blocks_left(iter))
-         CALL dbs_tas_iterator_next_block(iter, row, column, block, transposed)
-         CALL dbs_tas_put_block(matrix_b, row, column, block, transposed, summation=summation)
+      CALL block_tas_iterator_start(iter, matrix_a)
+      DO WHILE (block_tas_iterator_blocks_left(iter))
+         CALL block_tas_iterator_next_block(iter, row, column, block, transposed)
+         CALL block_tas_put_block(matrix_b, row, column, block, transposed, summation=summation)
       ENDDO
-      CALL dbs_tas_iterator_stop(iter)
+      CALL block_tas_iterator_stop(iter)
       CALL dbcsr_data_clear_pointer(block)
       CALL dbcsr_data_release(block)
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_reserve_blocks_template(matrix_in, matrix_out)
+   SUBROUTINE block_tas_reserve_blocks_template(matrix_in, matrix_out)
       !! Make sure that matrix_out has same blocks reserved as matrix_in. This assumes that both
       !! matrices have same number of block rows and block columns.
 
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix_in
-      TYPE(dbs_tas_type), INTENT(INOUT) :: matrix_out
-      TYPE(dbs_tas_iterator)                        :: iter
+      TYPE(block_tas_type), INTENT(IN) :: matrix_in
+      TYPE(block_tas_type), INTENT(INOUT) :: matrix_out
+      TYPE(block_tas_iterator)                        :: iter
       INTEGER :: iblk, nblk
       INTEGER(KIND=int_8)                  :: row, column
       INTEGER :: blk
       INTEGER(KIND=int_8), DIMENSION(:), ALLOCATABLE :: row_res, col_res
 
-      nblk = dbs_tas_get_num_blocks(matrix_in)
+      nblk = block_tas_get_num_blocks(matrix_in)
       ALLOCATE (row_res(nblk), col_res(nblk))
-      CALL dbs_tas_iterator_start(iter, matrix_in)
+      CALL block_tas_iterator_start(iter, matrix_in)
       DO iblk = 1, nblk
-         CALL dbs_tas_iterator_next_block(iter, row, column, blk)
+         CALL block_tas_iterator_next_block(iter, row, column, blk)
          row_res(iblk) = row
          col_res(iblk) = column
       ENDDO
-      CPASSERT(.NOT. dbs_tas_iterator_blocks_left(iter))
-      CALL dbs_tas_iterator_stop(iter)
+      CPASSERT(.NOT. block_tas_iterator_blocks_left(iter))
+      CALL block_tas_iterator_stop(iter)
 
-      CALL dbs_tas_reserve_blocks(matrix_out, row_res, col_res)
+      CALL block_tas_reserve_blocks(matrix_out, row_res, col_res)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_finalize(matrix)
-      TYPE(dbs_tas_type), INTENT(INOUT)                  :: matrix
+   SUBROUTINE block_tas_finalize(matrix)
+      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix
 
       CALL dbcsr_finalize(matrix%matrix)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_distribution_new(dist, mp_comm, &
+   SUBROUTINE block_tas_distribution_new(dist, mp_comm, &
                                          row_dist, col_dist, split_info, nosplit)
       !! create new distribution.
       !! Exactly like dbcsr_distribution_new but with custom types for row_dist and col_dist instead of
       !! arrays.
 
-      TYPE(dbs_tas_distribution_type), INTENT(OUT)   :: dist
+      TYPE(block_tas_distribution_type), INTENT(OUT)   :: dist
       INTEGER, INTENT(IN)                              :: mp_comm
-      CLASS(dbs_tas_distribution), INTENT(IN)        :: row_dist, col_dist
-      TYPE(dbs_tas_split_info), INTENT(IN), OPTIONAL :: split_info
+      CLASS(block_tas_distribution), INTENT(IN)        :: row_dist, col_dist
+      TYPE(block_tas_split_info), INTENT(IN), OPTIONAL :: split_info
          !! Strategy of how to split process grid (optional). If not present a default split heuristic is applied.
       LOGICAL, INTENT(IN), OPTIONAL                    :: nosplit
          !! if .TRUE. don't split process grid (optional)
       !LOGICAL, INTENT(IN), OPTIONAL                    :: strict_split
 
-      TYPE(dbs_tas_split_info)                       :: split_info_prv
+      TYPE(block_tas_split_info)                       :: split_info_prv
 
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS       :: row_dist_vec
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS       :: col_dist_vec
@@ -372,11 +372,11 @@ CONTAINS
       INTEGER                                          :: nrows, ncols, irow, col, icol, row, &
                                                           split_rowcol, nsplit, handle
       LOGICAL                                          :: opt_nsplit
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_distribution_new'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_distribution_new'
 
       CALL timeset(routineN, handle)
       IF (PRESENT(split_info)) THEN
-         CALL dbs_tas_info_hold(split_info)
+         CALL block_tas_info_hold(split_info)
          split_info_prv = split_info
       ELSE
          ! default split heuristic: split into submatrices that have roughly same block dimensions
@@ -394,7 +394,7 @@ CONTAINS
                opt_nsplit = .FALSE.
             ENDIF
          ENDIF
-         CALL dbs_tas_create_split(split_info_prv, mp_comm, split_rowcol, nsplit=nsplit, opt_nsplit=opt_nsplit)
+         CALL block_tas_create_split(split_info_prv, mp_comm, split_rowcol, nsplit=nsplit, opt_nsplit=opt_nsplit)
       ENDIF
 
       SELECT CASE (split_info_prv%split_rowcol)
@@ -424,7 +424,7 @@ CONTAINS
          ENDDO
       END SELECT
 
-      mp_environ_tmp = dbs_mp_environ(split_info_prv%mp_comm_group)
+      mp_environ_tmp = block_mp_environ(split_info_prv%mp_comm_group)
 
       dist%info = split_info_prv
 
@@ -438,8 +438,8 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_distribution_destroy(dist)
-      TYPE(dbs_tas_distribution_type), INTENT(INOUT)     :: dist
+   SUBROUTINE block_tas_distribution_destroy(dist)
+      TYPE(block_tas_distribution_type), INTENT(INOUT)     :: dist
 
       ! Note: Issue with Cray CCE compiler
       ! commented out the following deallocate statements on polymorphic variables,
@@ -455,14 +455,14 @@ CONTAINS
       IF (ALLOCATED(dist%local_rowcols)) THEN
          DEALLOCATE (dist%local_rowcols)
       ENDIF
-      CALL dbs_tas_release_info(dist%info)
+      CALL block_tas_release_info(dist%info)
       CALL dbcsr_distribution_release(dist%dbcsr_dist)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_get_stored_coordinates(matrix, row, column, processor)
-      !! As dbs_get_stored_coordinates
+   SUBROUTINE block_tas_get_stored_coordinates(matrix, row, column, processor)
+      !! As block_get_stored_coordinates
 
-      TYPE(dbs_tas_type), INTENT(IN)                   :: matrix
+      TYPE(block_tas_type), INTENT(IN)                   :: matrix
       INTEGER(KIND=int_8), INTENT(IN)                    :: row, column
          !! global matrix blocked row
          !! global matrix blocked column
@@ -470,22 +470,22 @@ CONTAINS
          !! process ID
 
       INTEGER, DIMENSION(2)                              :: pcoord
-      TYPE(dbs_tas_split_info)                         :: info
+      TYPE(block_tas_split_info)                         :: info
 
       pcoord(1) = matrix%dist%row_dist%dist(row)
       pcoord(2) = matrix%dist%col_dist%dist(column)
-      info = dbs_tas_info(matrix)
+      info = block_tas_info(matrix)
 
       ! workaround for inefficient mpi_cart_rank
       processor = pcoord(1)*info%pdims(2) + pcoord(2)
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_repl_get_stored_coordinates(matrix, row, column, processors)
+   SUBROUTINE block_repl_get_stored_coordinates(matrix, row, column, processors)
       !! Get all processors for a given row/col combination if matrix is replicated on each process
       !! subgroup.
 
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
          !! tall-and-skinny matrix whose DBCSR submatrices are replicated matrices
       INTEGER, INTENT(IN)                                :: row, column
          !! row of a submatrix
@@ -495,11 +495,11 @@ CONTAINS
       INTEGER                                            :: igroup
       INTEGER(KIND=int_8)                                :: col_s, row_s
       INTEGER, DIMENSION(2)                              :: pcoord
-      TYPE(dbs_tas_split_info)                         :: info
+      TYPE(block_tas_split_info)                         :: info
 
       row_s = INT(row, KIND=int_8); col_s = INT(column, KIND=int_8)
 
-      info = dbs_tas_info(matrix)
+      info = block_tas_info(matrix)
       pcoord(1) = matrix%dist%row_dist%dist(row_s)
       pcoord(2) = matrix%dist%col_dist%dist(col_s)
 
@@ -507,23 +507,23 @@ CONTAINS
          CALL mp_cart_rank(info%mp_comm, pcoord, processors(igroup + 1))
          SELECT CASE (info%split_rowcol)
          CASE (rowsplit)
-            row_s = row_s + dbs_tas_nblkrows_local(matrix)
+            row_s = row_s + block_tas_nblkrows_local(matrix)
             pcoord(1) = matrix%dist%row_dist%dist(row_s)
          CASE (colsplit)
-            col_s = col_s + dbs_tas_nblkcols_local(matrix)
+            col_s = col_s + block_tas_nblkcols_local(matrix)
             pcoord(2) = matrix%dist%col_dist%dist(col_s)
          END SELECT
       ENDDO
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_convert_to_dbcsr(matrix_rect, matrix_dbcsr)
+   SUBROUTINE block_tas_convert_to_dbcsr(matrix_rect, matrix_dbcsr)
       !! Convert a tall-and-skinny matrix into a normal DBCSR matrix.
       !! This is not recommended for matrices with a very large dimension.
 
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix_rect
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix_rect
       TYPE(dbcsr_type), INTENT(OUT)                      :: matrix_dbcsr
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_convert_to_dbcsr'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_convert_to_dbcsr'
 
       INTEGER                                            :: handle
       INTEGER(KIND=int_8)                                :: col, row
@@ -533,14 +533,14 @@ CONTAINS
       TYPE(dbcsr_data_obj)                               :: block
       TYPE(dbcsr_distribution_obj)                       :: dist
       TYPE(dbcsr_mp_obj)                                 :: mp_environ_tmp
-      TYPE(dbs_tas_iterator)                           :: iter
-      TYPE(dbs_tas_split_info)                         :: info
+      TYPE(block_tas_iterator)                           :: iter
+      TYPE(block_tas_split_info)                         :: info
       INTEGER                                            :: block_number, rb_count, nblks_local
       INTEGER, DIMENSION(:), ALLOCATABLE                 :: nz_rows, nz_cols
 
       CALL timeset(routineN, handle)
 
-      info = dbs_tas_info(matrix_rect)
+      info = block_tas_info(matrix_rect)
 
       ALLOCATE (row_dist_vec(matrix_rect%nblkrows))
       ALLOCATE (row_size_vec(matrix_rect%nblkrows))
@@ -557,7 +557,7 @@ CONTAINS
          col_size_vec(col) = matrix_rect%col_blk_size%data(col)
       ENDDO
 
-      mp_environ_tmp = dbs_mp_environ(info%mp_comm)
+      mp_environ_tmp = block_mp_environ(info%mp_comm)
       CALL dbcsr_distribution_new(dist, mp_environ_tmp, row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
       CALL dbcsr_mp_release(mp_environ_tmp)
 
@@ -573,14 +573,14 @@ CONTAINS
       CALL dbcsr_distribution_release(dist)
 
       CALL dbcsr_data_init(block)
-      CALL dbcsr_data_new(block, dbcsr_type_1d_to_2d(dbs_tas_get_data_type(matrix_rect)))
+      CALL dbcsr_data_new(block, dbcsr_type_1d_to_2d(block_tas_get_data_type(matrix_rect)))
 
-      nblks_local = dbs_tas_get_num_blocks(matrix_rect)
-      CALL dbs_tas_iterator_start(iter, matrix_rect)
+      nblks_local = block_tas_get_num_blocks(matrix_rect)
+      CALL block_tas_iterator_start(iter, matrix_rect)
       ALLOCATE (nz_rows(nblks_local), nz_cols(nblks_local))
       rb_count = 0
-      DO WHILE (dbs_tas_iterator_blocks_left(iter))
-         CALL dbs_tas_iterator_next_block(iter, row, col, block_number)
+      DO WHILE (block_tas_iterator_blocks_left(iter))
+         CALL block_tas_iterator_next_block(iter, row, col, block_number)
          rb_count = rb_count + 1
          nz_rows(rb_count) = INT(row)
          nz_cols(rb_count) = INT(col)
@@ -588,14 +588,14 @@ CONTAINS
 
       CALL dbcsr_reserve_blocks(matrix_dbcsr, nz_rows, nz_cols)
 
-      CALL dbs_tas_iterator_stop(iter)
-      CALL dbs_tas_iterator_start(iter, matrix_rect)
-      DO WHILE (dbs_tas_iterator_blocks_left(iter))
-         CALL dbs_tas_iterator_next_block(iter, row, col, block, tr)
+      CALL block_tas_iterator_stop(iter)
+      CALL block_tas_iterator_start(iter, matrix_rect)
+      DO WHILE (block_tas_iterator_blocks_left(iter))
+         CALL block_tas_iterator_next_block(iter, row, col, block, tr)
          CALL dbcsr_put_block(matrix_dbcsr, INT(row), INT(col), block)
       ENDDO
 
-      CALL dbs_tas_iterator_stop(iter)
+      CALL block_tas_iterator_stop(iter)
       CALL dbcsr_data_clear_pointer(block)
       CALL dbcsr_data_release(block)
 
@@ -604,15 +604,15 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_convert_to_tas(info, matrix_rect, matrix_dbcsr)
+   SUBROUTINE block_tas_convert_to_tas(info, matrix_rect, matrix_dbcsr)
       !! Converts a DBCSR matrix into the tall-and-skinny matrix type.
 
-      TYPE(dbs_tas_split_info), INTENT(IN)               :: info
+      TYPE(block_tas_split_info), INTENT(IN)               :: info
          !! Strategy of how to split process grid
-      TYPE(dbs_tas_type), INTENT(OUT)                    :: matrix_rect
+      TYPE(block_tas_type), INTENT(OUT)                    :: matrix_rect
       TYPE(dbcsr_type), INTENT(IN)                         :: matrix_dbcsr
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_convert_to_tas'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_convert_to_tas'
 
       CHARACTER(len=default_string_length)               :: name
       INTEGER                                            :: col, data_type, handle, numnodes, row
@@ -623,9 +623,9 @@ CONTAINS
       TYPE(dbcsr_data_obj)                               :: block
       TYPE(dbcsr_distribution_obj)                       :: dbcsr_dist
       TYPE(dbcsr_iterator)                               :: iter
-      TYPE(dbs_tas_blk_size_arb)                         :: col_blk_size_obj, row_blk_size_obj
-      TYPE(dbs_tas_dist_arb)                             :: col_dist_obj, row_dist_obj
-      TYPE(dbs_tas_distribution_type)                    :: dist
+      TYPE(block_tas_blk_size_arb)                         :: col_blk_size_obj, row_blk_size_obj
+      TYPE(block_tas_dist_arb)                             :: col_dist_obj, row_dist_obj
+      TYPE(block_tas_distribution_type)                    :: dist
 
       NULLIFY (col_blk_size, row_blk_size)
       CALL timeset(routineN, handle)
@@ -636,15 +636,15 @@ CONTAINS
       nbrows = dbcsr_nblkrows_total(matrix_dbcsr)
       nbcols = dbcsr_nblkcols_total(matrix_dbcsr)
 
-      row_dist_obj = dbs_tas_dist_arb(dbcsr_distribution_row_dist(dbcsr_dist), pdims(1), nbrows)
-      col_dist_obj = dbs_tas_dist_arb(dbcsr_distribution_col_dist(dbcsr_dist), pdims(2), nbcols)
+      row_dist_obj = block_tas_dist_arb(dbcsr_distribution_row_dist(dbcsr_dist), pdims(1), nbrows)
+      col_dist_obj = block_tas_dist_arb(dbcsr_distribution_col_dist(dbcsr_dist), pdims(2), nbcols)
 
-      row_blk_size_obj = dbs_tas_blk_size_arb(row_blk_size)
-      col_blk_size_obj = dbs_tas_blk_size_arb(col_blk_size)
+      row_blk_size_obj = block_tas_blk_size_arb(row_blk_size)
+      col_blk_size_obj = block_tas_blk_size_arb(col_blk_size)
 
-      CALL dbs_tas_distribution_new(dist, info%mp_comm, row_dist_obj, col_dist_obj)
+      CALL block_tas_distribution_new(dist, info%mp_comm, row_dist_obj, col_dist_obj)
 
-      CALL dbs_tas_create(matrix_rect, TRIM(name)//"_compressed", &
+      CALL block_tas_create(matrix_rect, TRIM(name)//"_compressed", &
                             dist, data_type, row_blk_size_obj, col_blk_size_obj)
 
       CALL dbcsr_data_init(block)
@@ -653,46 +653,46 @@ CONTAINS
       CALL dbcsr_iterator_start(iter, matrix_dbcsr)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, row, col, block, tr)
-         CALL dbs_tas_put_block(matrix_rect, INT(row, KIND=int_8), INT(col, KIND=int_8), block)
+         CALL block_tas_put_block(matrix_rect, INT(row, KIND=int_8), INT(col, KIND=int_8), block)
       ENDDO
       CALL dbcsr_iterator_stop(iter)
       CALL dbcsr_data_clear_pointer(block)
       CALL dbcsr_data_release(block)
 
-      CALL dbs_tas_finalize(matrix_rect)
+      CALL block_tas_finalize(matrix_rect)
 
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_iterator_start(iter, matrix_in)
+   SUBROUTINE block_tas_iterator_start(iter, matrix_in)
       !! As dbcsr_iterator_start
-      TYPE(dbs_tas_iterator), INTENT(INOUT)              :: iter
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix_in
+      TYPE(block_tas_iterator), INTENT(INOUT)              :: iter
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix_in
 
       CALL dbcsr_iterator_start(iter%iter, matrix_in%matrix)
 
       iter%dist = matrix_in%dist
    END SUBROUTINE
 
-   FUNCTION dbs_tas_iterator_blocks_left(iter)
+   FUNCTION block_tas_iterator_blocks_left(iter)
       !! As dbcsr_iterator_blocks_left
-      TYPE(dbs_tas_iterator), INTENT(IN)                 :: iter
-      LOGICAL                                            :: dbs_tas_iterator_blocks_left
+      TYPE(block_tas_iterator), INTENT(IN)                 :: iter
+      LOGICAL                                            :: block_tas_iterator_blocks_left
 
-      dbs_tas_iterator_blocks_left = dbcsr_iterator_blocks_left(iter%iter)
+      block_tas_iterator_blocks_left = dbcsr_iterator_blocks_left(iter%iter)
    END FUNCTION
 
-   SUBROUTINE dbs_tas_iterator_stop(iter)
+   SUBROUTINE block_tas_iterator_stop(iter)
       !! As dbcsr_iterator_stop
-      TYPE(dbs_tas_iterator), INTENT(INOUT)              :: iter
+      TYPE(block_tas_iterator), INTENT(INOUT)              :: iter
 
       CALL dbcsr_iterator_stop(iter%iter)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_iterator_next_area_block(iterator, row, column, block, transposed, block_number, &
+   SUBROUTINE block_tas_iterator_next_area_block(iterator, row, column, block, transposed, block_number, &
       !! As dbcsr_iterator_next_block
                                                  row_size, col_size)
-      TYPE(dbs_tas_iterator), INTENT(INOUT)              :: iterator
+      TYPE(block_tas_iterator), INTENT(INOUT)              :: iterator
       INTEGER(KIND=int_8), INTENT(OUT)                   :: row, column
       TYPE(dbcsr_data_obj), INTENT(INOUT)                :: block
       LOGICAL, INTENT(OUT)                               :: transposed
@@ -708,11 +708,11 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_iterator_next_block_index(iterator, row, column, block_number, &
+   SUBROUTINE block_tas_iterator_next_block_index(iterator, row, column, block_number, &
                                                   transposed, blk_p, row_size, col_size)
       !! As dbcsr_iterator_next_block
 
-      TYPE(dbs_tas_iterator), INTENT(INOUT)              :: iterator
+      TYPE(block_tas_iterator), INTENT(INOUT)              :: iterator
       INTEGER(KIND=int_8), INTENT(OUT)                   :: row, column
          !! global block row
          !! global block column
@@ -730,12 +730,12 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_reserve_blocks_index(matrix, rows, columns)
+   SUBROUTINE block_tas_reserve_blocks_index(matrix, rows, columns)
       !! As dbcsr_reserve_blocks
-      TYPE(dbs_tas_type), INTENT(INOUT)                  :: matrix
+      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix
       INTEGER(KIND=int_8), DIMENSION(:), INTENT(IN)      :: rows, columns
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_reserve_blocks_index'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_reserve_blocks_index'
 
       INTEGER                                            :: handle, icol, irow
       INTEGER, DIMENSION(SIZE(rows), 2)                :: rowcols_group
@@ -744,12 +744,12 @@ CONTAINS
       CALL timeset(routineN, handle)
 
       DO irow = 1, SIZE(rows)
-         CALL block_index_global_to_local(dbs_tas_info(matrix), matrix%dist, row=rows(irow), &
+         CALL block_index_global_to_local(block_tas_info(matrix), matrix%dist, row=rows(irow), &
                                           row_group=rowcols_group(irow, 1))
       ENDDO
 
       DO icol = 1, SIZE(columns)
-         CALL block_index_global_to_local(dbs_tas_info(matrix), matrix%dist, column=columns(icol), &
+         CALL block_index_global_to_local(block_tas_info(matrix), matrix%dist, column=columns(icol), &
                                           column_group=rowcols_group(icol, 2))
       ENDDO
 
@@ -762,10 +762,10 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_put_block_area(matrix, row, col, block, transposed, summation, &
+   SUBROUTINE block_tas_put_block_area(matrix, row, col, block, transposed, summation, &
       !! As dbcsr_put_block
                                        scale)
-      TYPE(dbs_tas_type), INTENT(INOUT)                  :: matrix
+      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix
       INTEGER(KIND=int_8), INTENT(IN)                    :: row, col
       TYPE(dbcsr_data_obj)                               :: block
       LOGICAL, INTENT(IN), OPTIONAL                      :: transposed, summation
@@ -773,15 +773,15 @@ CONTAINS
 
       INTEGER                                            :: col_group, row_group
 
-      CALL block_index_global_to_local(dbs_tas_info(matrix), matrix%dist, row=row, column=col, &
+      CALL block_index_global_to_local(block_tas_info(matrix), matrix%dist, row=row, column=col, &
                                        row_group=row_group, column_group=col_group)
       CALL dbcsr_put_block(matrix%matrix, row_group, col_group, block, transposed=transposed, summation=summation, scale=scale)
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_get_block_p_area(matrix, row, col, block, transposed, found, row_size, col_size)
+   SUBROUTINE block_tas_get_block_p_area(matrix, row, col, block, transposed, found, row_size, col_size)
       !! As dbcsr_get_block_p
-      TYPE(dbs_tas_type), INTENT(INOUT)                  :: matrix
+      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix
       INTEGER(KIND=int_8), INTENT(IN)                    :: row, col
       TYPE(dbcsr_data_obj), INTENT(INOUT)                :: block
       LOGICAL, INTENT(OUT)                               :: transposed, found
@@ -789,18 +789,18 @@ CONTAINS
 
       INTEGER                                            :: col_group, row_group
 
-      CALL block_index_global_to_local(dbs_tas_info(matrix), matrix%dist, row=row, column=col, &
+      CALL block_index_global_to_local(block_tas_info(matrix), matrix%dist, row=row, column=col, &
                                        row_group=row_group, column_group=col_group)
 
       CALL dbcsr_get_block_p(matrix%matrix, row_group, col_group, block, transposed, found, row_size=row_size, col_size=col_size)
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_copy_distribution(dist_in, dist_out, own_dist)
+   SUBROUTINE block_tas_copy_distribution(dist_in, dist_out, own_dist)
       !! Copy a distribution
 
-      TYPE(dbs_tas_distribution_type), INTENT(INOUT)     :: dist_in
-      TYPE(dbs_tas_distribution_type), INTENT(OUT)       :: dist_out
+      TYPE(block_tas_distribution_type), INTENT(INOUT)     :: dist_in
+      TYPE(block_tas_distribution_type), INTENT(OUT)       :: dist_out
       LOGICAL, INTENT(IN), OPTIONAL                      :: own_dist
          !! Whether distribution should be owned by dist_out
 
@@ -814,18 +814,18 @@ CONTAINS
 
       IF (.NOT. own_dist_prv) THEN
          CALL dbcsr_distribution_hold(dist_in%dbcsr_dist)
-         CALL dbs_tas_info_hold(dist_in%info)
+         CALL block_tas_info_hold(dist_in%info)
       ENDIF
 
       dist_out = dist_in
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_blk_sizes(matrix, row, col, row_size, col_size)
+   SUBROUTINE block_tas_blk_sizes(matrix, row, col, row_size, col_size)
       !! Get block size for a given row & column
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER(KIND=int_8), INTENT(IN)                    :: row, col
       INTEGER, INTENT(OUT)                               :: row_size, col_size
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_blk_sizes'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_blk_sizes'
       INTEGER :: handle
 
       CALL timeset(routineN, handle)
@@ -836,119 +836,119 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE
 
-   FUNCTION dbs_tas_info(matrix)
+   FUNCTION block_tas_info(matrix)
       !! get info on mpi grid splitting
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
-      TYPE(dbs_tas_split_info)                           :: dbs_tas_info
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
+      TYPE(block_tas_split_info)                           :: block_tas_info
 
-      dbs_tas_info = matrix%dist%info
+      block_tas_info = matrix%dist%info
    END FUNCTION
 
-   FUNCTION dbs_tas_nblkrows_total(matrix) RESULT(nblkrows_total)
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
+   FUNCTION block_tas_nblkrows_total(matrix) RESULT(nblkrows_total)
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER(KIND=int_8)                                :: nblkrows_total
 
       nblkrows_total = matrix%nblkrows
    END FUNCTION
 
-   FUNCTION dbs_tas_nfullrows_total(matrix) RESULT(nfullrows_total)
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
+   FUNCTION block_tas_nfullrows_total(matrix) RESULT(nfullrows_total)
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER(KIND=int_8)                                :: nfullrows_total
 
       nfullrows_total = matrix%nfullrows
    END FUNCTION
 
-   FUNCTION dbs_tas_nblkcols_total(matrix) RESULT(nblkcols_total)
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
+   FUNCTION block_tas_nblkcols_total(matrix) RESULT(nblkcols_total)
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER(KIND=int_8)                                :: nblkcols_total
 
       nblkcols_total = matrix%nblkcols
    END FUNCTION
 
-   FUNCTION dbs_tas_nfullcols_total(matrix) RESULT(nfullcols_total)
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
+   FUNCTION block_tas_nfullcols_total(matrix) RESULT(nfullcols_total)
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER(KIND=int_8)                                :: nfullcols_total
 
       nfullcols_total = matrix%nfullcols
    END FUNCTION
-   FUNCTION dbs_tas_nblkcols_local(matrix) RESULT(nblkcols_local)
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
+   FUNCTION block_tas_nblkcols_local(matrix) RESULT(nblkcols_local)
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER                                            :: nblkcols_local
 
       nblkcols_local = dbcsr_nblkcols_total(matrix%matrix)
    END FUNCTION
 
-   FUNCTION dbs_tas_nblkrows_local(matrix) RESULT(nblkrows_local)
-      TYPE(dbs_tas_type), INTENT(IN)                     :: matrix
+   FUNCTION block_tas_nblkrows_local(matrix) RESULT(nblkrows_local)
+      TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER                                            :: nblkrows_local
 
       nblkrows_local = dbcsr_nblkrows_total(matrix%matrix)
    END FUNCTION
 
-   PURE FUNCTION dbs_tas_get_num_blocks(matrix) RESULT(num_blocks)
-      !! As dbs_get_num_blocks: get number of local blocks
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix
+   PURE FUNCTION block_tas_get_num_blocks(matrix) RESULT(num_blocks)
+      !! As block_get_num_blocks: get number of local blocks
+      TYPE(block_tas_type), INTENT(IN) :: matrix
       INTEGER                        :: num_blocks
 
       num_blocks = dbcsr_get_num_blocks(matrix%matrix)
    END FUNCTION
 
-   FUNCTION dbs_tas_get_num_blocks_total(matrix) RESULT(num_blocks)
+   FUNCTION block_tas_get_num_blocks_total(matrix) RESULT(num_blocks)
       !! get total number of blocks
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix
+      TYPE(block_tas_type), INTENT(IN) :: matrix
       INTEGER(KIND=int_8)              :: num_blocks
-      TYPE(dbs_tas_split_info)       :: info
+      TYPE(block_tas_split_info)       :: info
 
-      info = dbs_tas_info(matrix)
-      num_blocks = dbs_tas_get_num_blocks(matrix)
+      info = block_tas_info(matrix)
+      num_blocks = block_tas_get_num_blocks(matrix)
       CALL mp_sum(num_blocks, info%mp_comm)
 
    END FUNCTION
 
-   PURE FUNCTION dbs_tas_get_nze(matrix)
-      !! As dbs_get_nze: get number of local non-zero elements
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix
-      INTEGER :: dbs_tas_get_nze
+   PURE FUNCTION block_tas_get_nze(matrix)
+      !! As block_get_nze: get number of local non-zero elements
+      TYPE(block_tas_type), INTENT(IN) :: matrix
+      INTEGER :: block_tas_get_nze
 
-      dbs_tas_get_nze = dbcsr_get_nze(matrix%matrix)
+      block_tas_get_nze = dbcsr_get_nze(matrix%matrix)
 
    END FUNCTION
 
-   FUNCTION dbs_tas_get_nze_total(matrix)
+   FUNCTION block_tas_get_nze_total(matrix)
       !! Get total number of non-zero elements
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix
-      INTEGER(KIND=int_8)              :: dbs_tas_get_nze_total
-      TYPE(dbs_tas_split_info)       :: info
+      TYPE(block_tas_type), INTENT(IN) :: matrix
+      INTEGER(KIND=int_8)              :: block_tas_get_nze_total
+      TYPE(block_tas_split_info)       :: info
 
-      dbs_tas_get_nze_total = dbs_tas_get_nze(matrix)
-      info = dbs_tas_info(matrix)
-      CALL mp_sum(dbs_tas_get_nze_total, info%mp_comm)
+      block_tas_get_nze_total = block_tas_get_nze(matrix)
+      info = block_tas_info(matrix)
+      CALL mp_sum(block_tas_get_nze_total, info%mp_comm)
    END FUNCTION
 
-   FUNCTION dbs_tas_get_data_type(matrix) RESULT(data_type)
-      !! As dbs_get_data_type
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix
+   FUNCTION block_tas_get_data_type(matrix) RESULT(data_type)
+      !! As block_get_data_type
+      TYPE(block_tas_type), INTENT(IN) :: matrix
       INTEGER                          :: data_type
 
       data_type = dbcsr_get_data_type(matrix%matrix)
    END FUNCTION
 
-   FUNCTION dbs_tas_get_data_size(matrix) RESULT(data_size)
-      !! As dbs_get_data_size
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix
+   FUNCTION block_tas_get_data_size(matrix) RESULT(data_size)
+      !! As block_get_data_size
+      TYPE(block_tas_type), INTENT(IN) :: matrix
       INTEGER                          :: data_size
 
       data_size = dbcsr_get_data_size(matrix%matrix)
    END FUNCTION
 
-   SUBROUTINE dbs_tas_clear(matrix)
+   SUBROUTINE block_tas_clear(matrix)
       !! Clear matrix (erase all data)
-      TYPE(dbs_tas_type), INTENT(INOUT) :: matrix
+      TYPE(block_tas_type), INTENT(INOUT) :: matrix
 
       CALL dbcsr_clear(matrix%matrix)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_get_info(matrix, nblkrows_total, nblkcols_total, &
+   SUBROUTINE block_tas_get_info(matrix, nblkrows_total, nblkcols_total, &
                                  nfullrows_total, nfullcols_total, &
                                  nblkrows_local, nblkcols_local, &
                                  nfullrows_local, nfullcols_local, &
@@ -957,23 +957,23 @@ CONTAINS
                                  row_blk_size, col_blk_size, distribution, name, data_area, &
                                  matrix_type, data_type)
 
-      TYPE(dbs_tas_type), INTENT(IN)                                :: matrix
+      TYPE(block_tas_type), INTENT(IN)                                :: matrix
       INTEGER(KIND=int_8), INTENT(OUT), OPTIONAL                      :: nblkrows_total, nblkcols_total, nfullrows_total, &
                                                                          nfullcols_total
       INTEGER, INTENT(OUT), OPTIONAL                                  :: nblkrows_local, nblkcols_local, nfullrows_local, &
                                                                          nfullcols_local, nprow, npcol, my_prow, my_pcol
       INTEGER(KIND=int_8), DIMENSION(:), OPTIONAL, ALLOCATABLE        :: local_rows, local_cols
-      CLASS(dbs_tas_distribution), ALLOCATABLE, OPTIONAL, &
+      CLASS(block_tas_distribution), ALLOCATABLE, OPTIONAL, &
          INTENT(OUT)                                                  :: proc_row_dist, proc_col_dist
-      CLASS(dbs_tas_rowcol_data), ALLOCATABLE, OPTIONAL, &
+      CLASS(block_tas_rowcol_data), ALLOCATABLE, OPTIONAL, &
          INTENT(OUT)                                                  :: row_blk_size, col_blk_size
-      TYPE(dbs_tas_distribution_type), OPTIONAL                     :: distribution
+      TYPE(block_tas_distribution_type), OPTIONAL                     :: distribution
       CHARACTER(len=*), INTENT(OUT), OPTIONAL                         :: name
       TYPE(dbcsr_data_obj), INTENT(OUT), OPTIONAL                     :: data_area
       CHARACTER, OPTIONAL                                             :: matrix_type
       INTEGER, OPTIONAL                                               :: data_type
 
-      TYPE(dbs_tas_split_info)                                      :: info
+      TYPE(block_tas_split_info)                                      :: info
       INTEGER                                                         :: numnodes, irow, icol
       INTEGER, DIMENSION(2)                                           :: pdims, pcoord
       INTEGER, DIMENSION(:), POINTER                                  :: local_rows_local, local_cols_local
@@ -984,13 +984,13 @@ CONTAINS
                           local_rows=local_rows_local, local_cols=local_cols_local, &
                           name=name, data_area=data_area, matrix_type=matrix_type, data_type=data_type)
 
-      IF (PRESENT(nblkrows_total)) nblkrows_total = dbs_tas_nblkrows_total(matrix)
-      IF (PRESENT(nblkcols_total)) nblkcols_total = dbs_tas_nblkcols_total(matrix)
+      IF (PRESENT(nblkrows_total)) nblkrows_total = block_tas_nblkrows_total(matrix)
+      IF (PRESENT(nblkcols_total)) nblkcols_total = block_tas_nblkcols_total(matrix)
 
-      IF (PRESENT(nfullrows_total)) nfullrows_total = dbs_tas_nfullrows_total(matrix)
-      IF (PRESENT(nfullcols_total)) nfullcols_total = dbs_tas_nfullcols_total(matrix)
+      IF (PRESENT(nfullrows_total)) nfullrows_total = block_tas_nfullrows_total(matrix)
+      IF (PRESENT(nfullcols_total)) nfullcols_total = block_tas_nfullcols_total(matrix)
 
-      info = dbs_tas_info(matrix)
+      info = block_tas_info(matrix)
 
       CALL mp_environ(numnodes, pdims, pcoord, info%mp_comm)
       IF (PRESENT(my_prow)) my_prow = pcoord(1)
@@ -1022,10 +1022,10 @@ CONTAINS
    END SUBROUTINE
 
 #:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE dbs_tas_iterator_next_block_${dsuffix}$ (iterator, row, column, block, transposed, block_number, &
+   SUBROUTINE block_tas_iterator_next_block_${dsuffix}$ (iterator, row, column, block, transposed, block_number, &
       !! As dbcsr_iterator_next_block
                                                          row_size, col_size)
-      TYPE(dbs_tas_iterator), INTENT(INOUT) :: iterator
+      TYPE(block_tas_iterator), INTENT(INOUT) :: iterator
       INTEGER(KIND=int_8), INTENT(OUT)      :: row, column
       ${dtype}$, DIMENSION(:, :), POINTER   :: block
       LOGICAL, INTENT(OUT)                  :: transposed
@@ -1045,9 +1045,9 @@ CONTAINS
 
 #:for dparam, dtype, dsuffix in dtype_float_list
    !! As dbcsr_put_block
-   SUBROUTINE dbs_tas_put_block_${dsuffix}$ (matrix, row, col, block, transposed, summation, &
+   SUBROUTINE block_tas_put_block_${dsuffix}$ (matrix, row, col, block, transposed, summation, &
                                                scale)
-      TYPE(dbs_tas_type), INTENT(INOUT)     :: matrix
+      TYPE(block_tas_type), INTENT(INOUT)     :: matrix
       ${dtype}$, DIMENSION(:, :), INTENT(IN) :: block
       LOGICAL, INTENT(IN), OPTIONAL         :: transposed, summation
       INTEGER(KIND=int_8), INTENT(IN)       :: row, col
@@ -1064,9 +1064,9 @@ CONTAINS
 #:endfor
 
 #:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE dbs_tas_get_block_p_${dsuffix}$ (matrix, row, col, block, transposed, found, row_size, col_size)
+   SUBROUTINE block_tas_get_block_p_${dsuffix}$ (matrix, row, col, block, transposed, found, row_size, col_size)
       !! As dbcsr_get_block_p
-      TYPE(dbs_tas_type), INTENT(INOUT)  :: matrix
+      TYPE(block_tas_type), INTENT(INOUT)  :: matrix
       INTEGER(KIND=int_8), INTENT(IN)    :: row, col
       ${dtype}$, DIMENSION(:, :), POINTER :: block
       LOGICAL, INTENT(OUT)               :: transposed
@@ -1084,18 +1084,18 @@ CONTAINS
 #:endfor
 
 #:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE dbs_tas_set_${dsuffix}$ (matrix, alpha)
+   SUBROUTINE block_tas_set_${dsuffix}$ (matrix, alpha)
       !! As dbcsr_set
-      TYPE(dbs_tas_type), INTENT(INOUT)    :: matrix
+      TYPE(block_tas_type), INTENT(INOUT)    :: matrix
       ${dtype}$, INTENT(IN)                :: alpha
       CALL dbcsr_set(matrix%matrix, alpha)
    END SUBROUTINE
 #:endfor
 
 #:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE dbs_tas_filter_${dsuffix}$ (matrix, eps, method, use_absolute)
+   SUBROUTINE block_tas_filter_${dsuffix}$ (matrix, eps, method, use_absolute)
       !! As dbcsr_filter
-      TYPE(dbs_tas_type), INTENT(INOUT)    :: matrix
+      TYPE(block_tas_type), INTENT(INOUT)    :: matrix
       ${dtype}$, INTENT(IN)                :: eps
       INTEGER, INTENT(IN), OPTIONAL        :: method
       LOGICAL, INTENT(IN), OPTIONAL        :: use_absolute

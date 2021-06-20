@@ -22,14 +22,14 @@ MODULE qs_tensors_types
                                               cp_para_env_release
    USE cp_para_types,                   ONLY: cp_para_env_type
    USE dbcsr_api,                       ONLY: dbcsr_type_real_8
-   USE dbs_tensor_api,                ONLY: dbs_t_create,&
-                                              dbs_t_default_distvec,&
-                                              dbs_t_distribution_destroy,&
-                                              dbs_t_distribution_new,&
-                                              dbs_t_distribution_type,&
-                                              dbs_t_mp_environ_pgrid,&
-                                              dbs_t_pgrid_type,&
-                                              dbs_t_type
+   USE block_tensor_api,                ONLY: block_tensor_create,&
+                                              block_tensor_default_distvec,&
+                                              block_tensor_distribution_destroy,&
+                                              block_tensor_distribution_new,&
+                                              block_tensor_distribution_type,&
+                                              block_tensor_mp_environ_pgrid,&
+                                              block_tensor_pgrid_type,&
+                                              block_tensor_type
    USE distribution_2d_types,           ONLY: distribution_2d_create_prv => distribution_2d_create,&
                                               distribution_2d_release,&
                                               distribution_2d_type
@@ -321,9 +321,9 @@ CONTAINS
 !> \param name ...
 ! **************************************************************************************************
    SUBROUTINE create_3c_tensor(t3c, dist_1, dist_2, dist_3, pgrid, sizes_1, sizes_2, sizes_3, map1, map2, name)
-      TYPE(dbs_t_type), INTENT(OUT)                    :: t3c
+      TYPE(block_tensor_type), INTENT(OUT)                    :: t3c
       INTEGER, ALLOCATABLE, DIMENSION(:), INTENT(OUT)    :: dist_1, dist_2, dist_3
-      TYPE(dbs_t_pgrid_type), INTENT(IN)               :: pgrid
+      TYPE(block_tensor_pgrid_type), INTENT(IN)               :: pgrid
       INTEGER, DIMENSION(:), INTENT(IN)                  :: sizes_1, sizes_2, sizes_3, map1, map2
       CHARACTER(len=*), INTENT(IN)                       :: name
 
@@ -331,11 +331,11 @@ CONTAINS
 
       INTEGER                                            :: handle, size_1, size_2, size_3
       INTEGER, DIMENSION(3)                              :: pcoord, pdims
-      TYPE(dbs_t_distribution_type)                    :: dist
+      TYPE(block_tensor_distribution_type)                    :: dist
 
       CALL timeset(routineN, handle)
 
-      CALL dbs_t_mp_environ_pgrid(pgrid, pdims, pcoord)
+      CALL block_tensor_mp_environ_pgrid(pgrid, pdims, pcoord)
 
       size_1 = SIZE(sizes_1)
       size_2 = SIZE(sizes_2)
@@ -345,14 +345,14 @@ CONTAINS
       ALLOCATE (dist_2(size_2))
       ALLOCATE (dist_3(size_3))
 
-      CALL dbs_t_default_distvec(size_1, pdims(1), sizes_1, dist_1)
-      CALL dbs_t_default_distvec(size_2, pdims(2), sizes_2, dist_2)
-      CALL dbs_t_default_distvec(size_3, pdims(3), sizes_3, dist_3)
+      CALL block_tensor_default_distvec(size_1, pdims(1), sizes_1, dist_1)
+      CALL block_tensor_default_distvec(size_2, pdims(2), sizes_2, dist_2)
+      CALL block_tensor_default_distvec(size_3, pdims(3), sizes_3, dist_3)
 
-      CALL dbs_t_distribution_new(dist, pgrid, dist_1, dist_2, dist_3)
-      CALL dbs_t_create(t3c, name, dist, map1, map2, dbcsr_type_real_8, sizes_1, &
+      CALL block_tensor_distribution_new(dist, pgrid, dist_1, dist_2, dist_3)
+      CALL block_tensor_create(t3c, name, dist, map1, map2, dbcsr_type_real_8, sizes_1, &
                           sizes_2, sizes_3)
-      CALL dbs_t_distribution_destroy(dist)
+      CALL block_tensor_distribution_destroy(dist)
 
       CALL timestop(handle)
    END SUBROUTINE
@@ -369,9 +369,9 @@ CONTAINS
 !> \param name ...
 ! **************************************************************************************************
    SUBROUTINE create_2c_tensor(t2c, dist_1, dist_2, pgrid, sizes_1, sizes_2, order, name)
-      TYPE(dbs_t_type), INTENT(OUT)                    :: t2c
+      TYPE(block_tensor_type), INTENT(OUT)                    :: t2c
       INTEGER, ALLOCATABLE, DIMENSION(:), INTENT(OUT)    :: dist_1, dist_2
-      TYPE(dbs_t_pgrid_type), INTENT(IN)               :: pgrid
+      TYPE(block_tensor_pgrid_type), INTENT(IN)               :: pgrid
       INTEGER, DIMENSION(:), INTENT(IN)                  :: sizes_1, sizes_2
       INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL        :: order
       CHARACTER(len=*), INTENT(IN)                       :: name
@@ -380,7 +380,7 @@ CONTAINS
 
       INTEGER                                            :: handle, size_1, size_2
       INTEGER, DIMENSION(2)                              :: order_in, pcoord, pdims
-      TYPE(dbs_t_distribution_type)                    :: dist
+      TYPE(block_tensor_distribution_type)                    :: dist
 
       CALL timeset(routineN, handle)
 
@@ -390,7 +390,7 @@ CONTAINS
          order_in = [1, 2]
       ENDIF
 
-      CALL dbs_t_mp_environ_pgrid(pgrid, pdims, pcoord)
+      CALL block_tensor_mp_environ_pgrid(pgrid, pdims, pcoord)
 
       size_1 = SIZE(sizes_1)
       size_2 = SIZE(sizes_2)
@@ -398,12 +398,12 @@ CONTAINS
       ALLOCATE (dist_1(size_1))
       ALLOCATE (dist_2(size_2))
 
-      CALL dbs_t_default_distvec(size_1, pdims(1), sizes_1, dist_1)
-      CALL dbs_t_default_distvec(size_2, pdims(2), sizes_2, dist_2)
+      CALL block_tensor_default_distvec(size_1, pdims(1), sizes_1, dist_1)
+      CALL block_tensor_default_distvec(size_2, pdims(2), sizes_2, dist_2)
 
-      CALL dbs_t_distribution_new(dist, pgrid, dist_1, dist_2)
-      CALL dbs_t_create(t2c, name, dist, [order_in(1)], [order_in(2)], dbcsr_type_real_8, sizes_1, sizes_2)
-      CALL dbs_t_distribution_destroy(dist)
+      CALL block_tensor_distribution_new(dist, pgrid, dist_1, dist_2)
+      CALL block_tensor_create(t2c, name, dist, [order_in(1)], [order_in(2)], dbcsr_type_real_8, sizes_1, sizes_2)
+      CALL block_tensor_distribution_destroy(dist)
 
       CALL timestop(handle)
    END SUBROUTINE

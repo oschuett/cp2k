@@ -7,15 +7,15 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tas_split
+MODULE block_tas_split
    !! methods to split tall-and-skinny matrices along longest dimension.
    !! Basically, we are splitting process grid and each subgrid holds its own DBCSR matrix.
 
-   USE dbs_tas_types, ONLY: &
-      dbs_tas_distribution_type, dbs_tas_split_info
-   USE dbs_tas_global, ONLY: &
-      dbs_tas_distribution
-   USE dbs_tas_util, ONLY: &
+   USE block_tas_types, ONLY: &
+      block_tas_distribution_type, block_tas_split_info
+   USE block_tas_global, ONLY: &
+      block_tas_distribution
+   USE block_tas_util, ONLY: &
       swap
    USE util, ONLY: &
       sort
@@ -34,14 +34,14 @@ MODULE dbs_tas_split
       block_index_global_to_local, &
       block_index_local_to_global, &
       colsplit, &
-      dbs_tas_get_split_info, &
-      dbs_tas_info_hold, &
-      dbs_tas_mp_comm, &
-      dbs_tas_mp_dims, &
-      dbs_tas_release_info, &
-      dbs_tas_create_split, &
-      dbs_tas_create_split_rows_or_cols, &
-      dbs_tas_set_strict_split, &
+      block_tas_get_split_info, &
+      block_tas_info_hold, &
+      block_tas_mp_comm, &
+      block_tas_mp_dims, &
+      block_tas_release_info, &
+      block_tas_create_split, &
+      block_tas_create_split_rows_or_cols, &
+      block_tas_set_strict_split, &
       group_to_mrowcol, &
       group_to_world_proc_map, &
       rowsplit, &
@@ -50,23 +50,23 @@ MODULE dbs_tas_split
       default_nsplit_accept_ratio, &
       default_pdims_accept_ratio
 
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tas_split'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tas_split'
 
    INTEGER, PARAMETER :: rowsplit = 1, colsplit = 2
    REAL(real_8), PARAMETER :: default_pdims_accept_ratio = 1.2_real_8
    REAL(real_8), PARAMETER :: default_nsplit_accept_ratio = 3.0_real_8
 
-   INTERFACE dbs_tas_mp_comm
-      MODULE PROCEDURE dbs_tas_mp_comm
-      MODULE PROCEDURE dbs_tas_mp_comm_from_matrix_sizes
+   INTERFACE block_tas_mp_comm
+      MODULE PROCEDURE block_tas_mp_comm
+      MODULE PROCEDURE block_tas_mp_comm_from_matrix_sizes
    END INTERFACE
 
 CONTAINS
 
-   SUBROUTINE dbs_tas_create_split_rows_or_cols(split_info, mp_comm, ngroup, igroup, split_rowcol, own_comm)
+   SUBROUTINE block_tas_create_split_rows_or_cols(split_info, mp_comm, ngroup, igroup, split_rowcol, own_comm)
       !! split mpi grid by rows or columns
 
-      TYPE(dbs_tas_split_info), INTENT(OUT)            :: split_info
+      TYPE(block_tas_split_info), INTENT(OUT)            :: split_info
       INTEGER, INTENT(IN)                                :: mp_comm
          !! global mpi communicator with a 2d cartesian grid
       INTEGER, INTENT(INOUT)                             :: ngroup
@@ -82,7 +82,7 @@ CONTAINS
          numproc_group, numproc_group_check, handle
       INTEGER, DIMENSION(2)                              :: pcoord, pcoord_group, pdims, pdims_group
       LOGICAL                                            :: to_assert, own_comm_prv
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_create_split_rows_or_cols'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_create_split_rows_or_cols'
 
       CALL timeset(routineN, handle)
 
@@ -141,17 +141,17 @@ CONTAINS
 
    END SUBROUTINE
 
-   FUNCTION dbs_tas_mp_comm(mp_comm, split_rowcol, nsplit)
+   FUNCTION block_tas_mp_comm(mp_comm, split_rowcol, nsplit)
       !! Create default cartesian process grid that is consistent with default split heuristic
-      !! of dbs_tas_create_split
+      !! of block_tas_create_split
       !! \return new communicator
 
       INTEGER, INTENT(IN)                                :: mp_comm
       INTEGER, INTENT(IN)                                :: split_rowcol
       INTEGER, INTENT(IN)                             :: nsplit
-      INTEGER                                            :: dbs_tas_mp_comm
+      INTEGER                                            :: block_tas_mp_comm
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_mp_comm'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_mp_comm'
 
       INTEGER                                            :: handle, iproc, numproc
       INTEGER, DIMENSION(2)                              :: myploc, npdims
@@ -160,21 +160,21 @@ CONTAINS
 
       CALL mp_environ(numproc, iproc, mp_comm)
 
-      npdims = dbs_tas_mp_dims(numproc, split_rowcol, nsplit)
+      npdims = block_tas_mp_dims(numproc, split_rowcol, nsplit)
 
-      CALL mp_cart_create(mp_comm, 2, npdims, myploc, dbs_tas_mp_comm)
+      CALL mp_cart_create(mp_comm, 2, npdims, myploc, block_tas_mp_comm)
 
       CALL timestop(handle)
    END FUNCTION
 
-   FUNCTION dbs_tas_mp_dims(numproc, split_rowcol, nsplit)
-      !! Get optimal process grid dimensions consistent with dbs_tas_create_split
+   FUNCTION block_tas_mp_dims(numproc, split_rowcol, nsplit)
+      !! Get optimal process grid dimensions consistent with block_tas_create_split
       INTEGER, INTENT(IN)                                :: numproc
       INTEGER, INTENT(IN)                                :: split_rowcol
       INTEGER, INTENT(IN)                                :: nsplit
-      INTEGER, DIMENSION(2)                              :: dbs_tas_mp_dims
+      INTEGER, DIMENSION(2)                              :: block_tas_mp_dims
 
-      INTEGER                                            :: dbs_tas_mp_comm, nsplit_opt
+      INTEGER                                            :: block_tas_mp_comm, nsplit_opt
       INTEGER                                            :: group_size
       INTEGER, DIMENSION(2)                              :: group_dims
 
@@ -196,9 +196,9 @@ CONTAINS
 
       SELECT CASE (split_rowcol)
       CASE (rowsplit)
-         dbs_tas_mp_dims(:) = [group_dims(1)*nsplit_opt, group_dims(2)]
+         block_tas_mp_dims(:) = [group_dims(1)*nsplit_opt, group_dims(2)]
       CASE (colsplit)
-         dbs_tas_mp_dims(:) = [group_dims(1), group_dims(2)*nsplit_opt]
+         block_tas_mp_dims(:) = [group_dims(1), group_dims(2)*nsplit_opt]
       END SELECT
 
    END FUNCTION
@@ -277,7 +277,7 @@ CONTAINS
 
    END FUNCTION
 
-   FUNCTION dbs_tas_mp_comm_from_matrix_sizes(mp_comm, nblkrows, nblkcols) RESULT(mp_comm_new)
+   FUNCTION block_tas_mp_comm_from_matrix_sizes(mp_comm, nblkrows, nblkcols) RESULT(mp_comm_new)
       !! Derive optimal cartesian process grid from matrix sizes. This ensures optimality for
       !! dense matrices only
 
@@ -297,13 +297,13 @@ CONTAINS
          nsplit = INT((nblkcols - 1)/nblkrows + 1)
       ENDIF
 
-      mp_comm_new = dbs_tas_mp_comm(mp_comm, split_rowcol, nsplit)
+      mp_comm_new = block_tas_mp_comm(mp_comm, split_rowcol, nsplit)
    END FUNCTION
 
-   SUBROUTINE dbs_tas_create_split(split_info, mp_comm, split_rowcol, nsplit, own_comm, opt_nsplit)
+   SUBROUTINE block_tas_create_split(split_info, mp_comm, split_rowcol, nsplit, own_comm, opt_nsplit)
       !! Split Cartesian process grid using a default split heuristic.
 
-      TYPE(dbs_tas_split_info), INTENT(OUT)            :: split_info
+      TYPE(block_tas_split_info), INTENT(OUT)            :: split_info
          !! object storing all data corresponding to split, submatrices and parallelization
       INTEGER, INTENT(IN)                                :: mp_comm
          !! MPI communicator with associated cartesian grid
@@ -316,7 +316,7 @@ CONTAINS
       LOGICAL, INTENT(IN), OPTIONAL                      :: opt_nsplit
          !! whether nsplit should be optimized to process grid
 
-      CHARACTER(LEN=*), PARAMETER                        :: routineN = 'dbs_tas_create_split'
+      CHARACTER(LEN=*), PARAMETER                        :: routineN = 'block_tas_create_split'
 
       INTEGER                                            :: &
          handle, iproc, numproc, igroup, nsplit_opt, pdim_split, pdim_nonsplit
@@ -359,7 +359,7 @@ CONTAINS
 
       igroup = pcoord(split_rowcol)/pdims_group(split_rowcol)
 
-      CALL dbs_tas_create_split_rows_or_cols(split_info, mp_comm, nsplit_opt, igroup, split_rowcol, own_comm=own_comm)
+      CALL block_tas_create_split_rows_or_cols(split_info, mp_comm, nsplit_opt, igroup, split_rowcol, own_comm=own_comm)
 
       IF (nsplit > 0) THEN
          ALLOCATE (split_info%ngroup_opt, SOURCE=nsplit)
@@ -385,10 +385,10 @@ CONTAINS
       ENDIF
    END FUNCTION
 
-   SUBROUTINE dbs_tas_get_split_info(info, mp_comm, nsplit, igroup, mp_comm_group, split_rowcol, pgrid_offset)
+   SUBROUTINE block_tas_get_split_info(info, mp_comm, nsplit, igroup, mp_comm_group, split_rowcol, pgrid_offset)
       !! Get info on split
 
-      TYPE(dbs_tas_split_info), INTENT(IN)             :: info
+      TYPE(block_tas_split_info), INTENT(IN)             :: info
       INTEGER, INTENT(OUT), OPTIONAL                     :: mp_comm, nsplit, igroup, mp_comm_group, &
                                                             split_rowcol
          !! communicator (global process grid)
@@ -416,8 +416,8 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_release_info(split_info)
-      TYPE(dbs_tas_split_info), INTENT(INOUT)          :: split_info
+   SUBROUTINE block_tas_release_info(split_info)
+      TYPE(block_tas_split_info), INTENT(INOUT)          :: split_info
       LOGICAL                                            :: abort
 
       abort = .FALSE.
@@ -445,8 +445,8 @@ CONTAINS
       IF (ALLOCATED(split_info%ngroup_opt)) DEALLOCATE (split_info%ngroup_opt)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_info_hold(split_info)
-      TYPE(dbs_tas_split_info), INTENT(IN)             :: split_info
+   SUBROUTINE block_tas_info_hold(split_info)
+      TYPE(block_tas_split_info), INTENT(IN)             :: split_info
 
       INTEGER, POINTER                                   :: ref
 
@@ -535,8 +535,8 @@ CONTAINS
                                           row, column)
       !! map group local block index to global matrix index
 
-      TYPE(dbs_tas_split_info), INTENT(IN)             :: info
-      TYPE(dbs_tas_distribution_type), INTENT(IN)      :: dist
+      TYPE(block_tas_split_info), INTENT(IN)             :: info
+      TYPE(block_tas_distribution_type), INTENT(IN)      :: dist
       INTEGER, INTENT(IN), OPTIONAL                      :: row_group, column_group
          !! group local row block index
          !! group local column block index
@@ -560,8 +560,8 @@ CONTAINS
 
    SUBROUTINE block_index_global_to_local(info, dist, row, column, row_group, column_group)
       !! map global block index to group local index
-      TYPE(dbs_tas_split_info), INTENT(IN)               :: info
-      TYPE(dbs_tas_distribution_type), INTENT(IN)        :: dist
+      TYPE(block_tas_split_info), INTENT(IN)               :: info
+      TYPE(block_tas_distribution_type), INTENT(IN)        :: dist
       INTEGER(KIND=int_8), INTENT(IN), OPTIONAL          :: row, column
       INTEGER, INTENT(OUT), OPTIONAL                     :: row_group, column_group
 
@@ -601,8 +601,8 @@ CONTAINS
    SUBROUTINE group_to_mrowcol(info, rowcol_dist, igroup, rowcols)
       !! maps a process subgroup to matrix rows/columns
 
-      TYPE(dbs_tas_split_info), INTENT(IN)                      :: info
-      CLASS(dbs_tas_distribution), INTENT(IN)                   :: rowcol_dist
+      TYPE(block_tas_split_info), INTENT(IN)                      :: info
+      CLASS(block_tas_distribution), INTENT(IN)                   :: rowcol_dist
       INTEGER, INTENT(IN)                                         :: igroup
          !! group ID
       INTEGER(KIND=int_8), DIMENSION(:), ALLOCATABLE, INTENT(OUT) :: rowcols
@@ -631,9 +631,9 @@ CONTAINS
       CALL sort(rowcols, nrowcols, sort_indices)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_set_strict_split(info)
+   SUBROUTINE block_tas_set_strict_split(info)
       !! freeze current split factor such that it is never changed during multiplication
-      TYPE(dbs_tas_split_info), INTENT(INOUT)                      :: info
+      TYPE(block_tas_split_info), INTENT(INOUT)                      :: info
       info%strict_split = [.TRUE., .TRUE.]
    END SUBROUTINE
 

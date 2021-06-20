@@ -31,11 +31,11 @@ MODULE rpa_gw_im_time_util
         dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, &
         dbcsr_multiply, dbcsr_p_type, dbcsr_release, dbcsr_release_p, dbcsr_reserve_all_blocks, &
         dbcsr_scalar, dbcsr_set_diag, dbcsr_type, dbcsr_type_no_symmetry
-   USE dbs_tensor_api,                ONLY: &
-        dbs_t_contract, dbs_t_copy, dbs_t_copy_matrix_to_tensor, dbs_t_create, &
-        dbs_t_default_distvec, dbs_t_destroy, dbs_t_get_info, dbs_t_get_num_blocks, &
-        dbs_t_pgrid_create, dbs_t_pgrid_destroy, dbs_t_pgrid_type, &
-        dbs_t_reserved_block_indices, dbs_t_type
+   USE block_tensor_api,                ONLY: &
+        block_tensor_contract, block_tensor_copy, block_tensor_copy_matrix_to_tensor, block_tensor_create, &
+        block_tensor_default_distvec, block_tensor_destroy, block_tensor_get_info, block_tensor_get_num_blocks, &
+        block_tensor_pgrid_create, block_tensor_pgrid_destroy, block_tensor_pgrid_type, &
+        block_tensor_reserved_block_indices, block_tensor_type
    USE hfx_types,                       ONLY: alloc_containers,&
                                               block_ind_type,&
                                               hfx_compression_type
@@ -107,13 +107,13 @@ CONTAINS
                                          t_3c_overl_nnP_ic, t_3c_overl_nnP_ic_reflected, &
                                          qs_env, unit_nr, do_beta)
 
-      TYPE(dbs_t_type), DIMENSION(:, :)                :: t_3c_overl_int
+      TYPE(block_tensor_type), DIMENSION(:, :)                :: t_3c_overl_int
       TYPE(hfx_compression_type), DIMENSION(:, :, :)     :: t_3c_O_compressed
       TYPE(block_ind_type), DIMENSION(:, :, :)           :: t_3c_O_ind
-      TYPE(dbs_t_type)                                 :: t_3c_overl_int_ao_mo
+      TYPE(block_tensor_type)                                 :: t_3c_overl_int_ao_mo
       TYPE(hfx_compression_type)                         :: t_3c_O_mo_compressed
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: t_3c_O_mo_ind
-      TYPE(dbs_t_type)                                 :: t_3c_overl_int_gw_RI, &
+      TYPE(block_tensor_type)                                 :: t_3c_overl_int_gw_RI, &
                                                             t_3c_overl_int_gw_AO
       INTEGER, DIMENSION(:), INTENT(IN)                  :: starts_array_mc, ends_array_mc
       TYPE(cp_fm_type), POINTER                          :: mo_coeff
@@ -122,7 +122,7 @@ CONTAINS
                                                             nmo
       TYPE(cp_para_env_type), POINTER                    :: para_env
       LOGICAL, INTENT(IN)                                :: do_ic_model
-      TYPE(dbs_t_type)                                 :: t_3c_overl_nnP_ic, &
+      TYPE(block_tensor_type)                                 :: t_3c_overl_nnP_ic, &
                                                             t_3c_overl_nnP_ic_reflected
       TYPE(qs_environment_type), POINTER                 :: qs_env
       INTEGER, INTENT(IN)                                :: unit_nr
@@ -148,8 +148,8 @@ CONTAINS
       TYPE(atomic_kind_type), DIMENSION(:), POINTER      :: atomic_kind_set
       TYPE(cp_fm_type), POINTER                          :: fm_mat_mo_coeff_gw
       TYPE(dbcsr_distribution_type)                      :: dist, dist_templ
-      TYPE(dbs_t_pgrid_type)                           :: pgrid_2d, pgrid_AO, pgrid_ic, pgrid_MO
-      TYPE(dbs_t_type)                                 :: mo_coeff_gw_t, mo_coeff_gw_t_tmp, &
+      TYPE(block_tensor_pgrid_type)                           :: pgrid_2d, pgrid_AO, pgrid_ic, pgrid_MO
+      TYPE(block_tensor_type)                                 :: mo_coeff_gw_t, mo_coeff_gw_t_tmp, &
                                                             t_3c_overl_int_ao_ao, &
                                                             t_3c_overl_int_mo_ao, &
                                                             t_3c_overl_int_mo_mo
@@ -228,7 +228,7 @@ CONTAINS
       DEALLOCATE (basis_set_ao, basis_set_ri_aux)
 
       pdims = 0
-      CALL dbs_t_pgrid_create(para_env%group, pdims, pgrid_AO, &
+      CALL block_tensor_pgrid_create(para_env%group, pdims, pgrid_AO, &
                                 tensor_dims=[SIZE(sizes_RI_split), SIZE(sizes_AO_split), SIZE(sizes_AO_split)])
 
       pdims_2d = 0
@@ -236,11 +236,11 @@ CONTAINS
 
       ! we iterate over MO blocks for saving memory during contraction, thus we should not parallelize over MO dimension
       pdims = [pdims_2d(1), pdims_2d(2), 1]
-      CALL dbs_t_pgrid_create(para_env%group, pdims, pgrid_MO, &
+      CALL block_tensor_pgrid_create(para_env%group, pdims, pgrid_MO, &
                                 tensor_dims=[SIZE(sizes_RI_split), SIZE(sizes_AO_split), 1])
 
       pdims_2d = 0
-      CALL dbs_t_pgrid_create(para_env%group, pdims_2d, pgrid_2d, &
+      CALL block_tensor_pgrid_create(para_env%group, pdims_2d, pgrid_2d, &
                                 tensor_dims=[SIZE(sizes_AO_split), nmo])
 
       CALL create_3c_tensor(t_3c_overl_int_ao_ao, dist1, dist2, dist3, pgrid_AO, &
@@ -262,22 +262,22 @@ CONTAINS
                             sizes_AO_split, sizes_RI_split, sizes_MO, [1], [2, 3], name="(AO | RI MO)")
       DEALLOCATE (dist1, dist2, dist3)
 
-      CALL dbs_t_pgrid_destroy(pgrid_AO)
-      CALL dbs_t_pgrid_destroy(pgrid_MO)
+      CALL block_tensor_pgrid_destroy(pgrid_AO)
+      CALL block_tensor_pgrid_destroy(pgrid_MO)
 
       CALL create_2c_tensor(mo_coeff_gw_t, dist1, dist2, pgrid_2d, sizes_AO_split, sizes_MO_1, name="(AO|MO)")
       DEALLOCATE (dist1, dist2)
-      CALL dbs_t_pgrid_destroy(pgrid_2d)
+      CALL block_tensor_pgrid_destroy(pgrid_2d)
 
-      CALL dbs_t_create(mat_mo_coeff_gw, mo_coeff_gw_t_tmp, name="MO coeffs")
-      CALL dbs_t_copy_matrix_to_tensor(mat_mo_coeff_gw, mo_coeff_gw_t_tmp)
+      CALL block_tensor_create(mat_mo_coeff_gw, mo_coeff_gw_t_tmp, name="MO coeffs")
+      CALL block_tensor_copy_matrix_to_tensor(mat_mo_coeff_gw, mo_coeff_gw_t_tmp)
 
-      CALL dbs_t_copy(mo_coeff_gw_t_tmp, mo_coeff_gw_t)
+      CALL block_tensor_copy(mo_coeff_gw_t_tmp, mo_coeff_gw_t)
 
       bounds(1, 1) = homo - gw_corr_lev_occ + 1
       bounds(2, 1) = homo + gw_corr_lev_virt
 
-      CALL dbs_t_get_info(t_3c_overl_int_ao_ao, nfull_total=bounds_3c)
+      CALL block_tensor_get_info(t_3c_overl_int_ao_ao, nfull_total=bounds_3c)
 
       ibounds(:, 1) = [1, bounds_3c(1)]
       ibounds(:, 3) = [1, bounds_3c(3)]
@@ -290,9 +290,9 @@ CONTAINS
 
          ibounds(:, 2) = [starts_array_mc(i_mem), ends_array_mc(i_mem)]
 
-         CALL dbs_t_copy(t_3c_overl_int(1, 1), t_3c_overl_int_ao_ao, move_data=.TRUE.)
+         CALL block_tensor_copy(t_3c_overl_int(1, 1), t_3c_overl_int_ao_ao, move_data=.TRUE.)
 
-         CALL dbs_t_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_ao_ao, dbcsr_scalar(1.0_dp), &
+         CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_ao_ao, dbcsr_scalar(1.0_dp), &
                                t_3c_overl_int_ao_mo, contract_1=[1], notcontract_1=[2], &
                                contract_2=[3], notcontract_2=[1, 2], map_1=[3], map_2=[1, 2], &
                                bounds_2=ibounds, move_data=.FALSE., unit_nr=unit_nr_prv)
@@ -303,7 +303,7 @@ CONTAINS
 
       IF (do_ic_model) THEN
          pdims = 0
-         CALL dbs_t_pgrid_create(para_env%group, pdims, pgrid_ic, &
+         CALL block_tensor_pgrid_create(para_env%group, pdims, pgrid_ic, &
                                    tensor_dims=[SIZE(sizes_RI_split), nmo, nmo])
 
          CALL create_3c_tensor(t_3c_overl_int_mo_ao, dist1, dist2, dist3, pgrid_ic, &
@@ -312,19 +312,19 @@ CONTAINS
          CALL create_3c_tensor(t_3c_overl_int_mo_mo, dist1, dist2, dist3, pgrid_ic, &
                                sizes_RI_split, sizes_MO_1, sizes_MO_1, [1, 2], [3], name="(RI MO | MO)")
          DEALLOCATE (dist1, dist2, dist3)
-         CALL dbs_t_create(t_3c_overl_int_mo_mo, t_3c_overl_nnP_ic)
+         CALL block_tensor_create(t_3c_overl_int_mo_mo, t_3c_overl_nnP_ic)
          CALL create_3c_tensor(t_3c_overl_nnP_ic_reflected, dist1, dist2, dist3, pgrid_ic, &
                                sizes_RI_split, sizes_MO_1, sizes_MO_1, [1], [2, 3], name="(RI | MO MO)")
          DEALLOCATE (dist1, dist2, dist3)
 
-         CALL dbs_t_pgrid_destroy(pgrid_ic)
+         CALL block_tensor_pgrid_destroy(pgrid_ic)
 
-         CALL dbs_t_copy(t_3c_overl_int_ao_mo, t_3c_overl_int_mo_ao, order=[1, 3, 2])
-         CALL dbs_t_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_mo_ao, dbcsr_scalar(0.0_dp), &
+         CALL block_tensor_copy(t_3c_overl_int_ao_mo, t_3c_overl_int_mo_ao, order=[1, 3, 2])
+         CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_mo_ao, dbcsr_scalar(0.0_dp), &
                                t_3c_overl_int_mo_mo, contract_1=[1], notcontract_1=[2], &
                                contract_2=[3], notcontract_2=[1, 2], map_1=[3], map_2=[1, 2], &
                                bounds_2=bounds, move_data=.FALSE., unit_nr=unit_nr_prv)
-         CALL dbs_t_copy(t_3c_overl_int_mo_mo, t_3c_overl_nnP_ic)
+         CALL block_tensor_copy(t_3c_overl_int_mo_mo, t_3c_overl_nnP_ic)
 
          NULLIFY (mat_mo_coeff_gw_reflected)
          CALL dbcsr_init_p(mat_mo_coeff_gw_reflected)
@@ -343,8 +343,8 @@ CONTAINS
          CALL dbcsr_distribution_get(dist_templ, nprows=nprows, npcols=npcols)
 
          ALLOCATE (distp_1(size_MO), distp_2(size_MO))
-         CALL dbs_t_default_distvec(size_MO, nprows, sizes_MO_blocked, distp_1)
-         CALL dbs_t_default_distvec(size_MO, npcols, sizes_MO_blocked, distp_2)
+         CALL block_tensor_default_distvec(size_MO, nprows, sizes_MO_blocked, distp_1)
+         CALL block_tensor_default_distvec(size_MO, npcols, sizes_MO_blocked, distp_2)
          CALL dbcsr_distribution_new(dist, template=dist_templ, row_dist=distp_1, col_dist=distp_2, reuse_arrays=.TRUE.)
 
          ALLOCATE (sizes_MO_p1(size_MO))
@@ -383,31 +383,31 @@ CONTAINS
 
          CALL dbcsr_filter(mat_mo_coeff_gw_reflected_norm, 1.0E-20_dp)
 
-         CALL dbs_t_copy_matrix_to_tensor(mat_mo_coeff_gw_reflected_norm, mo_coeff_gw_t_tmp)
+         CALL block_tensor_copy_matrix_to_tensor(mat_mo_coeff_gw_reflected_norm, mo_coeff_gw_t_tmp)
          CALL dbcsr_release(mat_mo_coeff_gw_reflected_norm)
-         CALL dbs_t_copy(mo_coeff_gw_t_tmp, mo_coeff_gw_t)
+         CALL block_tensor_copy(mo_coeff_gw_t_tmp, mo_coeff_gw_t)
 
-         CALL dbs_t_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_ao_ao, dbcsr_scalar(0.0_dp), &
+         CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_ao_ao, dbcsr_scalar(0.0_dp), &
                                t_3c_overl_int_ao_mo, contract_1=[1], notcontract_1=[2], &
                                contract_2=[3], notcontract_2=[1, 2], map_1=[3], map_2=[1, 2], &
                                bounds_2=bounds, move_data=.FALSE., unit_nr=unit_nr_prv)
 
-         CALL dbs_t_copy(t_3c_overl_int_ao_mo, t_3c_overl_int_mo_ao, order=[1, 3, 2])
-         CALL dbs_t_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_mo_ao, dbcsr_scalar(0.0_dp), &
+         CALL block_tensor_copy(t_3c_overl_int_ao_mo, t_3c_overl_int_mo_ao, order=[1, 3, 2])
+         CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_mo_ao, dbcsr_scalar(0.0_dp), &
                                t_3c_overl_int_mo_mo, contract_1=[1], notcontract_1=[2], &
                                contract_2=[3], notcontract_2=[1, 2], map_1=[3], map_2=[1, 2], &
                                bounds_2=bounds, move_data=.FALSE., unit_nr=unit_nr_prv)
-         CALL dbs_t_copy(t_3c_overl_int_mo_mo, t_3c_overl_nnP_ic_reflected)
-         CALL dbs_t_destroy(t_3c_overl_int_mo_ao)
-         CALL dbs_t_destroy(t_3c_overl_int_mo_mo)
+         CALL block_tensor_copy(t_3c_overl_int_mo_mo, t_3c_overl_nnP_ic_reflected)
+         CALL block_tensor_destroy(t_3c_overl_int_mo_ao)
+         CALL block_tensor_destroy(t_3c_overl_int_mo_mo)
 
          CALL dbcsr_release_p(mat_mo_coeff_gw_reflected)
 
       ENDIF
 
       CALL alloc_containers(t_3c_O_mo_compressed, 1)
-      ALLOCATE (t_3c_O_mo_ind(dbs_t_get_num_blocks(t_3c_overl_int_ao_mo), 3))
-      CALL dbs_t_reserved_block_indices(t_3c_overl_int_ao_mo, t_3c_O_mo_ind)
+      ALLOCATE (t_3c_O_mo_ind(block_tensor_get_num_blocks(t_3c_overl_int_ao_mo), 3))
+      CALL block_tensor_reserved_block_indices(t_3c_overl_int_ao_mo, t_3c_O_mo_ind)
 
       CALL get_tensor_occupancy(t_3c_overl_int_ao_mo, nze, occ)
       memory_3c = 0.0_dp
@@ -425,9 +425,9 @@ CONTAINS
 
       CALL dbcsr_release_p(mat_mo_coeff_gw)
 
-      CALL dbs_t_destroy(t_3c_overl_int_ao_ao)
-      CALL dbs_t_destroy(mo_coeff_gw_t)
-      CALL dbs_t_destroy(mo_coeff_gw_t_tmp)
+      CALL block_tensor_destroy(t_3c_overl_int_ao_ao)
+      CALL block_tensor_destroy(mo_coeff_gw_t)
+      CALL block_tensor_destroy(mo_coeff_gw_t_tmp)
 
       CALL timestop(handle)
 

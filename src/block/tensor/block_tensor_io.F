@@ -7,54 +7,54 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tensor_io
+MODULE block_tensor_io
    !! DBCSR tensor Input / Output
 
-#:include "dbs_tensor.fypp"
+#:include "block_tensor.fypp"
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
-   USE dbs_tensor_types, ONLY: &
-      dbs_t_get_info, dbs_t_type, ndims_tensor, dbs_t_get_num_blocks, dbs_t_get_num_blocks_total, &
-      blk_dims_tensor, dbs_t_get_stored_coordinates, dbs_t_get_nze, dbs_t_get_nze_total, &
-      dbs_t_pgrid_type, dbs_t_nblks_total
+   USE block_tensor_types, ONLY: &
+      block_tensor_get_info, block_tensor_type, ndims_tensor, block_tensor_get_num_blocks, block_tensor_get_num_blocks_total, &
+      blk_dims_tensor, block_tensor_get_stored_coordinates, block_tensor_get_nze, block_tensor_get_nze_total, &
+      block_tensor_pgrid_type, block_tensor_nblks_total
    USE kinds, ONLY: default_string_length, int_8, real_8
    USE message_passing, ONLY: mp_environ, mp_sum, mp_max
-   USE dbs_tensor_block, ONLY: &
-      dbs_t_iterator_type, dbs_t_iterator_next_block, dbs_t_iterator_start, &
-      dbs_t_iterator_blocks_left, dbs_t_iterator_stop, dbs_t_get_block
-   USE dbs_tas_io, ONLY: dbs_tas_write_split_info
+   USE block_tensor_block, ONLY: &
+      block_tensor_iterator_type, block_tensor_iterator_next_block, block_tensor_iterator_start, &
+      block_tensor_iterator_blocks_left, block_tensor_iterator_stop, block_tensor_get_block
+   USE block_tas_io, ONLY: block_tas_write_split_info
 
 #include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tensor_types'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor_types'
 
    PUBLIC :: &
-      dbs_t_write_tensor_info, &
-      dbs_t_write_tensor_dist, &
-      dbs_t_write_blocks, &
-      dbs_t_write_block, &
-      dbs_t_write_block_indices, &
-      dbs_t_write_split_info, &
+      block_tensor_write_tensor_info, &
+      block_tensor_write_tensor_dist, &
+      block_tensor_write_blocks, &
+      block_tensor_write_block, &
+      block_tensor_write_block_indices, &
+      block_tensor_write_split_info, &
       prep_output_unit
 
 CONTAINS
 
-   SUBROUTINE dbs_t_write_tensor_info(tensor, unit_nr, full_info)
+   SUBROUTINE block_tensor_write_tensor_info(tensor, unit_nr, full_info)
       !! Write tensor global info: block dimensions, full dimensions and process grid dimensions
 
-      TYPE(dbs_t_type), INTENT(IN) :: tensor
+      TYPE(block_tensor_type), INTENT(IN) :: tensor
       INTEGER, INTENT(IN)            :: unit_nr
       LOGICAL, OPTIONAL, INTENT(IN)  :: full_info
          !! Whether to print distribution and block size vectors
       INTEGER, DIMENSION(ndims_tensor(tensor)) :: nblks_total, nfull_total, pdims, my_ploc, nblks_local, nfull_local
 
 #:for idim in range(1, maxdim+1)
-      INTEGER, DIMENSION(dbs_t_nblks_total(tensor, ${idim}$)) :: proc_dist_${idim}$
-      INTEGER, DIMENSION(dbs_t_nblks_total(tensor, ${idim}$)) :: blk_size_${idim}$
-      INTEGER, DIMENSION(dbs_t_nblks_total(tensor, ${idim}$)) :: blks_local_${idim}$
+      INTEGER, DIMENSION(block_tensor_nblks_total(tensor, ${idim}$)) :: proc_dist_${idim}$
+      INTEGER, DIMENSION(block_tensor_nblks_total(tensor, ${idim}$)) :: blk_size_${idim}$
+      INTEGER, DIMENSION(block_tensor_nblks_total(tensor, ${idim}$)) :: blks_local_${idim}$
 #:endfor
       CHARACTER(len=default_string_length)                     :: name
       INTEGER                                                  :: idim
@@ -64,7 +64,7 @@ CONTAINS
       unit_nr_prv = prep_output_unit(unit_nr)
       IF (unit_nr_prv == 0) RETURN
 
-      CALL dbs_t_get_info(tensor, nblks_total, nfull_total, nblks_local, nfull_local, pdims, my_ploc, &
+      CALL block_tensor_get_info(tensor, nblks_total, nfull_total, nblks_local, nfull_local, pdims, my_ploc, &
                             ${varlist("blks_local")}$, ${varlist("proc_dist")}$, ${varlist("blk_size")}$, &
                             name=name)
 
@@ -112,9 +112,9 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_write_tensor_dist(tensor, unit_nr)
+   SUBROUTINE block_tensor_write_tensor_dist(tensor, unit_nr)
       !! Write info on tensor distribution & load balance
-      TYPE(dbs_t_type), INTENT(IN) :: tensor
+      TYPE(block_tensor_type), INTENT(IN) :: tensor
       INTEGER, INTENT(IN)            :: unit_nr
       INTEGER                        :: nproc, myproc, nblock_max, nelement_max
       INTEGER(KIND=int_8)            :: nblock_sum, nelement_sum, nblock_tot
@@ -130,11 +130,11 @@ CONTAINS
 
       CALL mp_environ(nproc, myproc, mp_comm)
 
-      nblock = dbs_t_get_num_blocks(tensor)
-      nelement = dbs_t_get_nze(tensor)
+      nblock = block_tensor_get_num_blocks(tensor)
+      nelement = block_tensor_get_nze(tensor)
 
-      nblock_sum = dbs_t_get_num_blocks_total(tensor)
-      nelement_sum = dbs_t_get_nze_total(tensor)
+      nblock_sum = block_tensor_get_num_blocks_total(tensor)
+      nelement_sum = block_tensor_get_nze_total(tensor)
 
       tmp = (/nblock, nelement/)
       CALL mp_max(tmp, mp_comm)
@@ -159,10 +159,10 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_write_blocks(tensor, io_unit_master, io_unit_all, write_int)
+   SUBROUTINE block_tensor_write_blocks(tensor, io_unit_master, io_unit_all, write_int)
       !! Write all tensor blocks
 
-      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor
+      TYPE(block_tensor_type), INTENT(INOUT)                  :: tensor
       INTEGER, INTENT(IN)                                :: io_unit_master, io_unit_all
          !! for global output
          !! for local output
@@ -174,33 +174,33 @@ CONTAINS
       REAL(KIND=real_8), ALLOCATABLE, &
          DIMENSION(${shape_colon(ndim)}$)                :: blk_values_${ndim}$
 #:endfor
-      TYPE(dbs_t_iterator_type)                        :: iterator
+      TYPE(block_tensor_iterator_type)                        :: iterator
       INTEGER                                            :: proc, mynode, numnodes
       LOGICAL                                            :: found
 
       IF (io_unit_master > 0) THEN
          WRITE (io_unit_master, '(T7,A)') "(block index) @ process: (array index) value"
       ENDIF
-      CALL dbs_t_iterator_start(iterator, tensor)
-      DO WHILE (dbs_t_iterator_blocks_left(iterator))
-         CALL dbs_t_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size)
-         CALL dbs_t_get_stored_coordinates(tensor, blk_index, proc)
+      CALL block_tensor_iterator_start(iterator, tensor)
+      DO WHILE (block_tensor_iterator_blocks_left(iterator))
+         CALL block_tensor_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size)
+         CALL block_tensor_get_stored_coordinates(tensor, blk_index, proc)
          CALL mp_environ(numnodes, mynode, tensor%pgrid%mp_comm_2d)
          CPASSERT(proc .EQ. mynode)
 #:for ndim in ndims
          IF (ndims_tensor(tensor) == ${ndim}$) THEN
-            CALL dbs_t_get_block(tensor, blk_index, blk_values_${ndim}$, found)
+            CALL block_tensor_get_block(tensor, blk_index, blk_values_${ndim}$, found)
             CPASSERT(found)
-            CALL dbs_t_write_block(tensor%name, blk_size, blk_index, proc, io_unit_all, &
+            CALL block_tensor_write_block(tensor%name, blk_size, blk_index, proc, io_unit_all, &
                                      blk_values_${ndim}$=blk_values_${ndim}$, write_int=write_int)
             DEALLOCATE (blk_values_${ndim}$)
          ENDIF
 #:endfor
       ENDDO
-      CALL dbs_t_iterator_stop(iterator)
+      CALL block_tensor_iterator_stop(iterator)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_write_block(name, blk_size, blk_index, proc, unit_nr, &
+   SUBROUTINE block_tensor_write_block(name, blk_size, blk_index, proc, unit_nr, &
                                   ${varlist("blk_values",nmin=2)}$, write_int)
       !! Write a tensor block
       CHARACTER(LEN=*), INTENT(IN)                       :: name
@@ -258,10 +258,10 @@ CONTAINS
       ENDIF
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_write_block_indices(tensor, io_unit_master, io_unit_all)
-      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor
+   SUBROUTINE block_tensor_write_block_indices(tensor, io_unit_master, io_unit_all)
+      TYPE(block_tensor_type), INTENT(INOUT)                  :: tensor
       INTEGER, INTENT(IN)                                :: io_unit_master, io_unit_all
-      TYPE(dbs_t_iterator_type)                        :: iterator
+      TYPE(block_tensor_iterator_type)                        :: iterator
       INTEGER, DIMENSION(ndims_tensor(tensor))          :: blk_index, blk_size
       INTEGER                                            :: blk, mynode, numnodes, proc
 
@@ -269,10 +269,10 @@ CONTAINS
          WRITE (io_unit_master, '(T7,A)') "(block index) @ process: size"
       ENDIF
 
-      CALL dbs_t_iterator_start(iterator, tensor)
-      DO WHILE (dbs_t_iterator_blocks_left(iterator))
-         CALL dbs_t_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size)
-         CALL dbs_t_get_stored_coordinates(tensor, blk_index, proc)
+      CALL block_tensor_iterator_start(iterator, tensor)
+      DO WHILE (block_tensor_iterator_blocks_left(iterator))
+         CALL block_tensor_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size)
+         CALL block_tensor_get_stored_coordinates(tensor, blk_index, proc)
          CALL mp_environ(numnodes, mynode, tensor%pgrid%mp_comm_2d)
          CPASSERT(proc .EQ. mynode)
 #:for ndim in ndims
@@ -282,15 +282,15 @@ CONTAINS
          ENDIF
 #:endfor
       ENDDO
-      CALL dbs_t_iterator_stop(iterator)
+      CALL block_tensor_iterator_stop(iterator)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_write_split_info(pgrid, unit_nr)
-      TYPE(dbs_t_pgrid_type), INTENT(IN) :: pgrid
+   SUBROUTINE block_tensor_write_split_info(pgrid, unit_nr)
+      TYPE(block_tensor_pgrid_type), INTENT(IN) :: pgrid
       INTEGER, INTENT(IN) :: unit_nr
 
       IF (ALLOCATED(pgrid%tas_split_info)) THEN
-         CALL dbs_tas_write_split_info(pgrid%tas_split_info, unit_nr)
+         CALL block_tas_write_split_info(pgrid%tas_split_info, unit_nr)
       ENDIF
    END SUBROUTINE
 

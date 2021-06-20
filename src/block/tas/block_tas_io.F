@@ -7,20 +7,20 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tas_io
+MODULE block_tas_io
 
    !! tall-and-skinny matrices: Input / Output
-   USE dbs_tas_types, ONLY: &
-      dbs_tas_type, dbs_tas_split_info
-   USE dbs_tas_global, ONLY: &
-      dbs_tas_rowcol_data, dbs_tas_distribution
+   USE block_tas_types, ONLY: &
+      block_tas_type, block_tas_split_info
+   USE block_tas_global, ONLY: &
+      block_tas_rowcol_data, block_tas_distribution
    USE kinds, ONLY: &
       int_8, real_8, default_string_length
-   USE dbs_tas_base, ONLY: &
-      dbs_tas_get_info, dbs_tas_get_num_blocks, dbs_tas_get_num_blocks_total, dbs_tas_get_nze_total, &
-      dbs_tas_get_nze, dbs_tas_nblkrows_total, dbs_tas_nblkcols_total, dbs_tas_info
-   USE dbs_tas_split, ONLY: &
-      dbs_tas_get_split_info, rowsplit, colsplit
+   USE block_tas_base, ONLY: &
+      block_tas_get_info, block_tas_get_num_blocks, block_tas_get_num_blocks_total, block_tas_get_nze_total, &
+      block_tas_get_nze, block_tas_nblkrows_total, block_tas_nblkcols_total, block_tas_info
+   USE block_tas_split, ONLY: &
+      block_tas_get_split_info, rowsplit, colsplit
    USE message_passing, ONLY: &
       mp_environ, mp_sum, mp_max
    USE dbcsr_dist_methods, ONLY: &
@@ -29,20 +29,20 @@ MODULE dbs_tas_io
    IMPLICIT NONE
    PRIVATE
 
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tas_io'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tas_io'
 
    PUBLIC :: &
-      dbs_tas_write_dist, &
-      dbs_tas_write_matrix_info, &
-      dbs_tas_write_split_info, &
+      block_tas_write_dist, &
+      block_tas_write_matrix_info, &
+      block_tas_write_split_info, &
       prep_output_unit
 
 CONTAINS
 
-   SUBROUTINE dbs_tas_write_matrix_info(matrix, unit_nr, full_info)
+   SUBROUTINE block_tas_write_matrix_info(matrix, unit_nr, full_info)
       !! Write basic infos of tall-and-skinny matrix: block dimensions, full dimensions, process grid dimensions
 
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix
+      TYPE(block_tas_type), INTENT(IN) :: matrix
       INTEGER, INTENT(IN)            :: unit_nr
       LOGICAL, OPTIONAL, INTENT(IN)  :: full_info
          !! Whether to print distribution and block size vectors
@@ -50,15 +50,15 @@ CONTAINS
       INTEGER(KIND=int_8)                      :: nblkrows_total, nblkcols_total, nfullrows_total, &
                                                   nfullcols_total
       INTEGER                                  :: nprow, npcol, unit_nr_prv
-      CLASS(dbs_tas_distribution), ALLOCATABLE :: proc_row_dist, proc_col_dist
-      CLASS(dbs_tas_rowcol_data), ALLOCATABLE  :: row_blk_size, col_blk_size
+      CLASS(block_tas_distribution), ALLOCATABLE :: proc_row_dist, proc_col_dist
+      CLASS(block_tas_rowcol_data), ALLOCATABLE  :: row_blk_size, col_blk_size
       INTEGER(KIND=int_8)                      :: iblk
       CHARACTER(default_string_length)         :: name
 
       unit_nr_prv = prep_output_unit(unit_nr)
       IF (unit_nr_prv == 0) RETURN
 
-      CALL dbs_tas_get_info(matrix, nblkrows_total=nblkrows_total, nblkcols_total=nblkcols_total, &
+      CALL block_tas_get_info(matrix, nblkrows_total=nblkrows_total, nblkcols_total=nblkcols_total, &
                               nfullrows_total=nfullrows_total, nfullcols_total=nfullcols_total, &
                               nprow=nprow, npcol=npcol, proc_row_dist=proc_row_dist, proc_col_dist=proc_col_dist, &
                               row_blk_size=row_blk_size, col_blk_size=col_blk_size, name=name)
@@ -100,10 +100,10 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_write_dist(matrix, unit_nr, full_info)
+   SUBROUTINE block_tas_write_dist(matrix, unit_nr, full_info)
       !! Write info on tall-and-skinny matrix distribution & load balance
 
-      TYPE(dbs_tas_type), INTENT(IN) :: matrix
+      TYPE(block_tas_type), INTENT(IN) :: matrix
       INTEGER, INTENT(IN)              :: unit_nr
       LOGICAL, INTENT(IN), OPTIONAL    :: full_info
          !! Whether to print subgroup DBCSR distribution
@@ -123,15 +123,15 @@ CONTAINS
       unit_nr_prv = prep_output_unit(unit_nr)
       IF (unit_nr_prv == 0) RETURN
 
-      CALL dbs_tas_get_split_info(matrix%dist%info, mp_comm, ngroup, igroup, mp_comm_group, split_rowcol)
-      CALL dbs_tas_get_info(matrix, name=name)
+      CALL block_tas_get_split_info(matrix%dist%info, mp_comm, ngroup, igroup, mp_comm_group, split_rowcol)
+      CALL block_tas_get_info(matrix, name=name)
       CALL mp_environ(nproc, iproc, mp_comm)
 
-      nblock = dbs_tas_get_num_blocks(matrix)
-      nelement = dbs_tas_get_nze(matrix)
+      nblock = block_tas_get_num_blocks(matrix)
+      nelement = block_tas_get_nze(matrix)
 
-      nblock_p_sum = dbs_tas_get_num_blocks_total(matrix)
-      nelement_p_sum = dbs_tas_get_nze_total(matrix)
+      nblock_p_sum = block_tas_get_num_blocks_total(matrix)
+      nelement_p_sum = block_tas_get_nze_total(matrix)
 
       tmp = (/nblock, nelement/)
       CALL mp_max(tmp, mp_comm)
@@ -147,7 +147,7 @@ CONTAINS
       CALL mp_max(tmp_i8, mp_comm)
       nblock_s_max = tmp_i8(1); nelement_s_max = tmp_i8(2)
 
-      nblock_tot = dbs_tas_nblkrows_total(matrix)*dbs_tas_nblkcols_total(matrix)
+      nblock_tot = block_tas_nblkrows_total(matrix)*block_tas_nblkcols_total(matrix)
       occupation = -1.0_real_8
       IF (nblock_tot .NE. 0) occupation = 100.0_real_8*REAL(nblock_p_sum, real_8)/REAL(nblock_tot, real_8)
 
@@ -185,9 +185,9 @@ CONTAINS
       ENDIF
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_write_split_info(info, unit_nr, name)
+   SUBROUTINE block_tas_write_split_info(info, unit_nr, name)
       !! Print info on how matrix is split
-      TYPE(dbs_tas_split_info), INTENT(IN)             :: info
+      TYPE(block_tas_split_info), INTENT(IN)             :: info
       INTEGER, INTENT(IN) :: unit_nr
       CHARACTER(len=*), INTENT(IN), OPTIONAL             :: name
       INTEGER                                            :: groupsize, igroup, mp_comm, &
@@ -206,7 +206,7 @@ CONTAINS
          ALLOCATE (name_prv, SOURCE="")
       ENDIF
 
-      CALL dbs_tas_get_split_info(info, mp_comm, nsplit, igroup, mp_comm_group, split_rowcol, pgrid_offset)
+      CALL block_tas_get_split_info(info, mp_comm, nsplit, igroup, mp_comm_group, split_rowcol, pgrid_offset)
 
       CALL mp_environ(numnodes, mynode, mp_comm)
       CALL mp_environ(numnodes, dims, coord, mp_comm)

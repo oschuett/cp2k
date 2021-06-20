@@ -7,26 +7,26 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tensor_reshape
+MODULE block_tensor_transform
    !! Routines to reshape / redistribute tensors
 
-#:include "dbs_tensor.fypp"
+#:include "block_tensor.fypp"
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
-   USE dbs_allocate_wrap, ONLY: allocate_any
-   USE dbs_tas_base, ONLY: dbs_tas_copy, dbs_tas_get_info, dbs_tas_info
-   USE dbs_tensor_block, ONLY: &
-      block_nd, create_block, destroy_block, dbs_t_iterator_type, dbs_t_iterator_next_block, &
-      dbs_t_iterator_blocks_left, dbs_t_iterator_start, dbs_t_iterator_stop, dbs_t_get_block, &
-      dbs_t_reserve_blocks, dbs_t_put_block
-   USE dbs_tensor_types, ONLY: dbs_t_blk_sizes, &
-                                 dbs_t_create, &
-                                 dbs_t_get_data_type, &
-                                 dbs_t_type, &
+   USE block_allocate_wrap, ONLY: allocate_any
+   USE block_tas_base, ONLY: block_tas_copy, block_tas_get_info, block_tas_info
+   USE block_tensor_block, ONLY: &
+      block_nd, create_block, destroy_block, block_tensor_iterator_type, block_tensor_iterator_next_block, &
+      block_tensor_iterator_blocks_left, block_tensor_iterator_start, block_tensor_iterator_stop, block_tensor_get_block, &
+      block_tensor_reserve_blocks, block_tensor_put_block
+   USE block_tensor_types, ONLY: block_tensor_blk_sizes, &
+                                 block_tensor_create, &
+                                 block_tensor_get_data_type, &
+                                 block_tensor_type, &
                                  ndims_tensor, &
-                                 dbs_t_get_stored_coordinates, &
-                                 dbs_t_clear
+                                 block_tensor_get_stored_coordinates, &
+                                 block_tensor_clear
    USE kinds, ONLY: default_string_length
    USE kinds, ONLY: ${uselist(dtype_float_prec)}$
    USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
@@ -40,10 +40,10 @@ MODULE dbs_tensor_reshape
 
    IMPLICIT NONE
    PRIVATE
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tensor_reshape'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor_transform'
 
    PUBLIC :: &
-      dbs_t_reshape
+      block_tensor_reshape
 
    TYPE block_buffer_type
       INTEGER                                    :: ndim = -1
@@ -64,10 +64,10 @@ MODULE dbs_tensor_reshape
 
 CONTAINS
 
-   SUBROUTINE dbs_t_reshape(tensor_in, tensor_out, summation, move_data)
+   SUBROUTINE block_tensor_reshape(tensor_in, tensor_out, summation, move_data)
       !! copy data (involves reshape)
 
-      TYPE(dbs_t_type), INTENT(INOUT)               :: tensor_in, tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT)               :: tensor_in, tensor_out
       LOGICAL, INTENT(IN), OPTIONAL                    :: summation
          !! tensor_out = tensor_out + tensor_in move_data memory optimization: transfer data from tensor_in to tensor_out s.t.
          !! tensor_in is empty on return
@@ -79,7 +79,7 @@ CONTAINS
                                                             num_entries_recv, num_entries_send, &
                                                             num_rec, num_send
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: req_array, index_recv, blks_to_allocate
-      TYPE(dbs_t_iterator_type)                        :: iter
+      TYPE(block_tensor_iterator_type)                        :: iter
       TYPE(block_nd)                                     :: blk_data
       TYPE(block_buffer_type), ALLOCATABLE, DIMENSION(:) :: buffer_recv, buffer_send
       INTEGER, DIMENSION(ndims_tensor(tensor_in))       :: blk_size, ind_nd, index
@@ -99,7 +99,7 @@ CONTAINS
 
       CPASSERT(tensor_out%valid)
 
-      IF (.NOT. summation_prv) CALL dbs_t_clear(tensor_out)
+      IF (.NOT. summation_prv) CALL block_tensor_clear(tensor_out)
 
       mp_comm = tensor_in%pgrid%mp_comm_2d
       CALL mp_environ(numnodes, mynode, mp_comm)
@@ -113,14 +113,14 @@ CONTAINS
       ALLOCATE (num_send(0:2*numnodes - 1))
       num_send(:) = 0
       ALLOCATE (req_array(1:numnodes, 4))
-      CALL dbs_t_iterator_start(iter, tensor_in)
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
-         CALL dbs_t_get_stored_coordinates(tensor_out, ind_nd, iproc)
+      CALL block_tensor_iterator_start(iter, tensor_in)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
+         CALL block_tensor_get_stored_coordinates(tensor_out, ind_nd, iproc)
          num_send(2*iproc) = num_send(2*iproc) + PRODUCT(blk_size)
          num_send(2*iproc + 1) = num_send(2*iproc + 1) + 1
       ENDDO
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
       CALL mp_alltoall(num_send, num_rec, 2, mp_comm)
       DO iproc = 0, numnodes - 1
          num_entries_recv(iproc) = num_rec(2*iproc)
@@ -129,24 +129,24 @@ CONTAINS
          num_blocks_send(iproc) = num_send(2*iproc + 1)
 
          CALL block_buffer_create(buffer_send(iproc), num_blocks_send(iproc), num_entries_send(iproc), &
-                                  dbs_t_get_data_type(tensor_in), ndims_tensor(tensor_in))
+                                  block_tensor_get_data_type(tensor_in), ndims_tensor(tensor_in))
          CALL block_buffer_create(buffer_recv(iproc), num_blocks_recv(iproc), num_entries_recv(iproc), &
-                                  dbs_t_get_data_type(tensor_in), ndims_tensor(tensor_in))
+                                  block_tensor_get_data_type(tensor_in), ndims_tensor(tensor_in))
       ENDDO
-      CALL dbs_t_iterator_start(iter, tensor_in)
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
-         CALL dbs_t_get_block(tensor_in, ind_nd, blk_data, found)
+      CALL block_tensor_iterator_start(iter, tensor_in)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
+         CALL block_tensor_get_block(tensor_in, ind_nd, blk_data, found)
          CPASSERT(found)
-         CALL dbs_t_get_stored_coordinates(tensor_out, ind_nd, iproc)
+         CALL block_tensor_get_stored_coordinates(tensor_out, ind_nd, iproc)
          CALL block_buffer_add_anyd_block(buffer_send(iproc), ind_nd, blk_data)
          CALL destroy_block(blk_data)
       ENDDO
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
-      IF (move_prv) CALL dbs_t_clear(tensor_in)
+      IF (move_prv) CALL block_tensor_clear(tensor_in)
 
-      CALL dbs_t_communicate_buffer(mp_comm, buffer_recv, buffer_send, req_array)
+      CALL block_tensor_communicate_buffer(mp_comm, buffer_recv, buffer_send, req_array)
       DO iproc = 0, numnodes - 1
          CALL block_buffer_destroy(buffer_send(iproc))
       ENDDO
@@ -162,18 +162,18 @@ CONTAINS
          DEALLOCATE (index_recv)
       ENDDO
 
-      CALL dbs_t_reserve_blocks(tensor_out, blks_to_allocate)
+      CALL block_tensor_reserve_blocks(tensor_out, blks_to_allocate)
       DEALLOCATE (blks_to_allocate)
 
       DO iproc = 0, numnodes - 1
          DO WHILE (block_buffer_blocks_left(buffer_recv(iproc)))
             CALL block_buffer_get_next_anyd_block(buffer_recv(iproc), ndata, index)
-            CALL dbs_t_blk_sizes(tensor_in, index, blk_size)
+            CALL block_tensor_blk_sizes(tensor_in, index, blk_size)
             ! create block
-            CALL create_block(blk_data, blk_size, dbs_t_get_data_type(tensor_in))
+            CALL create_block(blk_data, blk_size, block_tensor_get_data_type(tensor_in))
             ! get actual block data
             CALL block_buffer_get_next_anyd_block(buffer_recv(iproc), ndata, index, blk_data)
-            CALL dbs_t_put_block(tensor_out, index, blk_data, summation=summation)
+            CALL block_tensor_put_block(tensor_out, index, blk_data, summation=summation)
             CALL destroy_block(blk_data)
          ENDDO
          CALL block_buffer_destroy(buffer_recv(iproc))
@@ -283,7 +283,7 @@ CONTAINS
       block_buffer_blocks_left = buffer%endpos .LT. buffer%nblock
    END FUNCTION
 
-   SUBROUTINE dbs_t_communicate_buffer(mp_comm, buffer_recv, buffer_send, req_array)
+   SUBROUTINE block_tensor_communicate_buffer(mp_comm, buffer_recv, buffer_send, req_array)
       !! communicate buffer
       INTEGER, INTENT(IN)                    :: mp_comm
       TYPE(block_buffer_type), DIMENSION(0:), INTENT(INOUT) :: buffer_recv, buffer_send
@@ -292,7 +292,7 @@ CONTAINS
       INTEGER                                :: iproc, mynode, numnodes, rec_counter, &
                                                 send_counter
       INTEGER                                   :: handle
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_communicate_buffer'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_communicate_buffer'
 
       CALL timeset(routineN, handle)
       CALL mp_environ(numnodes, mynode, mp_comm)
@@ -419,4 +419,4 @@ CONTAINS
    END SUBROUTINE
 #:endfor
 
-END MODULE dbs_tensor_reshape
+END MODULE block_tensor_transform

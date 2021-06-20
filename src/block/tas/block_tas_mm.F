@@ -7,7 +7,7 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tas_mm
+MODULE block_tas_mm
    !! Matrix multiplication for tall-and-skinny matrices. This uses the k-split (non-recursive) CARMA
    !! algorithm that is communication-optimal as long as the two smaller dimensions have
    !! the same size.
@@ -16,32 +16,32 @@ MODULE dbs_tas_mm
    !! (group sizes and process grid dimensions) can not be derived from matrix dimensions and need to be
    !! set manually.
 
-#:include "dbs_tas.fypp"
+#:include "block_tas.fypp"
 
    USE dbcsr_data_methods, ONLY: &
       dbcsr_scalar_zero, dbcsr_scalar, dbcsr_scalar_multiply
    USE dbcsr_data_types, ONLY: &
       dbcsr_scalar_type, dbcsr_type_real_8, dbcsr_type_real_4, dbcsr_type_complex_8, dbcsr_type_complex_4
    USE dbcsr_multiply_api, ONLY: dbcsr_multiply
-   USE dbs_tas_base, ONLY: &
-      dbs_tas_create, dbs_tas_destroy, dbs_tas_distribution_destroy, dbs_tas_distribution_new, &
-      dbs_tas_get_data_type, dbs_tas_info, dbs_tas_nblkcols_total, &
-      dbs_tas_nblkrows_total, dbs_tas_filter, dbs_tas_get_info, dbs_tas_iterator_blocks_left, &
-      dbs_tas_get_nze_total, dbs_tas_reserve_blocks, dbs_tas_iterator_start, dbs_tas_iterator_next_block, &
-      dbs_tas_iterator_stop, dbs_tas_copy, dbs_tas_get_block_p, dbs_tas_clear, dbs_tas_get_num_blocks, &
-      dbs_tas_nfullrows_total, dbs_tas_nfullcols_total
-   USE dbs_tas_types, ONLY: &
-      dbs_tas_distribution_type, dbs_tas_split_info, dbs_tas_type, dbs_tas_iterator
-   USE dbs_tas_global, ONLY: &
-      dbs_tas_dist_cyclic, dbs_tas_dist_arb, dbs_tas_distribution, dbs_tas_dist_arb_default, &
-      dbs_tas_rowcol_data, dbs_tas_blk_size_one, dbs_tas_default_distvec
-   USE dbs_tas_reshape_ops, ONLY: &
-      dbs_tas_merge, dbs_tas_replicate, dbs_tas_reshape
-   USE dbs_tas_split, ONLY: &
-      rowsplit, colsplit, dbs_tas_get_split_info, dbs_tas_create_split, dbs_tas_mp_comm, &
-      dbs_tas_release_info, accept_pgrid_dims, dbs_tas_info_hold, default_nsplit_accept_ratio
-   USE dbs_tas_util, ONLY: &
-      swap, invert_transpose_flag, array_eq, dbs_mp_environ
+   USE block_tas_base, ONLY: &
+      block_tas_create, block_tas_destroy, block_tas_distribution_destroy, block_tas_distribution_new, &
+      block_tas_get_data_type, block_tas_info, block_tas_nblkcols_total, &
+      block_tas_nblkrows_total, block_tas_filter, block_tas_get_info, block_tas_iterator_blocks_left, &
+      block_tas_get_nze_total, block_tas_reserve_blocks, block_tas_iterator_start, block_tas_iterator_next_block, &
+      block_tas_iterator_stop, block_tas_copy, block_tas_get_block_p, block_tas_clear, block_tas_get_num_blocks, &
+      block_tas_nfullrows_total, block_tas_nfullcols_total
+   USE block_tas_types, ONLY: &
+      block_tas_distribution_type, block_tas_split_info, block_tas_type, block_tas_iterator
+   USE block_tas_global, ONLY: &
+      block_tas_dist_cyclic, block_tas_dist_arb, block_tas_distribution, block_tas_dist_arb_default, &
+      block_tas_rowcol_data, block_tas_blk_size_one, block_tas_default_distvec
+   USE block_tas_reshape_ops, ONLY: &
+      block_tas_merge, block_tas_replicate, block_tas_reshape
+   USE block_tas_split, ONLY: &
+      rowsplit, colsplit, block_tas_get_split_info, block_tas_create_split, block_tas_mp_comm, &
+      block_tas_release_info, accept_pgrid_dims, block_tas_info_hold, default_nsplit_accept_ratio
+   USE block_tas_util, ONLY: &
+      swap, invert_transpose_flag, array_eq, block_mp_environ
    USE dbcsr_types, ONLY: &
       dbcsr_no_transpose, dbcsr_transpose, dbcsr_type, dbcsr_distribution_obj, dbcsr_mp_obj, &
       dbcsr_type_no_symmetry
@@ -51,8 +51,8 @@ MODULE dbs_tas_mm
       mp_comm_compare, mp_environ, mp_sum, mp_comm_free, mp_cart_create, mp_max, mp_sync
    USE dbcsr_operations, ONLY: &
       dbcsr_scale, dbcsr_get_info, dbcsr_copy, dbcsr_clear, dbcsr_add, dbcsr_zero
-   USE dbs_tas_io, ONLY: &
-      dbs_tas_write_dist, dbs_tas_write_matrix_info, dbs_tas_write_split_info, prep_output_unit
+   USE block_tas_io, ONLY: &
+      block_tas_write_dist, block_tas_write_matrix_info, block_tas_write_split_info, prep_output_unit
    USE dbcsr_work_operations, ONLY: dbcsr_create, dbcsr_finalize
    USE dbcsr_transformations, ONLY: dbcsr_redistribute
    USE dbcsr_dist_methods, ONLY: dbcsr_distribution_new
@@ -64,19 +64,19 @@ MODULE dbs_tas_mm
    IMPLICIT NONE
    PRIVATE
 
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tas_mm'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tas_mm'
 
    PUBLIC :: &
-      dbs_tas_multiply, &
-      dbs_tas_batched_mm_init, &
-      dbs_tas_batched_mm_finalize, &
-      dbs_tas_result_index, &
-      dbs_tas_set_batched_state, &
-      dbs_tas_batched_mm_complete
+      block_tas_multiply, &
+      block_tas_batched_mm_init, &
+      block_tas_batched_mm_finalize, &
+      block_tas_result_index, &
+      block_tas_set_batched_state, &
+      block_tas_batched_mm_complete
 
 CONTAINS
 
-   RECURSIVE SUBROUTINE dbs_tas_multiply(transa, transb, transc, alpha, matrix_a, matrix_b, beta, matrix_c, &
+   RECURSIVE SUBROUTINE block_tas_multiply(transa, transb, transc, alpha, matrix_a, matrix_b, beta, matrix_c, &
                                            optimize_dist, split_opt, filter_eps, flop, move_data_a, &
                                            move_data_b, retain_sparsity, simple_split, result_index, unit_nr, log_verbose)
       !! tall-and-skinny matrix-matrix multiplication. Undocumented dummy arguments are identical to
@@ -84,12 +84,12 @@ CONTAINS
 
       CHARACTER(LEN=1), INTENT(IN)               :: transa, transb, transc
       TYPE(dbcsr_scalar_type), INTENT(IN)        :: alpha, beta
-      TYPE(dbs_tas_type), TARGET, &
+      TYPE(block_tas_type), TARGET, &
          INTENT(INOUT)                           :: matrix_a, matrix_b, matrix_c
       LOGICAL, INTENT(IN), OPTIONAL              :: optimize_dist
          !! Whether distribution should be optimized internally. In the current implementation this guarantees optimal parameters
          !! only for dense matrices.
-      TYPE(dbs_tas_split_info), INTENT(OUT), &
+      TYPE(block_tas_split_info), INTENT(OUT), &
          OPTIONAL                       :: split_opt
          !! optionally return split info containing optimal grid and split parameters. This can be used to choose optimal process
          !! grids for subsequent matrix multiplications with matrices of similar shape and sparsity.
@@ -105,7 +105,7 @@ CONTAINS
       LOGICAL, OPTIONAL, INTENT(IN)              :: log_verbose
          !! only for testing: verbose output
 
-      TYPE(dbs_tas_type), POINTER              :: matrix_b_rs, matrix_a_rs, matrix_c_rs, &
+      TYPE(block_tas_type), POINTER              :: matrix_b_rs, matrix_a_rs, matrix_c_rs, &
                                                     matrix_c_rep, matrix_b_rep, matrix_a_rep
 
       REAL(KIND=real_8)                          :: filter_eps_prv
@@ -122,14 +122,14 @@ CONTAINS
       LOGICAL                                    :: new_a, new_b, new_c, simple_split_prv, opt_pgrid, &
                                                     move_a, move_b, do_batched, &
                                                     nodata_3
-      TYPE(dbs_tas_split_info)                 :: info, info_a, info_b, info_c
-      CHARACTER(LEN=*), PARAMETER                :: routineN = 'dbs_tas_multiply'
+      TYPE(block_tas_split_info)                 :: info, info_a, info_b, info_c
+      CHARACTER(LEN=*), PARAMETER                :: routineN = 'block_tas_multiply'
       INTEGER(KIND=int_8)                        :: nze_a, nze_b, nze_c, nze_c_sum
       TYPE(dbcsr_type)                           :: matrix_a_mm, matrix_b_mm, matrix_c_mm
 
       CALL timeset(routineN, handle)
       CALL mp_sync(matrix_a%dist%info%mp_comm)
-      CALL timeset("dbs_tas_total", handle2)
+      CALL timeset("block_tas_total", handle2)
 
       NULLIFY (matrix_b_rs, matrix_a_rs, matrix_c_rs)
 
@@ -140,7 +140,7 @@ CONTAINS
       ELSE
          simple_split_prv = .FALSE.
 
-         info_a = dbs_tas_info(matrix_a); info_b = dbs_tas_info(matrix_b); info_c = dbs_tas_info(matrix_c)
+         info_a = block_tas_info(matrix_a); info_b = block_tas_info(matrix_b); info_c = block_tas_info(matrix_c)
          IF (info_a%strict_split(1) .OR. info_b%strict_split(1) .OR. info_c%strict_split(1)) simple_split_prv = .TRUE.
       ENDIF
 
@@ -157,8 +157,8 @@ CONTAINS
          IF (matrix_a%do_batched == 3) THEN
             CPASSERT(batched_repl == 0)
             batched_repl = 1
-            CALL dbs_tas_get_split_info( &
-               dbs_tas_info(matrix_a%mm_storage%store_batched_repl), &
+            CALL block_tas_get_split_info( &
+               block_tas_info(matrix_a%mm_storage%store_batched_repl), &
                nsplit=nsplit_batched)
             CPASSERT(nsplit_batched > 0)
             max_mm_dim_batched = 3
@@ -170,8 +170,8 @@ CONTAINS
          IF (matrix_b%do_batched == 3) THEN
             CPASSERT(batched_repl == 0)
             batched_repl = 2
-            CALL dbs_tas_get_split_info( &
-               dbs_tas_info(matrix_b%mm_storage%store_batched_repl), &
+            CALL block_tas_get_split_info( &
+               block_tas_info(matrix_b%mm_storage%store_batched_repl), &
                nsplit=nsplit_batched)
             CPASSERT(nsplit_batched > 0)
             max_mm_dim_batched = 1
@@ -183,8 +183,8 @@ CONTAINS
          IF (matrix_c%do_batched == 3) THEN
             CPASSERT(batched_repl == 0)
             batched_repl = 3
-            CALL dbs_tas_get_split_info( &
-               dbs_tas_info(matrix_c%mm_storage%store_batched_repl), &
+            CALL block_tas_get_split_info( &
+               block_tas_info(matrix_c%mm_storage%store_batched_repl), &
                nsplit=nsplit_batched)
             CPASSERT(nsplit_batched > 0)
             max_mm_dim_batched = 2
@@ -197,17 +197,17 @@ CONTAINS
       IF (PRESENT(move_data_a)) move_a = move_data_a
       IF (PRESENT(move_data_b)) move_b = move_data_b
 
-      IF (.NOT. dbs_tas_get_data_type(matrix_a) .EQ. dbs_tas_get_data_type(matrix_b)) THEN
+      IF (.NOT. block_tas_get_data_type(matrix_a) .EQ. block_tas_get_data_type(matrix_b)) THEN
          CPABORT("matrices must have same datatype")
       ENDIF
 
-      data_type = dbs_tas_get_data_type(matrix_a)
+      data_type = block_tas_get_data_type(matrix_a)
 
       transa_prv = transa; transb_prv = transb; transc_prv = transc
 
-      dims_a = [dbs_tas_nblkrows_total(matrix_a), dbs_tas_nblkcols_total(matrix_a)]
-      dims_b = [dbs_tas_nblkrows_total(matrix_b), dbs_tas_nblkcols_total(matrix_b)]
-      dims_c = [dbs_tas_nblkrows_total(matrix_c), dbs_tas_nblkcols_total(matrix_c)]
+      dims_a = [block_tas_nblkrows_total(matrix_a), block_tas_nblkcols_total(matrix_a)]
+      dims_b = [block_tas_nblkrows_total(matrix_b), block_tas_nblkcols_total(matrix_b)]
+      dims_c = [block_tas_nblkrows_total(matrix_c), block_tas_nblkcols_total(matrix_c)]
 
       IF (unit_nr_prv .GT. 0) THEN
          WRITE (unit_nr_prv, '(A)') repeat("-", 80)
@@ -247,15 +247,15 @@ CONTAINS
          WRITE (unit_nr_prv, "(T2,A, 1X, I12, 1X, I12, 1X, I12)") "mm dims:", dims(1), dims(2), dims(3)
       ENDIF
 
-      CALL dbs_tas_get_split_info(dbs_tas_info(matrix_a), mp_comm=mp_comm)
+      CALL block_tas_get_split_info(block_tas_info(matrix_a), mp_comm=mp_comm)
       CALL mp_environ(numproc, iproc, mp_comm)
 
       ! derive optimal matrix layout and split factor from occupancies
-      nze_a = dbs_tas_get_nze_total(matrix_a)
-      nze_b = dbs_tas_get_nze_total(matrix_b)
+      nze_a = block_tas_get_nze_total(matrix_a)
+      nze_b = block_tas_get_nze_total(matrix_b)
 
       IF (.NOT. simple_split_prv) THEN
-         CALL dbs_tas_result_index(transa, transb, transc, matrix_a, matrix_b, matrix_c, filter_eps, &
+         CALL block_tas_result_index(transa, transb, transc, matrix_a, matrix_b, matrix_c, filter_eps, &
                                      blk_ind=result_index, nze=nze_c, retain_sparsity=retain_sparsity)
 
          IF (PRESENT(result_index)) THEN
@@ -307,8 +307,8 @@ CONTAINS
                                     nodata2=nodata_3, comm_new=comm_tmp, &
                                     move_data_1=move_a, unit_nr=unit_nr_prv)
 
-         info = dbs_tas_info(matrix_a_rs)
-         CALL dbs_tas_get_split_info(info, split_rowcol=split_rc, mp_comm=mp_comm)
+         info = block_tas_info(matrix_a_rs)
+         CALL block_tas_get_split_info(info, split_rowcol=split_rc, mp_comm=mp_comm)
 
          new_b = .FALSE.
          IF (matrix_b%do_batched <= 2) THEN
@@ -338,8 +338,8 @@ CONTAINS
                                     comm_new=comm_tmp, &
                                     move_data_1=move_a, move_data_2=move_b, unit_nr=unit_nr_prv)
 
-         info = dbs_tas_info(matrix_a_rs)
-         CALL dbs_tas_get_split_info(info, split_rowcol=split_rc, mp_comm=mp_comm)
+         info = block_tas_info(matrix_a_rs)
+         CALL block_tas_get_split_info(info, split_rowcol=split_rc, mp_comm=mp_comm)
 
          IF (matrix_c%do_batched == 1) THEN
             matrix_c%mm_storage%batched_beta = beta
@@ -381,8 +381,8 @@ CONTAINS
                                     split_rc_1=split_b, split_rc_2=split_c, &
                                     nodata2=nodata_3, comm_new=comm_tmp, &
                                     move_data_1=move_b, unit_nr=unit_nr_prv)
-         info = dbs_tas_info(matrix_b_rs)
-         CALL dbs_tas_get_split_info(info, split_rowcol=split_rc, mp_comm=mp_comm)
+         info = block_tas_info(matrix_b_rs)
+         CALL block_tas_get_split_info(info, split_rowcol=split_rc, mp_comm=mp_comm)
 
          new_a = .FALSE.
          IF (matrix_a%do_batched <= 2) THEN
@@ -403,7 +403,7 @@ CONTAINS
 
       END SELECT
 
-      CALL dbs_tas_get_split_info(info, nsplit=nsplit, mp_comm=mp_comm, mp_comm_group=mp_comm_group)
+      CALL block_tas_get_split_info(info, nsplit=nsplit, mp_comm=mp_comm, mp_comm_group=mp_comm_group)
 
       CALL mp_environ(numproc, pdims, pcoord, mp_comm)
       CALL mp_environ(numproc_sub, pdims_sub, pcoord_sub, mp_comm_group)
@@ -420,10 +420,10 @@ CONTAINS
          IF (unit_nr_prv > 0) THEN
             WRITE (unit_nr_prv, "(T2, A)") "SPLIT / PARALLELIZATION INFO"
          ENDIF
-         CALL dbs_tas_write_split_info(info, unit_nr_prv)
-         IF (ASSOCIATED(matrix_a_rs)) CALL dbs_tas_write_matrix_info(matrix_a_rs, unit_nr_prv, full_info=log_verbose)
-         IF (ASSOCIATED(matrix_b_rs)) CALL dbs_tas_write_matrix_info(matrix_b_rs, unit_nr_prv, full_info=log_verbose)
-         IF (ASSOCIATED(matrix_c_rs)) CALL dbs_tas_write_matrix_info(matrix_c_rs, unit_nr_prv, full_info=log_verbose)
+         CALL block_tas_write_split_info(info, unit_nr_prv)
+         IF (ASSOCIATED(matrix_a_rs)) CALL block_tas_write_matrix_info(matrix_a_rs, unit_nr_prv, full_info=log_verbose)
+         IF (ASSOCIATED(matrix_b_rs)) CALL block_tas_write_matrix_info(matrix_b_rs, unit_nr_prv, full_info=log_verbose)
+         IF (ASSOCIATED(matrix_c_rs)) CALL block_tas_write_matrix_info(matrix_c_rs, unit_nr_prv, full_info=log_verbose)
          IF (unit_nr_prv > 0) THEN
             IF (opt_pgrid) THEN
                WRITE (unit_nr_prv, "(T4, A, 1X, A)") "Change process grid:", "Yes"
@@ -443,62 +443,62 @@ CONTAINS
       CASE (1)
          IF (matrix_b%do_batched <= 2) THEN
             ALLOCATE (matrix_b_rep)
-            CALL dbs_tas_replicate(matrix_b_rs%matrix, dbs_tas_info(matrix_a_rs), matrix_b_rep, move_data=.TRUE.)
+            CALL block_tas_replicate(matrix_b_rs%matrix, block_tas_info(matrix_a_rs), matrix_b_rep, move_data=.TRUE.)
             IF (matrix_b%do_batched == 1 .or. matrix_b%do_batched == 2) THEN
                matrix_b%mm_storage%store_batched_repl => matrix_b_rep
-               CALL dbs_tas_set_batched_state(matrix_b, state=3)
+               CALL block_tas_set_batched_state(matrix_b, state=3)
             ENDIF
          ELSEIF (matrix_b%do_batched == 3) THEN
             matrix_b_rep => matrix_b%mm_storage%store_batched_repl
          ENDIF
 
          IF (new_b) THEN
-            CALL dbs_tas_destroy(matrix_b_rs)
+            CALL block_tas_destroy(matrix_b_rs)
             DEALLOCATE (matrix_b_rs)
          ENDIF
          IF (unit_nr_prv /= 0) THEN
-            CALL dbs_tas_write_dist(matrix_a_rs, unit_nr_prv)
-            CALL dbs_tas_write_dist(matrix_b_rep, unit_nr_prv, full_info=log_verbose)
+            CALL block_tas_write_dist(matrix_a_rs, unit_nr_prv)
+            CALL block_tas_write_dist(matrix_b_rep, unit_nr_prv, full_info=log_verbose)
          ENDIF
 
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_a_rs%matrix, matrix_a_mm, optimize_pgrid=opt_pgrid, move_data=move_a)
 
          ! keep communicators alive even after releasing TAS matrices (communicator management does not work between DBCSR and TAS)
-         info_a = dbs_tas_info(matrix_a_rs)
-         CALL dbs_tas_info_hold(info_a)
+         info_a = block_tas_info(matrix_a_rs)
+         CALL block_tas_info_hold(info_a)
 
          IF (new_a) THEN
-            CALL dbs_tas_destroy(matrix_a_rs)
+            CALL block_tas_destroy(matrix_a_rs)
             DEALLOCATE (matrix_a_rs)
          ENDIF
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_b_rep%matrix, matrix_b_mm, optimize_pgrid=opt_pgrid, &
                                    move_data=matrix_b%do_batched == 0)
 
-         info_b = dbs_tas_info(matrix_b_rep)
-         CALL dbs_tas_info_hold(info_b)
+         info_b = block_tas_info(matrix_b_rep)
+         CALL block_tas_info_hold(info_b)
 
          IF (matrix_b%do_batched == 0) THEN
-            CALL dbs_tas_destroy(matrix_b_rep)
+            CALL block_tas_destroy(matrix_b_rep)
             DEALLOCATE (matrix_b_rep)
          ENDIF
 
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_c_rs%matrix, matrix_c_mm, nodata=nodata_3, optimize_pgrid=opt_pgrid)
 
-         info_c = dbs_tas_info(matrix_c_rs)
-         CALL dbs_tas_info_hold(info_c)
+         info_c = block_tas_info(matrix_c_rs)
+         CALL block_tas_info_hold(info_c)
 
          CALL mp_sync(matrix_a%dist%info%mp_comm)
-         CALL timeset("dbs_tas_dbcsr", handle4)
+         CALL timeset("block_tas_dbcsr", handle4)
          SELECT CASE (tr_case)
          CASE (dbcsr_no_transpose)
-            CALL timeset("dbs_tas_mm_1N", handle3)
+            CALL timeset("block_tas_mm_1N", handle3)
 
             CALL dbcsr_multiply(transa=dbcsr_no_transpose, transb=dbcsr_no_transpose, alpha=alpha, &
                                 matrix_a=matrix_a_mm, matrix_b=matrix_b_mm, beta=beta, matrix_c=matrix_c_mm, &
                                 filter_eps=filter_eps_prv, retain_sparsity=retain_sparsity, flop=flop)
             CALL timestop(handle3)
          CASE (dbcsr_transpose)
-            CALL timeset("dbs_tas_mm_1T", handle3)
+            CALL timeset("block_tas_mm_1T", handle3)
             CALL dbcsr_multiply(transa=dbcsr_transpose, transb=dbcsr_no_transpose, alpha=alpha, &
                                 matrix_a=matrix_b_mm, matrix_b=matrix_a_mm, beta=beta, matrix_c=matrix_c_mm, &
                                 filter_eps=filter_eps_prv, retain_sparsity=retain_sparsity, flop=flop)
@@ -521,65 +521,65 @@ CONTAINS
 
          CALL dbcsr_release(matrix_c_mm)
 
-         IF (PRESENT(filter_eps)) CALL dbs_tas_filter(matrix_c_rs, filter_eps)
+         IF (PRESENT(filter_eps)) CALL block_tas_filter(matrix_c_rs, filter_eps)
 
          IF (unit_nr_prv /= 0) THEN
-            CALL dbs_tas_write_dist(matrix_c_rs, unit_nr_prv)
+            CALL block_tas_write_dist(matrix_c_rs, unit_nr_prv)
          ENDIF
 
       CASE (2)
          IF (matrix_c%do_batched <= 1) THEN
             ALLOCATE (matrix_c_rep)
-            CALL dbs_tas_replicate(matrix_c_rs%matrix, dbs_tas_info(matrix_a_rs), matrix_c_rep, nodata=nodata_3)
+            CALL block_tas_replicate(matrix_c_rs%matrix, block_tas_info(matrix_a_rs), matrix_c_rep, nodata=nodata_3)
             IF (matrix_c%do_batched == 1) THEN
                matrix_c%mm_storage%store_batched_repl => matrix_c_rep
-               CALL dbs_tas_set_batched_state(matrix_c, state=3)
+               CALL block_tas_set_batched_state(matrix_c, state=3)
             ENDIF
          ELSEIF (matrix_c%do_batched == 2) THEN
             ALLOCATE (matrix_c_rep)
-            CALL dbs_tas_replicate(matrix_c_rs%matrix, dbs_tas_info(matrix_a_rs), matrix_c_rep, nodata=nodata_3)
+            CALL block_tas_replicate(matrix_c_rs%matrix, block_tas_info(matrix_a_rs), matrix_c_rep, nodata=nodata_3)
             ! just leave sparsity structure for retain sparsity but no values
             IF (.not. nodata_3) CALL dbcsr_zero(matrix_c_rep%matrix)
             matrix_c%mm_storage%store_batched_repl => matrix_c_rep
-            CALL dbs_tas_set_batched_state(matrix_c, state=3)
+            CALL block_tas_set_batched_state(matrix_c, state=3)
          ELSEIF (matrix_c%do_batched == 3) THEN
             matrix_c_rep => matrix_c%mm_storage%store_batched_repl
          ENDIF
 
          IF (unit_nr_prv /= 0) THEN
-            CALL dbs_tas_write_dist(matrix_a_rs, unit_nr_prv)
-            CALL dbs_tas_write_dist(matrix_b_rs, unit_nr_prv)
+            CALL block_tas_write_dist(matrix_a_rs, unit_nr_prv)
+            CALL block_tas_write_dist(matrix_b_rs, unit_nr_prv)
          ENDIF
 
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_a_rs%matrix, matrix_a_mm, optimize_pgrid=opt_pgrid, move_data=move_a)
 
          ! keep communicators alive even after releasing TAS matrices (communicator management does not work between DBCSR and TAS)
-         info_a = dbs_tas_info(matrix_a_rs)
-         CALL dbs_tas_info_hold(info_a)
+         info_a = block_tas_info(matrix_a_rs)
+         CALL block_tas_info_hold(info_a)
 
          IF (new_a) THEN
-            CALL dbs_tas_destroy(matrix_a_rs)
+            CALL block_tas_destroy(matrix_a_rs)
             DEALLOCATE (matrix_a_rs)
          ENDIF
 
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_b_rs%matrix, matrix_b_mm, optimize_pgrid=opt_pgrid, move_data=move_b)
 
-         info_b = dbs_tas_info(matrix_b_rs)
-         CALL dbs_tas_info_hold(info_b)
+         info_b = block_tas_info(matrix_b_rs)
+         CALL block_tas_info_hold(info_b)
 
          IF (new_b) THEN
-            CALL dbs_tas_destroy(matrix_b_rs)
+            CALL block_tas_destroy(matrix_b_rs)
             DEALLOCATE (matrix_b_rs)
          ENDIF
 
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_c_rep%matrix, matrix_c_mm, nodata=nodata_3, optimize_pgrid=opt_pgrid)
 
-         info_c = dbs_tas_info(matrix_c_rep)
-         CALL dbs_tas_info_hold(info_c)
+         info_c = block_tas_info(matrix_c_rep)
+         CALL block_tas_info_hold(info_c)
 
          CALL mp_sync(matrix_a%dist%info%mp_comm)
-         CALL timeset("dbs_tas_dbcsr", handle4)
-         CALL timeset("dbs_tas_mm_2", handle3)
+         CALL timeset("block_tas_dbcsr", handle4)
+         CALL timeset("block_tas_mm_2", handle3)
          CALL dbcsr_multiply(transa=transa_prv, transb=transb_prv, alpha=alpha, matrix_a=matrix_a_mm, &
                              matrix_b=matrix_b_mm, beta=beta, matrix_c=matrix_c_mm, &
                              filter_eps=filter_eps_prv/REAL(nsplit, KIND=real_8), retain_sparsity=retain_sparsity, flop=flop)
@@ -593,91 +593,91 @@ CONTAINS
          nze_c = dbcsr_get_nze(matrix_c_mm)
 
          CALL redistribute_and_sum(matrix_c_mm, matrix_c_rep%matrix, local_copy=.NOT. opt_pgrid, alpha=beta)
-         nze_c_sum = dbs_tas_get_nze_total(matrix_c_rep)
+         nze_c_sum = block_tas_get_nze_total(matrix_c_rep)
 
          CALL dbcsr_release(matrix_c_mm)
 
          IF (unit_nr_prv /= 0) THEN
-            CALL dbs_tas_write_dist(matrix_c_rep, unit_nr_prv, full_info=log_verbose)
+            CALL block_tas_write_dist(matrix_c_rep, unit_nr_prv, full_info=log_verbose)
          ENDIF
 
          IF (matrix_c%do_batched == 0) THEN
-            CALL dbs_tas_merge(matrix_c_rs%matrix, matrix_c_rep, move_data=.TRUE.)
+            CALL block_tas_merge(matrix_c_rs%matrix, matrix_c_rep, move_data=.TRUE.)
          ELSE
-            matrix_c%mm_storage%batched_out = .TRUE. ! postpone merging submatrices to dbs_tas_batched_mm_finalize
+            matrix_c%mm_storage%batched_out = .TRUE. ! postpone merging submatrices to block_tas_batched_mm_finalize
          ENDIF
 
          IF (matrix_c%do_batched == 0) THEN
-            CALL dbs_tas_destroy(matrix_c_rep)
+            CALL block_tas_destroy(matrix_c_rep)
             DEALLOCATE (matrix_c_rep)
          ENDIF
 
-         IF (PRESENT(filter_eps)) CALL dbs_tas_filter(matrix_c_rs, filter_eps)
+         IF (PRESENT(filter_eps)) CALL block_tas_filter(matrix_c_rs, filter_eps)
 
          ! set upper limit on memory consumption for replicated matrix and complete batched mm
          ! if limit is exceeded
          IF (nze_c_sum > default_nsplit_accept_ratio*MAX(nze_a, nze_b)) THEN
-            CALL dbs_tas_batched_mm_complete(matrix_c)
+            CALL block_tas_batched_mm_complete(matrix_c)
          ENDIF
 
       CASE (3)
          IF (matrix_a%do_batched <= 2) THEN
             ALLOCATE (matrix_a_rep)
-            CALL dbs_tas_replicate(matrix_a_rs%matrix, dbs_tas_info(matrix_b_rs), matrix_a_rep, move_data=.TRUE.)
+            CALL block_tas_replicate(matrix_a_rs%matrix, block_tas_info(matrix_b_rs), matrix_a_rep, move_data=.TRUE.)
             IF (matrix_a%do_batched == 1 .or. matrix_a%do_batched == 2) THEN
                matrix_a%mm_storage%store_batched_repl => matrix_a_rep
-               CALL dbs_tas_set_batched_state(matrix_a, state=3)
+               CALL block_tas_set_batched_state(matrix_a, state=3)
             ENDIF
          ELSEIF (matrix_a%do_batched == 3) THEN
             matrix_a_rep => matrix_a%mm_storage%store_batched_repl
          ENDIF
 
          IF (new_a) THEN
-            CALL dbs_tas_destroy(matrix_a_rs)
+            CALL block_tas_destroy(matrix_a_rs)
             DEALLOCATE (matrix_a_rs)
          ENDIF
          IF (unit_nr_prv /= 0) THEN
-            CALL dbs_tas_write_dist(matrix_a_rep, unit_nr_prv, full_info=log_verbose)
-            CALL dbs_tas_write_dist(matrix_b_rs, unit_nr_prv)
+            CALL block_tas_write_dist(matrix_a_rep, unit_nr_prv, full_info=log_verbose)
+            CALL block_tas_write_dist(matrix_b_rs, unit_nr_prv)
          ENDIF
 
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_a_rep%matrix, matrix_a_mm, optimize_pgrid=opt_pgrid, &
                                    move_data=matrix_a%do_batched == 0)
 
          ! keep communicators alive even after releasing TAS matrices (communicator management does not work between DBCSR and TAS)
-         info_a = dbs_tas_info(matrix_a_rep)
-         CALL dbs_tas_info_hold(info_a)
+         info_a = block_tas_info(matrix_a_rep)
+         CALL block_tas_info_hold(info_a)
 
          IF (matrix_a%do_batched == 0) THEN
-            CALL dbs_tas_destroy(matrix_a_rep)
+            CALL block_tas_destroy(matrix_a_rep)
             DEALLOCATE (matrix_a_rep)
          ENDIF
 
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_b_rs%matrix, matrix_b_mm, optimize_pgrid=opt_pgrid, move_data=move_b)
 
-         info_b = dbs_tas_info(matrix_b_rs)
-         CALL dbs_tas_info_hold(info_b)
+         info_b = block_tas_info(matrix_b_rs)
+         CALL block_tas_info_hold(info_b)
 
          IF (new_b) THEN
-            CALL dbs_tas_destroy(matrix_b_rs)
+            CALL block_tas_destroy(matrix_b_rs)
             DEALLOCATE (matrix_b_rs)
          ENDIF
          CALL convert_to_new_pgrid(mp_comm_mm, matrix_c_rs%matrix, matrix_c_mm, nodata=nodata_3, optimize_pgrid=opt_pgrid)
 
-         info_c = dbs_tas_info(matrix_c_rs)
-         CALL dbs_tas_info_hold(info_c)
+         info_c = block_tas_info(matrix_c_rs)
+         CALL block_tas_info_hold(info_c)
 
          CALL mp_sync(matrix_a%dist%info%mp_comm)
-         CALL timeset("dbs_tas_dbcsr", handle4)
+         CALL timeset("block_tas_dbcsr", handle4)
          SELECT CASE (tr_case)
          CASE (dbcsr_no_transpose)
-            CALL timeset("dbs_tas_mm_3N", handle3)
+            CALL timeset("block_tas_mm_3N", handle3)
             CALL dbcsr_multiply(transa=dbcsr_no_transpose, transb=dbcsr_no_transpose, alpha=alpha, &
                                 matrix_a=matrix_a_mm, matrix_b=matrix_b_mm, beta=beta, matrix_c=matrix_c_mm, &
                                 filter_eps=filter_eps_prv, retain_sparsity=retain_sparsity, flop=flop)
             CALL timestop(handle3)
          CASE (dbcsr_transpose)
-            CALL timeset("dbs_tas_mm_3T", handle3)
+            CALL timeset("block_tas_mm_3T", handle3)
             CALL dbcsr_multiply(transa=dbcsr_no_transpose, transb=dbcsr_transpose, alpha=alpha, &
                                 matrix_a=matrix_b_mm, matrix_b=matrix_a_mm, beta=beta, matrix_c=matrix_c_mm, &
                                 filter_eps=filter_eps_prv, retain_sparsity=retain_sparsity, flop=flop)
@@ -699,23 +699,23 @@ CONTAINS
 
          CALL dbcsr_release(matrix_c_mm)
 
-         IF (PRESENT(filter_eps)) CALL dbs_tas_filter(matrix_c_rs, filter_eps)
+         IF (PRESENT(filter_eps)) CALL block_tas_filter(matrix_c_rs, filter_eps)
 
          IF (unit_nr_prv /= 0) THEN
-            CALL dbs_tas_write_dist(matrix_c_rs, unit_nr_prv)
+            CALL block_tas_write_dist(matrix_c_rs, unit_nr_prv)
          ENDIF
       END SELECT
 
       CALL mp_comm_free(mp_comm_mm)
 
-      CALL dbs_tas_get_split_info(info_c, mp_comm=mp_comm)
+      CALL block_tas_get_split_info(info_c, mp_comm=mp_comm)
 
       IF (PRESENT(split_opt)) THEN
          SELECT CASE (max_mm_dim)
          CASE (1, 3)
             CALL mp_sum(nze_c, mp_comm)
          CASE (2)
-            CALL dbs_tas_get_split_info(info_c, mp_comm=mp_comm, mp_comm_group=mp_comm_group)
+            CALL block_tas_get_split_info(info_c, mp_comm=mp_comm, mp_comm_group=mp_comm_group)
             CALL mp_sum(nze_c, mp_comm_group)
             CALL mp_max(nze_c, mp_comm)
 
@@ -723,8 +723,8 @@ CONTAINS
          nsplit_opt = split_factor_estimate(max_mm_dim, nze_a, nze_b, nze_c, numproc)
          ! ideally we should rederive the split factor from the actual sparsity of C, but
          ! due to parameter beta, we can not get the sparsity of AxB from DBCSR if not new_c
-         mp_comm_opt = dbs_tas_mp_comm(mp_comm, split_rc, nsplit_opt)
-         CALL dbs_tas_create_split(split_opt, mp_comm_opt, split_rc, nsplit_opt, own_comm=.TRUE.)
+         mp_comm_opt = block_tas_mp_comm(mp_comm, split_rc, nsplit_opt)
+         CALL block_tas_create_split(split_opt, mp_comm_opt, split_rc, nsplit_opt, own_comm=.TRUE.)
          IF (unit_nr_prv > 0) THEN
             WRITE (unit_nr_prv, "(T2,A)") &
                "MM PARAMETERS"
@@ -738,11 +738,11 @@ CONTAINS
 
       IF (new_c) THEN
          CALL dbcsr_scale(matrix_c%matrix, beta)
-         CALL dbs_tas_reshape(matrix_c_rs, matrix_c, summation=.TRUE., transposed=transc_prv /= transc, &
+         CALL block_tas_reshape(matrix_c_rs, matrix_c, summation=.TRUE., transposed=transc_prv /= transc, &
                                 move_data=.TRUE.)
-         CALL dbs_tas_destroy(matrix_c_rs)
+         CALL block_tas_destroy(matrix_c_rs)
          DEALLOCATE (matrix_c_rs)
-         IF (PRESENT(filter_eps)) CALL dbs_tas_filter(matrix_c, filter_eps)
+         IF (PRESENT(filter_eps)) CALL block_tas_filter(matrix_c, filter_eps)
       ELSEIF (matrix_c%do_batched > 0) THEN
          IF (matrix_c%mm_storage%batched_out) THEN
             matrix_c%mm_storage%batched_trans = transc_prv /= transc
@@ -750,10 +750,10 @@ CONTAINS
       ENDIF
 
       IF (PRESENT(move_data_a)) THEN
-         IF (move_data_a) CALL dbs_tas_clear(matrix_a)
+         IF (move_data_a) CALL block_tas_clear(matrix_a)
       ENDIF
       IF (PRESENT(move_data_b)) THEN
-         IF (move_data_b) CALL dbs_tas_clear(matrix_b)
+         IF (move_data_b) CALL block_tas_clear(matrix_b)
       ENDIF
 
       IF (PRESENT(flop)) THEN
@@ -770,9 +770,9 @@ CONTAINS
          WRITE (unit_nr_prv, '(A)') repeat("-", 80)
       ENDIF
 
-      CALL dbs_tas_release_info(info_a)
-      CALL dbs_tas_release_info(info_b)
-      CALL dbs_tas_release_info(info_c)
+      CALL block_tas_release_info(info_a)
+      CALL block_tas_release_info(info_b)
+      CALL block_tas_release_info(info_c)
 
       CALL mp_sync(matrix_a%dist%info%mp_comm)
       CALL timestop(handle2)
@@ -811,8 +811,8 @@ CONTAINS
 
       INTEGER, INTENT(IN)               :: mp_comm
          !! communicator that defines Cartesian topology
-      TYPE(dbs_tas_type), INTENT(INOUT) :: matrix_in
-      TYPE(dbs_tas_type), INTENT(OUT)   :: matrix_out
+      TYPE(block_tas_type), INTENT(INOUT) :: matrix_in
+      TYPE(block_tas_type), INTENT(OUT)   :: matrix_out
       LOGICAL, INTENT(IN)               :: transposed
          !! Whether matrix_out should be transposed
       CHARACTER(LEN=1), INTENT(INOUT)   :: trans
@@ -824,8 +824,8 @@ CONTAINS
       INTEGER                           :: numnodes
       INTEGER(KIND=int_8), DIMENSION(2) :: dims
       INTEGER, DIMENSION(2)             :: pdims, pcoord
-      TYPE(dbs_tas_dist_arb)            :: new_row_dist, new_col_dist
-      TYPE(dbs_tas_distribution_type)   :: dist
+      TYPE(block_tas_dist_arb)            :: new_row_dist, new_col_dist
+      TYPE(block_tas_distribution_type)   :: dist
       LOGICAL                           :: nodata_prv
       CHARACTER(LEN=*), PARAMETER       :: routineN = 'reshape_mm_small'
       INTEGER                           :: handle
@@ -849,25 +849,25 @@ CONTAINS
 
       CALL mp_environ(numnodes, pdims, pcoord, mp_comm)
 
-      dims = [dbs_tas_nblkrows_total(matrix_in), dbs_tas_nblkcols_total(matrix_in)]
+      dims = [block_tas_nblkrows_total(matrix_in), block_tas_nblkcols_total(matrix_in)]
 
       IF (transposed) CALL swap(dims)
 
       IF (.NOT. transposed) THEN
-         new_row_dist = dbs_tas_dist_arb_default(pdims(1), dims(1), matrix_in%row_blk_size)
-         new_col_dist = dbs_tas_dist_arb_default(pdims(2), dims(2), matrix_in%col_blk_size)
-         CALL dbs_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
-         CALL dbs_tas_create(matrix_out, matrix_in%matrix%name, dist, dbs_tas_get_data_type(matrix_in), &
+         new_row_dist = block_tas_dist_arb_default(pdims(1), dims(1), matrix_in%row_blk_size)
+         new_col_dist = block_tas_dist_arb_default(pdims(2), dims(2), matrix_in%col_blk_size)
+         CALL block_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
+         CALL block_tas_create(matrix_out, matrix_in%matrix%name, dist, block_tas_get_data_type(matrix_in), &
                                matrix_in%row_blk_size, matrix_in%col_blk_size, own_dist=.TRUE.)
       ELSE
-         new_row_dist = dbs_tas_dist_arb_default(pdims(1), dims(1), matrix_in%col_blk_size)
-         new_col_dist = dbs_tas_dist_arb_default(pdims(2), dims(2), matrix_in%row_blk_size)
-         CALL dbs_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
-         CALL dbs_tas_create(matrix_out, matrix_in%matrix%name, dist, dbs_tas_get_data_type(matrix_in), &
+         new_row_dist = block_tas_dist_arb_default(pdims(1), dims(1), matrix_in%col_blk_size)
+         new_col_dist = block_tas_dist_arb_default(pdims(2), dims(2), matrix_in%row_blk_size)
+         CALL block_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
+         CALL block_tas_create(matrix_out, matrix_in%matrix%name, dist, block_tas_get_data_type(matrix_in), &
                                matrix_in%col_blk_size, matrix_in%row_blk_size, own_dist=.TRUE.)
 
       ENDIF
-      IF (.NOT. nodata_prv) CALL dbs_tas_reshape(matrix_in, matrix_out, transposed=transposed, move_data=move_data)
+      IF (.NOT. nodata_prv) CALL block_tas_reshape(matrix_in, matrix_out, transposed=transposed, move_data=move_data)
 
       CALL timestop(handle)
 
@@ -879,9 +879,9 @@ CONTAINS
       !! Reshape either matrix1 or matrix2 to make sure that their process grids are compatible with
       !! the same split factor.
 
-      TYPE(dbs_tas_type), TARGET, &
+      TYPE(block_tas_type), TARGET, &
          INTENT(INOUT)                           :: matrix1_in, matrix2_in
-      TYPE(dbs_tas_type), POINTER, INTENT(OUT) :: matrix1_out, matrix2_out
+      TYPE(block_tas_type), POINTER, INTENT(OUT) :: matrix1_out, matrix2_out
       LOGICAL, INTENT(OUT)                       :: new1, new2
          !! Whether matrix1_out is a new matrix or simply pointing to matrix1_in
          !! Whether matrix2_out is a new matrix or simply pointing to matrix2_in
@@ -914,9 +914,9 @@ CONTAINS
                                                     nsplit_prv, ref, split_rc_ref
       INTEGER, DIMENSION(2)                      :: pcoord, pdims
       LOGICAL                                    :: optimize_dist_prv, trans1_newdist, trans2_newdist
-      TYPE(dbs_tas_dist_cyclic)                :: row_dist_1, col_dist_1, row_dist_2, col_dist_2
-      TYPE(dbs_tas_distribution_type)          :: dist_1, dist_2
-      TYPE(dbs_tas_split_info)                 :: split_info
+      TYPE(block_tas_dist_cyclic)                :: row_dist_1, col_dist_1, row_dist_2, col_dist_2
+      TYPE(block_tas_distribution_type)          :: dist_1, dist_2
+      TYPE(block_tas_split_info)                 :: split_info
       INTEGER(KIND=int_8)                        :: nze1, nze2
       LOGICAL                                    :: nodata1_prv, nodata2_prv
 
@@ -945,10 +945,10 @@ CONTAINS
          optimize_dist_prv = .FALSE.
       ENDIF
 
-      dims1 = [dbs_tas_nblkrows_total(matrix1_in), dbs_tas_nblkcols_total(matrix1_in)]
-      dims2 = [dbs_tas_nblkrows_total(matrix2_in), dbs_tas_nblkcols_total(matrix2_in)]
-      nze1 = dbs_tas_get_nze_total(matrix1_in)
-      nze2 = dbs_tas_get_nze_total(matrix2_in)
+      dims1 = [block_tas_nblkrows_total(matrix1_in), block_tas_nblkcols_total(matrix1_in)]
+      dims2 = [block_tas_nblkrows_total(matrix2_in), block_tas_nblkcols_total(matrix2_in)]
+      nze1 = block_tas_get_nze_total(matrix1_in)
+      nze2 = block_tas_get_nze_total(matrix2_in)
 
       IF (trans1 == dbcsr_transpose) split_rc_1 = MOD(split_rc_1, 2) + 1
 
@@ -977,7 +977,7 @@ CONTAINS
       IF ((.NOT. optimize_dist_prv) .AND. dist_compatible(matrix1_in, matrix2_in, split_rc_1, split_rc_2)) THEN
          CALL change_split(matrix1_in, matrix1_out, nsplit_prv, split_rc_1, new1, &
                            move_data=move_data_1, nodata=nodata1, opt_nsplit=opt_nsplit)
-         CALL dbs_tas_get_split_info(dbs_tas_info(matrix1_out), nsplit=nsplit_prv)
+         CALL block_tas_get_split_info(block_tas_info(matrix1_out), nsplit=nsplit_prv)
          CALL change_split(matrix2_in, matrix2_out, nsplit_prv, split_rc_2, new2, &
                            move_data=move_data_2, nodata=nodata2, opt_nsplit=.FALSE.)
          IF (unit_nr_prv > 0) THEN
@@ -1029,9 +1029,9 @@ CONTAINS
 
             CPASSERT(nsplit_prv > 0)
 
-            CALL dbs_tas_get_split_info(dbs_tas_info(matrix1_in), mp_comm=mp_comm)
-            comm_new = dbs_tas_mp_comm(mp_comm, rowsplit, nsplit_prv)
-            CALL dbs_tas_create_split(split_info, comm_new, rowsplit, nsplit_prv)
+            CALL block_tas_get_split_info(block_tas_info(matrix1_in), mp_comm=mp_comm)
+            comm_new = block_tas_mp_comm(mp_comm, rowsplit, nsplit_prv)
+            CALL block_tas_create_split(split_info, comm_new, rowsplit, nsplit_prv)
 
             CALL mp_environ(numnodes, pdims, pcoord, comm_new)
 
@@ -1039,37 +1039,37 @@ CONTAINS
             ! sizes are not equal. However we can not use arbitrary distributions
             ! for large dimensions since this would require storing distribution vectors as arrays
             ! which can not be stored for large dimensions.
-            row_dist_1 = dbs_tas_dist_cyclic(1, pdims(1), dims1(1))
-            col_dist_1 = dbs_tas_dist_cyclic(1, pdims(2), dims1(2))
+            row_dist_1 = block_tas_dist_cyclic(1, pdims(1), dims1(1))
+            col_dist_1 = block_tas_dist_cyclic(1, pdims(2), dims1(2))
 
-            row_dist_2 = dbs_tas_dist_cyclic(1, pdims(1), dims2(1))
-            col_dist_2 = dbs_tas_dist_cyclic(1, pdims(2), dims2(2))
+            row_dist_2 = block_tas_dist_cyclic(1, pdims(1), dims2(1))
+            col_dist_2 = block_tas_dist_cyclic(1, pdims(2), dims2(2))
 
-            CALL dbs_tas_distribution_new(dist_1, comm_new, row_dist_1, col_dist_1, split_info=split_info)
-            CALL dbs_tas_distribution_new(dist_2, comm_new, row_dist_2, col_dist_2, split_info=split_info)
-            CALL dbs_tas_release_info(split_info)
+            CALL block_tas_distribution_new(dist_1, comm_new, row_dist_1, col_dist_1, split_info=split_info)
+            CALL block_tas_distribution_new(dist_2, comm_new, row_dist_2, col_dist_2, split_info=split_info)
+            CALL block_tas_release_info(split_info)
 
             ALLOCATE (matrix1_out)
             IF (.NOT. trans1_newdist) THEN
-               CALL dbs_tas_create(matrix1_out, matrix1_in%matrix%name, dist_1, dbs_tas_get_data_type(matrix1_in), &
+               CALL block_tas_create(matrix1_out, matrix1_in%matrix%name, dist_1, block_tas_get_data_type(matrix1_in), &
                                      matrix1_in%row_blk_size, matrix1_in%col_blk_size, own_dist=.TRUE.)
 
             ELSE
-               CALL dbs_tas_create(matrix1_out, matrix1_in%matrix%name, dist_1, dbs_tas_get_data_type(matrix1_in), &
+               CALL block_tas_create(matrix1_out, matrix1_in%matrix%name, dist_1, block_tas_get_data_type(matrix1_in), &
                                      matrix1_in%col_blk_size, matrix1_in%row_blk_size, own_dist=.TRUE.)
             ENDIF
 
             ALLOCATE (matrix2_out)
             IF (.NOT. trans2_newdist) THEN
-               CALL dbs_tas_create(matrix2_out, matrix2_in%matrix%name, dist_2, dbs_tas_get_data_type(matrix2_in), &
+               CALL block_tas_create(matrix2_out, matrix2_in%matrix%name, dist_2, block_tas_get_data_type(matrix2_in), &
                                      matrix2_in%row_blk_size, matrix2_in%col_blk_size, own_dist=.TRUE.)
             ELSE
-               CALL dbs_tas_create(matrix2_out, matrix2_in%matrix%name, dist_2, dbs_tas_get_data_type(matrix2_in), &
+               CALL block_tas_create(matrix2_out, matrix2_in%matrix%name, dist_2, block_tas_get_data_type(matrix2_in), &
                                      matrix2_in%col_blk_size, matrix2_in%row_blk_size, own_dist=.TRUE.)
             ENDIF
 
-            IF (.NOT. nodata1_prv) CALL dbs_tas_reshape(matrix1_in, matrix1_out, transposed=trans1_newdist, move_data=move_data_1)
-            IF (.NOT. nodata2_prv) CALL dbs_tas_reshape(matrix2_in, matrix2_out, transposed=trans2_newdist, move_data=move_data_2)
+            IF (.NOT. nodata1_prv) CALL block_tas_reshape(matrix1_in, matrix1_out, transposed=trans1_newdist, move_data=move_data_1)
+            IF (.NOT. nodata2_prv) CALL block_tas_reshape(matrix2_in, matrix2_out, transposed=trans2_newdist, move_data=move_data_2)
             new1 = .TRUE.
             new2 = .TRUE.
 
@@ -1113,9 +1113,9 @@ CONTAINS
    SUBROUTINE change_split(matrix_in, matrix_out, nsplit, split_rowcol, is_new, opt_nsplit, move_data, nodata)
       !! Change split factor without redistribution
 
-      TYPE(dbs_tas_type), TARGET, &
+      TYPE(block_tas_type), TARGET, &
          INTENT(INOUT)                           :: matrix_in
-      TYPE(dbs_tas_type), POINTER, INTENT(OUT) :: matrix_out
+      TYPE(block_tas_type), POINTER, INTENT(OUT) :: matrix_out
       INTEGER, INTENT(IN)                        :: nsplit
          !! new split factor, set to 0 to not change split of matrix_in
       INTEGER, INTENT(IN)                        :: split_rowcol
@@ -1131,19 +1131,19 @@ CONTAINS
 
       INTEGER                                    :: &
          mp_comm, split_rc, nsplit_old, handle, data_type, nsplit_new, nsplit_prv
-      TYPE(dbs_tas_split_info)                 :: split_info
+      TYPE(block_tas_split_info)                 :: split_info
       CHARACTER(len=default_string_length)       :: name
-      TYPE(dbs_tas_distribution_type)          :: dist
+      TYPE(block_tas_distribution_type)          :: dist
       LOGICAL                                    :: nodata_prv
-      CLASS(dbs_tas_distribution), ALLOCATABLE :: rdist, cdist
-      CLASS(dbs_tas_rowcol_data), ALLOCATABLE  :: rbsize, cbsize
+      CLASS(block_tas_distribution), ALLOCATABLE :: rdist, cdist
+      CLASS(block_tas_rowcol_data), ALLOCATABLE  :: rbsize, cbsize
       CHARACTER(LEN=*), PARAMETER                :: routineN = 'change_split'
 
       NULLIFY (matrix_out)
 
       is_new = .TRUE.
 
-      CALL dbs_tas_get_split_info(dbs_tas_info(matrix_in), mp_comm=mp_comm, &
+      CALL block_tas_get_split_info(block_tas_info(matrix_in), mp_comm=mp_comm, &
                                     split_rowcol=split_rc, nsplit=nsplit_old)
 
       IF (nsplit == 0) THEN
@@ -1163,37 +1163,37 @@ CONTAINS
       nodata_prv = .FALSE.
       IF (PRESENT(nodata)) nodata_prv = nodata
 
-      CALL dbs_tas_get_info(matrix_in, data_type=data_type, name=name, &
+      CALL block_tas_get_info(matrix_in, data_type=data_type, name=name, &
                               row_blk_size=rbsize, col_blk_size=cbsize, &
                               proc_row_dist=rdist, proc_col_dist=cdist)
 
-      CALL dbs_tas_create_split(split_info, mp_comm, split_rowcol, nsplit_prv, opt_nsplit=opt_nsplit)
+      CALL block_tas_create_split(split_info, mp_comm, split_rowcol, nsplit_prv, opt_nsplit=opt_nsplit)
 
-      CALL dbs_tas_get_split_info(split_info, nsplit=nsplit_new)
+      CALL block_tas_get_split_info(split_info, nsplit=nsplit_new)
 
       IF (nsplit_old == nsplit_new .AND. split_rc == split_rowcol) THEN
          matrix_out => matrix_in
          is_new = .FALSE.
-         CALL dbs_tas_release_info(split_info)
+         CALL block_tas_release_info(split_info)
          CALL timestop(handle)
          RETURN
       ENDIF
 
-      CALL dbs_tas_distribution_new(dist, mp_comm, rdist, cdist, &
+      CALL block_tas_distribution_new(dist, mp_comm, rdist, cdist, &
                                       split_info=split_info)
 
-      CALL dbs_tas_release_info(split_info)
+      CALL block_tas_release_info(split_info)
 
       ALLOCATE (matrix_out)
-      CALL dbs_tas_create(matrix_out, name, dist, &
+      CALL block_tas_create(matrix_out, name, dist, &
                             data_type, &
                             rbsize, cbsize, own_dist=.TRUE.)
 
-      IF (.NOT. nodata_prv) CALL dbs_tas_copy(matrix_out, matrix_in)
+      IF (.NOT. nodata_prv) CALL block_tas_copy(matrix_out, matrix_in)
 
       IF (PRESENT(move_data)) THEN
          IF (.NOT. nodata_prv) THEN
-            IF (move_data) CALL dbs_tas_clear(matrix_in)
+            IF (move_data) CALL block_tas_clear(matrix_in)
             move_data = .TRUE.
          ENDIF
       ENDIF
@@ -1203,13 +1203,13 @@ CONTAINS
 
    FUNCTION dist_compatible(mat_a, mat_b, split_rc_a, split_rc_b, unit_nr)
       !! Check whether matrices have same distribution and same split.
-      TYPE(dbs_tas_type), INTENT(IN)           :: mat_a, mat_b
+      TYPE(block_tas_type), INTENT(IN)           :: mat_a, mat_b
       INTEGER, INTENT(IN)                        :: split_rc_a, split_rc_b
       INTEGER, INTENT(IN), OPTIONAL              :: unit_nr
       LOGICAL                                    :: dist_compatible
 
       INTEGER                                    :: same_local_rowcols, split_check_a, split_check_b
-      TYPE(dbs_tas_split_info)                 :: info_a, info_b
+      TYPE(block_tas_split_info)                 :: info_a, info_b
       INTEGER                                    :: unit_nr_prv, numproc
       INTEGER, DIMENSION(2)                      :: pdims_a, pdims_b, pcoord_a, pcoord_b
       INTEGER(int_8), DIMENSION(:), ALLOCATABLE         :: local_rowcols_a, local_rowcols_b
@@ -1218,10 +1218,10 @@ CONTAINS
 
       dist_compatible = .FALSE.
 
-      info_a = dbs_tas_info(mat_a)
-      info_b = dbs_tas_info(mat_b)
-      CALL dbs_tas_get_split_info(info_a, split_rowcol=split_check_a)
-      CALL dbs_tas_get_split_info(info_b, split_rowcol=split_check_b)
+      info_a = block_tas_info(mat_a)
+      info_b = block_tas_info(mat_b)
+      CALL block_tas_get_split_info(info_a, split_rowcol=split_check_a)
+      CALL block_tas_get_split_info(info_b, split_rowcol=split_check_b)
       IF (split_check_b /= split_rc_b .OR. split_check_a /= split_rc_a .OR. split_rc_a /= split_rc_b) THEN
          IF (unit_nr_prv > 0) THEN
             WRITE (unit_nr_prv, *) "matrix layout a not compatible", split_check_a, split_rc_a
@@ -1245,11 +1245,11 @@ CONTAINS
       ! check that distribution is the same by comparing local rows / columns for each matrix
       SELECT CASE (split_rc_a)
       CASE (rowsplit)
-         CALL dbs_tas_get_info(mat_a, local_rows=local_rowcols_a)
-         CALL dbs_tas_get_info(mat_b, local_rows=local_rowcols_b)
+         CALL block_tas_get_info(mat_a, local_rows=local_rowcols_a)
+         CALL block_tas_get_info(mat_b, local_rows=local_rowcols_b)
       CASE (colsplit)
-         CALL dbs_tas_get_info(mat_a, local_cols=local_rowcols_a)
-         CALL dbs_tas_get_info(mat_b, local_cols=local_rowcols_b)
+         CALL block_tas_get_info(mat_a, local_cols=local_rowcols_a)
+         CALL block_tas_get_info(mat_b, local_cols=local_rowcols_b)
       END SELECT
 
       same_local_rowcols = MERGE(1, 0, array_eq(local_rowcols_a, local_rowcols_b))
@@ -1270,16 +1270,16 @@ CONTAINS
 
    SUBROUTINE reshape_mm_template(template, matrix_in, matrix_out, trans, split_rc, nodata, move_data)
       !! Reshape matrix_in s.t. it has same process grid, distribution and split as template
-      TYPE(dbs_tas_type), INTENT(IN)           :: template
-      TYPE(dbs_tas_type), INTENT(INOUT)        :: matrix_in
-      TYPE(dbs_tas_type), INTENT(OUT)          :: matrix_out
+      TYPE(block_tas_type), INTENT(IN)           :: template
+      TYPE(block_tas_type), INTENT(INOUT)        :: matrix_in
+      TYPE(block_tas_type), INTENT(OUT)          :: matrix_out
       CHARACTER(LEN=1), INTENT(INOUT)            :: trans
       INTEGER, INTENT(IN)                        :: split_rc
       LOGICAL, INTENT(IN), OPTIONAL              :: nodata, move_data
-      CLASS(dbs_tas_distribution), ALLOCATABLE :: row_dist, col_dist
+      CLASS(block_tas_distribution), ALLOCATABLE :: row_dist, col_dist
 
-      TYPE(dbs_tas_distribution_type)          :: dist_new
-      TYPE(dbs_tas_split_info)                 :: info_template, info_matrix
+      TYPE(block_tas_distribution_type)          :: dist_new
+      TYPE(block_tas_split_info)                 :: info_template, info_matrix
       INTEGER                                    :: mp_comm, dim_split_template, dim_split_matrix, &
                                                     numnodes, handle
       INTEGER, DIMENSION(2)                      :: pcoord, pdims
@@ -1294,8 +1294,8 @@ CONTAINS
          nodata_prv = .FALSE.
       ENDIF
 
-      info_template = dbs_tas_info(template)
-      info_matrix = dbs_tas_info(matrix_in)
+      info_template = block_tas_info(template)
+      info_matrix = block_tas_info(matrix_in)
 
       dim_split_template = info_template%split_rowcol
       dim_split_matrix = split_rc
@@ -1316,55 +1316,55 @@ CONTAINS
       CASE (1)
          IF (.NOT. transposed) THEN
             ALLOCATE (row_dist, source=template%dist%row_dist)
-            ALLOCATE (col_dist, source=dbs_tas_dist_arb_default(pdims(2), matrix_in%nblkcols, matrix_in%col_blk_size))
+            ALLOCATE (col_dist, source=block_tas_dist_arb_default(pdims(2), matrix_in%nblkcols, matrix_in%col_blk_size))
          ELSE
             ALLOCATE (row_dist, source=template%dist%row_dist)
-            ALLOCATE (col_dist, source=dbs_tas_dist_arb_default(pdims(2), matrix_in%nblkrows, matrix_in%row_blk_size))
+            ALLOCATE (col_dist, source=block_tas_dist_arb_default(pdims(2), matrix_in%nblkrows, matrix_in%row_blk_size))
          ENDIF
       CASE (2)
          IF (.NOT. transposed) THEN
-            ALLOCATE (row_dist, source=dbs_tas_dist_arb_default(pdims(1), matrix_in%nblkrows, matrix_in%row_blk_size))
+            ALLOCATE (row_dist, source=block_tas_dist_arb_default(pdims(1), matrix_in%nblkrows, matrix_in%row_blk_size))
             ALLOCATE (col_dist, source=template%dist%col_dist)
          ELSE
-            ALLOCATE (row_dist, source=dbs_tas_dist_arb_default(pdims(1), matrix_in%nblkcols, matrix_in%col_blk_size))
+            ALLOCATE (row_dist, source=block_tas_dist_arb_default(pdims(1), matrix_in%nblkcols, matrix_in%col_blk_size))
             ALLOCATE (col_dist, source=template%dist%col_dist)
          ENDIF
       END SELECT
 
-      CALL dbs_tas_get_split_info(info_template, mp_comm=mp_comm)
-      CALL dbs_tas_distribution_new(dist_new, mp_comm, row_dist, col_dist, split_info=info_template)
+      CALL block_tas_get_split_info(info_template, mp_comm=mp_comm)
+      CALL block_tas_distribution_new(dist_new, mp_comm, row_dist, col_dist, split_info=info_template)
       IF (.NOT. transposed) THEN
-         CALL dbs_tas_create(matrix_out, matrix_in%matrix%name, dist_new, dbs_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, matrix_in%matrix%name, dist_new, block_tas_get_data_type(matrix_in), &
                                matrix_in%row_blk_size, matrix_in%col_blk_size, own_dist=.TRUE.)
       ELSE
-         CALL dbs_tas_create(matrix_out, matrix_in%matrix%name, dist_new, dbs_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, matrix_in%matrix%name, dist_new, block_tas_get_data_type(matrix_in), &
                                matrix_in%col_blk_size, matrix_in%row_blk_size, own_dist=.TRUE.)
       ENDIF
 
-      IF (.NOT. nodata_prv) CALL dbs_tas_reshape(matrix_in, matrix_out, transposed=transposed, move_data=move_data)
+      IF (.NOT. nodata_prv) CALL block_tas_reshape(matrix_in, matrix_out, transposed=transposed, move_data=move_data)
 
       CALL timestop(handle)
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_result_index(transa, transb, transc, matrix_a, matrix_b, matrix_c, filter_eps, &
+   SUBROUTINE block_tas_result_index(transa, transb, transc, matrix_a, matrix_b, matrix_c, filter_eps, &
                                      unit_nr, blk_ind, nze, retain_sparsity)
       !! Estimate sparsity pattern of C resulting from A x B = C by multiplying the block norms of A and B
-      !! Same dummy arguments as dbs_tas_multiply
+      !! Same dummy arguments as block_tas_multiply
       CHARACTER(LEN=1), INTENT(IN)               :: transa, transb, transc
-      TYPE(dbs_tas_type), INTENT(INOUT), TARGET        :: matrix_a, matrix_b, matrix_c
-      TYPE(dbs_tas_type), POINTER                      :: matrix_a_bnorm, matrix_b_bnorm, matrix_c_bnorm
+      TYPE(block_tas_type), INTENT(INOUT), TARGET        :: matrix_a, matrix_b, matrix_c
+      TYPE(block_tas_type), POINTER                      :: matrix_a_bnorm, matrix_b_bnorm, matrix_c_bnorm
       REAL(KIND=real_8), INTENT(IN), OPTIONAL    :: filter_eps
       INTEGER, INTENT(IN), OPTIONAL              :: unit_nr
       INTEGER(int_8), DIMENSION(:, :), ALLOCATABLE, INTENT(OUT), OPTIONAL :: blk_ind
       LOGICAL, INTENT(IN), OPTIONAL :: retain_sparsity
       INTEGER(int_8), INTENT(OUT), OPTIONAL :: nze
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_tas_result_index'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_result_index'
       LOGICAL :: retain_sparsity_prv
       INTEGER :: bn, row_size, col_size, handle, iblk, mp_comm, nblk
       INTEGER(int_8) :: row, col
-      TYPE(dbs_tas_iterator) :: iter
+      TYPE(block_tas_iterator) :: iter
 
       CALL timeset(routineN, handle)
 
@@ -1380,39 +1380,39 @@ CONTAINS
          CALL create_block_norms_matrix(matrix_b, matrix_b_bnorm)
          CALL create_block_norms_matrix(matrix_c, matrix_c_bnorm, nodata=.TRUE.)
 
-         CALL dbs_tas_multiply(transa, transb, transc, dbcsr_scalar(1.0_real_8), matrix_a_bnorm, &
+         CALL block_tas_multiply(transa, transb, transc, dbcsr_scalar(1.0_real_8), matrix_a_bnorm, &
                                  matrix_b_bnorm, dbcsr_scalar(0.0_real_8), matrix_c_bnorm, &
                                  filter_eps=filter_eps, move_data_a=.TRUE., move_data_b=.TRUE., &
                                  simple_split=.TRUE., unit_nr=unit_nr)
-         CALL dbs_tas_destroy(matrix_a_bnorm)
-         CALL dbs_tas_destroy(matrix_b_bnorm)
+         CALL block_tas_destroy(matrix_a_bnorm)
+         CALL block_tas_destroy(matrix_b_bnorm)
 
          DEALLOCATE (matrix_a_bnorm, matrix_b_bnorm)
       ELSE
          matrix_c_bnorm => matrix_c
       ENDIF
 
-      nblk = dbs_tas_get_num_blocks(matrix_c_bnorm)
+      nblk = block_tas_get_num_blocks(matrix_c_bnorm)
       IF (PRESENT(blk_ind)) ALLOCATE (blk_ind(nblk, 2))
 
-      CALL dbs_tas_iterator_start(iter, matrix_c_bnorm)
+      CALL block_tas_iterator_start(iter, matrix_c_bnorm)
       IF (PRESENT(nze)) nze = 0
       DO iblk = 1, nblk
-         CALL dbs_tas_iterator_next_block(iter, row, col, bn)
+         CALL block_tas_iterator_next_block(iter, row, col, bn)
          row_size = matrix_c%row_blk_size%data(row)
          col_size = matrix_c%col_blk_size%data(col)
          IF (PRESENT(nze)) nze = nze + row_size*col_size
          IF (PRESENT(blk_ind)) blk_ind(iblk, :) = [row, col]
       ENDDO
-      CALL dbs_tas_iterator_stop(iter)
+      CALL block_tas_iterator_stop(iter)
 
       IF (PRESENT(nze)) THEN
-         CALL dbs_tas_get_split_info(dbs_tas_info(matrix_a), mp_comm=mp_comm)
+         CALL block_tas_get_split_info(block_tas_info(matrix_a), mp_comm=mp_comm)
          CALL mp_sum(nze, mp_comm)
       ENDIF
 
       IF (.NOT. retain_sparsity_prv) THEN
-         CALL dbs_tas_destroy(matrix_c_bnorm)
+         CALL block_tas_destroy(matrix_c_bnorm)
          DEALLOCATE (matrix_c_bnorm)
       ENDIF
 
@@ -1461,11 +1461,11 @@ CONTAINS
 
    SUBROUTINE create_block_norms_matrix(matrix_in, matrix_out, nodata)
       !! Create a matrix with block sizes one that contains the block norms of matrix_in
-      TYPE(dbs_tas_type), INTENT(INOUT)        :: matrix_in
-      TYPE(dbs_tas_type), INTENT(OUT)          :: matrix_out
+      TYPE(block_tas_type), INTENT(INOUT)        :: matrix_in
+      TYPE(block_tas_type), INTENT(OUT)          :: matrix_out
       LOGICAL, INTENT(IN), OPTIONAL              :: nodata
-      TYPE(dbs_tas_blk_size_one)               :: row_blk_size, col_blk_size
-      TYPE(dbs_tas_iterator)                   :: iter
+      TYPE(block_tas_blk_size_one)               :: row_blk_size, col_blk_size
+      TYPE(block_tas_iterator)                   :: iter
       INTEGER(KIND=int_8)                        :: row, column, nblkrows, nblkcols
       CHARACTER(len=default_string_length)       :: name
       INTEGER                                    :: data_type
@@ -1484,34 +1484,34 @@ CONTAINS
          nodata_prv = .FALSE.
       ENDIF
 
-      CALL dbs_tas_get_info(matrix_in, data_type=data_type, name=name, &
+      CALL block_tas_get_info(matrix_in, data_type=data_type, name=name, &
                               nblkrows_total=nblkrows, nblkcols_total=nblkcols)
 
-      row_blk_size = dbs_tas_blk_size_one(nblkrows)
-      col_blk_size = dbs_tas_blk_size_one(nblkcols)
+      row_blk_size = block_tas_blk_size_one(nblkrows)
+      col_blk_size = block_tas_blk_size_one(nblkcols)
 
       ! not sure if assumption that same distribution can be taken still holds
-      CALL dbs_tas_create(matrix_out, name, matrix_in%dist, &
+      CALL block_tas_create(matrix_out, name, matrix_in%dist, &
                             data_type, &
                             row_blk_size, col_blk_size)
 
       IF (.NOT. nodata_prv) THEN
-         CALL dbs_tas_reserve_blocks(matrix_in, matrix_out)
+         CALL block_tas_reserve_blocks(matrix_in, matrix_out)
 
-         CALL dbs_tas_iterator_start(iter, matrix_in)
+         CALL block_tas_iterator_start(iter, matrix_in)
 
-         DO WHILE (dbs_tas_iterator_blocks_left(iter))
+         DO WHILE (block_tas_iterator_blocks_left(iter))
 
 #:for dparam, dtype, dsuffix in dtype_float_list
             IF (data_type == ${dparam}$) THEN
-               CALL dbs_tas_iterator_next_block(iter, row, column, block_get_${dsuffix}$, tr)
-               CALL dbs_tas_get_block_p(matrix_out, row, column, block_put_${dsuffix}$, tr, found)
+               CALL block_tas_iterator_next_block(iter, row, column, block_get_${dsuffix}$, tr)
+               CALL block_tas_get_block_p(matrix_out, row, column, block_put_${dsuffix}$, tr, found)
                CPASSERT(found)
                block_put_${dsuffix}$ (1, 1) = SQRT(SUM(block_get_${dsuffix}$**2)) ! norm2 works only for real
             ENDIF
 #:endfor
          ENDDO
-         CALL dbs_tas_iterator_stop(iter)
+         CALL block_tas_iterator_stop(iter)
       ENDIF
 
    END SUBROUTINE
@@ -1568,10 +1568,10 @@ CONTAINS
       CALL mp_environ(nproc, pdims, pcoord, mp_comm_cart)
 
       ALLOCATE (row_dist(nbrows), col_dist(nbcols))
-      CALL dbs_tas_default_distvec(nbrows, pdims(1), rbsize, row_dist)
-      CALL dbs_tas_default_distvec(nbcols, pdims(2), rcsize, col_dist)
+      CALL block_tas_default_distvec(nbrows, pdims(1), rbsize, row_dist)
+      CALL block_tas_default_distvec(nbcols, pdims(2), rcsize, col_dist)
 
-      mp_obj = dbs_mp_environ(mp_comm_cart)
+      mp_obj = block_mp_environ(mp_comm_cart)
       CALL dbcsr_distribution_new(dist, mp_obj, row_dist, col_dist, reuse_arrays=.TRUE.)
       CALL dbcsr_mp_release(mp_obj)
 
@@ -1588,19 +1588,19 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_batched_mm_init(matrix)
-      TYPE(dbs_tas_type), INTENT(INOUT) :: matrix
-      CALL dbs_tas_set_batched_state(matrix, state=1)
+   SUBROUTINE block_tas_batched_mm_init(matrix)
+      TYPE(block_tas_type), INTENT(INOUT) :: matrix
+      CALL block_tas_set_batched_state(matrix, state=1)
       ALLOCATE (matrix%mm_storage)
       matrix%mm_storage%batched_out = .FALSE.
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_batched_mm_finalize(matrix)
-      TYPE(dbs_tas_type), INTENT(INOUT) :: matrix
+   SUBROUTINE block_tas_batched_mm_finalize(matrix)
+      TYPE(block_tas_type), INTENT(INOUT) :: matrix
       INTEGER :: handle
 
       CALL mp_sync(matrix%dist%info%mp_comm)
-      CALL timeset("dbs_tas_total", handle)
+      CALL timeset("block_tas_total", handle)
 
       IF (matrix%do_batched == 0) RETURN
 
@@ -1608,22 +1608,22 @@ CONTAINS
          CALL dbcsr_scale(matrix%matrix, matrix%mm_storage%batched_beta)
       ENDIF
 
-      CALL dbs_tas_batched_mm_complete(matrix)
+      CALL block_tas_batched_mm_complete(matrix)
 
       matrix%mm_storage%batched_out = .FALSE.
 
       DEALLOCATE (matrix%mm_storage)
-      CALL dbs_tas_set_batched_state(matrix, state=0)
+      CALL block_tas_set_batched_state(matrix, state=0)
 
       CALL mp_sync(matrix%dist%info%mp_comm)
       CALL timestop(handle)
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_set_batched_state(matrix, state, opt_grid)
+   SUBROUTINE block_tas_set_batched_state(matrix, state, opt_grid)
       !! set state flags during batched multiplication
 
-      TYPE(dbs_tas_type), INTENT(INOUT) :: matrix
+      TYPE(block_tas_type), INTENT(INOUT) :: matrix
       LOGICAL, INTENT(IN), OPTIONAL :: opt_grid
       !! whether process grid was already optimized and should not be changed
       INTEGER, INTENT(IN), OPTIONAL :: state
@@ -1655,8 +1655,8 @@ CONTAINS
       ENDIF
    END SUBROUTINE
 
-   SUBROUTINE dbs_tas_batched_mm_complete(matrix, warn)
-      TYPE(dbs_tas_type), INTENT(INOUT) :: matrix
+   SUBROUTINE block_tas_batched_mm_complete(matrix, warn)
+      TYPE(block_tas_type), INTENT(INOUT) :: matrix
       LOGICAL, INTENT(IN), OPTIONAL :: warn
 
       IF (matrix%do_batched == 0) RETURN
@@ -1669,22 +1669,22 @@ CONTAINS
          ENDIF
          IF (storage%batched_out .AND. matrix%do_batched == 3) THEN
 
-            CALL dbs_tas_merge(storage%store_batched%matrix, &
+            CALL block_tas_merge(storage%store_batched%matrix, &
                                  storage%store_batched_repl, move_data=.TRUE.)
 
-            CALL dbs_tas_reshape(storage%store_batched, matrix, summation=.TRUE., &
+            CALL block_tas_reshape(storage%store_batched, matrix, summation=.TRUE., &
                                    transposed=storage%batched_trans, move_data=.TRUE.)
-            CALL dbs_tas_destroy(storage%store_batched)
+            CALL block_tas_destroy(storage%store_batched)
             DEALLOCATE (storage%store_batched)
          ENDIF
 
          IF (ASSOCIATED(storage%store_batched_repl)) THEN
-            CALL dbs_tas_destroy(storage%store_batched_repl)
+            CALL block_tas_destroy(storage%store_batched_repl)
             DEALLOCATE (storage%store_batched_repl)
          ENDIF
       END ASSOCIATE
 
-      CALL dbs_tas_set_batched_state(matrix, state=2)
+      CALL block_tas_set_batched_state(matrix, state=2)
 
    END SUBROUTINE
 

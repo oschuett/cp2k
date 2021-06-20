@@ -23,13 +23,13 @@ MODULE xas_tdp_kernel
         dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, dbcsr_multiply, &
         dbcsr_p_type, dbcsr_put_block, dbcsr_release, dbcsr_reserve_block2d, dbcsr_set, &
         dbcsr_transposed, dbcsr_type, dbcsr_type_no_symmetry, dbcsr_type_symmetric
-   USE dbs_tensor_api,                ONLY: dbs_t_get_block,&
-                                              dbs_t_iterator_blocks_left,&
-                                              dbs_t_iterator_next_block,&
-                                              dbs_t_iterator_start,&
-                                              dbs_t_iterator_stop,&
-                                              dbs_t_iterator_type,&
-                                              dbs_t_type
+   USE block_tensor_api,                ONLY: block_tensor_get_block,&
+                                              block_tensor_iterator_blocks_left,&
+                                              block_tensor_iterator_next_block,&
+                                              block_tensor_iterator_start,&
+                                              block_tensor_iterator_stop,&
+                                              block_tensor_iterator_type,&
+                                              block_tensor_type
    USE distribution_2d_types,           ONLY: distribution_2d_type
    USE kinds,                           ONLY: dp
    USE message_passing,                 ONLY: mp_bcast
@@ -994,7 +994,7 @@ CONTAINS
       TYPE(cp_para_env_type), POINTER                    :: para_env
       TYPE(dbcsr_distribution_type)                      :: opt_dbcsr_dist
       TYPE(dbcsr_p_type), DIMENSION(:), POINTER          :: matrices, matrix_s
-      TYPE(dbs_t_type), POINTER                        :: pq_X
+      TYPE(block_tensor_type), POINTER                        :: pq_X
       TYPE(dbcsr_type), POINTER                          :: aI_P, P_Ib, work
       TYPE(distribution_2d_type), POINTER                :: opt_dist2d
       TYPE(gto_basis_set_p_type), DIMENSION(:), POINTER  :: ri_basis
@@ -1098,7 +1098,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE contract3_RI_to_doMOs(ab_Q, vec, mat_abIJ, atom_k)
 
-      TYPE(dbs_t_type)                                 :: ab_Q
+      TYPE(block_tensor_type)                                 :: ab_Q
       REAL(dp), DIMENSION(:), INTENT(IN)                 :: vec
       TYPE(dbcsr_type)                                   :: mat_abIJ
       INTEGER, INTENT(IN)                                :: atom_k
@@ -1111,7 +1111,7 @@ CONTAINS
       REAL(dp)                                           :: prefac
       REAL(dp), ALLOCATABLE, DIMENSION(:, :, :)          :: iabc
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pblock
-      TYPE(dbs_t_iterator_type)                        :: iter
+      TYPE(block_tensor_iterator_type)                        :: iter
       TYPE(dbcsr_type)                                   :: work
 
       NULLIFY (pblock)
@@ -1120,9 +1120,9 @@ CONTAINS
 
       nk = SIZE(vec)
 
-      CALL dbs_t_iterator_start(iter, ab_Q)
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, ind, blk)
+      CALL block_tensor_iterator_start(iter, ab_Q)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, ind, blk)
 
          iatom = ind(1)
          jatom = ind(2)
@@ -1133,7 +1133,7 @@ CONTAINS
          prefac = 1.0_dp
          IF (iatom == jatom) prefac = 0.5_dp
 
-         CALL dbs_t_get_block(ab_Q, ind, iabc, t_found)
+         CALL block_tensor_get_block(ab_Q, ind, iabc, t_found)
 
          CALL dbcsr_get_block_p(mat_abIJ, iatom, jatom, pblock, found)
          IF ((.NOT. found) .OR. (.NOT. t_found)) CYCLE
@@ -1145,7 +1145,7 @@ CONTAINS
 
          DEALLOCATE (iabc)
       END DO !iter
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
       !matrix only half filled => need to add its transpose
       CALL dbcsr_create(work, template=mat_abIJ)
@@ -1175,7 +1175,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE contract2_AO_to_doMO_low(ab_Q, vec, mat_aIb, mat_bIa, atom_k)
 
-      TYPE(dbs_t_type)                                 :: ab_Q
+      TYPE(block_tensor_type)                                 :: ab_Q
       REAL(dp), DIMENSION(:), INTENT(IN)                 :: vec
       TYPE(dbcsr_type), INTENT(INOUT)                    :: mat_aIb, mat_bIa
       INTEGER, INTENT(IN)                                :: atom_k
@@ -1188,7 +1188,7 @@ CONTAINS
       LOGICAL                                            :: found, t_found
       REAL(dp), ALLOCATABLE, DIMENSION(:, :, :)          :: iabc
       REAL(dp), DIMENSION(:, :), POINTER                 :: pblock
-      TYPE(dbs_t_iterator_type)                        :: iter
+      TYPE(block_tensor_iterator_type)                        :: iter
 
       NULLIFY (atom_blk_size, pblock)
 
@@ -1196,9 +1196,9 @@ CONTAINS
 
       CALL dbcsr_get_info(mat_aIb, row_blk_size=atom_blk_size)
 
-      CALL dbs_t_iterator_start(iter, ab_Q)
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, ind, blk)
+      CALL block_tensor_iterator_start(iter, ab_Q)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, ind, blk)
 
          iatom = ind(1)
          jatom = ind(2)
@@ -1206,7 +1206,7 @@ CONTAINS
 
          IF (atom_k .NE. katom) CYCLE
 
-         CALL dbs_t_get_block(ab_Q, ind, iabc, t_found)
+         CALL block_tensor_get_block(ab_Q, ind, iabc, t_found)
          IF (.NOT. t_found) CYCLE
 
          ! Deal with mat_aIb
@@ -1245,7 +1245,7 @@ CONTAINS
 
          DEALLOCATE (iabc)
       END DO !iter
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
       CALL timestop(handle)
 

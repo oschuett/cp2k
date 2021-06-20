@@ -7,28 +7,29 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tensor_test
+MODULE block_tensor_test
    !! General methods for testing DBCSR tensors.
 
-#:include "dbs_tensor.fypp"
+#:include "block_tensor.fypp"
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
    USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
-   USE dbs_tas_base, ONLY: dbs_tas_info
-   USE dbs_tensor, ONLY: &
-      dbs_t_copy, dbs_t_get_block, dbs_t_iterator_type, dbs_t_iterator_blocks_left, &
-      dbs_t_iterator_next_block, dbs_t_iterator_start, dbs_t_iterator_stop, &
-      dbs_t_reserve_blocks, dbs_t_get_stored_coordinates, dbs_t_put_block, &
-      dbs_t_contract, dbs_t_inverse_order
-   USE dbs_tensor_block, ONLY: block_nd
-   USE dbs_tensor_types, ONLY: &
-      dbs_t_create, dbs_t_destroy, dbs_t_type, dbs_t_distribution_type, dbs_t_distribution_destroy, &
-      dims_tensor, ndims_tensor, dbs_t_distribution_new, dbs_t_nd_mp_comm, dbs_t_get_data_type, &
-      mp_environ_pgrid, dbs_t_pgrid_type, dbs_t_pgrid_create, dbs_t_pgrid_destroy, dbs_t_get_info, &
-      dbs_t_default_distvec
-   USE dbs_tensor_io, ONLY: &
-      dbs_t_write_blocks, dbs_t_write_block_indices
+   USE block_tas_base, ONLY: block_tas_info
+   USE block_tensor, ONLY: &
+      block_tensor_copy, block_tensor_get_block, block_tensor_iterator_type, block_tensor_iterator_blocks_left, &
+      block_tensor_iterator_next_block, block_tensor_iterator_start, block_tensor_iterator_stop, &
+      block_tensor_reserve_blocks, block_tensor_get_stored_coordinates, block_tensor_put_block, &
+      block_tensor_contract, block_tensor_inverse_order
+   USE block_tensor_block, ONLY: block_nd
+   USE block_tensor_types, ONLY: &
+      block_tensor_create, block_tensor_destroy, block_tensor_type, block_tensor_distribution_type, &
+      block_tensor_distribution_destroy, &
+      dims_tensor, ndims_tensor, block_tensor_distribution_new, block_tensor_nd_mp_comm, block_tensor_get_data_type, &
+      mp_environ_pgrid, block_tensor_pgrid_type, block_tensor_pgrid_create, block_tensor_pgrid_destroy, block_tensor_get_info, &
+      block_tensor_default_distvec
+   USE block_tensor_io, ONLY: &
+      block_tensor_write_blocks, block_tensor_write_block_indices
    USE kinds, ONLY: ${uselist(dtype_float_prec)}$, &
                           default_string_length, &
                           int_8
@@ -38,10 +39,10 @@ MODULE dbs_tensor_test
                             mp_comm_free, &
                             mp_sum, &
                             mp_cart_create
-   USE dbs_allocate_wrap, ONLY: allocate_any
-   USE dbs_tensor_index, ONLY: &
-      combine_tensor_index, get_2d_indices_tensor, dbs_t_get_mapping_info
-   USE dbs_tas_test, ONLY: dbs_tas_checksum
+   USE block_allocate_wrap, ONLY: allocate_any
+   USE block_tensor_index, ONLY: &
+      combine_tensor_index, get_2d_indices_tensor, block_tensor_get_mapping_info
+   USE block_tas_test, ONLY: block_tas_checksum
    USE dbcsr_data_types, ONLY: dbcsr_scalar_type
    USE dbcsr_blas_operations, ONLY: &
       dbcsr_lapack_larnv, set_larnv_seed
@@ -49,14 +50,14 @@ MODULE dbs_tensor_test
 
    IMPLICIT NONE
    PRIVATE
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tensor_test'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor_test'
 
    PUBLIC :: &
-      dbs_t_setup_test_tensor, &
-      dbs_t_contract_test, &
-      dbs_t_test_formats, &
-      dbs_t_checksum, &
-      dbs_t_reset_randmat_seed
+      block_tensor_setup_test_tensor, &
+      block_tensor_contract_test, &
+      block_tensor_test_formats, &
+      block_tensor_checksum, &
+      block_tensor_reset_randmat_seed
 
    INTERFACE dist_sparse_tensor_to_repl_dense_array
 #:for dparam, dtype, dsuffix in [dtype_float_list[0]]
@@ -71,43 +72,43 @@ MODULE dbs_tensor_test
 
 CONTAINS
 
-   FUNCTION dbs_t_equal(tensor1, tensor2)
+   FUNCTION block_tensor_equal(tensor1, tensor2)
       !! check if two (arbitrarily mapped and distributed) tensors are equal.
-      TYPE(dbs_t_type), INTENT(INOUT)          :: tensor1, tensor2
-      LOGICAL                                    :: dbs_t_equal
+      TYPE(block_tensor_type), INTENT(INOUT)          :: tensor1, tensor2
+      LOGICAL                                    :: block_tensor_equal
 
       INTEGER                                    :: blk
-      TYPE(dbs_t_type)                         :: tensor2_tmp
-      TYPE(dbs_t_iterator_type)                :: iter
+      TYPE(block_tensor_type)                         :: tensor2_tmp
+      TYPE(block_tensor_iterator_type)                :: iter
       TYPE(block_nd)                             :: blk_data1, blk_data2
       INTEGER, DIMENSION(ndims_tensor(tensor1)) :: blk_size, ind_nd
       LOGICAL :: found
 
       ! create a copy of tensor2 that has exact same data format as tensor1
-      CALL dbs_t_create(tensor1, tensor2_tmp)
+      CALL block_tensor_create(tensor1, tensor2_tmp)
 
-      CALL dbs_t_reserve_blocks(tensor1, tensor2_tmp)
-      CALL dbs_t_copy(tensor2, tensor2_tmp)
+      CALL block_tensor_reserve_blocks(tensor1, tensor2_tmp)
+      CALL block_tensor_copy(tensor2, tensor2_tmp)
 
-      dbs_t_equal = .TRUE.
+      block_tensor_equal = .TRUE.
 
-      CALL dbs_t_iterator_start(iter, tensor1)
+      CALL block_tensor_iterator_start(iter, tensor1)
 
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
-         CALL dbs_t_get_block(tensor1, ind_nd, blk_data1, found)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
+         CALL block_tensor_get_block(tensor1, ind_nd, blk_data1, found)
          CPASSERT(found)
-         CALL dbs_t_get_block(tensor2_tmp, ind_nd, blk_data2, found)
+         CALL block_tensor_get_block(tensor2_tmp, ind_nd, blk_data2, found)
          CPASSERT(found)
 
          IF (.NOT. blocks_equal(blk_data1, blk_data2)) THEN
-            dbs_t_equal = .FALSE.
+            block_tensor_equal = .FALSE.
          ENDIF
       ENDDO
 
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
-      CALL dbs_t_destroy(tensor2_tmp)
+      CALL block_tensor_destroy(tensor2_tmp)
    END FUNCTION
 
    PURE FUNCTION blocks_equal(block1, block2)
@@ -163,7 +164,7 @@ CONTAINS
       END SUBROUTINE
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_test_formats(ndims, mp_comm, unit_nr, verbose, &
+   SUBROUTINE block_tensor_test_formats(ndims, mp_comm, unit_nr, verbose, &
                                    ${varlist("blk_size")}$, &
                                    ${varlist("blk_ind")}$)
       !! Test equivalence of all tensor formats, using a random distribution.
@@ -178,8 +179,8 @@ CONTAINS
       LOGICAL, INTENT(IN)                         :: verbose
          !! if .TRUE., print all tensor blocks
       INTEGER, INTENT(IN)                         :: mp_comm
-      TYPE(dbs_t_distribution_type)             :: dist1, dist2
-      TYPE(dbs_t_type)                          :: tensor1, tensor2
+      TYPE(block_tensor_distribution_type)             :: dist1, dist2
+      TYPE(block_tensor_type)                          :: tensor1, tensor2
       INTEGER                                     :: isep, iblk
       INTEGER, DIMENSION(:), ALLOCATABLE          :: ${varlist("dist1")}$, &
                                                      ${varlist("dist2")}$
@@ -191,12 +192,12 @@ CONTAINS
       INTEGER, DIMENSION(ndims, factorial(ndims)) :: perm
       INTEGER                                     :: io_unit
       INTEGER                                     :: mynode, numnodes
-      TYPE(dbs_t_pgrid_type)                    :: comm_nd
+      TYPE(block_tensor_pgrid_type)                    :: comm_nd
       CHARACTER(LEN=default_string_length)        :: tensor_name
 
       ! Process grid
       pdims(:) = 0
-      CALL dbs_t_pgrid_create(mp_comm, pdims, comm_nd)
+      CALL block_tensor_pgrid_create(mp_comm, pdims, comm_nd)
       CALL mp_environ(numnodes, mynode, mp_comm)
 
       io_unit = 0
@@ -263,8 +264,8 @@ CONTAINS
                nblks = SIZE(blk_size_${dim}$)
                ALLOCATE (dist1_${dim}$ (nblks))
                ALLOCATE (dist2_${dim}$ (nblks))
-               CALL dbs_t_default_distvec(nblks, pdims(${dim}$), blk_size_${dim}$, dist1_${dim}$)
-               CALL dbs_t_default_distvec(nblks, pdims(${dim}$), blk_size_${dim}$, dist2_${dim}$)
+               CALL block_tensor_default_distvec(nblks, pdims(${dim}$), blk_size_${dim}$, dist1_${dim}$)
+               CALL block_tensor_default_distvec(nblks, pdims(${dim}$), blk_size_${dim}$, dist2_${dim}$)
             ENDIF
 #:endfor
 
@@ -308,27 +309,27 @@ CONTAINS
 
 #:for ndim in ndims
             IF (ndims == ${ndim}$) THEN
-               CALL dbs_t_distribution_new(dist2, comm_nd, ${varlist("dist2", nmax=ndim)}$)
-               CALL dbs_t_create(tensor2, "Ref", dist2, map1_ref, map2_ref, &
+               CALL block_tensor_distribution_new(dist2, comm_nd, ${varlist("dist2", nmax=ndim)}$)
+               CALL block_tensor_create(tensor2, "Ref", dist2, map1_ref, map2_ref, &
                                    dbcsr_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
-               CALL dbs_t_setup_test_tensor(tensor2, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
+               CALL block_tensor_setup_test_tensor(tensor2, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
             ENDIF
 #:endfor
 
-            IF (verbose) CALL dbs_t_write_blocks(tensor2, io_unit, unit_nr)
+            IF (verbose) CALL block_tensor_write_blocks(tensor2, io_unit, unit_nr)
 
 #:for ndim in ndims
             IF (ndims == ${ndim}$) THEN
-               CALL dbs_t_distribution_new(dist1, comm_nd, ${varlist("dist1", nmax=ndim)}$)
-               CALL dbs_t_create(tensor1, tensor_name, dist1, map1, map2, &
+               CALL block_tensor_distribution_new(dist1, comm_nd, ${varlist("dist1", nmax=ndim)}$)
+               CALL block_tensor_create(tensor1, tensor_name, dist1, map1, map2, &
                                    dbcsr_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
-               CALL dbs_t_setup_test_tensor(tensor1, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
+               CALL block_tensor_setup_test_tensor(tensor1, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
             ENDIF
 #:endfor
 
-            IF (verbose) CALL dbs_t_write_blocks(tensor1, io_unit, unit_nr)
+            IF (verbose) CALL block_tensor_write_blocks(tensor1, io_unit, unit_nr)
 
-            eql = dbs_t_equal(tensor1, tensor2)
+            eql = block_tensor_equal(tensor1, tensor2)
 
             IF (.NOT. eql) THEN
                IF (io_unit > 0) WRITE (io_unit, '(A,1X,A)') TRIM(tensor_name), 'Test failed!'
@@ -338,11 +339,11 @@ CONTAINS
             ENDIF
             DEALLOCATE (map1, map2)
 
-            CALL dbs_t_destroy(tensor1)
-            CALL dbs_t_distribution_destroy(dist1)
+            CALL block_tensor_destroy(tensor1)
+            CALL block_tensor_distribution_destroy(dist1)
 
-            CALL dbs_t_destroy(tensor2)
-            CALL dbs_t_distribution_destroy(dist2)
+            CALL block_tensor_destroy(tensor2)
+            CALL block_tensor_distribution_destroy(dist2)
 
 #:for dim in range(1, maxdim+1)
             IF (${dim}$ <= ndims) THEN
@@ -352,13 +353,13 @@ CONTAINS
 
          ENDDO
       ENDDO
-      CALL dbs_t_pgrid_destroy(comm_nd)
+      CALL block_tensor_pgrid_destroy(comm_nd)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_setup_test_tensor(tensor, mp_comm, enumerate, ${varlist("blk_ind")}$)
+   SUBROUTINE block_tensor_setup_test_tensor(tensor, mp_comm, enumerate, ${varlist("blk_ind")}$)
       !! Allocate and fill test tensor - entries are enumerated by their index s.t. they only depend
       !! on global properties of the tensor but not on distribution, matrix representation, etc.
-      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor
+      TYPE(block_tensor_type), INTENT(INOUT)                  :: tensor
       INTEGER, INTENT(IN)                                :: mp_comm
          !! communicator
       LOGICAL, INTENT(IN)                                :: enumerate
@@ -375,7 +376,7 @@ CONTAINS
       REAL(KIND=real_8), ALLOCATABLE, &
          DIMENSION(${shape_colon(ndim)}$)                :: blk_values_${ndim}$
 #:endfor
-      TYPE(dbs_t_iterator_type)                        :: iterator
+      TYPE(block_tensor_iterator_type)                        :: iterator
       INTEGER, DIMENSION(4)                              :: iseed
       INTEGER, DIMENSION(2)                              :: blk_index_2d, nblks_2d
 
@@ -396,7 +397,7 @@ CONTAINS
             ind_nd(ib, :) = [${varlist("blk_ind", nmax=ndim, suffix="(ib)")}$]
          ENDIF
 #:endfor
-         CALL dbs_t_get_stored_coordinates(tensor, ind_nd(ib, :), proc)
+         CALL block_tensor_get_stored_coordinates(tensor, ind_nd(ib, :), proc)
          IF (proc == mynode) THEN
             my_nblks_alloc = my_nblks_alloc + 1
          ENDIF
@@ -410,7 +411,7 @@ CONTAINS
 
       i = 0
       DO ib = 1, nblks_alloc
-         CALL dbs_t_get_stored_coordinates(tensor, ind_nd(ib, :), proc)
+         CALL block_tensor_get_stored_coordinates(tensor, ind_nd(ib, :), proc)
          IF (proc == mynode) THEN
             i = i + 1
 #:for dim in range(1, maxdim+1)
@@ -423,17 +424,17 @@ CONTAINS
 
 #:for ndim in ndims
       IF (ndims_tensor(tensor) == ${ndim}$) THEN
-         CALL dbs_t_reserve_blocks(tensor, ${varlist("my_blk_ind", nmax=ndim)}$)
+         CALL block_tensor_reserve_blocks(tensor, ${varlist("my_blk_ind", nmax=ndim)}$)
       ENDIF
 #:endfor
 
-      CALL dbs_t_iterator_start(iterator, tensor)
-      DO WHILE (dbs_t_iterator_blocks_left(iterator))
-         CALL dbs_t_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+      CALL block_tensor_iterator_start(iterator, tensor)
+      DO WHILE (block_tensor_iterator_blocks_left(iterator))
+         CALL block_tensor_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
 
          IF (.NOT. enumerate) THEN
             blk_index_2d = INT(get_2d_indices_tensor(tensor%nd_index_blk, blk_index))
-            CALL dbs_t_get_mapping_info(tensor%nd_index_blk, dims_2d=nblks_2d)
+            CALL block_tensor_get_mapping_info(tensor%nd_index_blk, dims_2d=nblks_2d)
             CALL set_larnv_seed(blk_index_2d(1), nblks_2d(1), blk_index_2d(2), nblks_2d(2), randmat_counter, iseed)
             nze = PRODUCT(blk_size)
          ENDIF
@@ -447,12 +448,12 @@ CONTAINS
             ELSE
                CALL dlarnv(1, iseed, nze, blk_values_${ndim}$)
             ENDIF
-            CALL dbs_t_put_block(tensor, blk_index, blk_size, blk_values_${ndim}$)
+            CALL block_tensor_put_block(tensor, blk_index, blk_size, blk_values_${ndim}$)
             DEALLOCATE (blk_values_${ndim}$)
          ENDIF
 #:endfor
       ENDDO
-      CALL dbs_t_iterator_stop(iterator)
+      CALL block_tensor_iterator_stop(iterator)
 
    END SUBROUTINE
 
@@ -497,25 +498,25 @@ CONTAINS
       !! Transform a distributed sparse tensor to a replicated dense array. This is only useful for
       !! testing tensor contraction by matrix multiplication of dense arrays.
 
-      TYPE(dbs_t_type), INTENT(INOUT)                          :: tensor
+      TYPE(block_tensor_type), INTENT(INOUT)                          :: tensor
       ${dtype}$, ALLOCATABLE, DIMENSION(${shape_colon(ndim)}$), &
          INTENT(OUT)                                             :: array
       ${dtype}$, ALLOCATABLE, DIMENSION(${shape_colon(ndim)}$)   :: block
       INTEGER, DIMENSION(ndims_tensor(tensor))                  :: dims_nd, ind_nd, blk_size, blk_offset
-      TYPE(dbs_t_iterator_type)                                     :: iterator
+      TYPE(block_tensor_iterator_type)                                     :: iterator
       INTEGER                                                    :: blk, idim
       INTEGER, DIMENSION(ndims_tensor(tensor))                  :: blk_start, blk_end
       LOGICAL                                                    :: found
 
       CPASSERT(ndims_tensor(tensor) .EQ. ${ndim}$)
-      CALL dbs_t_get_info(tensor, nfull_total=dims_nd)
+      CALL block_tensor_get_info(tensor, nfull_total=dims_nd)
       CALL allocate_any(array, shape_spec=dims_nd)
       array(${shape_colon(ndim)}$) = 0.0_${dprec}$
 
-      CALL dbs_t_iterator_start(iterator, tensor)
-      DO WHILE (dbs_t_iterator_blocks_left(iterator))
-         CALL dbs_t_iterator_next_block(iterator, ind_nd, blk, blk_size=blk_size, blk_offset=blk_offset)
-         CALL dbs_t_get_block(tensor, ind_nd, block, found)
+      CALL block_tensor_iterator_start(iterator, tensor)
+      DO WHILE (block_tensor_iterator_blocks_left(iterator))
+         CALL block_tensor_iterator_next_block(iterator, ind_nd, blk, blk_size=blk_size, blk_offset=blk_offset)
+         CALL block_tensor_get_block(tensor, ind_nd, block, found)
          CPASSERT(found)
 
          DO idim = 1, ndims_tensor(tensor)
@@ -527,14 +528,14 @@ CONTAINS
 
          DEALLOCATE (block)
       ENDDO
-      CALL dbs_t_iterator_stop(iterator)
+      CALL block_tensor_iterator_stop(iterator)
       CALL mp_sum(array, tensor%pgrid%mp_comm_2d)
 
    END SUBROUTINE
 #:endfor
 #:endfor
 
-   SUBROUTINE dbs_t_contract_test(alpha, tensor_1, tensor_2, beta, tensor_3, &
+   SUBROUTINE block_tensor_contract_test(alpha, tensor_1, tensor_2, beta, tensor_3, &
                                     contract_1, notcontract_1, &
                                     contract_2, notcontract_2, &
                                     map_1, map_2, &
@@ -542,11 +543,11 @@ CONTAINS
                                     bounds_1, bounds_2, bounds_3, &
                                     log_verbose, write_int)
       !! test tensor contraction
-      !! @note for testing/debugging, simply replace a call to dbs_t_contract with a call to this routine
+      !! @note for testing/debugging, simply replace a call to block_tensor_contract with a call to this routine
       !! @endnote
 
       TYPE(dbcsr_scalar_type), INTENT(IN) :: alpha
-      TYPE(dbs_t_type), INTENT(INOUT)    :: tensor_1, tensor_2, tensor_3
+      TYPE(block_tensor_type), INTENT(INOUT)    :: tensor_1, tensor_2, tensor_3
       TYPE(dbcsr_scalar_type), INTENT(IN) :: beta
       INTEGER, DIMENSION(:), INTENT(IN)    :: contract_1, contract_2, &
                                               notcontract_1, notcontract_2, &
@@ -594,9 +595,9 @@ CONTAINS
       io_unit = -1
       IF (mynode .EQ. 0) io_unit = unit_nr
 
-      cs_1 = dbs_t_checksum(tensor_1)
-      cs_2 = dbs_t_checksum(tensor_2)
-      cs_3 = dbs_t_checksum(tensor_3)
+      cs_1 = block_tensor_checksum(tensor_1)
+      cs_2 = block_tensor_checksum(tensor_2)
+      cs_3 = block_tensor_checksum(tensor_3)
 
       IF (io_unit > 0) THEN
          WRITE (io_unit, *)
@@ -615,8 +616,8 @@ CONTAINS
       ENDIF
 
       IF (debug) THEN
-         CALL dbs_t_write_block_indices(tensor_1, io_unit, unit_nr)
-         CALL dbs_t_write_blocks(tensor_1, io_unit, unit_nr, write_int)
+         CALL block_tensor_write_block_indices(tensor_1, io_unit, unit_nr)
+         CALL block_tensor_write_blocks(tensor_1, io_unit, unit_nr, write_int)
       ENDIF
 
       SELECT CASE (ndims_tensor(tensor_3))
@@ -626,7 +627,7 @@ CONTAINS
 #:endfor
       END SELECT
 
-      CALL dbs_t_contract(alpha, tensor_1, tensor_2, beta, tensor_3, &
+      CALL block_tensor_contract(alpha, tensor_1, tensor_2, beta, tensor_3, &
                             contract_1, notcontract_1, &
                             contract_2, notcontract_2, &
                             map_1, map_2, &
@@ -634,7 +635,7 @@ CONTAINS
                             filter_eps=1.0E-12_real_8, &
                             unit_nr=io_unit, log_verbose=log_verbose)
 
-      cs_3 = dbs_t_checksum(tensor_3)
+      cs_3 = block_tensor_checksum(tensor_3)
 
       IF (debug) THEN
          IF (io_unit > 0) THEN
@@ -646,10 +647,10 @@ CONTAINS
 
       ! crop tensor as first step
       bounds_t1(1, :) = 1
-      CALL dbs_t_get_info(tensor_1, nfull_total=bounds_t1(2, :))
+      CALL block_tensor_get_info(tensor_1, nfull_total=bounds_t1(2, :))
 
       bounds_t2(1, :) = 1
-      CALL dbs_t_get_info(tensor_2, nfull_total=bounds_t2(2, :))
+      CALL block_tensor_get_info(tensor_2, nfull_total=bounds_t2(2, :))
 
       IF (PRESENT(bounds_1)) THEN
          bounds_t1(:, contract_1) = bounds_1
@@ -708,7 +709,7 @@ CONTAINS
                  map_t3_1 => map_1, map_t3_2 => map_2)
 
 #:for i in range(1,4)
-         order_t${i}$ (:) = dbs_t_inverse_order([map_t${i}$_1, map_t${i}$_2])
+         order_t${i}$ (:) = block_tensor_inverse_order([map_t${i}$_1, map_t${i}$_2])
 
          SELECT CASE (ndims_tensor(tensor_${i}$))
 #:for ndim in ndims
@@ -755,15 +756,15 @@ CONTAINS
       sizes_2d(2) = PRODUCT(nd_sizes(map2))
    END FUNCTION
 
-   FUNCTION dbs_t_checksum(tensor, local, pos)
-      !! checksum of a tensor consistent with dbs_checksum
-      TYPE(dbs_t_type), INTENT(IN) :: tensor
-      REAL(KIND=real_8) :: dbs_t_checksum
+   FUNCTION block_tensor_checksum(tensor, local, pos)
+      !! checksum of a tensor consistent with block_checksum
+      TYPE(block_tensor_type), INTENT(IN) :: tensor
+      REAL(KIND=real_8) :: block_tensor_checksum
       LOGICAL, INTENT(IN), OPTIONAL     :: local, pos
-      dbs_t_checksum = dbs_tas_checksum(tensor%matrix_rep, local, pos)
+      block_tensor_checksum = block_tas_checksum(tensor%matrix_rep, local, pos)
    END FUNCTION
 
-   SUBROUTINE dbs_t_reset_randmat_seed()
+   SUBROUTINE block_tensor_reset_randmat_seed()
       !! Reset the seed used for generating random matrices to default value
       randmat_counter = rand_seed_init
    END SUBROUTINE

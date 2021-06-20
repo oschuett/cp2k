@@ -7,7 +7,7 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tas_util
+MODULE block_tas_util
 
    !! often used utilities for tall-and-skinny matrices
 
@@ -32,11 +32,11 @@ MODULE dbs_tas_util
    IMPLICIT NONE
    PRIVATE
 
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tas_util'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tas_util'
 
    PUBLIC :: &
       array_eq, &
-      dbs_mp_environ, &
+      block_mp_environ, &
       index_unique, &
       invert_transpose_flag, &
       swap
@@ -52,10 +52,10 @@ MODULE dbs_tas_util
    END INTERFACE
 
 CONTAINS
-   FUNCTION dbs_mp_environ(mp_comm)
+   FUNCTION block_mp_environ(mp_comm)
       !! Create a dbcsr mp environment from communicator
       INTEGER, INTENT(IN)                                :: mp_comm
-      TYPE(dbcsr_mp_obj)                                 :: dbs_mp_environ
+      TYPE(dbcsr_mp_obj)                                 :: block_mp_environ
 
       INTEGER                                            :: mynode, numnodes, pcol, prow
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: pgrid
@@ -73,7 +73,7 @@ CONTAINS
 
       CPASSERT(mynode == pgrid(mycoord(1), mycoord(2)))
 
-      CALL dbcsr_mp_new(dbs_mp_environ, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
+      CALL dbcsr_mp_new(block_mp_environ, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
    END FUNCTION
 
    SUBROUTINE swap_i8(arr)

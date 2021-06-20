@@ -39,11 +39,11 @@ MODULE hfx_types
                                               cp_print_key_unit_nr
    USE cp_para_types,                   ONLY: cp_para_env_type
    USE cp_units,                        ONLY: cp_unit_from_cp2k
-   USE dbs_tensor_api,                ONLY: &
-        dbs_t_batched_contract_finalize, dbs_t_default_distvec, dbs_t_destroy, &
-        dbs_t_distribution_destroy, dbs_t_distribution_new, dbs_t_distribution_type, &
-        dbs_t_mp_dims_create, dbs_t_pgrid_create, dbs_t_pgrid_destroy, dbs_t_pgrid_type, &
-        dbs_t_type
+   USE block_tensor_api,                ONLY: &
+        block_tensor_batched_contract_finalize, block_tensor_default_distvec, block_tensor_destroy, &
+        block_tensor_distribution_destroy, block_tensor_distribution_new, block_tensor_distribution_type, &
+        block_tensor_mp_dims_create, block_tensor_pgrid_create, block_tensor_pgrid_destroy, block_tensor_pgrid_type, &
+        block_tensor_type
    USE hfx_helpers,                     ONLY: count_cells_perd,&
                                               next_image_cell_perd
    USE input_constants,                 ONLY: &
@@ -387,12 +387,12 @@ MODULE hfx_types
       LOGICAL :: same_op ! whether RI operator is same as HF potential
 
       ! default process grid used for 3c tensors
-      TYPE(dbs_t_pgrid_type), POINTER :: pgrid => NULL()
-      TYPE(dbs_t_pgrid_type), POINTER :: pgrid_2d => NULL()
+      TYPE(block_tensor_pgrid_type), POINTER :: pgrid => NULL()
+      TYPE(block_tensor_pgrid_type), POINTER :: pgrid_2d => NULL()
 
       ! distributions for (RI | AO AO) 3c integral tensor (non split)
       TYPE(distribution_3d_type) :: dist_3d
-      TYPE(dbs_t_distribution_type) :: dist
+      TYPE(block_tensor_distribution_type) :: dist
 
       ! MO localization
       TYPE(qs_loc_env_new_type), POINTER                 :: qs_loc_env => NULL()
@@ -408,36 +408,36 @@ MODULE hfx_types
       INTEGER, DIMENSION(:), ALLOCATABLE :: bsizes_RI, bsizes_AO, bsizes_RI_split, bsizes_AO_split, &
                                             bsizes_RI_fit, bsizes_AO_fit
 
-      ! Note: changed static DIMENSION(1,1) of dbs_t_type to allocatables as workaround for gfortran 8.3.0,
+      ! Note: changed static DIMENSION(1,1) of block_tensor_type to allocatables as workaround for gfortran 8.3.0,
       ! with static dimension gfortran gets stuck during compilation
 
       ! 2c tensor in (RI | RI) format for contraction
-      TYPE(dbs_t_type), DIMENSION(:, :), ALLOCATABLE    :: t_2c_int
+      TYPE(block_tensor_type), DIMENSION(:, :), ALLOCATABLE    :: t_2c_int
 
       ! 3c integral tensor in default format
-      TYPE(dbs_t_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int
+      TYPE(block_tensor_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int
 
       ! 3c integral tensor in (AO RI | AO) format for contraction
-      TYPE(dbs_t_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int_ctr_1
+      TYPE(block_tensor_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int_ctr_1
       TYPE(block_ind_type), DIMENSION(:, :), ALLOCATABLE :: blk_indices
-      TYPE(dbs_t_pgrid_type), POINTER                :: pgrid_1 => NULL()
+      TYPE(block_tensor_pgrid_type), POINTER                :: pgrid_1 => NULL()
 
       ! 3c integral tensor in ( AO | RI AO) (MO) or (AO RI | AO) (RHO) format for contraction
-      TYPE(dbs_t_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int_ctr_2
-      TYPE(dbs_t_pgrid_type), POINTER                :: pgrid_2 => NULL()
+      TYPE(block_tensor_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int_ctr_2
+      TYPE(block_tensor_pgrid_type), POINTER                :: pgrid_2 => NULL()
 
       ! 3c integral tensor in ( RI | AO AO ) format for contraction
-      TYPE(dbs_t_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int_ctr_3
-      TYPE(dbs_t_pgrid_type), POINTER                :: pgrid_3 => NULL()
+      TYPE(block_tensor_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int_ctr_3
+      TYPE(block_tensor_pgrid_type), POINTER                :: pgrid_3 => NULL()
 
       ! 3c integral tensor in (RI | MO AO ) format for contraction
-      TYPE(dbs_t_type), DIMENSION(:, :, :), ALLOCATABLE :: t_3c_int_mo
-      TYPE(dbs_t_type), DIMENSION(:, :, :), ALLOCATABLE :: t_3c_ctr_RI
-      TYPE(dbs_t_type), DIMENSION(:, :, :), ALLOCATABLE :: t_3c_ctr_KS
-      TYPE(dbs_t_type), DIMENSION(:, :, :), ALLOCATABLE :: t_3c_ctr_KS_copy
+      TYPE(block_tensor_type), DIMENSION(:, :, :), ALLOCATABLE :: t_3c_int_mo
+      TYPE(block_tensor_type), DIMENSION(:, :, :), ALLOCATABLE :: t_3c_ctr_RI
+      TYPE(block_tensor_type), DIMENSION(:, :, :), ALLOCATABLE :: t_3c_ctr_KS
+      TYPE(block_tensor_type), DIMENSION(:, :, :), ALLOCATABLE :: t_3c_ctr_KS_copy
       ! 3c integral tensor in ( RI AO | AO ) format for contraction
-      !TYPE(dbs_t_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int_ctr_4
-      !TYPE(dbs_t_pgrid_type), POINTER                :: pgrid_4 => NULL()
+      !TYPE(block_tensor_type), DIMENSION(:, :), ALLOCATABLE :: t_3c_int_ctr_4
+      !TYPE(block_tensor_pgrid_type), POINTER                :: pgrid_4 => NULL()
 
       ! optional: sections for output handling
       ! alternatively set unit_nr_dbcsr (for logging tensor operations) and unit_nr (for general
@@ -1274,22 +1274,22 @@ CONTAINS
       ALLOCATE (dist_RI(natom))
       ALLOCATE (dist_AO_1(natom))
       ALLOCATE (dist_AO_2(natom))
-      CALL dbs_t_default_distvec(natom, pdims(1), ri_data%bsizes_RI, dist_RI)
-      CALL dbs_t_default_distvec(natom, pdims(2), ri_data%bsizes_AO, dist_AO_1)
-      CALL dbs_t_default_distvec(natom, pdims(3), ri_data%bsizes_AO, dist_AO_2)
+      CALL block_tensor_default_distvec(natom, pdims(1), ri_data%bsizes_RI, dist_RI)
+      CALL block_tensor_default_distvec(natom, pdims(2), ri_data%bsizes_AO, dist_AO_1)
+      CALL block_tensor_default_distvec(natom, pdims(3), ri_data%bsizes_AO, dist_AO_2)
       CALL distribution_3d_create(dist_3d, dist_RI, dist_ao_1, dist_ao_2, nkind, particle_set, &
                                   mp_comm_3d, own_comm=.TRUE.)
 
       ALLOCATE (ri_data%pgrid)
-      CALL dbs_t_pgrid_create(para_env%group, pdims, ri_data%pgrid)
+      CALL block_tensor_pgrid_create(para_env%group, pdims, ri_data%pgrid)
 
       ALLOCATE (ri_data%pgrid_2d)
       pdims_2d = 0
-      CALL dbs_t_pgrid_create(para_env%group, pdims_2d, ri_data%pgrid_2d)
+      CALL block_tensor_pgrid_create(para_env%group, pdims_2d, ri_data%pgrid_2d)
 
       ri_data%dist_3d = dist_3d
 
-      CALL dbs_t_distribution_new(ri_data%dist, ri_data%pgrid, &
+      CALL block_tensor_distribution_new(ri_data%dist, ri_data%pgrid, &
                                     dist_RI, dist_AO_1, dist_AO_2)
 
       DEALLOCATE (dist_AO_1, dist_AO_2, dist_RI)
@@ -1373,12 +1373,12 @@ CONTAINS
          MO_dim = (MO_dim - 1)/ri_data%min_bsize_MO + 1
 
          pdims = 0
-         CALL dbs_t_mp_dims_create(nproc, pdims, [SIZE(ri_data%bsizes_AO_split), SIZE(ri_data%bsizes_RI_split), MO_dim])
+         CALL block_tensor_mp_dims_create(nproc, pdims, [SIZE(ri_data%bsizes_AO_split), SIZE(ri_data%bsizes_RI_split), MO_dim])
 
-         CALL dbs_t_pgrid_create(para_env%group, pdims, ri_data%pgrid_1)
+         CALL block_tensor_pgrid_create(para_env%group, pdims, ri_data%pgrid_1)
 
          pdims = pdims([3, 2, 1])
-         CALL dbs_t_pgrid_create(para_env%group, pdims, ri_data%pgrid_2)
+         CALL block_tensor_pgrid_create(para_env%group, pdims, ri_data%pgrid_2)
 
          CALL create_3c_tensor(ri_data%t_3c_int_ctr_1(1, 1), ri_data%dist1_ao_1, ri_data%dist1_ri, ri_data%dist1_ao_2, &
                                ri_data%pgrid_1, ri_data%bsizes_AO_split, ri_data%bsizes_RI_split, ri_data%bsizes_AO_split, &
@@ -1439,28 +1439,28 @@ CONTAINS
       CALL hfx_ri_write_stats(ri_data)
 
       IF (ASSOCIATED(ri_data%pgrid)) THEN
-         CALL dbs_t_pgrid_destroy(ri_data%pgrid)
+         CALL block_tensor_pgrid_destroy(ri_data%pgrid)
          DEALLOCATE (ri_data%pgrid)
       ENDIF
       IF (ASSOCIATED(ri_data%pgrid_1)) THEN
-         CALL dbs_t_pgrid_destroy(ri_data%pgrid_1)
+         CALL block_tensor_pgrid_destroy(ri_data%pgrid_1)
          DEALLOCATE (ri_data%pgrid_1)
       ENDIF
       IF (ASSOCIATED(ri_data%pgrid_2)) THEN
-         CALL dbs_t_pgrid_destroy(ri_data%pgrid_2)
+         CALL block_tensor_pgrid_destroy(ri_data%pgrid_2)
          DEALLOCATE (ri_data%pgrid_2)
       ENDIF
       IF (ASSOCIATED(ri_data%pgrid_3)) THEN
-         CALL dbs_t_pgrid_destroy(ri_data%pgrid_3)
+         CALL block_tensor_pgrid_destroy(ri_data%pgrid_3)
          DEALLOCATE (ri_data%pgrid_3)
       ENDIF
       IF (ASSOCIATED(ri_data%pgrid_2d)) THEN
-         CALL dbs_t_pgrid_destroy(ri_data%pgrid_2d)
+         CALL block_tensor_pgrid_destroy(ri_data%pgrid_2d)
          DEALLOCATE (ri_data%pgrid_2d)
       ENDIF
 
       CALL distribution_3d_destroy(ri_data%dist_3d)
-      CALL dbs_t_distribution_destroy(ri_data%dist)
+      CALL block_tensor_distribution_destroy(ri_data%dist)
 
       DEALLOCATE (ri_data%bsizes_RI)
       DEALLOCATE (ri_data%bsizes_AO)
@@ -1475,15 +1475,15 @@ CONTAINS
             CALL dealloc_containers(ri_data%store_3c(i_mem, j_mem), unused)
          ENDDO
          ENDDO
-         CALL dbs_t_destroy(ri_data%t_3c_int_ctr_1(1, 1))
+         CALL block_tensor_destroy(ri_data%t_3c_int_ctr_1(1, 1))
          DEALLOCATE (ri_data%t_3c_int_ctr_1)
-         CALL dbs_t_destroy(ri_data%t_3c_int_ctr_2(1, 1))
+         CALL block_tensor_destroy(ri_data%t_3c_int_ctr_2(1, 1))
          DEALLOCATE (ri_data%t_3c_int_ctr_2)
          DEALLOCATE (ri_data%dist1_RI, ri_data%dist1_AO_1, ri_data%dist1_AO_2)
          DEALLOCATE (ri_data%dist3_RI, ri_data%dist3_AO_1, ri_data%dist3_AO_2)
-         CALL dbs_t_destroy(ri_data%t_3c_int_ctr_3(1, 1))
+         CALL block_tensor_destroy(ri_data%t_3c_int_ctr_3(1, 1))
          DEALLOCATE (ri_data%t_3c_int_ctr_3)
-         CALL dbs_t_destroy(ri_data%t_2c_int(1, 1))
+         CALL block_tensor_destroy(ri_data%t_2c_int(1, 1))
          DEALLOCATE (ri_data%t_2c_int)
          DEALLOCATE (ri_data%starts_array_mem_block, ri_data%ends_array_mem_block, &
                      ri_data%starts_array_mem, ri_data%ends_array_mem)
@@ -1493,20 +1493,20 @@ CONTAINS
          DEALLOCATE (ri_data%blk_indices)
          DEALLOCATE (ri_data%store_3c)
       ELSEIF (ri_data%flavor == ri_mo) THEN
-         CALL dbs_t_destroy(ri_data%t_3c_int_ctr_1(1, 1))
-         CALL dbs_t_destroy(ri_data%t_3c_int_ctr_2(1, 1))
+         CALL block_tensor_destroy(ri_data%t_3c_int_ctr_1(1, 1))
+         CALL block_tensor_destroy(ri_data%t_3c_int_ctr_2(1, 1))
          DEALLOCATE (ri_data%t_3c_int_ctr_1)
          DEALLOCATE (ri_data%t_3c_int_ctr_2)
 
          DO ispin = 1, SIZE(ri_data%t_3c_int_mo, 1)
-            CALL dbs_t_batched_contract_finalize(ri_data%t_2c_int(ispin, 1))
-            CALL dbs_t_batched_contract_finalize(ri_data%t_3c_int_mo(ispin, 1, 1))
-            CALL dbs_t_batched_contract_finalize(ri_data%t_3c_ctr_RI(ispin, 1, 1))
-            CALL dbs_t_destroy(ri_data%t_2c_int(ispin, 1))
-            CALL dbs_t_destroy(ri_data%t_3c_int_mo(ispin, 1, 1))
-            CALL dbs_t_destroy(ri_data%t_3c_ctr_RI(ispin, 1, 1))
-            CALL dbs_t_destroy(ri_data%t_3c_ctr_KS(ispin, 1, 1))
-            CALL dbs_t_destroy(ri_data%t_3c_ctr_KS_copy(ispin, 1, 1))
+            CALL block_tensor_batched_contract_finalize(ri_data%t_2c_int(ispin, 1))
+            CALL block_tensor_batched_contract_finalize(ri_data%t_3c_int_mo(ispin, 1, 1))
+            CALL block_tensor_batched_contract_finalize(ri_data%t_3c_ctr_RI(ispin, 1, 1))
+            CALL block_tensor_destroy(ri_data%t_2c_int(ispin, 1))
+            CALL block_tensor_destroy(ri_data%t_3c_int_mo(ispin, 1, 1))
+            CALL block_tensor_destroy(ri_data%t_3c_ctr_RI(ispin, 1, 1))
+            CALL block_tensor_destroy(ri_data%t_3c_ctr_KS(ispin, 1, 1))
+            CALL block_tensor_destroy(ri_data%t_3c_ctr_KS_copy(ispin, 1, 1))
          ENDDO
          DEALLOCATE (ri_data%t_2c_int)
          DEALLOCATE (ri_data%t_3c_int_mo)

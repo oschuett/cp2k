@@ -7,13 +7,13 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_allocate_wrap
+MODULE block_allocate_wrap
    !! Wrapper for allocating, copying and reshaping arrays.
    !! @todo: with fortran 2008 support, this should be replaced by plain ALLOCATE
    !! @note in particular ALLOCATE(..., SOURCE=...) does not work in gcc 5.4.0, see also
    !! https://gcc.gnu.org/bugzilla/show_bug.cgi?id=44672
 
-#:include "dbs_tensor.fypp"
+#:include "block_tensor.fypp"
 #:set maxdim = fortran_max_ndim
 
    USE kinds, ONLY: ${uselist(dtype_float_prec)}$

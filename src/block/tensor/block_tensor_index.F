@@ -7,16 +7,16 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tensor_index
+MODULE block_tensor_index
    !! tensor index and mapping to DBCSR index
-   USE dbs_allocate_wrap, ONLY: allocate_any
+   USE block_allocate_wrap, ONLY: allocate_any
    USE kinds, ONLY: int_8
 #include "../../base/base_uses.f90"
-#:include "dbs_tensor.fypp"
+#:include "block_tensor.fypp"
 
    IMPLICIT NONE
    PRIVATE
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tensor_index'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor_index'
 
    PUBLIC :: &
       combine_tensor_index, &
@@ -25,7 +25,7 @@ MODULE dbs_tensor_index
       destroy_nd_to_2d_mapping, &
       get_2d_indices_tensor, &
       get_2d_indices_pgrid, &
-      dbs_t_get_mapping_info, &
+      block_tensor_get_mapping_info, &
       get_nd_indices_tensor, &
       get_nd_indices_pgrid, &
       nd_to_2d_mapping, &
@@ -34,7 +34,7 @@ MODULE dbs_tensor_index
       split_pgrid_index, &
       ndims_mapping_row, &
       ndims_mapping_column, &
-      dbs_t_inverse_order, &
+      block_tensor_inverse_order, &
       permute_index
 
    TYPE nd_to_2d_mapping
@@ -135,8 +135,9 @@ CONTAINS
       ndims_mapping_column = map%ndim2_2d
    END FUNCTION
 
-   PURE SUBROUTINE dbs_t_get_mapping_info(map, ndim_nd, ndim1_2d, ndim2_2d, dims_2d_i8, dims_2d, dims_nd, dims1_2d, dims2_2d, &
-                                            map1_2d, map2_2d, map_nd, base, col_major)
+   PURE SUBROUTINE block_tensor_get_mapping_info(map, ndim_nd, ndim1_2d, ndim2_2d, dims_2d_i8,&
+                                                 dims_2d, dims_nd, dims1_2d, dims2_2d, &
+                                                 map1_2d, map2_2d, map_nd, base, col_major)
       !! get mapping info
 
       TYPE(nd_to_2d_mapping), INTENT(IN)                 :: map
@@ -201,7 +202,7 @@ CONTAINS
          col_major = map%col_major
       ENDIF
 
-   END SUBROUTINE dbs_t_get_mapping_info
+   END SUBROUTINE block_tensor_get_mapping_info
 
    PURE FUNCTION combine_tensor_index(ind_in, dims) RESULT(ind_out)
       !! transform nd index to flat index
@@ -364,14 +365,14 @@ CONTAINS
 
    END FUNCTION
 
-   PURE FUNCTION dbs_t_inverse_order(order)
+   PURE FUNCTION block_tensor_inverse_order(order)
       !! Invert order
       INTEGER, DIMENSION(:), INTENT(IN)                  :: order
-      INTEGER, DIMENSION(SIZE(order))                    :: dbs_t_inverse_order
+      INTEGER, DIMENSION(SIZE(order))                    :: block_tensor_inverse_order
 
       INTEGER                                            :: i
 
-      dbs_t_inverse_order(order) = (/(i, i=1, SIZE(order))/)
+      block_tensor_inverse_order(order) = (/(i, i=1, SIZE(order))/)
    END FUNCTION
 
    SUBROUTINE permute_index(map_in, map_out, order)
@@ -386,7 +387,7 @@ CONTAINS
       INTEGER, DIMENSION(ndims_mapping_column(map_in))    :: map2_2d, map2_2d_reorder
       INTEGER, DIMENSION(ndims_mapping(map_in))          :: dims_nd, dims_reorder
 
-      CALL dbs_t_get_mapping_info(map_in, ndim_nd, dims_nd=dims_nd, map1_2d=map1_2d, map2_2d=map2_2d)
+      CALL block_tensor_get_mapping_info(map_in, ndim_nd, dims_nd=dims_nd, map1_2d=map1_2d, map2_2d=map2_2d)
 
       dims_reorder(order) = dims_nd
 
@@ -395,4 +396,4 @@ CONTAINS
 
       CALL create_nd_to_2d_mapping(map_out, dims_reorder, map1_2d_reorder, map2_2d_reorder)
    END SUBROUTINE
-END MODULE dbs_tensor_index
+END MODULE block_tensor_index

@@ -7,72 +7,72 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tensor_split
+MODULE block_tensor_split
 
    !! Routines to split blocks and to convert between tensors with different block sizes.
-#:include "dbs_tensor.fypp"
+#:include "block_tensor.fypp"
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
-   USE dbs_allocate_wrap, ONLY: allocate_any
-   USE dbs_array_list_methods, ONLY: get_ith_array
-   USE dbs_tensor_block, ONLY: dbs_t_iterator_type, &
-                                 dbs_t_get_block, &
-                                 dbs_t_put_block, &
-                                 dbs_t_iterator_start, &
-                                 dbs_t_iterator_blocks_left, &
-                                 dbs_t_iterator_stop, &
-                                 dbs_t_iterator_next_block, &
-                                 dbs_t_reserve_blocks, &
-                                 dbs_t_reserved_block_indices
-   USE dbs_tensor_index, ONLY: dbs_t_get_mapping_info, &
-                                 dbs_t_inverse_order
-   USE dbs_tensor_types, ONLY: dbs_t_create, &
-                                 dbs_t_get_data_type, &
-                                 dbs_t_type, &
+   USE block_allocate_wrap, ONLY: allocate_any
+   USE block_array_list_methods, ONLY: get_ith_array
+   USE block_tensor_block, ONLY: block_tensor_iterator_type, &
+                                 block_tensor_get_block, &
+                                 block_tensor_put_block, &
+                                 block_tensor_iterator_start, &
+                                 block_tensor_iterator_blocks_left, &
+                                 block_tensor_iterator_stop, &
+                                 block_tensor_iterator_next_block, &
+                                 block_tensor_reserve_blocks, &
+                                 block_tensor_reserved_block_indices
+   USE block_tensor_index, ONLY: block_tensor_get_mapping_info, &
+                                 block_tensor_inverse_order
+   USE block_tensor_types, ONLY: block_tensor_create, &
+                                 block_tensor_get_data_type, &
+                                 block_tensor_type, &
                                  ndims_tensor, &
-                                 dbs_t_distribution_type, &
-                                 dbs_t_distribution, &
-                                 dbs_t_distribution_destroy, &
-                                 dbs_t_distribution_new_expert, &
-                                 dbs_t_clear, &
-                                 dbs_t_finalize, &
-                                 dbs_t_get_num_blocks, &
-                                 dbs_t_blk_offsets, &
-                                 dbs_t_blk_sizes, &
+                                 block_tensor_distribution_type, &
+                                 block_tensor_distribution, &
+                                 block_tensor_distribution_destroy, &
+                                 block_tensor_distribution_new_expert, &
+                                 block_tensor_clear, &
+                                 block_tensor_finalize, &
+                                 block_tensor_get_num_blocks, &
+                                 block_tensor_blk_offsets, &
+                                 block_tensor_blk_sizes, &
                                  ndims_matrix_row, &
                                  ndims_matrix_column, &
-                                 dbs_t_filter, &
-                                 dbs_t_copy_contraction_storage
+                                 block_tensor_filter, &
+                                 block_tensor_copy_contraction_storage
    USE dbcsr_api, ONLY: ${uselist(dtype_float_param)}$
    USE kinds, ONLY: ${uselist(dtype_float_prec)}$, dp
 
 #include "../../base/base_uses.f90"
    IMPLICIT NONE
    PRIVATE
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tensor_split'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor_split'
    PUBLIC :: &
-      dbs_t_make_compatible_blocks, &
-      dbs_t_split_blocks, &
-      dbs_t_split_blocks_generic, &
-      dbs_t_split_copyback, &
-      dbs_t_crop
+      block_tensor_make_compatible_blocks, &
+      block_tensor_split_blocks, &
+      block_tensor_split_blocks_generic, &
+      block_tensor_split_copyback, &
+      block_tensor_crop
 
 CONTAINS
 
-   SUBROUTINE dbs_t_split_blocks_generic(tensor_in, tensor_out, ${varlist("blk_size")}$, nodata)
+   SUBROUTINE block_tensor_split_blocks_generic(tensor_in, tensor_out, ${varlist("blk_size")}$, nodata)
       !! Split tensor blocks into smaller blocks
-      TYPE(dbs_t_type), INTENT(INOUT)               :: tensor_in
+      TYPE(block_tensor_type), INTENT(INOUT)               :: tensor_in
          !! Input tensor
-      TYPE(dbs_t_type), INTENT(OUT)                 :: tensor_out
+      TYPE(block_tensor_type), INTENT(OUT)                 :: tensor_out
          !! Output tensor (splitted blocks)
       INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL     :: ${varlist("blk_size")}$
          !! block sizes for each of the tensor dimensions
       LOGICAL, INTENT(IN), OPTIONAL                   :: nodata
          !! don't copy data from tensor_in to tensor_out
 
-      TYPE(dbs_t_distribution_type)                 :: dist_old, dist_split
-      TYPE(dbs_t_iterator_type)                     :: iter
+      TYPE(block_tensor_distribution_type)                 :: dist_old, dist_split
+      TYPE(block_tensor_iterator_type)                     :: iter
       INTEGER, DIMENSION(:), ALLOCATABLE              :: ${varlist("nd_dist_split")}$
       INTEGER, DIMENSION(:), ALLOCATABLE              :: ${varlist("nd_blk_size_split")}$
       INTEGER, DIMENSION(:), ALLOCATABLE              :: ${varlist("index_split_offset")}$
@@ -94,11 +94,11 @@ CONTAINS
       ${dtype}$, DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${dsuffix}$_${ndim}$d
 #:endfor
 #:endfor
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_split_blocks_generic'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_split_blocks_generic'
 
       CALL timeset(routineN, handle)
 
-      dist_old = dbs_t_distribution(tensor_in)
+      dist_old = block_tensor_distribution(tensor_in)
 
       DO idim = 1, ndims_tensor(tensor_in)
          CALL get_ith_array(dist_old%nd_dist, idim, dist_d)
@@ -152,18 +152,18 @@ CONTAINS
 
       ENDDO
 
-      CALL dbs_t_get_mapping_info(tensor_in%nd_index_blk, map1_2d=map1_2d, map2_2d=map2_2d)
+      CALL block_tensor_get_mapping_info(tensor_in%nd_index_blk, map1_2d=map1_2d, map2_2d=map2_2d)
 
 #:for ndim in ndims
       IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
-         CALL dbs_t_distribution_new_expert(dist_split, tensor_in%pgrid, map1_2d, map2_2d, &
+         CALL block_tensor_distribution_new_expert(dist_split, tensor_in%pgrid, map1_2d, map2_2d, &
                                               ${varlist("nd_dist_split", nmax=ndim)}$)
-         CALL dbs_t_create(tensor_out, tensor_in%name, dist_split, map1_2d, map2_2d, &
-                             dbs_t_get_data_type(tensor_in), ${varlist("nd_blk_size_split", nmax=ndim)}$)
+         CALL block_tensor_create(tensor_out, tensor_in%name, dist_split, map1_2d, map2_2d, &
+                             block_tensor_get_data_type(tensor_in), ${varlist("nd_blk_size_split", nmax=ndim)}$)
       ENDIF
 #:endfor
 
-      CALL dbs_t_distribution_destroy(dist_split)
+      CALL block_tensor_distribution_destroy(dist_split)
 
       IF (PRESENT(nodata)) THEN
          IF (nodata) THEN
@@ -172,11 +172,11 @@ CONTAINS
          ENDIF
       ENDIF
 
-      CALL dbs_t_iterator_start(iter, tensor_in)
+      CALL block_tensor_iterator_start(iter, tensor_in)
 
       bcount = 0
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, blk_index, blk, blk_size=blk_size)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size)
 #:for ndim in ndims
          IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
 #:for idim in range(1,ndim+1)
@@ -189,15 +189,15 @@ CONTAINS
          ENDIF
 #:endfor
       ENDDO
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
       ALLOCATE (blks_to_allocate(bcount, ndims_tensor(tensor_in)))
 
-      CALL dbs_t_iterator_start(iter, tensor_in)
+      CALL block_tensor_iterator_start(iter, tensor_in)
 
       bcount = 0
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
 
 #:for ndim in ndims
          IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
@@ -214,19 +214,19 @@ CONTAINS
 #:endfor
       ENDDO
 
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
-      CALL dbs_t_reserve_blocks(tensor_out, blks_to_allocate)
+      CALL block_tensor_reserve_blocks(tensor_out, blks_to_allocate)
 
-      CALL dbs_t_iterator_start(iter, tensor_in)
+      CALL block_tensor_iterator_start(iter, tensor_in)
 
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
 #:for dparam, dtype, dsuffix in dtype_float_list
-         IF (dbs_t_get_data_type(tensor_in) == ${dparam}$) THEN
+         IF (block_tensor_get_data_type(tensor_in) == ${dparam}$) THEN
 #:for ndim in ndims
             IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
-               CALL dbs_t_get_block(tensor_in, blk_index, block_${dsuffix}$_${ndim}$d, found)
+               CALL block_tensor_get_block(tensor_in, blk_index, block_${dsuffix}$_${ndim}$d, found)
                CPASSERT(found)
             ENDIF
 #:endfor
@@ -243,12 +243,12 @@ CONTAINS
 
 #:for dparam, dtype, dsuffix in dtype_float_list
 
-               IF (dbs_t_get_data_type(tensor_in) == ${dparam}$) THEN
+               IF (block_tensor_get_data_type(tensor_in) == ${dparam}$) THEN
 
 #:for idim in range(1,ndim+1)
                   inblock_offset(${idim}$) = inblock_offset_${idim}$ (bi_split(${idim}$))
 #:endfor
-                  CALL dbs_t_put_block(tensor_out, bi_split(1:${ndim}$), &
+                  CALL block_tensor_put_block(tensor_out, bi_split(1:${ndim}$), &
                                          blk_shape, &
                                          block_${dsuffix}$_${ndim}$d( &
                                          ${", ".join(["inblock_offset("+str(idim)+") + 1:inblock_offset("+str(idim)+") + blk_shape("+str(idim)+")" for idim in range(1, ndim+1)])}$))
@@ -261,30 +261,30 @@ CONTAINS
 #:endfor
 
 #:for dparam, dtype, dsuffix in dtype_float_list
-            IF (dbs_t_get_data_type(tensor_in) == ${dparam}$) THEN
+            IF (block_tensor_get_data_type(tensor_in) == ${dparam}$) THEN
                DEALLOCATE (block_${dsuffix}$_${ndim}$d)
             ENDIF
 #:endfor
          ENDIF
 #:endfor
       ENDDO
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
-      CALL dbs_t_finalize(tensor_out)
+      CALL block_tensor_finalize(tensor_out)
 
       ! remove blocks that are exactly 0, these can occur if a cropping operation was performed before splitting
-      CALL dbs_t_filter(tensor_out, TINY(0.0_dp))
+      CALL block_tensor_filter(tensor_out, TINY(0.0_dp))
 
       CALL timestop(handle)
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_split_blocks(tensor_in, tensor_out, block_sizes, nodata)
+   SUBROUTINE block_tensor_split_blocks(tensor_in, tensor_out, block_sizes, nodata)
       !! Split tensor blocks into smaller blocks of maximum size PRODUCT(block_sizes).
 
-      TYPE(dbs_t_type), INTENT(INOUT)               :: tensor_in
+      TYPE(block_tensor_type), INTENT(INOUT)               :: tensor_in
          !! Input tensor
-      TYPE(dbs_t_type), INTENT(OUT)                 :: tensor_out
+      TYPE(block_tensor_type), INTENT(OUT)                 :: tensor_out
          !! Output tensor (split blocks)
       INTEGER, DIMENSION(ndims_tensor(tensor_in)), &
          INTENT(IN)                                   :: block_sizes
@@ -328,19 +328,19 @@ CONTAINS
       ENDDO
 
 #:for ndim in ndims
-      IF (ndims_tensor(tensor_in) == ${ndim}$) CALL dbs_t_split_blocks_generic(tensor_in, tensor_out, &
+      IF (ndims_tensor(tensor_in) == ${ndim}$) CALL block_tensor_split_blocks_generic(tensor_in, tensor_out, &
                                                                                  ${varlist("nd_blk_size_split", nmax=ndim)}$, &
                                                                                  nodata=nodata)
 #:endfor
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_split_copyback(tensor_split_in, tensor_out, summation)
+   SUBROUTINE block_tensor_split_copyback(tensor_split_in, tensor_out, summation)
       !! Copy tensor with split blocks to tensor with original block sizes.
 
-      TYPE(dbs_t_type), INTENT(INOUT)               :: tensor_split_in
+      TYPE(block_tensor_type), INTENT(INOUT)               :: tensor_split_in
          !! tensor with smaller blocks
-      TYPE(dbs_t_type), INTENT(INOUT)               :: tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT)               :: tensor_out
          !! original tensor
       LOGICAL, INTENT(IN), OPTIONAL                   :: summation
       INTEGER, DIMENSION(:), ALLOCATABLE              :: first_split_d, last_split_d
@@ -352,13 +352,13 @@ CONTAINS
       INTEGER, DIMENSION(:, :), ALLOCATABLE            :: blks_to_allocate
       INTEGER                                         :: idim, iblk, blk, bcount
       INTEGER                                         :: ${varlist("iblk")}$, isplit_sum, splitsum, nblk
-      TYPE(dbs_t_iterator_type)                     :: iter
+      TYPE(block_tensor_iterator_type)                     :: iter
       INTEGER, DIMENSION(ndims_tensor(tensor_out)) :: blk_index, blk_size, blk_offset, blk_shape, blk_index_n
       LOGICAL                                         :: found
 
       INTEGER, DIMENSION(${maxdim}$)                  :: inblock_offset
       INTEGER                                            :: handle
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_split_copyback'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_split_copyback'
 #:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
       ${dtype}$, DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${dsuffix}$_${ndim}$d
@@ -369,9 +369,9 @@ CONTAINS
       CALL timeset(routineN, handle)
       CPASSERT(tensor_out%valid)
       IF (PRESENT(summation)) THEN
-         IF (.NOT. summation) CALL dbs_t_clear(tensor_out)
+         IF (.NOT. summation) CALL block_tensor_clear(tensor_out)
       ELSE
-         CALL dbs_t_clear(tensor_out)
+         CALL block_tensor_clear(tensor_out)
       ENDIF
 
       DO idim = 1, ndims_tensor(tensor_split_in)
@@ -418,12 +418,12 @@ CONTAINS
          DEALLOCATE (blk_size_split_d, blk_size_d)
       ENDDO
 
-      nblk = dbs_t_get_num_blocks(tensor_split_in)
+      nblk = block_tensor_get_num_blocks(tensor_split_in)
       ALLOCATE (blks_to_allocate(nblk, ndims_tensor(tensor_split_in)))
-      CALL dbs_t_iterator_start(iter, tensor_split_in)
+      CALL block_tensor_iterator_start(iter, tensor_split_in)
       bcount = 0
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, blk_index, blk, blk_size=blk_size)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size)
 #:for ndim in ndims
          IF (ndims_tensor(tensor_out) == ${ndim}$) THEN
 #:for idim in range(1,ndim+1)
@@ -434,14 +434,14 @@ CONTAINS
          blks_to_allocate(bcount + 1, :) = blk_index_n
          bcount = bcount + 1
       ENDDO
-      CALL dbs_t_iterator_stop(iter)
-      CALL dbs_t_reserve_blocks(tensor_out, blks_to_allocate)
+      CALL block_tensor_iterator_stop(iter)
+      CALL block_tensor_reserve_blocks(tensor_out, blks_to_allocate)
 
-      CALL dbs_t_iterator_start(iter, tensor_out)
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+      CALL block_tensor_iterator_start(iter, tensor_out)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
 #:for dprec, dparam, dtype, dsuffix in dtype_float_list_prec
-         IF (dbs_t_get_data_type(tensor_out) == ${dparam}$) THEN
+         IF (block_tensor_get_data_type(tensor_out) == ${dparam}$) THEN
 
 #:for ndim in ndims
             IF (ndims_tensor(tensor_out) == ${ndim}$) THEN
@@ -454,7 +454,7 @@ CONTAINS
                   inblock_offset(${idim}$) = inblock_offset_${idim}$ (iblk_${idim}$)
 #:endfor
 
-                  CALL dbs_t_get_block(tensor_split_in, [${", ".join(["iblk_"+str(idim) for idim in range(1, ndim+1)])}$], &
+                  CALL block_tensor_get_block(tensor_split_in, [${", ".join(["iblk_"+str(idim) for idim in range(1, ndim+1)])}$], &
                                          block_split_${dsuffix}$_${ndim}$d, found)
                   IF (found) THEN
                      blk_shape(1:${ndim}$) = SHAPE(block_split_${dsuffix}$_${ndim}$d)
@@ -466,28 +466,29 @@ CONTAINS
 #:for idim in range(1,ndim+1)
                ENDDO
 #:endfor
-               CALL dbs_t_put_block(tensor_out, blk_index, blk_size, block_${dsuffix}$_${ndim}$d, summation=summation)
+               CALL block_tensor_put_block(tensor_out, blk_index, blk_size, block_${dsuffix}$_${ndim}$d, summation=summation)
                DEALLOCATE (block_${dsuffix}$_${ndim}$d)
             ENDIF
 #:endfor
          ENDIF
 #:endfor
       ENDDO
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
       CALL timestop(handle)
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_make_compatible_blocks(tensor1, tensor2, tensor1_split, tensor2_split, order, nodata1, nodata2, move_data)
+   SUBROUTINE block_tensor_make_compatible_blocks(tensor1, tensor2, tensor1_split, tensor2_split, &
+                                                  order, nodata1, nodata2, move_data)
       !! split two tensors with same total sizes but different block sizes such that they have equal
       !! block sizes
       !! \move_data memory optimization: transfer data s.t. tensor1 and tensor2 may be empty on return
 
-      TYPE(dbs_t_type), INTENT(INOUT) :: tensor1, tensor2
+      TYPE(block_tensor_type), INTENT(INOUT) :: tensor1, tensor2
          !! tensor 1 in
          !! tensor 2 in
-      TYPE(dbs_t_type), INTENT(OUT)   :: tensor1_split, tensor2_split
+      TYPE(block_tensor_type), INTENT(OUT)   :: tensor1_split, tensor2_split
          !! tensor 1 with split blocks
          !! tensor 2 with split blocks
       INTEGER, DIMENSION(ndims_tensor(tensor1)), &
@@ -520,7 +521,7 @@ CONTAINS
       ENDIF
 
       IF (PRESENT(order)) THEN
-         order_prv(:) = dbs_t_inverse_order(order)
+         order_prv(:) = block_tensor_inverse_order(order)
       ELSE
          order_prv(:) = (/(i, i=1, ndims_tensor(tensor1))/)
       ENDIF
@@ -594,22 +595,22 @@ CONTAINS
 
 #:for ndim in ndims
       IF (ndims_tensor(tensor1) == ${ndim}$) THEN
-         CALL dbs_t_split_blocks_generic(tensor1, tensor1_split, ${varlist("blk_size_split_1", nmax=ndim)}$, nodata=nodata1)
-         IF (move_prv .AND. .NOT. nodata1_prv) CALL dbs_t_clear(tensor1)
-         CALL dbs_t_split_blocks_generic(tensor2, tensor2_split, ${varlist("blk_size_split_2", nmax=ndim)}$, nodata=nodata2)
-         IF (move_prv .AND. .NOT. nodata2_prv) CALL dbs_t_clear(tensor2)
+         CALL block_tensor_split_blocks_generic(tensor1, tensor1_split, ${varlist("blk_size_split_1", nmax=ndim)}$, nodata=nodata1)
+         IF (move_prv .AND. .NOT. nodata1_prv) CALL block_tensor_clear(tensor1)
+         CALL block_tensor_split_blocks_generic(tensor2, tensor2_split, ${varlist("blk_size_split_2", nmax=ndim)}$, nodata=nodata2)
+         IF (move_prv .AND. .NOT. nodata2_prv) CALL block_tensor_clear(tensor2)
       ENDIF
 #:endfor
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_crop(tensor_in, tensor_out, bounds, move_data)
-      TYPE(dbs_t_type), INTENT(INOUT) :: tensor_in
-      TYPE(dbs_t_type), INTENT(OUT) :: tensor_out
+   SUBROUTINE block_tensor_crop(tensor_in, tensor_out, bounds, move_data)
+      TYPE(block_tensor_type), INTENT(INOUT) :: tensor_in
+      TYPE(block_tensor_type), INTENT(OUT) :: tensor_out
       INTEGER, DIMENSION(2, ndims_tensor(tensor_in)), INTENT(IN) :: bounds
       LOGICAL, INTENT(IN), OPTIONAL :: move_data
       INTEGER, DIMENSION(2, ndims_tensor(tensor_in)) :: blk_bounds
-      TYPE(dbs_t_iterator_type)                     :: iter
+      TYPE(block_tensor_iterator_type)                     :: iter
       INTEGER, DIMENSION(ndims_tensor(tensor_in)) :: blk_index, blk_size, blk_offset
       LOGICAL :: found, move_data_prv
       INTEGER :: idim, blk, iblk, iblk_all, nblk
@@ -626,18 +627,18 @@ CONTAINS
          move_data_prv = .FALSE.
       ENDIF
 
-      CALL dbs_t_create(tensor_in, tensor_out)
+      CALL block_tensor_create(tensor_in, tensor_out)
 
       ! reserve blocks inside bounds
-      ALLOCATE (blk_ind(dbs_t_get_num_blocks(tensor_in), ndims_tensor(tensor_in)))
-      CALL dbs_t_reserved_block_indices(tensor_in, blk_ind)
-      nblk = dbs_t_get_num_blocks(tensor_in)
-      ALLOCATE (blk_ind_tmp(dbs_t_get_num_blocks(tensor_in), ndims_tensor(tensor_in)))
+      ALLOCATE (blk_ind(block_tensor_get_num_blocks(tensor_in), ndims_tensor(tensor_in)))
+      CALL block_tensor_reserved_block_indices(tensor_in, blk_ind)
+      nblk = block_tensor_get_num_blocks(tensor_in)
+      ALLOCATE (blk_ind_tmp(block_tensor_get_num_blocks(tensor_in), ndims_tensor(tensor_in)))
       blk_ind_tmp(:, :) = 0
       iblk = 0
       blk_loop: DO iblk_all = 1, nblk
-         CALL dbs_t_blk_offsets(tensor_in, blk_ind(iblk_all, :), blk_offset)
-         CALL dbs_t_blk_sizes(tensor_in, blk_ind(iblk_all, :), blk_size)
+         CALL block_tensor_blk_offsets(tensor_in, blk_ind(iblk_all, :), blk_offset)
+         CALL block_tensor_blk_sizes(tensor_in, blk_ind(iblk_all, :), blk_size)
          DO idim = 1, ndims_tensor(tensor_in)
             IF (bounds(1, idim) > blk_offset(idim) - 1 + blk_size(idim)) CYCLE blk_loop
             IF (bounds(2, idim) < blk_offset(idim)) CYCLE blk_loop
@@ -650,12 +651,12 @@ CONTAINS
       ALLOCATE (blk_ind(iblk, ndims_tensor(tensor_in)))
       blk_ind(:, :) = blk_ind_tmp(:iblk, :)
 
-      CALL dbs_t_reserve_blocks(tensor_out, blk_ind)
+      CALL block_tensor_reserve_blocks(tensor_out, blk_ind)
 
       ! copy blocks
-      CALL dbs_t_iterator_start(iter, tensor_out)
-      iter_loop: DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+      CALL block_tensor_iterator_start(iter, tensor_out)
+      iter_loop: DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
 
          DO idim = 1, ndims_tensor(tensor_in)
             blk_bounds(1, idim) = MAX(bounds(1, idim) - blk_offset(idim) + 1, 1)
@@ -663,16 +664,16 @@ CONTAINS
          ENDDO
 
 #:for dprec, dparam, dtype, dsuffix in dtype_float_list_prec
-         IF (dbs_t_get_data_type(tensor_in) == ${dparam}$) THEN
+         IF (block_tensor_get_data_type(tensor_in) == ${dparam}$) THEN
 #:for ndim in ndims
             IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
-               CALL dbs_t_get_block(tensor_in, blk_index, block_${dsuffix}$_${ndim}$d, found)
+               CALL block_tensor_get_block(tensor_in, blk_index, block_${dsuffix}$_${ndim}$d, found)
 
                CALL allocate_any(block_put_${dsuffix}$_${ndim}$d, blk_size)
                block_put_${dsuffix}$_${ndim}$d = 0.0_${dprec}$
                block_put_${dsuffix}$_${ndim}$d(${", ".join(["blk_bounds(1, "+str(idim)+"):blk_bounds(2,"+str(idim)+")" for idim in range(1, ndim+1)])}$) = &
                   block_${dsuffix}$_${ndim}$d(${", ".join(["blk_bounds(1, "+str(idim)+"):blk_bounds(2,"+str(idim)+")" for idim in range(1, ndim+1)])}$)
-               CALL dbs_t_put_block(tensor_out, blk_index, blk_size, block_put_${dsuffix}$_${ndim}$d)
+               CALL block_tensor_put_block(tensor_out, blk_index, blk_size, block_put_${dsuffix}$_${ndim}$d)
                DEALLOCATE (block_${dsuffix}$_${ndim}$d)
                DEALLOCATE (block_put_${dsuffix}$_${ndim}$d)
             ENDIF
@@ -680,13 +681,13 @@ CONTAINS
          ENDIF
 #:endfor
       ENDDO iter_loop
-      CALL dbs_t_iterator_stop(iter)
-      CALL dbs_t_finalize(tensor_out)
+      CALL block_tensor_iterator_stop(iter)
+      CALL block_tensor_finalize(tensor_out)
 
-      IF (move_data_prv) CALL dbs_t_clear(tensor_in)
+      IF (move_data_prv) CALL block_tensor_clear(tensor_in)
 
       ! transfer data for batched contraction
-      CALL dbs_t_copy_contraction_storage(tensor_in, tensor_out)
+      CALL block_tensor_copy_contraction_storage(tensor_in, tensor_out)
 
    END SUBROUTINE
 

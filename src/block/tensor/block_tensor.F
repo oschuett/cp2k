@@ -7,20 +7,20 @@
 ! SPDX-License-Identifier: GPL-2.0+                                                                !
 !--------------------------------------------------------------------------------------------------!
 
-MODULE dbs_tensor
+MODULE block_tensor
    !! DBCSR tensor framework for block-sparse tensor contraction.
    !! Representation of n-rank tensors as DBCSR tall-and-skinny matrices.
    !! Support for arbitrary redistribution between different representations.
    !! Support for arbitrary tensor contractions
    !! \todo implement checks and error messages
 
-#:include "dbs_tensor.fypp"
+#:include "block_tensor.fypp"
 #:set maxdim = maxrank
 #:set ndims = range(2,maxdim+1)
 
-   USE dbs_allocate_wrap, ONLY: &
+   USE block_allocate_wrap, ONLY: &
       allocate_any
-   USE dbs_array_list_methods, ONLY: &
+   USE block_array_list_methods, ONLY: &
       get_arrays, reorder_arrays, get_ith_array, array_list, array_sublist, check_equal, array_eq_i, &
       create_array_list, destroy_array_list, sizes_of_arrays
    USE dbcsr_api, ONLY: &
@@ -29,46 +29,46 @@ MODULE dbs_tensor
       dbcsr_transpose, dbcsr_no_transpose, dbcsr_scalar, dbcsr_put_block, &
       ${uselist(dtype_float_param)}$, dbcsr_clear, &
       dbcsr_release, dbcsr_desymmetrize, dbcsr_has_symmetry
-   USE dbs_tas_types, ONLY: &
-      dbs_tas_split_info
-   USE dbs_tas_base, ONLY: &
-      dbs_tas_copy, dbs_tas_finalize, dbs_tas_get_data_type, dbs_tas_get_info, dbs_tas_info
-   USE dbs_tas_mm, ONLY: &
-      dbs_tas_multiply, dbs_tas_batched_mm_init, dbs_tas_batched_mm_finalize, dbs_tas_result_index, &
-      dbs_tas_batched_mm_complete, dbs_tas_set_batched_state
-   USE dbs_tensor_block, ONLY: &
-      dbs_t_iterator_type, dbs_t_get_block, dbs_t_put_block, dbs_t_iterator_start, &
-      dbs_t_iterator_blocks_left, dbs_t_iterator_stop, dbs_t_iterator_next_block, &
-      ndims_iterator, dbs_t_reserve_blocks, block_nd, destroy_block
-   USE dbs_tensor_index, ONLY: &
-      dbs_t_get_mapping_info, nd_to_2d_mapping, dbs_t_inverse_order, permute_index, get_nd_indices_tensor, &
+   USE block_tas_types, ONLY: &
+      block_tas_split_info
+   USE block_tas_base, ONLY: &
+      block_tas_copy, block_tas_finalize, block_tas_get_data_type, block_tas_get_info, block_tas_info
+   USE block_tas_mm, ONLY: &
+      block_tas_multiply, block_tas_batched_mm_init, block_tas_batched_mm_finalize, block_tas_result_index, &
+      block_tas_batched_mm_complete, block_tas_set_batched_state
+   USE block_tensor_block, ONLY: &
+      block_tensor_iterator_type, block_tensor_get_block, block_tensor_put_block, block_tensor_iterator_start, &
+      block_tensor_iterator_blocks_left, block_tensor_iterator_stop, block_tensor_iterator_next_block, &
+      ndims_iterator, block_tensor_reserve_blocks, block_nd, destroy_block
+   USE block_tensor_index, ONLY: &
+      block_tensor_get_mapping_info, nd_to_2d_mapping, block_tensor_inverse_order, permute_index, get_nd_indices_tensor, &
       ndims_mapping_row, ndims_mapping_column, ndims_mapping
-   USE dbs_tensor_types, ONLY: &
-      dbs_t_create, dbs_t_get_data_type, dbs_t_type, ndims_tensor, dims_tensor, &
-      dbs_t_distribution_type, dbs_t_distribution, dbs_t_nd_mp_comm, dbs_t_destroy, &
-      dbs_t_distribution_destroy, dbs_t_distribution_new_expert, dbs_t_get_stored_coordinates, &
-      blk_dims_tensor, dbs_t_hold, dbs_t_pgrid_type, mp_environ_pgrid, dbs_t_filter, &
-      dbs_t_clear, dbs_t_finalize, dbs_t_get_num_blocks, dbs_t_scale, &
-      dbs_t_get_num_blocks_total, dbs_t_get_info, ndims_matrix_row, ndims_matrix_column, &
-      dbs_t_max_nblks_local, dbs_t_default_distvec, dbs_t_contraction_storage, dbs_t_nblks_total, &
-      dbs_t_distribution_new, dbs_t_copy_contraction_storage, dbs_t_pgrid_destroy
+   USE block_tensor_types, ONLY: &
+      block_tensor_create, block_tensor_get_data_type, block_tensor_type, ndims_tensor, dims_tensor, &
+      block_tensor_distribution_type, block_tensor_distribution, block_tensor_nd_mp_comm, block_tensor_destroy, &
+      block_tensor_distribution_destroy, block_tensor_distribution_new_expert, block_tensor_get_stored_coordinates, &
+      blk_dims_tensor, block_tensor_hold, block_tensor_pgrid_type, mp_environ_pgrid, block_tensor_filter, &
+      block_tensor_clear, block_tensor_finalize, block_tensor_get_num_blocks, block_tensor_scale, &
+      block_tensor_get_num_blocks_total, block_tensor_get_info, ndims_matrix_row, ndims_matrix_column, &
+      block_tensor_max_nblks_local, block_tensor_default_distvec, block_tensor_contraction_storage, block_tensor_nblks_total, &
+      block_tensor_distribution_new, block_tensor_copy_contraction_storage, block_tensor_pgrid_destroy
    USE kinds, ONLY: &
       ${uselist(dtype_float_prec)}$, default_string_length, int_8, dp
    USE message_passing, ONLY: &
       mp_environ, mp_max, mp_sum, mp_comm_free, mp_cart_create, mp_sync
    USE util, ONLY: &
       sort
-   USE dbs_tensor_reshape, ONLY: &
-      dbs_t_reshape
-   USE dbs_tas_split, ONLY: &
-      dbs_tas_mp_comm, rowsplit, colsplit, dbs_tas_info_hold, dbs_tas_release_info, default_nsplit_accept_ratio, &
-      default_pdims_accept_ratio, dbs_tas_create_split
+   USE block_tensor_transform, ONLY: &
+      block_tensor_reshape
+   USE block_tas_split, ONLY: &
+      block_tas_mp_comm, rowsplit, colsplit, block_tas_info_hold, block_tas_release_info, default_nsplit_accept_ratio, &
+      default_pdims_accept_ratio, block_tas_create_split
    USE dbcsr_data_types, ONLY: &
       dbcsr_scalar_type
-   USE dbs_tensor_split, ONLY: &
-      dbs_t_split_copyback, dbs_t_make_compatible_blocks, dbs_t_crop
-   USE dbs_tensor_io, ONLY: &
-      dbs_t_write_tensor_info, dbs_t_write_tensor_dist, prep_output_unit, dbs_t_write_split_info
+   USE block_tensor_split, ONLY: &
+      block_tensor_split_copyback, block_tensor_make_compatible_blocks, block_tensor_crop
+   USE block_tensor_io, ONLY: &
+      block_tensor_write_tensor_info, block_tensor_write_tensor_dist, prep_output_unit, block_tensor_write_split_info
    USE dbcsr_dist_operations, ONLY: &
       checker_tr
    USE dbcsr_toollib, ONLY: &
@@ -78,30 +78,30 @@ MODULE dbs_tensor
 
    IMPLICIT NONE
    PRIVATE
-   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'dbs_tensor'
+   CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor'
 
    PUBLIC :: &
-      dbs_t_contract, &
-      dbs_t_copy, &
-      dbs_t_get_block, &
-      dbs_t_get_stored_coordinates, &
-      dbs_t_inverse_order, &
-      dbs_t_iterator_blocks_left, &
-      dbs_t_iterator_next_block, &
-      dbs_t_iterator_start, &
-      dbs_t_iterator_stop, &
-      dbs_t_iterator_type, &
-      dbs_t_put_block, &
-      dbs_t_reserve_blocks, &
-      dbs_t_copy_matrix_to_tensor, &
-      dbs_t_copy_tensor_to_matrix, &
-      dbs_t_contract_index, &
-      dbs_t_batched_contract_init, &
-      dbs_t_batched_contract_finalize
+      block_tensor_contract, &
+      block_tensor_copy, &
+      block_tensor_get_block, &
+      block_tensor_get_stored_coordinates, &
+      block_tensor_inverse_order, &
+      block_tensor_iterator_blocks_left, &
+      block_tensor_iterator_next_block, &
+      block_tensor_iterator_start, &
+      block_tensor_iterator_stop, &
+      block_tensor_iterator_type, &
+      block_tensor_put_block, &
+      block_tensor_reserve_blocks, &
+      block_tensor_copy_matrix_to_tensor, &
+      block_tensor_copy_tensor_to_matrix, &
+      block_tensor_contract_index, &
+      block_tensor_batched_contract_init, &
+      block_tensor_batched_contract_finalize
 
 CONTAINS
 
-   SUBROUTINE dbs_t_copy(tensor_in, tensor_out, order, summation, bounds, move_data, unit_nr)
+   SUBROUTINE block_tensor_copy(tensor_in, tensor_out, order, summation, bounds, move_data, unit_nr)
       !! Copy tensor data.
       !! Redistributes tensor data according to distributions of target and source tensor.
       !! Permutes tensor index according to `order` argument (if present).
@@ -112,7 +112,7 @@ CONTAINS
       !! OR
       !! * target tensor is not yet created, in this case an exact copy of source tensor is returned.
 
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_in, tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_in, tensor_out
          !! Source
          !! Target
       INTEGER, DIMENSION(ndims_tensor(tensor_in)), &
@@ -126,20 +126,20 @@ CONTAINS
       INTEGER :: handle
 
       CALL mp_sync(tensor_in%pgrid%mp_comm_2d)
-      CALL timeset("dbs_t_total", handle)
+      CALL timeset("block_tensor_total", handle)
 
-      ! make sure that it is safe to use dbs_t_copy during a batched contraction
-      CALL dbs_tas_batched_mm_complete(tensor_in%matrix_rep, warn=.TRUE.)
-      CALL dbs_tas_batched_mm_complete(tensor_out%matrix_rep, warn=.TRUE.)
+      ! make sure that it is safe to use block_tensor_copy during a batched contraction
+      CALL block_tas_batched_mm_complete(tensor_in%matrix_rep, warn=.TRUE.)
+      CALL block_tas_batched_mm_complete(tensor_out%matrix_rep, warn=.TRUE.)
 
-      CALL dbs_t_copy_expert(tensor_in, tensor_out, order, summation, bounds, move_data, unit_nr)
+      CALL block_tensor_copy_expert(tensor_in, tensor_out, order, summation, bounds, move_data, unit_nr)
       CALL mp_sync(tensor_in%pgrid%mp_comm_2d)
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_copy_expert(tensor_in, tensor_out, order, summation, bounds, move_data, unit_nr)
+   SUBROUTINE block_tensor_copy_expert(tensor_in, tensor_out, order, summation, bounds, move_data, unit_nr)
       !! expert routine for copying a tensor. For internal use only.
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_in, tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_in, tensor_out
       INTEGER, DIMENSION(ndims_tensor(tensor_in)), &
          INTENT(IN), OPTIONAL                        :: order
       LOGICAL, INTENT(IN), OPTIONAL                  :: summation, move_data
@@ -147,12 +147,12 @@ CONTAINS
          INTENT(IN), OPTIONAL                        :: bounds
       INTEGER, INTENT(IN), OPTIONAL                  :: unit_nr
 
-      TYPE(dbs_t_type), POINTER                    :: in_tmp_1, in_tmp_2, &
+      TYPE(block_tensor_type), POINTER                    :: in_tmp_1, in_tmp_2, &
                                                         in_tmp_3, out_tmp_1
       INTEGER                                        :: handle, unit_nr_prv
       INTEGER, DIMENSION(:), ALLOCATABLE             :: map1_in_1, map1_in_2, map2_in_1, map2_in_2
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_copy'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_copy'
       LOGICAL                                        :: dist_compatible_tas, dist_compatible_tensor, &
                                                         summation_prv, new_in_1, new_in_2, &
                                                         new_in_3, new_out_1, block_compatible, &
@@ -187,7 +187,7 @@ CONTAINS
 
       IF (PRESENT(bounds)) THEN
          ALLOCATE (in_tmp_1)
-         CALL dbs_t_crop(tensor_in, in_tmp_1, bounds=bounds, move_data=move_prv)
+         CALL block_tensor_crop(tensor_in, in_tmp_1, bounds=bounds, move_data=move_prv)
          new_in_1 = .TRUE.
          move_prv = .TRUE.
       ELSE
@@ -203,7 +203,7 @@ CONTAINS
 
       IF (.NOT. block_compatible) THEN
          ALLOCATE (in_tmp_2, out_tmp_1)
-         CALL dbs_t_make_compatible_blocks(in_tmp_1, tensor_out, in_tmp_2, out_tmp_1, order=order, &
+         CALL block_tensor_make_compatible_blocks(in_tmp_1, tensor_out, in_tmp_2, out_tmp_1, order=order, &
                                              nodata2=.NOT. summation_prv, move_data=move_prv)
          new_in_2 = .TRUE.; new_out_1 = .TRUE.
          move_prv = .TRUE.
@@ -214,7 +214,7 @@ CONTAINS
 
       IF (PRESENT(order)) THEN
          ALLOCATE (in_tmp_3)
-         CALL dbs_t_permute_index(in_tmp_2, in_tmp_3, order)
+         CALL block_tensor_permute_index(in_tmp_2, in_tmp_3, order)
          new_in_3 = .TRUE.
       ELSE
          in_tmp_3 => in_tmp_2
@@ -222,11 +222,11 @@ CONTAINS
 
       ALLOCATE (map1_in_1(ndims_matrix_row(in_tmp_3)))
       ALLOCATE (map1_in_2(ndims_matrix_column(in_tmp_3)))
-      CALL dbs_t_get_mapping_info(in_tmp_3%nd_index, map1_2d=map1_in_1, map2_2d=map1_in_2)
+      CALL block_tensor_get_mapping_info(in_tmp_3%nd_index, map1_2d=map1_in_1, map2_2d=map1_in_2)
 
       ALLOCATE (map2_in_1(ndims_matrix_row(out_tmp_1)))
       ALLOCATE (map2_in_2(ndims_matrix_column(out_tmp_1)))
-      CALL dbs_t_get_mapping_info(out_tmp_1%nd_index, map1_2d=map2_in_1, map2_2d=map2_in_2)
+      CALL block_tensor_get_mapping_info(out_tmp_1%nd_index, map1_2d=map2_in_1, map2_2d=map2_in_2)
 
       IF (.NOT. PRESENT(order)) THEN
          IF (array_eq_i(map1_in_1, map2_in_1) .AND. array_eq_i(map1_in_2, map2_in_2)) THEN
@@ -237,36 +237,36 @@ CONTAINS
       ENDIF
 
       IF (dist_compatible_tas) THEN
-         CALL dbs_tas_copy(out_tmp_1%matrix_rep, in_tmp_3%matrix_rep, summation)
-         IF (move_prv) CALL dbs_t_clear(in_tmp_3)
+         CALL block_tas_copy(out_tmp_1%matrix_rep, in_tmp_3%matrix_rep, summation)
+         IF (move_prv) CALL block_tensor_clear(in_tmp_3)
       ELSEIF (dist_compatible_tensor) THEN
-         CALL dbs_t_copy_nocomm(in_tmp_3, out_tmp_1, summation)
-         IF (move_prv) CALL dbs_t_clear(in_tmp_3)
+         CALL block_tensor_copy_nocomm(in_tmp_3, out_tmp_1, summation)
+         IF (move_prv) CALL block_tensor_clear(in_tmp_3)
       ELSE
-         CALL dbs_t_reshape(in_tmp_3, out_tmp_1, summation, move_data=move_prv)
+         CALL block_tensor_reshape(in_tmp_3, out_tmp_1, summation, move_data=move_prv)
       ENDIF
 
       IF (new_in_1) THEN
-         CALL dbs_t_destroy(in_tmp_1)
+         CALL block_tensor_destroy(in_tmp_1)
          DEALLOCATE (in_tmp_1)
       ENDIF
 
       IF (new_in_2) THEN
-         CALL dbs_t_destroy(in_tmp_2)
+         CALL block_tensor_destroy(in_tmp_2)
          DEALLOCATE (in_tmp_2)
       ENDIF
 
       IF (new_in_3) THEN
-         CALL dbs_t_destroy(in_tmp_3)
+         CALL block_tensor_destroy(in_tmp_3)
          DEALLOCATE (in_tmp_3)
       ENDIF
 
       IF (new_out_1) THEN
          IF (unit_nr_prv /= 0) THEN
-            CALL dbs_t_write_tensor_dist(out_tmp_1, unit_nr)
+            CALL block_tensor_write_tensor_dist(out_tmp_1, unit_nr)
          ENDIF
-         CALL dbs_t_split_copyback(out_tmp_1, tensor_out, summation)
-         CALL dbs_t_destroy(out_tmp_1)
+         CALL block_tensor_split_copyback(out_tmp_1, tensor_out, summation)
+         CALL block_tensor_destroy(out_tmp_1)
          DEALLOCATE (out_tmp_1)
       ENDIF
 
@@ -274,51 +274,51 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_copy_nocomm(tensor_in, tensor_out, summation)
+   SUBROUTINE block_tensor_copy_nocomm(tensor_in, tensor_out, summation)
       !! copy without communication, requires that both tensors have same process grid and distribution
 
-      TYPE(dbs_t_type), INTENT(INOUT) :: tensor_in
-      TYPE(dbs_t_type), INTENT(INOUT) :: tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT) :: tensor_in
+      TYPE(block_tensor_type), INTENT(INOUT) :: tensor_out
       LOGICAL, INTENT(IN), OPTIONAL                      :: summation
          !! Whether to sum matrices b = a + b
-      TYPE(dbs_t_iterator_type) :: iter
+      TYPE(block_tensor_iterator_type) :: iter
       INTEGER, DIMENSION(ndims_tensor(tensor_in))  :: ind_nd
       INTEGER :: blk
       TYPE(block_nd) :: blk_data
       LOGICAL :: found
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_copy_nocomm'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_copy_nocomm'
       INTEGER :: handle
 
       CALL timeset(routineN, handle)
       CPASSERT(tensor_out%valid)
 
       IF (PRESENT(summation)) THEN
-         IF (.NOT. summation) CALL dbs_t_clear(tensor_out)
+         IF (.NOT. summation) CALL block_tensor_clear(tensor_out)
       ELSE
-         CALL dbs_t_clear(tensor_out)
+         CALL block_tensor_clear(tensor_out)
       ENDIF
 
-      CALL dbs_t_reserve_blocks(tensor_in, tensor_out)
+      CALL block_tensor_reserve_blocks(tensor_in, tensor_out)
 
-      CALL dbs_t_iterator_start(iter, tensor_in)
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, ind_nd, blk)
-         CALL dbs_t_get_block(tensor_in, ind_nd, blk_data, found)
+      CALL block_tensor_iterator_start(iter, tensor_in)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, ind_nd, blk)
+         CALL block_tensor_get_block(tensor_in, ind_nd, blk_data, found)
          CPASSERT(found)
-         CALL dbs_t_put_block(tensor_out, ind_nd, blk_data, summation=summation)
+         CALL block_tensor_put_block(tensor_out, ind_nd, blk_data, summation=summation)
          CALL destroy_block(blk_data)
       ENDDO
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_copy_matrix_to_tensor(matrix_in, tensor_out, summation)
+   SUBROUTINE block_tensor_copy_matrix_to_tensor(matrix_in, tensor_out, summation)
       !! copy matrix to tensor.
 
       TYPE(dbcsr_type), TARGET, INTENT(IN)               :: matrix_in
-      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT)                  :: tensor_out
       LOGICAL, INTENT(IN), OPTIONAL                      :: summation
          !! tensor_out = tensor_out + matrix_in
       TYPE(dbcsr_type), POINTER                          :: matrix_in_desym
@@ -330,7 +330,7 @@ CONTAINS
       LOGICAL                                            :: tr
 
       INTEGER                                            :: handle
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_copy_matrix_to_tensor'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_copy_matrix_to_tensor'
 
       CALL timeset(routineN, handle)
       CPASSERT(tensor_out%valid)
@@ -345,18 +345,18 @@ CONTAINS
       ENDIF
 
       IF (PRESENT(summation)) THEN
-         IF (.NOT. summation) CALL dbs_t_clear(tensor_out)
+         IF (.NOT. summation) CALL block_tensor_clear(tensor_out)
       ELSE
-         CALL dbs_t_clear(tensor_out)
+         CALL block_tensor_clear(tensor_out)
       ENDIF
 
-      CALL dbs_t_reserve_blocks(matrix_in_desym, tensor_out)
+      CALL block_tensor_reserve_blocks(matrix_in_desym, tensor_out)
 
       CALL dbcsr_iterator_start(iter, matrix_in_desym)
       DO WHILE (dbcsr_iterator_blocks_left(iter))
          CALL dbcsr_iterator_next_block(iter, ind_2d(1), ind_2d(2), block, tr)
          CALL allocate_any(block_arr, source=block)
-         CALL dbs_t_put_block(tensor_out, ind_2d, SHAPE(block_arr), block_arr, summation=summation)
+         CALL block_tensor_put_block(tensor_out, ind_2d, SHAPE(block_arr), block_arr, summation=summation)
          DEALLOCATE (block_arr)
       ENDDO
       CALL dbcsr_iterator_stop(iter)
@@ -370,18 +370,18 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_copy_tensor_to_matrix(tensor_in, matrix_out, summation)
+   SUBROUTINE block_tensor_copy_tensor_to_matrix(tensor_in, matrix_out, summation)
       !! copy tensor to matrix
 
-      TYPE(dbs_t_type), INTENT(INOUT)      :: tensor_in
+      TYPE(block_tensor_type), INTENT(INOUT)      :: tensor_in
       TYPE(dbcsr_type), INTENT(INOUT)        :: matrix_out
       LOGICAL, INTENT(IN), OPTIONAL          :: summation
          !! matrix_out = matrix_out + tensor_in
-      TYPE(dbs_t_iterator_type)            :: iter
+      TYPE(block_tensor_iterator_type)            :: iter
       INTEGER                                :: blk, handle
       INTEGER, DIMENSION(2)                  :: ind_2d
       REAL(KIND=real_8), DIMENSION(:, :), ALLOCATABLE :: block
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_copy_tensor_to_matrix'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_copy_tensor_to_matrix'
       LOGICAL :: found
 
       CALL timeset(routineN, handle)
@@ -392,14 +392,14 @@ CONTAINS
          CALL dbcsr_clear(matrix_out)
       ENDIF
 
-      CALL dbs_t_reserve_blocks(tensor_in, matrix_out)
+      CALL block_tensor_reserve_blocks(tensor_in, matrix_out)
 
-      CALL dbs_t_iterator_start(iter, tensor_in)
-      DO WHILE (dbs_t_iterator_blocks_left(iter))
-         CALL dbs_t_iterator_next_block(iter, ind_2d, blk)
+      CALL block_tensor_iterator_start(iter, tensor_in)
+      DO WHILE (block_tensor_iterator_blocks_left(iter))
+         CALL block_tensor_iterator_next_block(iter, ind_2d, blk)
          IF (dbcsr_has_symmetry(matrix_out) .AND. checker_tr(ind_2d(1), ind_2d(2))) CYCLE
 
-         CALL dbs_t_get_block(tensor_in, ind_2d, block, found)
+         CALL block_tensor_get_block(tensor_in, ind_2d, block, found)
          CPASSERT(found)
 
          IF (dbcsr_has_symmetry(matrix_out) .AND. ind_2d(1) > ind_2d(2)) THEN
@@ -409,13 +409,13 @@ CONTAINS
          ENDIF
          DEALLOCATE (block)
       ENDDO
-      CALL dbs_t_iterator_stop(iter)
+      CALL block_tensor_iterator_stop(iter)
 
       CALL timestop(handle)
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_contract(alpha, tensor_1, tensor_2, beta, tensor_3, &
+   SUBROUTINE block_tensor_contract(alpha, tensor_1, tensor_2, beta, tensor_3, &
                                contract_1, notcontract_1, &
                                contract_2, notcontract_2, &
                                map_1, map_2, &
@@ -438,22 +438,22 @@ CONTAINS
       !! Furthermore the two largest tensors involved in the contraction should map both to either
       !! tall or short matrices: the largest matrix dimension should be "on the same side"
       !! and should have identical distribution (which is always the case if the distributions were
-      !! obtained with dbs_t_default_distvec).
+      !! obtained with block_tensor_default_distvec).
       !!
       !! note 3: if the same tensor occurs in multiple contractions, a different tensor object should
       !! be created for each contraction and the data should be copied between the tensors by use of
-      !! dbs_t_copy. If the same tensor object is used in multiple contractions, matrix layouts are
+      !! block_tensor_copy. If the same tensor object is used in multiple contractions, matrix layouts are
       !! not compatible for all contractions (see note 2).
       !!
       !! note 4: automatic optimizations are enabled by using the feature of batched contraction, see
-      !! dbs_t_batched_contract_init, dbs_t_batched_contract_finalize. The arguments bounds_1,
+      !! block_tensor_batched_contract_init, block_tensor_batched_contract_finalize. The arguments bounds_1,
       !! bounds_2, bounds_3 give the index ranges of the batches.
       !! @endnote
 
       TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_1
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
          !! first tensor (in)
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_2
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
          !! second tensor (in)
       TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
@@ -468,7 +468,7 @@ CONTAINS
          !! indices of tensor_1 not to contract
       INTEGER, DIMENSION(:), INTENT(IN)              :: notcontract_2
          !! indices of tensor_2 not to contract
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_3
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_3
          !! contracted tensor (out)
       INTEGER, DIMENSION(2, SIZE(contract_1)), &
          INTENT(IN), OPTIONAL                        :: bounds_1
@@ -485,15 +485,15 @@ CONTAINS
       LOGICAL, INTENT(IN), OPTIONAL                  :: optimize_dist
          !! Whether distribution should be optimized internally. In the current implementation this guarantees optimal parameters
          !! only for dense matrices.
-      TYPE(dbs_t_pgrid_type), INTENT(OUT), &
+      TYPE(block_tensor_pgrid_type), INTENT(OUT), &
          POINTER, OPTIONAL                           :: pgrid_opt_1
          !! Optionally return optimal process grid for tensor_1. This can be used to choose optimal process grids for subsequent
          !! tensor contractions with tensors of similar shape and sparsity. Under some conditions, pgrid_opt_1 can not be returned,
          !! in this case the pointer is not associated.
-      TYPE(dbs_t_pgrid_type), INTENT(OUT), &
+      TYPE(block_tensor_pgrid_type), INTENT(OUT), &
          POINTER, OPTIONAL                           :: pgrid_opt_2
          !! Optionally return optimal process grid for tensor_2.
-      TYPE(dbs_t_pgrid_type), INTENT(OUT), &
+      TYPE(block_tensor_pgrid_type), INTENT(OUT), &
          POINTER, OPTIONAL                           :: pgrid_opt_3
          !! Optionally return optimal process grid for tensor_3.
       REAL(KIND=real_8), INTENT(IN), OPTIONAL        :: filter_eps
@@ -514,8 +514,8 @@ CONTAINS
       INTEGER                     :: handle
 
       CALL mp_sync(tensor_1%pgrid%mp_comm_2d)
-      CALL timeset("dbs_t_total", handle)
-      CALL dbs_t_contract_expert(alpha, tensor_1, tensor_2, beta, tensor_3, &
+      CALL timeset("block_tensor_total", handle)
+      CALL block_tensor_contract_expert(alpha, tensor_1, tensor_2, beta, tensor_3, &
                                    contract_1, notcontract_1, &
                                    contract_2, notcontract_2, &
                                    map_1, map_2, &
@@ -537,7 +537,7 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_contract_expert(alpha, tensor_1, tensor_2, beta, tensor_3, &
+   SUBROUTINE block_tensor_contract_expert(alpha, tensor_1, tensor_2, beta, tensor_3, &
                                       contract_1, notcontract_1, &
                                       contract_2, notcontract_2, &
                                       map_1, map_2, &
@@ -547,8 +547,8 @@ CONTAINS
                                       nblks_local, result_index, unit_nr, log_verbose)
       !! expert routine for tensor contraction. For internal use only.
       TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_1
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_2
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
       TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
@@ -556,7 +556,7 @@ CONTAINS
       INTEGER, DIMENSION(:), INTENT(IN)              :: map_2
       INTEGER, DIMENSION(:), INTENT(IN)              :: notcontract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: notcontract_2
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_3
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_3
       INTEGER, DIMENSION(2, SIZE(contract_1)), &
          INTENT(IN), OPTIONAL                        :: bounds_1
       INTEGER, DIMENSION(2, SIZE(notcontract_1)), &
@@ -564,11 +564,11 @@ CONTAINS
       INTEGER, DIMENSION(2, SIZE(notcontract_2)), &
          INTENT(IN), OPTIONAL                        :: bounds_3
       LOGICAL, INTENT(IN), OPTIONAL                  :: optimize_dist
-      TYPE(dbs_t_pgrid_type), INTENT(OUT), &
+      TYPE(block_tensor_pgrid_type), INTENT(OUT), &
          POINTER, OPTIONAL                           :: pgrid_opt_1
-      TYPE(dbs_t_pgrid_type), INTENT(OUT), &
+      TYPE(block_tensor_pgrid_type), INTENT(OUT), &
          POINTER, OPTIONAL                           :: pgrid_opt_2
-      TYPE(dbs_t_pgrid_type), INTENT(OUT), &
+      TYPE(block_tensor_pgrid_type), INTENT(OUT), &
          POINTER, OPTIONAL                           :: pgrid_opt_3
       REAL(KIND=real_8), INTENT(IN), OPTIONAL        :: filter_eps
       INTEGER(KIND=int_8), INTENT(OUT), OPTIONAL     :: flop
@@ -576,17 +576,17 @@ CONTAINS
       LOGICAL, INTENT(IN), OPTIONAL                  :: retain_sparsity
       INTEGER, INTENT(OUT), OPTIONAL                 :: nblks_local
          !! number of local blocks on this MPI rank
-      INTEGER, DIMENSION(dbs_t_max_nblks_local(tensor_3), ndims_tensor(tensor_3)), &
+      INTEGER, DIMENSION(block_tensor_max_nblks_local(tensor_3), ndims_tensor(tensor_3)), &
          OPTIONAL, INTENT(OUT)                       :: result_index
          !! get indices of non-zero tensor blocks for tensor_3 without actually performing contraction
          !! this is an estimate based on block norm multiplication
       INTEGER, OPTIONAL, INTENT(IN)                  :: unit_nr
       LOGICAL, INTENT(IN), OPTIONAL                  :: log_verbose
 
-      TYPE(dbs_t_type), POINTER                    :: tensor_contr_1, tensor_contr_2, tensor_contr_3
-      TYPE(dbs_t_type), TARGET                     :: tensor_algn_1, tensor_algn_2, tensor_algn_3
-      TYPE(dbs_t_type), POINTER                    :: tensor_crop_1, tensor_crop_2
-      TYPE(dbs_t_type), POINTER                    :: tensor_small, tensor_large
+      TYPE(block_tensor_type), POINTER                    :: tensor_contr_1, tensor_contr_2, tensor_contr_3
+      TYPE(block_tensor_type), TARGET                     :: tensor_algn_1, tensor_algn_2, tensor_algn_3
+      TYPE(block_tensor_type), POINTER                    :: tensor_crop_1, tensor_crop_2
+      TYPE(block_tensor_type), POINTER                    :: tensor_small, tensor_large
 
       INTEGER(int_8), DIMENSION(:, :), ALLOCATABLE  :: result_index_2d
       LOGICAL                                        :: assert_stmt, tensors_remapped
@@ -605,7 +605,7 @@ CONTAINS
       INTEGER                                        :: occ_1, occ_2
       INTEGER, DIMENSION(:), ALLOCATABLE             :: dims1, dims2, dims3
 
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_contract'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_contract'
       CHARACTER(LEN=1), DIMENSION(:), ALLOCATABLE    :: indchar1, indchar2, indchar3, indchar1_mod, &
                                                         indchar2_mod, indchar3_mod
       CHARACTER(LEN=1), DIMENSION(15) :: alph = &
@@ -614,7 +614,7 @@ CONTAINS
       INTEGER, DIMENSION(2, ndims_tensor(tensor_2)) :: bounds_t2
       LOGICAL                                        :: do_crop_1, do_crop_2, do_write_3, nodata_3, do_batched, pgrid_changed, &
                                                         pgrid_changed_any, do_change_pgrid(2)
-      TYPE(dbs_tas_split_info)                     :: split_opt, split, split_opt_avg
+      TYPE(block_tas_split_info)                     :: split_opt, split, split_opt_avg
       INTEGER, DIMENSION(2) :: pdims_2d_opt, pdims_2d, pcoord_2d, pdims_sub, pdims_sub_opt
       LOGICAL, DIMENSION(2) :: periods_2d
       REAL(real_8) :: pdim_ratio, pdim_ratio_opt
@@ -646,7 +646,7 @@ CONTAINS
       assert_stmt = SIZE(map_1) + SIZE(map_2) .EQ. ndims_tensor(tensor_3)
       CPASSERT(assert_stmt)
 
-      assert_stmt = dbs_t_get_data_type(tensor_1) .EQ. dbs_t_get_data_type(tensor_2)
+      assert_stmt = block_tensor_get_data_type(tensor_1) .EQ. block_tensor_get_data_type(tensor_2)
       CPASSERT(assert_stmt)
 
       unit_nr_prv = prep_output_unit(unit_nr)
@@ -668,7 +668,7 @@ CONTAINS
          IF (retain_sparsity) nodata_3 = .FALSE.
       ENDIF
 
-      CALL dbs_t_map_bounds_to_tensors(tensor_1, tensor_2, &
+      CALL block_tensor_map_bounds_to_tensors(tensor_1, tensor_2, &
                                          contract_1, notcontract_1, &
                                          contract_2, notcontract_2, &
                                          bounds_t1, bounds_t2, &
@@ -677,7 +677,7 @@ CONTAINS
 
       IF (do_crop_1) THEN
          ALLOCATE (tensor_crop_1)
-         CALL dbs_t_crop(tensor_1, tensor_crop_1, bounds_t1, move_data=move_data_1)
+         CALL block_tensor_crop(tensor_1, tensor_crop_1, bounds_t1, move_data=move_data_1)
          move_data_1 = .TRUE.
       ELSE
          tensor_crop_1 => tensor_1
@@ -685,7 +685,7 @@ CONTAINS
 
       IF (do_crop_2) THEN
          ALLOCATE (tensor_crop_2)
-         CALL dbs_t_crop(tensor_2, tensor_crop_2, bounds_t2, move_data=move_data_2)
+         CALL block_tensor_crop(tensor_2, tensor_crop_2, bounds_t2, move_data=move_data_2)
          move_data_2 = .TRUE.
       ELSE
          tensor_crop_2 => tensor_2
@@ -695,19 +695,19 @@ CONTAINS
       ! this is needed to avoid unnecessary work in case user contracts different portions of a
       ! tensor consecutively to save memory
       mp_comm = tensor_crop_1%pgrid%mp_comm_2d
-      occ_1 = dbs_t_get_num_blocks(tensor_crop_1)
+      occ_1 = block_tensor_get_num_blocks(tensor_crop_1)
       CALL mp_max(occ_1, mp_comm)
-      occ_2 = dbs_t_get_num_blocks(tensor_crop_2)
+      occ_2 = block_tensor_get_num_blocks(tensor_crop_2)
       CALL mp_max(occ_2, mp_comm)
 
       IF (occ_1 == 0 .OR. occ_2 == 0) THEN
-         CALL dbs_t_scale(tensor_3, beta)
+         CALL block_tensor_scale(tensor_3, beta)
          IF (do_crop_1) THEN
-            CALL dbs_t_destroy(tensor_crop_1)
+            CALL block_tensor_destroy(tensor_crop_1)
             DEALLOCATE (tensor_crop_1)
          ENDIF
          IF (do_crop_2) THEN
-            CALL dbs_t_destroy(tensor_crop_2)
+            CALL block_tensor_destroy(tensor_crop_2)
             DEALLOCATE (tensor_crop_2)
          ENDIF
 
@@ -722,13 +722,13 @@ CONTAINS
                TRIM(tensor_crop_1%name), 'x', TRIM(tensor_crop_2%name), '=', TRIM(tensor_3%name)
             WRITE (unit_nr_prv, '(A)') repeat("-", 80)
          ENDIF
-         CALL dbs_t_write_tensor_info(tensor_crop_1, unit_nr_prv, full_info=log_verbose)
-         CALL dbs_t_write_tensor_dist(tensor_crop_1, unit_nr_prv)
-         CALL dbs_t_write_tensor_info(tensor_crop_2, unit_nr_prv, full_info=log_verbose)
-         CALL dbs_t_write_tensor_dist(tensor_crop_2, unit_nr_prv)
+         CALL block_tensor_write_tensor_info(tensor_crop_1, unit_nr_prv, full_info=log_verbose)
+         CALL block_tensor_write_tensor_dist(tensor_crop_1, unit_nr_prv)
+         CALL block_tensor_write_tensor_info(tensor_crop_2, unit_nr_prv, full_info=log_verbose)
+         CALL block_tensor_write_tensor_dist(tensor_crop_2, unit_nr_prv)
       ENDIF
 
-      data_type = dbs_t_get_data_type(tensor_crop_1)
+      data_type = block_tensor_get_data_type(tensor_crop_1)
 
       ! align tensor index with data, tensor data is not modified
       ndims1 = ndims_tensor(tensor_crop_1)
@@ -746,7 +746,7 @@ CONTAINS
       indchar3(map_1) = indchar1(notcontract_1)
       indchar3(map_2) = indchar2(notcontract_2)
 
-      IF (unit_nr_prv /= 0) CALL dbs_t_print_contraction_index(tensor_crop_1, indchar1, &
+      IF (unit_nr_prv /= 0) CALL block_tensor_print_contraction_index(tensor_crop_1, indchar1, &
                                                                  tensor_crop_2, indchar2, &
                                                                  tensor_3, indchar3, unit_nr_prv)
       IF (unit_nr_prv > 0) THEN
@@ -762,7 +762,7 @@ CONTAINS
       CALL align_tensor(tensor_3, map_1, map_2, &
                         tensor_algn_3, map_1_mod, map_2_mod, indchar3, indchar3_mod)
 
-      IF (unit_nr_prv /= 0) CALL dbs_t_print_contraction_index(tensor_algn_1, indchar1_mod, &
+      IF (unit_nr_prv /= 0) CALL block_tensor_print_contraction_index(tensor_algn_1, indchar1_mod, &
                                                                  tensor_algn_2, indchar2_mod, &
                                                                  tensor_algn_3, indchar3_mod, unit_nr_prv)
 
@@ -884,18 +884,18 @@ CONTAINS
 
       END SELECT
 
-      IF (unit_nr_prv /= 0) CALL dbs_t_print_contraction_index(tensor_contr_1, indchar1_mod, &
+      IF (unit_nr_prv /= 0) CALL block_tensor_print_contraction_index(tensor_contr_1, indchar1_mod, &
                                                                  tensor_contr_2, indchar2_mod, &
                                                                  tensor_contr_3, indchar3_mod, unit_nr_prv)
       IF (unit_nr_prv /= 0) THEN
-         IF (new_1) CALL dbs_t_write_tensor_info(tensor_contr_1, unit_nr_prv, full_info=log_verbose)
-         IF (new_1) CALL dbs_t_write_tensor_dist(tensor_contr_1, unit_nr_prv)
-         IF (new_2) CALL dbs_t_write_tensor_info(tensor_contr_2, unit_nr_prv, full_info=log_verbose)
-         IF (new_2) CALL dbs_t_write_tensor_dist(tensor_contr_2, unit_nr_prv)
+         IF (new_1) CALL block_tensor_write_tensor_info(tensor_contr_1, unit_nr_prv, full_info=log_verbose)
+         IF (new_1) CALL block_tensor_write_tensor_dist(tensor_contr_1, unit_nr_prv)
+         IF (new_2) CALL block_tensor_write_tensor_info(tensor_contr_2, unit_nr_prv, full_info=log_verbose)
+         IF (new_2) CALL block_tensor_write_tensor_dist(tensor_contr_2, unit_nr_prv)
       ENDIF
 
       IF (.NOT. PRESENT(result_index)) THEN
-         CALL dbs_tas_multiply(trans_1, trans_2, trans_3, alpha, &
+         CALL block_tas_multiply(trans_1, trans_2, trans_3, alpha, &
                                  tensor_contr_1%matrix_rep, tensor_contr_2%matrix_rep, &
                                  beta, &
                                  tensor_contr_3%matrix_rep, filter_eps=filter_eps, flop=flop, &
@@ -904,7 +904,7 @@ CONTAINS
                                  move_data_a=move_data_1, move_data_b=move_data_2, retain_sparsity=retain_sparsity)
       ELSE
 
-         CALL dbs_tas_result_index(trans_1, trans_2, trans_3, tensor_contr_1%matrix_rep, tensor_contr_2%matrix_rep, &
+         CALL block_tas_result_index(trans_1, trans_2, trans_3, tensor_contr_1%matrix_rep, tensor_contr_2%matrix_rep, &
                                      tensor_contr_3%matrix_rep, filter_eps=filter_eps, blk_ind=result_index_2d)
 
          nblk = SIZE(result_index_2d, 1)
@@ -919,29 +919,29 @@ CONTAINS
          ENDDO
 
          IF (new_1) THEN
-            CALL dbs_t_destroy(tensor_contr_1)
+            CALL block_tensor_destroy(tensor_contr_1)
             DEALLOCATE (tensor_contr_1)
          ENDIF
          IF (new_2) THEN
-            CALL dbs_t_destroy(tensor_contr_2)
+            CALL block_tensor_destroy(tensor_contr_2)
             DEALLOCATE (tensor_contr_2)
          ENDIF
          IF (new_3) THEN
-            CALL dbs_t_destroy(tensor_contr_3)
+            CALL block_tensor_destroy(tensor_contr_3)
             DEALLOCATE (tensor_contr_3)
          ENDIF
          IF (do_crop_1) THEN
-            CALL dbs_t_destroy(tensor_crop_1)
+            CALL block_tensor_destroy(tensor_crop_1)
             DEALLOCATE (tensor_crop_1)
          ENDIF
          IF (do_crop_2) THEN
-            CALL dbs_t_destroy(tensor_crop_2)
+            CALL block_tensor_destroy(tensor_crop_2)
             DEALLOCATE (tensor_crop_2)
          ENDIF
 
-         CALL dbs_t_destroy(tensor_algn_1)
-         CALL dbs_t_destroy(tensor_algn_2)
-         CALL dbs_t_destroy(tensor_algn_3)
+         CALL block_tensor_destroy(tensor_algn_1)
+         CALL block_tensor_destroy(tensor_algn_2)
+         CALL block_tensor_destroy(tensor_algn_3)
 
          CALL timestop(handle)
          RETURN
@@ -985,13 +985,13 @@ CONTAINS
       IF ((.NOT. tensors_remapped) .AND. do_batched) THEN
          ASSOCIATE (storage => tensor_small%contraction_storage)
             CPASSERT(storage%static)
-            split = dbs_tas_info(tensor_large%matrix_rep)
+            split = block_tas_info(tensor_large%matrix_rep)
             do_change_pgrid(:) = &
                update_contraction_storage(storage, split_opt, split)
 
             IF (ANY(do_change_pgrid)) THEN
-               mp_comm_opt = dbs_tas_mp_comm(tensor_small%pgrid%mp_comm_2d, split_opt%split_rowcol, NINT(storage%nsplit_avg))
-               CALL dbs_tas_create_split(split_opt_avg, mp_comm_opt, split_opt%split_rowcol, &
+               mp_comm_opt = block_tas_mp_comm(tensor_small%pgrid%mp_comm_2d, split_opt%split_rowcol, NINT(storage%nsplit_avg))
+               CALL block_tas_create_split(split_opt_avg, mp_comm_opt, split_opt%split_rowcol, &
                                            NINT(storage%nsplit_avg), own_comm=.TRUE.)
                CALL mp_environ(split_opt_avg%mp_comm, 2, pdims_2d_opt, pcoord_2d, periods_2d)
             ENDIF
@@ -1007,7 +1007,7 @@ CONTAINS
             pdim_ratio_opt = MAXVAL(REAL(pdims_sub_opt, real_8))/MINVAL(pdims_sub_opt)
             IF (pdim_ratio/pdim_ratio_opt <= default_pdims_accept_ratio**2) THEN
                do_change_pgrid(1) = .FALSE.
-               CALL dbs_tas_release_info(split_opt_avg)
+               CALL block_tas_release_info(split_opt_avg)
             ENDIF
          ENDIF
       ENDIF
@@ -1018,61 +1018,61 @@ CONTAINS
             IF (tensor_contr_3%matrix_rep%mm_storage%batched_out) do_write_3 = .FALSE.
          ENDIF
          IF (do_write_3) THEN
-            CALL dbs_t_write_tensor_info(tensor_contr_3, unit_nr_prv, full_info=log_verbose)
-            CALL dbs_t_write_tensor_dist(tensor_contr_3, unit_nr_prv)
+            CALL block_tensor_write_tensor_info(tensor_contr_3, unit_nr_prv, full_info=log_verbose)
+            CALL block_tensor_write_tensor_dist(tensor_contr_3, unit_nr_prv)
          ENDIF
       ENDIF
 
       IF (new_3) THEN
          ! need redistribute if we created new tensor for tensor 3
-         CALL dbs_t_scale(tensor_algn_3, beta)
-         CALL dbs_t_copy_expert(tensor_contr_3, tensor_algn_3, summation=.TRUE., move_data=.TRUE.)
-         IF (PRESENT(filter_eps)) CALL dbs_t_filter(tensor_algn_3, filter_eps)
+         CALL block_tensor_scale(tensor_algn_3, beta)
+         CALL block_tensor_copy_expert(tensor_contr_3, tensor_algn_3, summation=.TRUE., move_data=.TRUE.)
+         IF (PRESENT(filter_eps)) CALL block_tensor_filter(tensor_algn_3, filter_eps)
          ! tensor_3 automatically has correct data because tensor_algn_3 contains a matrix
          ! pointer to data of tensor_3
       ENDIF
 
       ! transfer contraction storage
-      CALL dbs_t_copy_contraction_storage(tensor_contr_1, tensor_1)
-      CALL dbs_t_copy_contraction_storage(tensor_contr_2, tensor_2)
-      CALL dbs_t_copy_contraction_storage(tensor_contr_3, tensor_3)
+      CALL block_tensor_copy_contraction_storage(tensor_contr_1, tensor_1)
+      CALL block_tensor_copy_contraction_storage(tensor_contr_2, tensor_2)
+      CALL block_tensor_copy_contraction_storage(tensor_contr_3, tensor_3)
 
       IF (unit_nr_prv /= 0) THEN
-         IF (new_3 .AND. do_write_3) CALL dbs_t_write_tensor_info(tensor_3, unit_nr_prv, full_info=log_verbose)
-         IF (new_3 .AND. do_write_3) CALL dbs_t_write_tensor_dist(tensor_3, unit_nr_prv)
+         IF (new_3 .AND. do_write_3) CALL block_tensor_write_tensor_info(tensor_3, unit_nr_prv, full_info=log_verbose)
+         IF (new_3 .AND. do_write_3) CALL block_tensor_write_tensor_dist(tensor_3, unit_nr_prv)
       ENDIF
 
-      CALL dbs_t_destroy(tensor_algn_1)
-      CALL dbs_t_destroy(tensor_algn_2)
-      CALL dbs_t_destroy(tensor_algn_3)
+      CALL block_tensor_destroy(tensor_algn_1)
+      CALL block_tensor_destroy(tensor_algn_2)
+      CALL block_tensor_destroy(tensor_algn_3)
 
       IF (do_crop_1) THEN
-         CALL dbs_t_destroy(tensor_crop_1)
+         CALL block_tensor_destroy(tensor_crop_1)
          DEALLOCATE (tensor_crop_1)
       ENDIF
 
       IF (do_crop_2) THEN
-         CALL dbs_t_destroy(tensor_crop_2)
+         CALL block_tensor_destroy(tensor_crop_2)
          DEALLOCATE (tensor_crop_2)
       ENDIF
 
       IF (new_1) THEN
-         CALL dbs_t_destroy(tensor_contr_1)
+         CALL block_tensor_destroy(tensor_contr_1)
          DEALLOCATE (tensor_contr_1)
       ENDIF
       IF (new_2) THEN
-         CALL dbs_t_destroy(tensor_contr_2)
+         CALL block_tensor_destroy(tensor_contr_2)
          DEALLOCATE (tensor_contr_2)
       ENDIF
       IF (new_3) THEN
-         CALL dbs_t_destroy(tensor_contr_3)
+         CALL block_tensor_destroy(tensor_contr_3)
          DEALLOCATE (tensor_contr_3)
       ENDIF
 
       IF (PRESENT(move_data)) THEN
          IF (move_data) THEN
-            CALL dbs_t_clear(tensor_1)
-            CALL dbs_t_clear(tensor_2)
+            CALL block_tensor_clear(tensor_1)
+            CALL block_tensor_clear(tensor_2)
          ENDIF
       ENDIF
 
@@ -1087,12 +1087,12 @@ CONTAINS
          SELECT CASE (max_mm_dim)
          CASE (1)
             IF (ALLOCATED(tensor_1%contraction_storage) .AND. ALLOCATED(tensor_3%contraction_storage)) THEN
-               CALL dbs_t_change_pgrid_2d(tensor_1, tensor_1%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
+               CALL block_tensor_change_pgrid_2d(tensor_1, tensor_1%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
                                             nsplit=split_opt_avg%ngroup, dimsplit=split_opt_avg%split_rowcol, &
                                             pgrid_changed=pgrid_changed, &
                                             unit_nr=unit_nr_prv)
                IF (pgrid_changed) pgrid_changed_any = .TRUE.
-               CALL dbs_t_change_pgrid_2d(tensor_3, tensor_3%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
+               CALL block_tensor_change_pgrid_2d(tensor_3, tensor_3%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
                                             nsplit=split_opt_avg%ngroup, dimsplit=split_opt_avg%split_rowcol, &
                                             pgrid_changed=pgrid_changed, &
                                             unit_nr=unit_nr_prv)
@@ -1102,17 +1102,17 @@ CONTAINS
                IF (tensor_2%matrix_rep%do_batched == 3) THEN
                   ! set flag that process grid has been optimized to make sure that no grid optimizations are done
                   ! in TAS multiply algorithm
-                  CALL dbs_tas_batched_mm_complete(tensor_2%matrix_rep)
+                  CALL block_tas_batched_mm_complete(tensor_2%matrix_rep)
                ENDIF
             ENDIF
          CASE (2)
             IF (ALLOCATED(tensor_1%contraction_storage) .AND. ALLOCATED(tensor_2%contraction_storage)) THEN
-               CALL dbs_t_change_pgrid_2d(tensor_1, tensor_1%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
+               CALL block_tensor_change_pgrid_2d(tensor_1, tensor_1%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
                                             nsplit=split_opt_avg%ngroup, dimsplit=split_opt_avg%split_rowcol, &
                                             pgrid_changed=pgrid_changed, &
                                             unit_nr=unit_nr_prv)
                IF (pgrid_changed) pgrid_changed_any = .TRUE.
-               CALL dbs_t_change_pgrid_2d(tensor_2, tensor_2%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
+               CALL block_tensor_change_pgrid_2d(tensor_2, tensor_2%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
                                             nsplit=split_opt_avg%ngroup, dimsplit=split_opt_avg%split_rowcol, &
                                             pgrid_changed=pgrid_changed, &
                                             unit_nr=unit_nr_prv)
@@ -1120,17 +1120,17 @@ CONTAINS
             ENDIF
             IF (pgrid_changed_any) THEN
                IF (tensor_3%matrix_rep%do_batched == 3) THEN
-                  CALL dbs_tas_batched_mm_complete(tensor_3%matrix_rep)
+                  CALL block_tas_batched_mm_complete(tensor_3%matrix_rep)
                ENDIF
             ENDIF
          CASE (3)
             IF (ALLOCATED(tensor_2%contraction_storage) .AND. ALLOCATED(tensor_3%contraction_storage)) THEN
-               CALL dbs_t_change_pgrid_2d(tensor_2, tensor_2%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
+               CALL block_tensor_change_pgrid_2d(tensor_2, tensor_2%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
                                             nsplit=split_opt_avg%ngroup, dimsplit=split_opt_avg%split_rowcol, &
                                             pgrid_changed=pgrid_changed, &
                                             unit_nr=unit_nr_prv)
                IF (pgrid_changed) pgrid_changed_any = .TRUE.
-               CALL dbs_t_change_pgrid_2d(tensor_3, tensor_3%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
+               CALL block_tensor_change_pgrid_2d(tensor_3, tensor_3%pgrid%mp_comm_2d, pdims=pdims_2d_opt, &
                                             nsplit=split_opt_avg%ngroup, dimsplit=split_opt_avg%split_rowcol, &
                                             pgrid_changed=pgrid_changed, &
                                             unit_nr=unit_nr_prv)
@@ -1138,21 +1138,21 @@ CONTAINS
             ENDIF
             IF (pgrid_changed_any) THEN
                IF (tensor_1%matrix_rep%do_batched == 3) THEN
-                  CALL dbs_tas_batched_mm_complete(tensor_1%matrix_rep)
+                  CALL block_tas_batched_mm_complete(tensor_1%matrix_rep)
                ENDIF
             ENDIF
          END SELECT
-         CALL dbs_tas_release_info(split_opt_avg)
+         CALL block_tas_release_info(split_opt_avg)
       ENDIF
 
       IF ((.NOT. tensors_remapped) .AND. do_batched) THEN
          ! freeze TAS process grids if tensor grids were optimized
-         CALL dbs_tas_set_batched_state(tensor_1%matrix_rep, opt_grid=.TRUE.)
-         CALL dbs_tas_set_batched_state(tensor_2%matrix_rep, opt_grid=.TRUE.)
-         CALL dbs_tas_set_batched_state(tensor_3%matrix_rep, opt_grid=.TRUE.)
+         CALL block_tas_set_batched_state(tensor_1%matrix_rep, opt_grid=.TRUE.)
+         CALL block_tas_set_batched_state(tensor_2%matrix_rep, opt_grid=.TRUE.)
+         CALL block_tas_set_batched_state(tensor_3%matrix_rep, opt_grid=.TRUE.)
       ENDIF
 
-      CALL dbs_tas_release_info(split_opt)
+      CALL block_tas_release_info(split_opt)
 
       CALL timestop(handle)
 
@@ -1161,9 +1161,9 @@ CONTAINS
    SUBROUTINE align_tensor(tensor_in, contract_in, notcontract_in, &
       !! align tensor index with data
                            tensor_out, contract_out, notcontract_out, indp_in, indp_out)
-      TYPE(dbs_t_type), INTENT(INOUT)               :: tensor_in
+      TYPE(block_tensor_type), INTENT(INOUT)               :: tensor_in
       INTEGER, DIMENSION(:), INTENT(IN)            :: contract_in, notcontract_in
-      TYPE(dbs_t_type), INTENT(OUT)              :: tensor_out
+      TYPE(block_tensor_type), INTENT(OUT)              :: tensor_out
       INTEGER, DIMENSION(SIZE(contract_in)), &
          INTENT(OUT)                               :: contract_out
       INTEGER, DIMENSION(SIZE(notcontract_in)), &
@@ -1172,7 +1172,7 @@ CONTAINS
       CHARACTER(LEN=1), DIMENSION(ndims_tensor(tensor_in)), INTENT(OUT) :: indp_out
       INTEGER, DIMENSION(ndims_tensor(tensor_in)) :: align
 
-      CALL dbs_t_align_index(tensor_in, tensor_out, order=align)
+      CALL block_tensor_align_index(tensor_in, tensor_out, order=align)
       contract_out = align(contract_in)
       notcontract_out = align(notcontract_in)
       indp_out(align) = indp_in
@@ -1187,11 +1187,11 @@ CONTAINS
       !! matrix multiplication. This routine reshapes the two largest of the three tensors. Redistribution
       !! is avoided if tensors already in a consistent layout.
 
-      TYPE(dbs_t_type), TARGET, INTENT(INOUT)   :: tensor1
+      TYPE(block_tensor_type), TARGET, INTENT(INOUT)   :: tensor1
          !! tensor 1 in
-      TYPE(dbs_t_type), TARGET, INTENT(INOUT)   :: tensor2
+      TYPE(block_tensor_type), TARGET, INTENT(INOUT)   :: tensor2
          !! tensor 2 in
-      TYPE(dbs_t_type), POINTER, INTENT(OUT)    :: tensor1_out, tensor2_out
+      TYPE(block_tensor_type), POINTER, INTENT(OUT)    :: tensor1_out, tensor2_out
          !! tensor 1 out
          !! tensor 2 out
       INTEGER, DIMENSION(:), INTENT(IN)           :: ind1_free, ind2_free
@@ -1220,7 +1220,7 @@ CONTAINS
                                                      comm_2d, unit_nr_prv
       TYPE(array_list)                            :: dist_list
       INTEGER, DIMENSION(:), ALLOCATABLE          :: mp_dims
-      TYPE(dbs_t_distribution_type)             :: dist_in
+      TYPE(block_tensor_distribution_type)             :: dist_in
       INTEGER(KIND=int_8)                         :: nblkrows, nblkcols
       LOGICAL                                     :: optimize_dist_prv
       INTEGER, DIMENSION(ndims_tensor(tensor1)) :: dims1
@@ -1287,9 +1287,9 @@ CONTAINS
             IF (unit_nr_prv > 0) WRITE (unit_nr_prv, '(T2,A,1X,A)') "Redistribution of", TRIM(tensor1%name)
             nblkrows = PRODUCT(INT(dims1(ind1_linked), KIND=int_8))
             nblkcols = PRODUCT(INT(dims1(ind1_free), KIND=int_8))
-            comm_2d = dbs_tas_mp_comm(tensor1%pgrid%mp_comm_2d, nblkrows, nblkcols)
+            comm_2d = block_tas_mp_comm(tensor1%pgrid%mp_comm_2d, nblkrows, nblkcols)
             ALLOCATE (tensor1_out)
-            CALL dbs_t_remap(tensor1, ind1_linked, ind1_free, tensor1_out, comm_2d=comm_2d, &
+            CALL block_tensor_remap(tensor1, ind1_linked, ind1_free, tensor1_out, comm_2d=comm_2d, &
                                nodata=nodata1, move_data=move_data_1)
             CALL mp_comm_free(comm_2d)
             compat1 = 1
@@ -1300,23 +1300,23 @@ CONTAINS
          IF (compat2 == 0 .OR. optimize_dist_prv) THEN ! tensor 2 is not contraction compatible --> reshape
             IF (unit_nr_prv > 0) WRITE (unit_nr_prv, '(T2,A,1X,A,1X,A,1X,A)') "Redistribution of", &
                TRIM(tensor2%name), "compatible with", TRIM(tensor1%name)
-            dist_in = dbs_t_distribution(tensor1_out)
+            dist_in = block_tensor_distribution(tensor1_out)
             dist_list = array_sublist(dist_in%nd_dist, ind1_linked)
             IF (compat1 == 1) THEN ! linked index is first 2d dimension
                ! get distribution of linked index, tensor 2 must adopt this distribution
                ! get grid dimensions of linked index
                ALLOCATE (mp_dims(ndims_mapping_row(dist_in%pgrid%nd_index_grid)))
-               CALL dbs_t_get_mapping_info(dist_in%pgrid%nd_index_grid, dims1_2d=mp_dims)
+               CALL block_tensor_get_mapping_info(dist_in%pgrid%nd_index_grid, dims1_2d=mp_dims)
                ALLOCATE (tensor2_out)
-               CALL dbs_t_remap(tensor2, ind2_linked, ind2_free, tensor2_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
+               CALL block_tensor_remap(tensor2, ind2_linked, ind2_free, tensor2_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
                                   dist1=dist_list, mp_dims_1=mp_dims, nodata=nodata2, move_data=move_data_2)
             ELSEIF (compat1 == 2) THEN ! linked index is second 2d dimension
                ! get distribution of linked index, tensor 2 must adopt this distribution
                ! get grid dimensions of linked index
                ALLOCATE (mp_dims(ndims_mapping_column(dist_in%pgrid%nd_index_grid)))
-               CALL dbs_t_get_mapping_info(dist_in%pgrid%nd_index_grid, dims2_2d=mp_dims)
+               CALL block_tensor_get_mapping_info(dist_in%pgrid%nd_index_grid, dims2_2d=mp_dims)
                ALLOCATE (tensor2_out)
-               CALL dbs_t_remap(tensor2, ind2_free, ind2_linked, tensor2_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
+               CALL block_tensor_remap(tensor2, ind2_free, ind2_linked, tensor2_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
                                   dist2=dist_list, mp_dims_2=mp_dims, nodata=nodata2, move_data=move_data_2)
             ELSE
                CPABORT("should not happen")
@@ -1331,9 +1331,9 @@ CONTAINS
             IF (unit_nr_prv > 0) WRITE (unit_nr_prv, '(T2,A,1X,A)') "Redistribution of", TRIM(tensor2%name)
             nblkrows = PRODUCT(INT(dims2(ind2_linked), KIND=int_8))
             nblkcols = PRODUCT(INT(dims2(ind2_free), KIND=int_8))
-            comm_2d = dbs_tas_mp_comm(tensor2%pgrid%mp_comm_2d, nblkrows, nblkcols)
+            comm_2d = block_tas_mp_comm(tensor2%pgrid%mp_comm_2d, nblkrows, nblkcols)
             ALLOCATE (tensor2_out)
-            CALL dbs_t_remap(tensor2, ind2_linked, ind2_free, tensor2_out, nodata=nodata2, move_data=move_data_2)
+            CALL block_tensor_remap(tensor2, ind2_linked, ind2_free, tensor2_out, nodata=nodata2, move_data=move_data_2)
             CALL mp_comm_free(comm_2d)
             compat2 = 1
          ELSE
@@ -1343,19 +1343,19 @@ CONTAINS
          IF (compat1 == 0 .OR. optimize_dist_prv) THEN ! tensor 1 is not contraction compatible --> reshape
             IF (unit_nr_prv > 0) WRITE (unit_nr_prv, '(T2,A,1X,A,1X,A,1X,A)') "Redistribution of", TRIM(tensor1%name), &
                "compatible with", TRIM(tensor2%name)
-            dist_in = dbs_t_distribution(tensor2_out)
+            dist_in = block_tensor_distribution(tensor2_out)
             dist_list = array_sublist(dist_in%nd_dist, ind2_linked)
             IF (compat2 == 1) THEN
                ALLOCATE (mp_dims(ndims_mapping_row(dist_in%pgrid%nd_index_grid)))
-               CALL dbs_t_get_mapping_info(dist_in%pgrid%nd_index_grid, dims1_2d=mp_dims)
+               CALL block_tensor_get_mapping_info(dist_in%pgrid%nd_index_grid, dims1_2d=mp_dims)
                ALLOCATE (tensor1_out)
-               CALL dbs_t_remap(tensor1, ind1_linked, ind1_free, tensor1_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
+               CALL block_tensor_remap(tensor1, ind1_linked, ind1_free, tensor1_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
                                   dist1=dist_list, mp_dims_1=mp_dims, nodata=nodata1, move_data=move_data_1)
             ELSEIF (compat2 == 2) THEN
                ALLOCATE (mp_dims(ndims_mapping_column(dist_in%pgrid%nd_index_grid)))
-               CALL dbs_t_get_mapping_info(dist_in%pgrid%nd_index_grid, dims2_2d=mp_dims)
+               CALL block_tensor_get_mapping_info(dist_in%pgrid%nd_index_grid, dims2_2d=mp_dims)
                ALLOCATE (tensor1_out)
-               CALL dbs_t_remap(tensor1, ind1_free, ind1_linked, tensor1_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
+               CALL block_tensor_remap(tensor1, ind1_free, ind1_linked, tensor1_out, comm_2d=dist_in%pgrid%mp_comm_2d, &
                                   dist2=dist_list, mp_dims_2=mp_dims, nodata=nodata1, move_data=move_data_1)
             ELSE
                CPABORT("should not happen")
@@ -1419,12 +1419,12 @@ CONTAINS
       !! Prepare tensor for contraction: redistribute to a 2d format which can be contracted by
       !! matrix multiplication. This routine reshapes the smallest of the three tensors.
 
-      TYPE(dbs_t_type), TARGET, INTENT(INOUT)   :: tensor_in
+      TYPE(block_tensor_type), TARGET, INTENT(INOUT)   :: tensor_in
          !! tensor in
       INTEGER, DIMENSION(:), INTENT(IN)           :: ind1, ind2
          !! index that should be mapped to first matrix dimension
          !! index that should be mapped to second matrix dimension
-      TYPE(dbs_t_type), POINTER, INTENT(OUT)    :: tensor_out
+      TYPE(block_tensor_type), POINTER, INTENT(OUT)    :: tensor_out
          !! tensor out
       CHARACTER(LEN=1), INTENT(OUT)               :: trans
          !! transpose flag of matrix rep.
@@ -1466,8 +1466,8 @@ CONTAINS
          IF (unit_nr_prv > 0) WRITE (unit_nr_prv, '(T2,A,1X,A)') "Redistribution of", TRIM(tensor_in%name)
 
          ALLOCATE (tensor_out)
-         CALL dbs_t_remap(tensor_in, ind1, ind2, tensor_out, nodata=nodata, move_data=move_data)
-         CALL dbs_t_copy_contraction_storage(tensor_in, tensor_out)
+         CALL block_tensor_remap(tensor_in, ind1, ind2, tensor_out, nodata=nodata, move_data=move_data)
+         CALL block_tensor_copy_contraction_storage(tensor_in, tensor_out)
          compat1 = 1
          compat2 = 2
          new = .TRUE.
@@ -1502,10 +1502,10 @@ CONTAINS
    FUNCTION update_contraction_storage(storage, split_opt, split) RESULT(do_change_pgrid)
       !! update contraction storage that keeps track of process grids during a batched contraction
       !! and decide if tensor process grid needs to be optimized
-      TYPE(dbs_t_contraction_storage), INTENT(INOUT) :: storage
-      TYPE(dbs_tas_split_info), INTENT(IN)           :: split_opt
+      TYPE(block_tensor_contraction_storage), INTENT(INOUT) :: storage
+      TYPE(block_tas_split_info), INTENT(IN)           :: split_opt
          !! optimized TAS process grid
-      TYPE(dbs_tas_split_info), INTENT(IN)           :: split
+      TYPE(block_tas_split_info), INTENT(IN)           :: split
          !! current TAS process grid
       INTEGER, DIMENSION(2) :: pdims_opt, coor, pdims, pdims_sub
       LOGICAL, DIMENSION(2) :: periods
@@ -1553,7 +1553,7 @@ CONTAINS
       INTEGER, DIMENSION(ndims_mapping_column(nd_index)) :: map2
       INTEGER                            :: compat_map
 
-      CALL dbs_t_get_mapping_info(nd_index, map1_2d=map1, map2_2d=map2)
+      CALL block_tensor_get_mapping_info(nd_index, map1_2d=map1, map2_2d=map2)
 
       compat_map = 0
       IF (array_eq_i(map1, compat_ind)) THEN
@@ -1584,30 +1584,30 @@ CONTAINS
    END SUBROUTINE
 
    FUNCTION opt_pgrid(tensor, tas_split_info)
-      TYPE(dbs_t_type), INTENT(IN) :: tensor
-      TYPE(dbs_tas_split_info), INTENT(IN) :: tas_split_info
+      TYPE(block_tensor_type), INTENT(IN) :: tensor
+      TYPE(block_tas_split_info), INTENT(IN) :: tas_split_info
       INTEGER, DIMENSION(ndims_matrix_row(tensor)) :: map1
       INTEGER, DIMENSION(ndims_matrix_column(tensor)) :: map2
-      TYPE(dbs_t_pgrid_type) :: opt_pgrid
+      TYPE(block_tensor_pgrid_type) :: opt_pgrid
       INTEGER, DIMENSION(ndims_tensor(tensor)) :: dims
 
-      CALL dbs_t_get_mapping_info(tensor%pgrid%nd_index_grid, map1_2d=map1, map2_2d=map2)
+      CALL block_tensor_get_mapping_info(tensor%pgrid%nd_index_grid, map1_2d=map1, map2_2d=map2)
       CALL blk_dims_tensor(tensor, dims)
-      opt_pgrid = dbs_t_nd_mp_comm(tas_split_info%mp_comm, map1, map2, tdims=dims)
+      opt_pgrid = block_tensor_nd_mp_comm(tas_split_info%mp_comm, map1, map2, tdims=dims)
 
       ALLOCATE (opt_pgrid%tas_split_info, SOURCE=tas_split_info)
-      CALL dbs_tas_info_hold(opt_pgrid%tas_split_info)
+      CALL block_tas_info_hold(opt_pgrid%tas_split_info)
    END FUNCTION
 
-   SUBROUTINE dbs_t_remap(tensor_in, map1_2d, map2_2d, tensor_out, comm_2d, dist1, dist2, &
+   SUBROUTINE block_tensor_remap(tensor_in, map1_2d, map2_2d, tensor_out, comm_2d, dist1, dist2, &
                             mp_dims_1, mp_dims_2, name, nodata, move_data)
       !! Copy tensor to tensor with modified index mapping
 
-      TYPE(dbs_t_type), INTENT(INOUT)      :: tensor_in
+      TYPE(block_tensor_type), INTENT(INOUT)      :: tensor_in
       INTEGER, DIMENSION(:), INTENT(IN)      :: map1_2d, map2_2d
          !! new index mapping
          !! new index mapping
-      TYPE(dbs_t_type), INTENT(OUT)        :: tensor_out
+      TYPE(block_tensor_type), INTENT(OUT)        :: tensor_out
       CHARACTER(len=*), INTENT(IN), OPTIONAL :: name
       LOGICAL, INTENT(IN), OPTIONAL          :: nodata, move_data
       INTEGER, INTENT(IN), OPTIONAL          :: comm_2d
@@ -1617,12 +1617,12 @@ CONTAINS
       CHARACTER(len=default_string_length)   :: name_tmp
       INTEGER, DIMENSION(:), ALLOCATABLE     :: ${varlist("blk_sizes")}$, &
                                                 ${varlist("nd_dist")}$
-      TYPE(dbs_t_distribution_type)        :: dist
+      TYPE(block_tensor_distribution_type)        :: dist
       INTEGER                                :: comm_2d_prv, handle, i
       INTEGER, DIMENSION(ndims_tensor(tensor_in)) :: pdims, myploc
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_remap'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_remap'
       LOGICAL                               :: nodata_prv
-      TYPE(dbs_t_pgrid_type)              :: comm_nd
+      TYPE(block_tensor_pgrid_type)              :: comm_nd
 
       CALL timeset(routineN, handle)
 
@@ -1645,7 +1645,7 @@ CONTAINS
          comm_2d_prv = tensor_in%pgrid%mp_comm_2d
       ENDIF
 
-      comm_nd = dbs_t_nd_mp_comm(comm_2d_prv, map1_2d, map2_2d, dims1_nd=mp_dims_1, dims2_nd=mp_dims_2)
+      comm_nd = block_tensor_nd_mp_comm(comm_2d_prv, map1_2d, map2_2d, dims1_nd=mp_dims_1, dims2_nd=mp_dims_2)
       CALL mp_environ_pgrid(comm_nd, pdims, myploc)
 
 #:for ndim in ndims
@@ -1673,18 +1673,18 @@ CONTAINS
 
          IF (.NOT. ALLOCATED(nd_dist_${idim}$)) THEN
             ALLOCATE (nd_dist_${idim}$ (SIZE(blk_sizes_${idim}$)))
-            CALL dbs_t_default_distvec(SIZE(blk_sizes_${idim}$), pdims(${idim}$), blk_sizes_${idim}$, nd_dist_${idim}$)
+            CALL block_tensor_default_distvec(SIZE(blk_sizes_${idim}$), pdims(${idim}$), blk_sizes_${idim}$, nd_dist_${idim}$)
          ENDIF
 #:endfor
-         CALL dbs_t_distribution_new_expert(dist, comm_nd, map1_2d, map2_2d, &
+         CALL block_tensor_distribution_new_expert(dist, comm_nd, map1_2d, map2_2d, &
                                               ${varlist("nd_dist", nmax=ndim)}$, own_comm=.TRUE.)
       ENDIF
 #:endfor
 
 #:for ndim in ndims
       IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
-         CALL dbs_t_create(tensor_out, name_tmp, dist, &
-                             map1_2d, map2_2d, dbs_tas_get_data_type(tensor_in%matrix_rep), &
+         CALL block_tensor_create(tensor_out, name_tmp, dist, &
+                             map1_2d, map2_2d, block_tas_get_data_type(tensor_in%matrix_rep), &
                              ${varlist("blk_sizes", nmax=ndim)}$)
       ENDIF
 #:endfor
@@ -1695,46 +1695,46 @@ CONTAINS
          nodata_prv = .FALSE.
       ENDIF
 
-      IF (.NOT. nodata_prv) CALL dbs_t_copy_expert(tensor_in, tensor_out, move_data=move_data)
-      CALL dbs_t_distribution_destroy(dist)
+      IF (.NOT. nodata_prv) CALL block_tensor_copy_expert(tensor_in, tensor_out, move_data=move_data)
+      CALL block_tensor_distribution_destroy(dist)
 
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_align_index(tensor_in, tensor_out, order)
+   SUBROUTINE block_tensor_align_index(tensor_in, tensor_out, order)
       !! Align index with data
 
-      TYPE(dbs_t_type), INTENT(INOUT)               :: tensor_in
-      TYPE(dbs_t_type), INTENT(OUT)                 :: tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT)               :: tensor_in
+      TYPE(block_tensor_type), INTENT(OUT)                 :: tensor_out
       INTEGER, DIMENSION(ndims_matrix_row(tensor_in)) :: map1_2d
       INTEGER, DIMENSION(ndims_matrix_column(tensor_in)) :: map2_2d
       INTEGER, DIMENSION(ndims_tensor(tensor_in)), &
          INTENT(OUT), OPTIONAL                        :: order
          !! permutation resulting from alignment
       INTEGER, DIMENSION(ndims_tensor(tensor_in))     :: order_prv
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_align_index'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_align_index'
       INTEGER                                         :: handle
 
       CALL timeset(routineN, handle)
 
-      CALL dbs_t_get_mapping_info(tensor_in%nd_index_blk, map1_2d=map1_2d, map2_2d=map2_2d)
-      order_prv = dbs_t_inverse_order([map1_2d, map2_2d])
-      CALL dbs_t_permute_index(tensor_in, tensor_out, order=order_prv)
+      CALL block_tensor_get_mapping_info(tensor_in%nd_index_blk, map1_2d=map1_2d, map2_2d=map2_2d)
+      order_prv = block_tensor_inverse_order([map1_2d, map2_2d])
+      CALL block_tensor_permute_index(tensor_in, tensor_out, order=order_prv)
 
       IF (PRESENT(order)) order = order_prv
 
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_permute_index(tensor_in, tensor_out, order)
+   SUBROUTINE block_tensor_permute_index(tensor_in, tensor_out, order)
       !! Create new tensor by reordering index, data is copied exactly (shallow copy)
-      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor_in
-      TYPE(dbs_t_type), INTENT(OUT)                 :: tensor_out
+      TYPE(block_tensor_type), INTENT(INOUT)                  :: tensor_in
+      TYPE(block_tensor_type), INTENT(OUT)                 :: tensor_out
       INTEGER, DIMENSION(ndims_tensor(tensor_in)), &
          INTENT(IN)                                   :: order
 
       TYPE(nd_to_2d_mapping)                          :: nd_index_blk_rs, nd_index_rs
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_permute_index'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_permute_index'
       INTEGER                                         :: handle
       INTEGER                                         :: ndims
 
@@ -1756,7 +1756,7 @@ CONTAINS
          ALLOCATE (tensor_out%pgrid%tas_split_info, SOURCE=tensor_in%pgrid%tas_split_info)
       ENDIF
       tensor_out%refcount => tensor_in%refcount
-      CALL dbs_t_hold(tensor_out)
+      CALL block_tensor_hold(tensor_out)
 
       CALL reorder_arrays(tensor_in%blk_sizes, tensor_out%blk_sizes, order)
       CALL reorder_arrays(tensor_in%blk_offsets, tensor_out%blk_offsets, order)
@@ -1778,7 +1778,7 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_contract_index(alpha, tensor_1, tensor_2, beta, tensor_3, &
+   SUBROUTINE block_tensor_contract_index(alpha, tensor_1, tensor_2, beta, tensor_3, &
                                      contract_1, notcontract_1, &
                                      contract_2, notcontract_2, &
                                      map_1, map_2, &
@@ -1788,10 +1788,10 @@ CONTAINS
       !! get indices of non-zero tensor blocks for contraction result without actually
       !! performing contraction.
       !! this is an estimate based on block norm multiplication.
-      !! See documentation of dbs_t_contract.
+      !! See documentation of block_tensor_contract.
       TYPE(dbcsr_scalar_type), INTENT(IN)            :: alpha
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_1
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_2
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
       TYPE(dbcsr_scalar_type), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
@@ -1799,7 +1799,7 @@ CONTAINS
       INTEGER, DIMENSION(:), INTENT(IN)              :: map_2
       INTEGER, DIMENSION(:), INTENT(IN)              :: notcontract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: notcontract_2
-      TYPE(dbs_t_type), INTENT(INOUT), TARGET      :: tensor_3
+      TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_3
       INTEGER, DIMENSION(2, SIZE(contract_1)), &
          INTENT(IN), OPTIONAL                        :: bounds_1
       INTEGER, DIMENSION(2, SIZE(notcontract_1)), &
@@ -1809,12 +1809,12 @@ CONTAINS
       REAL(KIND=real_8), INTENT(IN), OPTIONAL        :: filter_eps
       INTEGER, INTENT(OUT)                           :: nblks_local
          !! number of local blocks on this MPI rank
-      INTEGER, DIMENSION(dbs_t_max_nblks_local(tensor_3), ndims_tensor(tensor_3)), &
+      INTEGER, DIMENSION(block_tensor_max_nblks_local(tensor_3), ndims_tensor(tensor_3)), &
          INTENT(OUT)                                 :: result_index
          !! indices of local non-zero tensor blocks for tensor_3
          !! only the elements result_index(:nblks_local, :) are relevant (all others are set to 0)
 
-      CALL dbs_t_contract_expert(alpha, tensor_1, tensor_2, beta, tensor_3, &
+      CALL block_tensor_contract_expert(alpha, tensor_1, tensor_2, beta, tensor_3, &
                                    contract_1, notcontract_1, &
                                    contract_2, notcontract_2, &
                                    map_1, map_2, &
@@ -1826,16 +1826,16 @@ CONTAINS
                                    result_index=result_index)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_map_bounds_to_tensors(tensor_1, tensor_2, &
+   SUBROUTINE block_tensor_map_bounds_to_tensors(tensor_1, tensor_2, &
                                             contract_1, notcontract_1, &
                                             contract_2, notcontract_2, &
                                             bounds_t1, bounds_t2, &
                                             bounds_1, bounds_2, bounds_3, &
                                             do_crop_1, do_crop_2)
       !! Map contraction bounds to bounds referring to tensor indices
-      !! see dbs_t_contract for docu of dummy arguments
+      !! see block_tensor_contract for docu of dummy arguments
 
-      TYPE(dbs_t_type), INTENT(IN)      :: tensor_1, tensor_2
+      TYPE(block_tensor_type), INTENT(IN)      :: tensor_1, tensor_2
       INTEGER, DIMENSION(:), INTENT(IN)   :: contract_1, contract_2, &
                                              notcontract_1, notcontract_2
       INTEGER, DIMENSION(2, ndims_tensor(tensor_1)), &
@@ -1858,10 +1858,10 @@ CONTAINS
       do_crop = .FALSE.
 
       bounds_t1(1, :) = 1
-      CALL dbs_t_get_info(tensor_1, nfull_total=bounds_t1(2, :))
+      CALL block_tensor_get_info(tensor_1, nfull_total=bounds_t1(2, :))
 
       bounds_t2(1, :) = 1
-      CALL dbs_t_get_info(tensor_2, nfull_total=bounds_t2(2, :))
+      CALL block_tensor_get_info(tensor_2, nfull_total=bounds_t2(2, :))
 
       IF (PRESENT(bounds_1)) THEN
          bounds_t1(:, contract_1) = bounds_1
@@ -1885,10 +1885,10 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_print_contraction_index(tensor_1, indchar1, tensor_2, indchar2, tensor_3, indchar3, unit_nr)
+   SUBROUTINE block_tensor_print_contraction_index(tensor_1, indchar1, tensor_2, indchar2, tensor_3, indchar3, unit_nr)
       !! print tensor contraction indices in a human readable way
 
-      TYPE(dbs_t_type), INTENT(IN) :: tensor_1, tensor_2, tensor_3
+      TYPE(block_tensor_type), INTENT(IN) :: tensor_1, tensor_2, tensor_3
       CHARACTER(LEN=1), DIMENSION(ndims_tensor(tensor_1)), INTENT(IN) :: indchar1
          !! characters printed for index of tensor 1
       CHARACTER(LEN=1), DIMENSION(ndims_tensor(tensor_2)), INTENT(IN) :: indchar2
@@ -1908,9 +1908,9 @@ CONTAINS
       unit_nr_prv = prep_output_unit(unit_nr)
 
       IF (unit_nr_prv /= 0) THEN
-         CALL dbs_t_get_mapping_info(tensor_1%nd_index_blk, map1_2d=map11, map2_2d=map12)
-         CALL dbs_t_get_mapping_info(tensor_2%nd_index_blk, map1_2d=map21, map2_2d=map22)
-         CALL dbs_t_get_mapping_info(tensor_3%nd_index_blk, map1_2d=map31, map2_2d=map32)
+         CALL block_tensor_get_mapping_info(tensor_1%nd_index_blk, map1_2d=map11, map2_2d=map12)
+         CALL block_tensor_get_mapping_info(tensor_2%nd_index_blk, map1_2d=map21, map2_2d=map22)
+         CALL block_tensor_get_mapping_info(tensor_3%nd_index_blk, map1_2d=map31, map2_2d=map32)
       ENDIF
 
       IF (unit_nr_prv > 0) THEN
@@ -1958,22 +1958,22 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_batched_contract_init(tensor, ${varlist("batch_range")}$)
+   SUBROUTINE block_tensor_batched_contract_init(tensor, ${varlist("batch_range")}$)
       !! Initialize batched contraction for this tensor.
       !!
       !! Explanation: A batched contraction is a contraction performed in several consecutive steps by
-      !! specification of bounds in dbs_t_contract. This can be used to reduce memory by a large factor.
-      !! The routines dbs_t_batched_contract_init and dbs_t_batched_contract_finalize should be
+      !! specification of bounds in block_tensor_contract. This can be used to reduce memory by a large factor.
+      !! The routines block_tensor_batched_contract_init and block_tensor_batched_contract_finalize should be
       !! called to define the scope of a batched contraction as this enables important optimizations
       !! (adapting communication scheme to batches and adapting process grid to multiplication algorithm).
-      !! The routines dbs_t_batched_contract_init and dbs_t_batched_contract_finalize must be called
+      !! The routines block_tensor_batched_contract_init and block_tensor_batched_contract_finalize must be called
       !! before the first and after the last contraction step on all 3 tensors.
       !!
       !! Requirements:
-      !! - the tensors are in a compatible matrix layout (see documentation of `dbs_t_contract`, note 2 & 3).
+      !! - the tensors are in a compatible matrix layout (see documentation of `block_tensor_contract`, note 2 & 3).
       !!   If they are not, process grid optimizations are disabled and a warning is issued.
       !! - within the scope of a batched contraction, it is not allowed to access or change tensor data
-      !!   except by calling the routines dbs_t_contract & dbs_t_copy.
+      !!   except by calling the routines block_tensor_contract & block_tensor_copy.
       !! - the bounds affecting indices of the smallest tensor must not change in the course of a batched
       !!   contraction (todo: get rid of this requirement).
       !!
@@ -1983,7 +1983,7 @@ CONTAINS
       !!   smallest of the 3 tensors.
       !!
       !! @note
-      !! Note 1: for an example of batched contraction see `examples/dbs_tensor_example.F`.
+      !! Note 1: for an example of batched contraction see `examples/block_tensor_example.F`.
       !! (todo: the example is outdated and should be updated).
       !!
       !! Note 2: it is meaningful to use this feature if the contraction consists of one batch only
@@ -1992,7 +1992,7 @@ CONTAINS
       !! contraction call). The process grid is then optimized after the first contraction
       !! and future contraction may profit from this optimization.
       !! @endnote
-      TYPE(dbs_t_type), INTENT(INOUT) :: tensor
+      TYPE(block_tensor_type), INTENT(INOUT) :: tensor
       INTEGER, DIMENSION(:), OPTIONAL, INTENT(IN)        :: ${varlist("batch_range")}$
          !! For internal load balancing optimizations, optionally specify the index ranges of
          !! batched contraction.
@@ -2003,7 +2003,7 @@ CONTAINS
       INTEGER, DIMENSION(:), ALLOCATABLE                 :: ${varlist("batch_range_prv")}$
       LOGICAL :: static_range
 
-      CALL dbs_t_get_info(tensor, nblks_total=tdims)
+      CALL block_tensor_get_info(tensor, nblks_total=tdims)
 
       static_range = .TRUE.
 #:for idim in range(1, maxdim+1)
@@ -2022,7 +2022,7 @@ CONTAINS
       ALLOCATE (tensor%contraction_storage)
       tensor%contraction_storage%static = static_range
       IF (static_range) THEN
-         CALL dbs_tas_batched_mm_init(tensor%matrix_rep)
+         CALL block_tas_batched_mm_init(tensor%matrix_rep)
       ENDIF
       tensor%contraction_storage%nsplit_avg = 0.0_real_8
       tensor%contraction_storage%ibatch = 0
@@ -2036,16 +2036,16 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_batched_contract_finalize(tensor, unit_nr)
+   SUBROUTINE block_tensor_batched_contract_finalize(tensor, unit_nr)
       !! finalize batched contraction. This performs all communication that has been postponed in the
       !! contraction calls.
-      TYPE(dbs_t_type), INTENT(INOUT) :: tensor
+      TYPE(block_tensor_type), INTENT(INOUT) :: tensor
       INTEGER, INTENT(IN), OPTIONAL :: unit_nr
       LOGICAL :: do_write
       INTEGER :: unit_nr_prv, handle
 
       CALL mp_sync(tensor%pgrid%mp_comm_2d)
-      CALL timeset("dbs_t_total", handle)
+      CALL timeset("block_tensor_total", handle)
       unit_nr_prv = prep_output_unit(unit_nr)
 
       do_write = .FALSE.
@@ -2054,7 +2054,7 @@ CONTAINS
          IF (tensor%matrix_rep%do_batched > 0) THEN
             IF (tensor%matrix_rep%mm_storage%batched_out) do_write = .TRUE.
          ENDIF
-         CALL dbs_tas_batched_mm_finalize(tensor%matrix_rep)
+         CALL block_tas_batched_mm_finalize(tensor%matrix_rep)
       ENDIF
 
       IF (do_write .AND. unit_nr_prv /= 0) THEN
@@ -2062,8 +2062,8 @@ CONTAINS
             WRITE (unit_nr_prv, "(T2,A)") &
                "FINALIZING BATCHED PROCESSING OF MATMUL"
          ENDIF
-         CALL dbs_t_write_tensor_info(tensor, unit_nr_prv)
-         CALL dbs_t_write_tensor_dist(tensor, unit_nr_prv)
+         CALL block_tensor_write_tensor_info(tensor, unit_nr_prv)
+         CALL block_tensor_write_tensor_dist(tensor, unit_nr_prv)
       ENDIF
 
       CALL destroy_array_list(tensor%contraction_storage%batch_ranges)
@@ -2073,11 +2073,11 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_change_pgrid(tensor, pgrid, ${varlist("batch_range")}$, &
+   SUBROUTINE block_tensor_change_pgrid(tensor, pgrid, ${varlist("batch_range")}$, &
                                    nodata, pgrid_changed, unit_nr)
       !! change the process grid of a tensor
-      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor
-      TYPE(dbs_t_pgrid_type), INTENT(IN)               :: pgrid
+      TYPE(block_tensor_type), INTENT(INOUT)                  :: tensor
+      TYPE(block_tensor_pgrid_type), INTENT(IN)               :: pgrid
       INTEGER, DIMENSION(:), OPTIONAL, INTENT(IN)        :: ${varlist("batch_range")}$
          !! For internal load balancing optimizations, optionally specify the index ranges of
          !! batched contraction.
@@ -2088,15 +2088,15 @@ CONTAINS
          !! optionally don't copy the tensor data (then tensor is empty on returned)
       LOGICAL, INTENT(OUT), OPTIONAL                     :: pgrid_changed
       INTEGER, INTENT(IN), OPTIONAL                      :: unit_nr
-      CHARACTER(LEN=*), PARAMETER :: routineN = 'dbs_t_change_pgrid'
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_change_pgrid'
       CHARACTER(default_string_length)                   :: name
       INTEGER                                            :: handle
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: ${varlist("bs")}$, &
                                                             ${varlist("dist")}$
       INTEGER, DIMENSION(ndims_tensor(tensor))           :: pcoord, pcoord_ref, pdims, pdims_ref, &
                                                             tdims
-      TYPE(dbs_t_type)                                 :: t_tmp
-      TYPE(dbs_t_distribution_type)                    :: dist
+      TYPE(block_tensor_type)                                 :: t_tmp
+      TYPE(block_tensor_distribution_type)                    :: dist
       INTEGER, DIMENSION(ndims_matrix_row(tensor)) :: map1
       INTEGER, &
          DIMENSION(ndims_matrix_column(tensor))    :: map2
@@ -2125,11 +2125,11 @@ CONTAINS
       ENDIF
 #:endfor
 
-      CALL dbs_t_get_info(tensor, nblks_total=tdims, name=name)
+      CALL block_tensor_get_info(tensor, nblks_total=tdims, name=name)
 
 #:for idim in range(1, maxdim+1)
       IF (ndims_tensor(tensor) >= ${idim}$) THEN
-         ALLOCATE (bs_${idim}$ (dbs_t_nblks_total(tensor, ${idim}$)))
+         ALLOCATE (bs_${idim}$ (block_tensor_nblks_total(tensor, ${idim}$)))
          CALL get_ith_array(tensor%blk_sizes, ${idim}$, bs_${idim}$)
          ALLOCATE (dist_${idim}$ (tdims(${idim}$)))
          dist_${idim}$ = 0
@@ -2138,40 +2138,40 @@ CONTAINS
                ind1 = batch_range_${idim}$ (ibatch)
                ind2 = batch_range_${idim}$ (ibatch + 1) - 1
                batch_size = ind2 - ind1 + 1
-               CALL dbs_t_default_distvec(batch_size, pdims(${idim}$), &
+               CALL block_tensor_default_distvec(batch_size, pdims(${idim}$), &
                                             bs_${idim}$ (ind1:ind2), dist_${idim}$ (ind1:ind2))
             ENDDO
          ELSE
-            CALL dbs_t_default_distvec(tdims(${idim}$), pdims(${idim}$), bs_${idim}$, dist_${idim}$)
+            CALL block_tensor_default_distvec(tdims(${idim}$), pdims(${idim}$), bs_${idim}$, dist_${idim}$)
          ENDIF
       ENDIF
 #:endfor
 
-      CALL dbs_t_get_mapping_info(tensor%nd_index_blk, map1_2d=map1, map2_2d=map2)
+      CALL block_tensor_get_mapping_info(tensor%nd_index_blk, map1_2d=map1, map2_2d=map2)
 #:for ndim in ndims
       IF (ndims_tensor(tensor) == ${ndim}$) THEN
-         CALL dbs_t_distribution_new(dist, pgrid, ${varlist("dist", nmax=ndim)}$)
-         CALL dbs_t_create(t_tmp, name, dist, map1, map2, dbcsr_type_real_8, ${varlist("bs", nmax=ndim)}$)
+         CALL block_tensor_distribution_new(dist, pgrid, ${varlist("dist", nmax=ndim)}$)
+         CALL block_tensor_create(t_tmp, name, dist, map1, map2, dbcsr_type_real_8, ${varlist("bs", nmax=ndim)}$)
       ENDIF
 #:endfor
-      CALL dbs_t_distribution_destroy(dist)
+      CALL block_tensor_distribution_destroy(dist)
 
       IF (PRESENT(nodata)) THEN
-         IF (.NOT. nodata) CALL dbs_t_copy_expert(tensor, t_tmp, move_data=.TRUE.)
+         IF (.NOT. nodata) CALL block_tensor_copy_expert(tensor, t_tmp, move_data=.TRUE.)
       ELSE
-         CALL dbs_t_copy_expert(tensor, t_tmp, move_data=.TRUE.)
+         CALL block_tensor_copy_expert(tensor, t_tmp, move_data=.TRUE.)
       ENDIF
 
-      CALL dbs_t_copy_contraction_storage(tensor, t_tmp)
+      CALL block_tensor_copy_contraction_storage(tensor, t_tmp)
 
-      CALL dbs_t_destroy(tensor)
+      CALL block_tensor_destroy(tensor)
       tensor = t_tmp
 
       IF (PRESENT(unit_nr)) THEN
          IF (unit_nr > 0) THEN
             WRITE (unit_nr, "(T2,A,1X,A)") "OPTIMIZED PGRID INFO FOR", TRIM(tensor%name)
             WRITE (unit_nr, "(T4,A,1X,3I6)") "process grid dimensions:", pdims
-            CALL dbs_t_write_split_info(pgrid, unit_nr)
+            CALL block_tensor_write_split_info(pgrid, unit_nr)
          ENDIF
       ENDIF
 
@@ -2180,9 +2180,9 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE
 
-   SUBROUTINE dbs_t_change_pgrid_2d(tensor, mp_comm, pdims, nodata, nsplit, dimsplit, pgrid_changed, unit_nr)
+   SUBROUTINE block_tensor_change_pgrid_2d(tensor, mp_comm, pdims, nodata, nsplit, dimsplit, pgrid_changed, unit_nr)
       !! map tensor to a new 2d process grid for the matrix representation.
-      TYPE(dbs_t_type), INTENT(INOUT)                  :: tensor
+      TYPE(block_tensor_type), INTENT(INOUT)                  :: tensor
       INTEGER, INTENT(IN)               :: mp_comm
       INTEGER, DIMENSION(2), INTENT(IN), OPTIONAL :: pdims
       LOGICAL, INTENT(IN), OPTIONAL                      :: nodata
@@ -2192,12 +2192,12 @@ CONTAINS
       INTEGER, DIMENSION(ndims_matrix_row(tensor)) :: map1
       INTEGER, DIMENSION(ndims_matrix_column(tensor)) :: map2
       INTEGER, DIMENSION(ndims_tensor(tensor)) :: dims, nbatches
-      TYPE(dbs_t_pgrid_type) :: pgrid
+      TYPE(block_tensor_pgrid_type) :: pgrid
       INTEGER, DIMENSION(:), ALLOCATABLE :: ${varlist("batch_range")}$
       INTEGER, DIMENSION(:), ALLOCATABLE :: array
       INTEGER :: idim
 
-      CALL dbs_t_get_mapping_info(tensor%pgrid%nd_index_grid, map1_2d=map1, map2_2d=map2)
+      CALL block_tensor_get_mapping_info(tensor%pgrid%nd_index_grid, map1_2d=map1, map2_2d=map2)
       CALL blk_dims_tensor(tensor, dims)
 
       IF (ALLOCATED(tensor%contraction_storage)) THEN
@@ -2216,19 +2216,19 @@ CONTAINS
          END ASSOCIATE
       ENDIF
 
-      pgrid = dbs_t_nd_mp_comm(mp_comm, map1, map2, pdims_2d=pdims, tdims=dims, nsplit=nsplit, dimsplit=dimsplit)
+      pgrid = block_tensor_nd_mp_comm(mp_comm, map1, map2, pdims_2d=pdims, tdims=dims, nsplit=nsplit, dimsplit=dimsplit)
       IF (ALLOCATED(tensor%contraction_storage)) THEN
 #:for ndim in range(1, maxdim+1)
          IF (ndims_tensor(tensor) == ${ndim}$) THEN
             CALL get_arrays(tensor%contraction_storage%batch_ranges, ${varlist("batch_range", nmax=ndim)}$)
-            CALL dbs_t_change_pgrid(tensor, pgrid, ${varlist("batch_range", nmax=ndim)}$, &
+            CALL block_tensor_change_pgrid(tensor, pgrid, ${varlist("batch_range", nmax=ndim)}$, &
                                       nodata=nodata, pgrid_changed=pgrid_changed, unit_nr=unit_nr)
          ENDIF
 #:endfor
       ELSE
-         CALL dbs_t_change_pgrid(tensor, pgrid, nodata=nodata, pgrid_changed=pgrid_changed, unit_nr=unit_nr)
+         CALL block_tensor_change_pgrid(tensor, pgrid, nodata=nodata, pgrid_changed=pgrid_changed, unit_nr=unit_nr)
       ENDIF
-      CALL dbs_t_pgrid_destroy(pgrid)
+      CALL block_tensor_pgrid_destroy(pgrid)
 
    END SUBROUTINE
 
