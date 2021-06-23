@@ -6,66 +6,66 @@
 !--------------------------------------------------------------------------------------------------!
 MODULE block_matrix_api
 
+ USE dbcsr_array_types, ONLY: array_i1d_obj
  USE dbcsr_types, ONLY: &
-     block_matrix_type => dbcsr_type
+     dbcsr_type
 
  USE dbcsr_iterator_operations, ONLY: &
-    block_matrix_iterator_blocks_left => dbcsr_iterator_blocks_left, &
-    block_matrix_iterator_next_block => dbcsr_iterator_next_block, &
-    block_matrix_iterator_start => dbcsr_iterator_start, &
-    block_matrix_iterator_stop => dbcsr_iterator_stop
+    dbcsr_iterator_blocks_left, &
+    dbcsr_iterator_next_block, &
+    dbcsr_iterator_start, &
+    dbcsr_iterator_stop
 
  USE dbcsr_transformations, ONLY: &
     dbcsr_desymmetrize_deep, &
-    block_matrix_redistribute => dbcsr_redistribute, &
-    block_matrix_complete_redistribute => dbcsr_complete_redistribute
+    dbcsr_redistribute, &
+    dbcsr_complete_redistribute
 
  USE dbcsr_operations, ONLY: &
-      block_matrix_set    => dbcsr_set, &
-      block_matrix_filter => dbcsr_filter, &
-      block_matrix_scale => dbcsr_scale, &
-      block_matrix_get_info => dbcsr_get_info, &
-      block_matrix_clear => dbcsr_clear, &
-      block_matrix_copy => dbcsr_copy, &
-      block_matrix_add => dbcsr_add, &
-      block_matrix_maxabs => dbcsr_maxabs, &
-      block_matrix_zero => dbcsr_zero
+      dbcsr_set, &
+      dbcsr_filter, &
+      dbcsr_scale, &
+      dbcsr_get_info, &
+      dbcsr_clear, &
+      dbcsr_copy, &
+      dbcsr_add, &
+      dbcsr_maxabs, &
+      dbcsr_zero, &
+      dbcsr_conform_scalar
 
  USE dbcsr_block_access, ONLY: &
-      block_matrix_get_block_p => dbcsr_get_block_p, &
-      block_matrix_put_block => dbcsr_put_block, &
-      block_matrix_reserve_blocks => dbcsr_reserve_blocks, &
-      block_matrix_put_block => dbcsr_put_block
+      dbcsr_get_block_p, &
+      dbcsr_reserve_blocks, &
+      dbcsr_put_block
 
  USE dbcsr_methods, ONLY: &
-      block_matrix_release              => dbcsr_release, &
-      block_matrix_get_data_type        => dbcsr_get_data_type, &
+      dbcsr_release, &
+      dbcsr_get_data_type, &
       block_matrix_mp_release           => dbcsr_mp_release, &
-      block_matrix_nblkcols_total       => dbcsr_nblkcols_total, &
-      block_matrix_nblkrows_total       => dbcsr_nblkrows_total, &
+      dbcsr_nblkcols_total, &
+      dbcsr_nblkrows_total, &
       block_matrix_nfullrows_total      => dbcsr_nfullrows_total, &
       block_matrix_nfullcols_total      => dbcsr_nfullcols_total, &
-      block_matrix_get_data_size        => dbcsr_get_data_size, &
-      block_matrix_get_num_blocks       => dbcsr_get_num_blocks, &
-      block_matrix_get_nze              => dbcsr_get_nze, &
+      dbcsr_get_data_size, &
+      dbcsr_get_num_blocks, &
+      dbcsr_get_nze, &
       block_mp_release                  => dbcsr_mp_release, &
       block_matrix_get_matrix_type      => dbcsr_get_matrix_type, &
-
-      block_matrix_blk_column_size      => dbcsr_blk_column_size, &
-      block_matrix_blk_row_size         => dbcsr_blk_row_size, &
-      block_matrix_row_block_sizes      => dbcsr_row_block_sizes, &
-      block_matrix_col_block_sizes      => dbcsr_col_block_sizes
+      dbcsr_blk_column_size, &
+      dbcsr_blk_row_size, &
+      dbcsr_row_block_sizes, &
+      dbcsr_col_block_sizes
 
  USE dbcsr_dist_methods, ONLY: &
       block_matrix_distribution_get => dbcsr_distribution_get, &
-      block_matrix_distribution_col_dist=> dbcsr_distribution_col_dist, &
-      block_matrix_distribution_new     => dbcsr_distribution_new, &
-      block_matrix_distribution_row_dist=> dbcsr_distribution_row_dist, &
-      block_matrix_distribution_hold    => dbcsr_distribution_hold, &
-      block_matrix_distribution_release => dbcsr_distribution_release
+      dbcsr_distribution_col_dist, &
+      dbcsr_distribution_new, &
+      dbcsr_distribution_row_dist, &
+      dbcsr_distribution_hold, &
+      dbcsr_distribution_release
 
  USE dbcsr_dist_operations, ONLY: &
-      block_matrix_get_stored_coordinates => dbcsr_get_stored_coordinates, &
+      dbcsr_get_stored_coordinates, &
       checker_tr
 
  USE dbcsr_data_methods, ONLY: &
@@ -97,15 +97,15 @@ MODULE block_matrix_api
       block_matrix_transpose => dbcsr_transpose, &
       block_matrix_no_transpose => dbcsr_no_transpose, &
       block_matrix_type_no_symmetry => dbcsr_type_no_symmetry, &
-      block_matrix_distribution_obj => dbcsr_distribution_obj, &
-      block_matrix_iterator => dbcsr_iterator, &
-      block_mp_obj => dbcsr_mp_obj
+      block_mp_obj => dbcsr_mp_obj, &
+      dbcsr_iterator, &
+      dbcsr_distribution_obj
 
- USE dbcsr_multiply_api, ONLY: block_matrix_multiply => dbcsr_multiply
+ USE dbcsr_multiply_api, ONLY: dbcsr_multiply
 
  USE dbcsr_work_operations, ONLY: &
-      block_matrix_create => dbcsr_create, &
-      block_matrix_finalize => dbcsr_finalize
+      dbcsr_create, &
+      dbcsr_finalize
 
  USE kinds, ONLY: &
       default_string_length, &
@@ -128,7 +128,7 @@ MODULE block_matrix_api
       swap
 
  USE dbcsr_dist_util, ONLY: &
-      block_matrix_checksum => dbcsr_checksum
+      dbcsr_checksum
 
  USE dbcsr_blas_operations, ONLY: &
      block_matrix_lapack_larnv => dbcsr_lapack_larnv, &
@@ -151,7 +151,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_iterator_stop
    PUBLIC :: block_matrix_transpose
    PUBLIC :: block_matrix_no_transpose
-   PUBLIC :: block_matrix_put_block
    PUBLIC :: block_matrix_clear
    PUBLIC :: block_matrix_release
    PUBLIC :: block_scalar
@@ -226,6 +225,718 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_lapack_larnv
    PUBLIC :: block_matrix_set_larnv_seed
 
+   TYPE block_matrix_distribution_obj
+      TYPE(dbcsr_distribution_obj), PRIVATE        :: dbcsr
+   END TYPE block_matrix_distribution_obj
+
+   TYPE block_matrix_type
+      TYPE(dbcsr_type), PRIVATE                    :: dbcsr
+      CHARACTER(LEN=default_string_length)         :: name = ""
+      TYPE(block_matrix_distribution_obj)          :: dist
+      TYPE(array_i1d_obj)                          :: row_blk_size
+      TYPE(array_i1d_obj)                          :: col_blk_size
+   END TYPE block_matrix_type
+
+   TYPE block_matrix_iterator
+      TYPE(dbcsr_iterator), PRIVATE        :: dbcsr
+   END TYPE block_matrix_iterator
+
+   INTERFACE block_matrix_create
+      MODULE PROCEDURE block_matrix_create_new
+      MODULE PROCEDURE block_matrix_create_template
+   END INTERFACE block_matrix_create
+
+   INTERFACE block_matrix_get_block_p
+      MODULE PROCEDURE block_matrix_get_block_p_d
+      MODULE PROCEDURE block_matrix_get_block_p_area
+   END INTERFACE block_matrix_get_block_p
+
+   INTERFACE block_matrix_put_block
+      MODULE PROCEDURE block_matrix_put_block_d
+      MODULE PROCEDURE block_matrix_put_block_area
+   END INTERFACE block_matrix_put_block
+
+   INTERFACE block_matrix_iterator_next_block
+      MODULE PROCEDURE block_matrix_iterator_next_block_d
+      MODULE PROCEDURE block_matrix_iterator_next_block_index
+      MODULE PROCEDURE block_matrix_iterator_next_block_area
+   END INTERFACE block_matrix_iterator_next_block
+
+   INTERFACE block_matrix_scale
+      MODULE PROCEDURE block_matrix_scale_d
+      MODULE PROCEDURE block_matrix_scale_anytype
+   END INTERFACE block_matrix_scale
+
+   INTERFACE block_matrix_multiply
+      MODULE PROCEDURE block_matrix_multiply_d
+      MODULE PROCEDURE block_matrix_multiply_anytype
+   END INTERFACE block_matrix_multiply
+
+   INTERFACE block_matrix_add
+      MODULE PROCEDURE block_matrix_add_d
+      MODULE PROCEDURE block_matrix_add_anytype
+   END INTERFACE block_matrix_add
+
    CONTAINS
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_create_new(matrix, name, dist, matrix_type, &
+                                      row_blk_size, col_blk_size, row_blk_size_obj, col_blk_size_obj, &
+                                      nze, data_type, data_buffer, &
+                                      !data_memory_type, index_memory_type, &
+                                      max_rbs, max_cbs, &
+                                      row_blk_offset, col_blk_offset, &
+                                      thread_dist, &
+                                      reuse, reuse_arrays, mutable_work, make_index, replication_type)
+
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+      CHARACTER(len=*), INTENT(IN)                       :: name
+      TYPE(block_matrix_distribution_obj), INTENT(IN)    :: dist
+      CHARACTER, INTENT(IN)                              :: matrix_type
+      INTEGER, DIMENSION(:), INTENT(IN), POINTER, &
+         CONTIGUOUS, OPTIONAL                            :: row_blk_size, col_blk_size
+      TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
+      INTEGER, INTENT(IN), OPTIONAL                      :: nze, data_type
+      TYPE(block_matrix_data_obj), INTENT(IN), OPTIONAL  :: data_buffer
+      !TYPE(dbcsr_memtype_type), INTENT(IN), OPTIONAL     :: data_memory_type, index_memory_type
+      INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
+      TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_offset, col_blk_offset
+      TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: thread_dist
+      LOGICAL, INTENT(IN), OPTIONAL                      :: reuse, reuse_arrays, mutable_work, &
+                                                            make_index
+      CHARACTER, INTENT(IN), OPTIONAL                    :: replication_type
+
+      CALL dbcsr_create(matrix%dbcsr, name=name, dist=dist%dbcsr, &
+                        matrix_type=matrix_type, &
+                        row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
+                        row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
+                        nze=nze, data_type=data_type, data_buffer=data_buffer, &
+                        !data_memory_type, index_memory_type, &
+                        max_rbs=max_rbs, max_cbs=max_cbs, &
+                        row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
+                        thread_dist=thread_dist%dbcsr, &
+                        reuse=reuse, reuse_arrays=reuse_arrays, &
+                        mutable_work=mutable_work, make_index=make_index, &
+                        replication_type=replication_type)
+
+      ! TODO: remove these copies.
+      matrix%name = matrix%dbcsr%name
+      matrix%dist%dbcsr = matrix%dbcsr%dist
+      matrix%row_blk_size = matrix%dbcsr%row_blk_size
+      matrix%col_blk_size = matrix%dbcsr%col_blk_size
+   END SUBROUTINE block_matrix_create_new
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_create_template(matrix, template, name, dist, matrix_type, &
+                                           row_blk_size, col_blk_size, &
+                                           row_blk_size_obj, col_blk_size_obj, &
+                                           nze, data_type, data_buffer, &
+                                           !data_memory_type, index_memory_type, &
+                                           max_rbs, max_cbs, &
+                                           row_blk_offset, col_blk_offset, &
+                                           reuse_arrays, mutable_work, make_index, replication_type)
+
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+      TYPE(block_matrix_type), INTENT(IN)                :: template
+      CHARACTER(len=*), INTENT(IN), OPTIONAL             :: name
+      TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: dist
+      CHARACTER, INTENT(IN), OPTIONAL                    :: matrix_type
+      INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL, &
+         POINTER, CONTIGUOUS                             :: row_blk_size, col_blk_size
+      TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
+      INTEGER, INTENT(IN), OPTIONAL                      :: nze, data_type
+      TYPE(block_matrix_data_obj), INTENT(IN), OPTIONAL  :: data_buffer
+      !TYPE(dbcsr_memtype_type), INTENT(IN), OPTIONAL     :: data_memory_type, index_memory_type
+      INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
+      TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_offset, col_blk_offset
+      LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays, mutable_work, make_index
+      CHARACTER, INTENT(IN), OPTIONAL                    :: replication_type
+
+      CALL dbcsr_create(matrix%dbcsr, template=template%dbcsr, name=name, dist=dist%dbcsr, &
+                        matrix_type=matrix_type, &
+                        row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
+                        row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
+                        nze=nze, data_type=data_type, data_buffer=data_buffer, &
+                        max_rbs=max_rbs, max_cbs=max_cbs, &
+                        row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
+                        reuse_arrays=reuse_arrays, mutable_work=mutable_work, &
+                        make_index=make_index, replication_type=replication_type)
+
+      ! TODO: remove these copies.
+      matrix%name = matrix%dbcsr%name
+      matrix%dist%dbcsr = matrix%dbcsr%dist
+      matrix%row_blk_size = matrix%dbcsr%row_blk_size
+      matrix%col_blk_size = matrix%dbcsr%col_blk_size
+   END SUBROUTINE block_matrix_create_template
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_iterator_blocks_left(iterator) RESULT(blocks_left)
+      TYPE(block_matrix_iterator), INTENT(IN)            :: iterator
+      LOGICAL                                            :: blocks_left
+
+      blocks_left = dbcsr_iterator_blocks_left(iterator%dbcsr)
+   END FUNCTION block_matrix_iterator_blocks_left
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_iterator_stop(iterator)
+      TYPE(block_matrix_iterator), INTENT(INOUT)           :: iterator
+
+      CALL dbcsr_iterator_stop(iterator%dbcsr)
+   END SUBROUTINE block_matrix_iterator_stop
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_iterator_start(iterator, matrix, shared, dynamic, &
+                                   dynamic_byrows, contiguous_pointers, read_only)
+      TYPE(block_matrix_iterator), INTENT(OUT)           :: iterator
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      LOGICAL, INTENT(IN), OPTIONAL                      :: shared, dynamic, dynamic_byrows, &
+                                                            contiguous_pointers, read_only
+
+      CALL dbcsr_iterator_start(iterator%dbcsr, matrix%dbcsr, shared, dynamic, &
+                                dynamic_byrows, contiguous_pointers, read_only)
+   END SUBROUTINE block_matrix_iterator_start
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_iterator_next_block_d(iterator, row, column, block, &
+                                                          transposed, block_number, &
+                                                          row_size, col_size, row_offset, col_offset)
+      TYPE(block_matrix_iterator), INTENT(INOUT) :: iterator
+      INTEGER, INTENT(OUT)                       :: row, column
+      REAL(dp), DIMENSION(:, :), POINTER         :: block
+      LOGICAL, INTENT(OUT)                       :: transposed
+      INTEGER, INTENT(OUT), OPTIONAL             :: block_number, row_size, &
+                                                    col_size, row_offset, &
+                                                    col_offset
+
+      CALL dbcsr_iterator_next_block(iterator%dbcsr, row, column, block, transposed, &
+                                     block_number, row_size, col_size, row_offset, col_offset)
+   END SUBROUTINE block_matrix_iterator_next_block_d
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_iterator_next_block_index(iterator, row, column, blk, &
+                                        transposed, blk_p, row_size, col_size, row_offset, col_offset)
+      TYPE(block_matrix_iterator), INTENT(INOUT)                :: iterator
+      INTEGER, INTENT(OUT)                               :: row, column, blk
+      LOGICAL, INTENT(OUT), OPTIONAL                     :: transposed
+      INTEGER, INTENT(OUT), OPTIONAL                     :: blk_p, row_size, col_size, row_offset, &
+                                                            col_offset
+
+      CALL dbcsr_iterator_next_block(iterator%dbcsr, row=row, column=column, blk=blk,&
+                                     transposed=transposed, blk_p=blk_p, &
+                                     row_size=row_size, col_size=col_size, &
+                                     row_offset=row_offset, col_offset=col_offset)
+   END SUBROUTINE block_matrix_iterator_next_block_index
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_iterator_next_block_area(iterator, row, column, block, &
+                                                    transposed, block_number, row_size, col_size, &
+                                                    row_offset, col_offset)
+      TYPE(block_matrix_iterator), INTENT(INOUT)         :: iterator
+      INTEGER, INTENT(OUT)                               :: row, column
+      TYPE(block_matrix_data_obj), INTENT(INOUT)         :: block
+      LOGICAL, INTENT(OUT)                               :: transposed
+      INTEGER, INTENT(OUT), OPTIONAL                     :: block_number, row_size, col_size, &
+                                                            row_offset, col_offset
+
+      CALL dbcsr_iterator_next_block(iterator%dbcsr, row=row, column=column, block=block, &
+                                     transposed=transposed, block_number=block_number, &
+                                     row_size=row_size, col_size=col_size, &
+                                     row_offset=row_offset, col_offset=col_offset)
+   END SUBROUTINE block_matrix_iterator_next_block_area
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_filter(matrix, eps, method, use_absolute, filter_diag)
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+      REAL(dp), INTENT(IN)                               :: eps
+      INTEGER, INTENT(IN), OPTIONAL                      :: method
+      LOGICAL, INTENT(in), OPTIONAL                      :: use_absolute, filter_diag
+
+      CALL dbcsr_filter(matrix%dbcsr, dbcsr_conform_scalar(eps, matrix%dbcsr), &
+                        method, use_absolute, filter_diag)
+   END SUBROUTINE block_matrix_filter
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_set(matrix, alpha)
+      TYPE(block_matrix_type), INTENT(INOUT)     :: matrix
+      REAL(dp), INTENT(IN)                       :: alpha
+
+      CALL dbcsr_set(matrix%dbcsr, alpha)
+   END SUBROUTINE block_matrix_set
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_get_block_p_d(matrix, row, col, block, tr, found, row_size, col_size)
+      TYPE(block_matrix_type), INTENT(INOUT)   :: matrix
+      INTEGER, INTENT(IN)                      :: row, col
+      REAL(dp), DIMENSION(:, :), POINTER       :: block
+      LOGICAL, INTENT(OUT)                     :: tr
+      LOGICAL, INTENT(OUT)                     :: found
+      INTEGER, INTENT(OUT), OPTIONAL           :: row_size, col_size
+
+      CALL dbcsr_get_block_p(matrix%dbcsr, row, col, block, tr, found, row_size, col_size)
+   END SUBROUTINE block_matrix_get_block_p_d
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_get_block_p_area(matrix, row, col, block, tr, found, &
+                                     row_size, col_size)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, INTENT(IN)                                :: row, col
+      TYPE(block_matrix_data_obj), INTENT(INOUT)         :: block
+      LOGICAL, INTENT(OUT)                               :: tr, found
+      INTEGER, INTENT(OUT), OPTIONAL                     :: row_size, col_size
+
+      CALL dbcsr_get_block_p(matrix%dbcsr, row, col, block, tr, found, row_size, col_size)
+    END SUBROUTINE block_matrix_get_block_p_area
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_put_block_d(matrix, row, col, block, transposed, summation, scale)
+      TYPE(block_matrix_type), INTENT(INOUT)   :: matrix
+      INTEGER, INTENT(IN)                      :: row, col
+      REAL(dp), DIMENSION(:, :), INTENT(IN)    :: block
+      LOGICAL, INTENT(IN), OPTIONAL            :: transposed, summation
+      REAL(dp), INTENT(IN), OPTIONAL           :: scale
+
+      CALL dbcsr_put_block(matrix%dbcsr, row, col, block, &
+                           transposed=transposed, summation=summation, scale=scale)
+   END SUBROUTINE block_matrix_put_block_d
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_put_block_area(matrix, row, col, block, lb_row_col, transposed, &
+                                          summation, scale)
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+      INTEGER, INTENT(IN)                                :: row, col
+      TYPE(block_matrix_data_obj)                        :: block
+      INTEGER, DIMENSION(2), INTENT(INOUT), OPTIONAL     :: lb_row_col
+      LOGICAL, INTENT(IN), OPTIONAL                      :: transposed, summation
+      TYPE(block_scalar_type), INTENT(IN), OPTIONAL      :: scale
+
+
+      CALL dbcsr_put_block(matrix%dbcsr, row, col, block, lb_row_col, &
+                           transposed=transposed, summation=summation, scale=scale)
+    END SUBROUTINE block_matrix_put_block_area
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_get_info(matrix, nblkrows_total, nblkcols_total, &
+                                    nfullrows_total, nfullcols_total, &
+                                    nblkrows_local, nblkcols_local, &
+                                    nfullrows_local, nfullcols_local, &
+                                    my_prow, my_pcol, &
+                                    local_rows, local_cols, proc_row_dist, proc_col_dist, &
+                                    row_blk_size, col_blk_size, row_blk_offset, col_blk_offset, &
+                                    distribution, name, matrix_type, data_type, &
+                                    group)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, INTENT(OUT), OPTIONAL :: nblkrows_total, nblkcols_total, nfullrows_total, &
+                                        nfullcols_total, nblkrows_local, nblkcols_local, nfullrows_local, nfullcols_local, &
+                                        my_prow, my_pcol
+      INTEGER, DIMENSION(:), OPTIONAL, POINTER           :: local_rows, local_cols, proc_row_dist, &
+                                                            proc_col_dist, &
+                                                            row_blk_size, col_blk_size, &
+                                                            row_blk_offset, col_blk_offset
+      TYPE(block_matrix_distribution_obj), INTENT(OUT), &
+         OPTIONAL                                        :: distribution
+      CHARACTER(len=*), INTENT(OUT), OPTIONAL            :: name
+      CHARACTER, INTENT(OUT), OPTIONAL                   :: matrix_type
+      INTEGER, INTENT(OUT), OPTIONAL                     :: data_type, group
+
+      TYPE(dbcsr_distribution_obj)                       :: dist
+
+      CALL dbcsr_get_info(matrix=matrix%dbcsr, &
+                          nblkrows_total=nblkrows_total, &
+                          nblkcols_total=nblkcols_total, &
+                          nfullrows_total=nfullrows_total, &
+                          nfullcols_total=nfullcols_total, &
+                          nblkrows_local=nblkrows_local, &
+                          nblkcols_local=nblkcols_local, &
+                          nfullrows_local=nfullrows_local, &
+                          nfullcols_local=nfullcols_local, &
+                          my_prow=my_prow, &
+                          my_pcol=my_pcol, &
+                          local_rows=local_rows, &
+                          local_cols=local_cols, &
+                          proc_row_dist=proc_row_dist, &
+                          proc_col_dist=proc_col_dist, &
+                          row_blk_size=row_blk_size, &
+                          col_blk_size=col_blk_size, &
+                          row_blk_offset=row_blk_offset, &
+                          col_blk_offset=col_blk_offset, &
+                          distribution=dist, &
+                          name=name, &
+                          matrix_type=matrix_type, &
+                          data_type=data_type, &
+                          group=group)
+
+      IF (PRESENT(distribution)) THEN
+         distribution%dbcsr = dist
+      ENDIF
+
+   END SUBROUTINE block_matrix_get_info
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_clear(matrix)
+      TYPE(block_matrix_type), INTENT(INOUT) :: matrix
+
+      CALL dbcsr_clear(matrix%dbcsr)
+   END SUBROUTINE block_matrix_clear
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_get_data_size(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER                                            :: res
+
+      res = dbcsr_get_data_size(matrix%dbcsr)
+   END FUNCTION block_matrix_get_data_size
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_get_data_type(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER                                            :: res
+
+      res = dbcsr_get_data_type(matrix%dbcsr)
+   END FUNCTION block_matrix_get_data_type
+
+   !================================================================================================
+   !================================================================================================
+   PURE FUNCTION block_matrix_get_nze(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER                                            :: res
+
+      res = dbcsr_get_nze(matrix%dbcsr)
+   END FUNCTION block_matrix_get_nze
+
+   !================================================================================================
+   !================================================================================================
+   PURE FUNCTION block_matrix_get_num_blocks(matrix) RESULT(num_blocks)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER                                            :: num_blocks
+
+      num_blocks = dbcsr_get_num_blocks(matrix%dbcsr)
+   END FUNCTION block_matrix_get_num_blocks
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_nblkrows_total(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER                                            :: res
+
+      res = dbcsr_nblkrows_total(matrix%dbcsr)
+   END FUNCTION block_matrix_nblkrows_total
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_nblkcols_total(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER                                            :: res
+
+      res = dbcsr_nblkcols_total(matrix%dbcsr)
+   END FUNCTION block_matrix_nblkcols_total
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_row_block_sizes(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: res
+
+      res => dbcsr_row_block_sizes(matrix%dbcsr)
+   END FUNCTION block_matrix_row_block_sizes
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_col_block_sizes(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: res
+
+      res => dbcsr_col_block_sizes(matrix%dbcsr)
+   END FUNCTION block_matrix_col_block_sizes
+
+   !================================================================================================
+   !================================================================================================
+   PURE FUNCTION block_matrix_blk_row_size(matrix, row) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, INTENT(IN)                                :: row
+      INTEGER                                            :: res
+
+      res = dbcsr_blk_row_size(matrix%dbcsr, row)
+   END FUNCTION block_matrix_blk_row_size
+
+   !================================================================================================
+   !================================================================================================
+   PURE FUNCTION block_matrix_blk_column_size(matrix, column) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, INTENT(IN)                                :: column
+      INTEGER                                            :: res
+
+      res = dbcsr_blk_column_size(matrix%dbcsr, column)
+   END FUNCTION block_matrix_blk_column_size
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_distribution_hold(dist)
+      TYPE(block_matrix_distribution_obj)                :: dist
+
+      CALL dbcsr_distribution_hold(dist%dbcsr)
+   END SUBROUTINE block_matrix_distribution_hold
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_reserve_blocks(matrix, rows, cols, blk_pointers)
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+      INTEGER, DIMENSION(:), INTENT(IN)                  :: rows, cols
+      INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL        :: blk_pointers
+
+      CALL dbcsr_reserve_blocks(matrix%dbcsr, rows, cols, blk_pointers)
+   END SUBROUTINE block_matrix_reserve_blocks
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_distribution_row_dist(dist) RESULT(res)
+      TYPE(block_matrix_distribution_obj), INTENT(IN)    :: dist
+      INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: res
+
+      res => dbcsr_distribution_row_dist(dist%dbcsr)
+   END FUNCTION block_matrix_distribution_row_dist
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_distribution_col_dist(dist) RESULT(res)
+      TYPE(block_matrix_distribution_obj), INTENT(IN)    :: dist
+      INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: res
+
+      res => dbcsr_distribution_col_dist(dist%dbcsr)
+   END FUNCTION block_matrix_distribution_col_dist
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_distribution_new(dist, mp_env, row_dist_block, col_dist_block, &
+                                            local_rows, local_cols, reuse_arrays)
+      TYPE(block_matrix_distribution_obj), INTENT(OUT)       :: dist
+      TYPE(block_mp_obj), INTENT(IN)                         :: mp_env
+      INTEGER, DIMENSION(:), INTENT(IN), POINTER, CONTIGUOUS :: row_dist_block, col_dist_block
+      INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL, &
+         POINTER, CONTIGUOUS                                 :: local_rows, local_cols
+      LOGICAL, OPTIONAL                                      :: reuse_arrays
+
+      CALL dbcsr_distribution_new(dist=dist%dbcsr, mp_env=mp_env, &
+                                 row_dist_block=row_dist_block, col_dist_block=col_dist_block, &
+                                 local_rows=local_rows, local_cols=local_cols, &
+                                 reuse_arrays=reuse_arrays)
+   END SUBROUTINE block_matrix_distribution_new
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_finalize(matrix, reshuffle)
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+      LOGICAL, INTENT(IN), OPTIONAL                      :: reshuffle
+
+      CALL dbcsr_finalize(matrix%dbcsr, reshuffle)
+   END SUBROUTINE block_matrix_finalize
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_distribution_release(dist)
+      TYPE(block_matrix_distribution_obj)                :: dist
+
+      CALL dbcsr_distribution_release(dist%dbcsr)
+   END SUBROUTINE block_matrix_distribution_release
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_release(matrix)
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+
+      CALL dbcsr_release(matrix%dbcsr)
+   END SUBROUTINE block_matrix_release
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_get_stored_coordinates(matrix, row, column, processor)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, INTENT(IN)                                :: row, column
+      INTEGER, INTENT(OUT), OPTIONAL                     :: processor
+
+      CALL dbcsr_get_stored_coordinates(matrix%dbcsr, row, column, processor)
+   END SUBROUTINE block_matrix_get_stored_coordinates
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_scale_d(matrix, alpha, last_column)
+      TYPE(block_matrix_type), INTENT(INOUT)    :: matrix
+       REAL(dp), INTENT(IN)                     :: alpha
+      INTEGER, INTENT(IN), OPTIONAL             :: last_column
+
+      CALL dbcsr_scale(matrix%dbcsr, alpha, last_column)
+   END SUBROUTINE block_matrix_scale_d
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_scale_anytype(matrix, alpha, limits)
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+      TYPE(block_scalar_type), INTENT(IN)                :: alpha
+      INTEGER, DIMENSION(4), INTENT(IN), OPTIONAL        :: limits
+
+      CALL dbcsr_scale(matrix%dbcsr, alpha, limits)
+   END SUBROUTINE block_matrix_scale_anytype
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_copy(matrix_b, matrix_a, name, keep_sparsity, &
+                                shallow_data, keep_imaginary, matrix_type)
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix_b
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix_a
+      CHARACTER(LEN=*), INTENT(IN), OPTIONAL             :: name
+      LOGICAL, INTENT(IN), OPTIONAL                      :: keep_sparsity, shallow_data, &
+                                                            keep_imaginary
+      CHARACTER, INTENT(IN), OPTIONAL                    :: matrix_type
+
+      CALL dbcsr_copy(matrix_b%dbcsr, matrix_a%dbcsr, name, keep_sparsity, &
+                      shallow_data, keep_imaginary, matrix_type)
+
+   END SUBROUTINE block_matrix_copy
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_redistribute(matrix, redist)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      TYPE(block_matrix_type), INTENT(INOUT)             :: redist
+
+      CALL dbcsr_redistribute(matrix%dbcsr, redist%dbcsr)
+   END SUBROUTINE block_matrix_redistribute
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_complete_redistribute(matrix, redist, keep_sparsity, summation)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      TYPE(block_matrix_type), INTENT(INOUT)             :: redist
+      LOGICAL, INTENT(IN), OPTIONAL                      :: keep_sparsity, summation
+
+      CALL dbcsr_redistribute(matrix%dbcsr, redist%dbcsr)
+      CALL dbcsr_complete_redistribute(matrix%dbcsr, redist%dbcsr, &
+                                       keep_sparsity=keep_sparsity, summation=summation)
+   END SUBROUTINE block_matrix_complete_redistribute
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_zero(matrix)
+      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+
+      CALL dbcsr_zero(matrix%dbcsr)
+   END SUBROUTINE block_matrix_zero
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_multiply_d(transa, transb, &
+                                      alpha, matrix_a, matrix_b, beta, matrix_c, &
+                                      first_row, last_row, &
+                                      first_column, last_column, first_k, last_k, &
+                                      retain_sparsity, filter_eps, flop)
+      CHARACTER(LEN=1), INTENT(IN)                   :: transa, transb
+      REAL(kind=dp), INTENT(IN)                      :: alpha
+      TYPE(block_matrix_type), INTENT(IN)            :: matrix_a, matrix_b
+      REAL(kind=dp), INTENT(IN)                      :: beta
+      TYPE(block_matrix_type), INTENT(INOUT)         :: matrix_c
+      INTEGER, INTENT(IN), OPTIONAL                  :: first_row, last_row, &
+                                                        first_column, last_column, &
+                                                        first_k, last_k
+      LOGICAL, INTENT(IN), OPTIONAL                  :: retain_sparsity
+      REAL(kind=dp), INTENT(IN), OPTIONAL            :: filter_eps
+      INTEGER(int_8), INTENT(OUT), OPTIONAL          :: flop
+
+      CALL dbcsr_multiply(transa=transa, transb=transb, &
+                          alpha=alpha, matrix_a=matrix_a%dbcsr, &
+                          matrix_b=matrix_b%dbcsr, beta=beta, matrix_c=matrix_c%dbcsr, &
+                          first_row=first_row, last_row=last_row, &
+                          first_column=first_column, last_column=last_column, &
+                          first_k=first_k, last_k=last_k, &
+                          retain_sparsity=retain_sparsity, filter_eps=filter_eps, flop=flop)
+   END SUBROUTINE block_matrix_multiply_d
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_multiply_anytype(transa, transb, &
+                                      alpha, matrix_a, matrix_b, beta, matrix_c, &
+                                      first_row, last_row, &
+                                      first_column, last_column, first_k, last_k, &
+                                      retain_sparsity, filter_eps, flop)
+      CHARACTER(LEN=1), INTENT(IN)                   :: transa, transb
+      TYPE(block_scalar_type), INTENT(IN)            :: alpha
+      TYPE(block_matrix_type), INTENT(IN)            :: matrix_a, matrix_b
+      TYPE(block_scalar_type), INTENT(IN)            :: beta
+      TYPE(block_matrix_type), INTENT(INOUT)         :: matrix_c
+      INTEGER, INTENT(IN), OPTIONAL                  :: first_row, last_row, &
+                                                        first_column, last_column, &
+                                                        first_k, last_k
+      LOGICAL, INTENT(IN), OPTIONAL                  :: retain_sparsity
+      REAL(kind=dp), INTENT(IN), OPTIONAL            :: filter_eps
+      INTEGER(int_8), INTENT(OUT), OPTIONAL          :: flop
+
+      CALL dbcsr_multiply(transa=transa, transb=transb, &
+                          alpha=alpha, matrix_a=matrix_a%dbcsr, &
+                          matrix_b=matrix_b%dbcsr, beta=beta, matrix_c=matrix_c%dbcsr, &
+                          first_row=first_row, last_row=last_row, &
+                          first_column=first_column, last_column=last_column, &
+                          first_k=first_k, last_k=last_k, &
+                          retain_sparsity=retain_sparsity, filter_eps=filter_eps, flop=flop)
+   END SUBROUTINE block_matrix_multiply_anytype
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_add_d(matrix_a, matrix_b, alpha_scalar, beta_scalar)
+      TYPE(block_matrix_type), INTENT(INOUT)   :: matrix_a
+      TYPE(block_matrix_type), INTENT(IN)      :: matrix_b
+     REAL(kind=dp), INTENT(IN)                 :: alpha_scalar, beta_scalar
+
+      CALL dbcsr_add(matrix_a%dbcsr, matrix_b%dbcsr, &
+                     alpha_scalar=alpha_scalar, beta_scalar=beta_scalar)
+
+   END SUBROUTINE block_matrix_add_d
+
+   !================================================================================================
+   !================================================================================================
+   SUBROUTINE block_matrix_add_anytype(matrix_a, matrix_b, alpha_scalar, beta_scalar)
+      TYPE(block_matrix_type), INTENT(INOUT)        :: matrix_a
+      TYPE(block_matrix_type), INTENT(IN)           :: matrix_b
+      TYPE(block_scalar_type), INTENT(IN), OPTIONAL :: alpha_scalar, beta_scalar
+
+      CALL dbcsr_add(matrix_a%dbcsr, matrix_b%dbcsr, &
+                     alpha_scalar=alpha_scalar, beta_scalar=beta_scalar)
+
+   END SUBROUTINE block_matrix_add_anytype
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_checksum(matrix, local, pos) RESULT(checksum)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      LOGICAL, INTENT(IN), OPTIONAL                      :: local, pos
+      REAL(KIND=dp)                                      :: checksum
+
+      checksum = dbcsr_checksum(matrix%dbcsr, local=local, pos=pos)
+   END FUNCTION block_matrix_checksum
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_maxabs(matrix) RESULT(norm)
+      TYPE(block_matrix_type), INTENT(INOUT)         :: matrix
+      REAL(KIND=dp)                                  :: norm
+
+      norm = dbcsr_maxabs(matrix%dbcsr)
+   END FUNCTION block_matrix_maxabs
+
 
 END MODULE block_matrix_api

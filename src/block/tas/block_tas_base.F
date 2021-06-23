@@ -685,9 +685,9 @@ CONTAINS
    SUBROUTINE block_tas_iterator_next_area_block(iterator, row, column, block, transposed, block_number, &
       !! As block_matrix_iterator_next_block
                                                  row_size, col_size)
-      TYPE(block_tas_iterator), INTENT(INOUT)              :: iterator
+      TYPE(block_tas_iterator), INTENT(INOUT)            :: iterator
       INTEGER(KIND=int_8), INTENT(OUT)                   :: row, column
-      TYPE(block_matrix_data_obj), INTENT(INOUT)                :: block
+      TYPE(block_matrix_data_obj), INTENT(INOUT)         :: block
       LOGICAL, INTENT(OUT)                               :: transposed
       INTEGER, INTENT(OUT), OPTIONAL                     :: block_number, row_size, col_size
 
@@ -949,7 +949,8 @@ CONTAINS
                                  nfullrows_local, nfullcols_local, &
                                  nprow, npcol, my_prow, my_pcol, &
                                  local_rows, local_cols, proc_row_dist, proc_col_dist, &
-                                 row_blk_size, col_blk_size, distribution, name, data_area, &
+                                 row_blk_size, col_blk_size, distribution, name, &
+                                 !data_area, &
                                  matrix_type, data_type)
 
       TYPE(block_tas_type), INTENT(IN)                                :: matrix
@@ -964,7 +965,7 @@ CONTAINS
          INTENT(OUT)                                                  :: row_blk_size, col_blk_size
       TYPE(block_tas_distribution_type), OPTIONAL                     :: distribution
       CHARACTER(len=*), INTENT(OUT), OPTIONAL                         :: name
-      TYPE(block_matrix_data_obj), INTENT(OUT), OPTIONAL                     :: data_area
+      !TYPE(block_matrix_data_obj), INTENT(OUT), OPTIONAL              :: data_area
       CHARACTER, OPTIONAL                                             :: matrix_type
       INTEGER, OPTIONAL                                               :: data_type
 
@@ -977,7 +978,9 @@ CONTAINS
       CALL block_matrix_get_info(matrix%matrix, nblkrows_local=nblkrows_local, nblkcols_local=nblkcols_local, &
                           nfullrows_local=nfullrows_local, nfullcols_local=nfullcols_local, &
                           local_rows=local_rows_local, local_cols=local_cols_local, &
-                          name=name, data_area=data_area, matrix_type=matrix_type, data_type=data_type)
+                          name=name, &
+                          !data_area=data_area, &
+                          matrix_type=matrix_type, data_type=data_type)
 
       IF (PRESENT(nblkrows_total)) nblkrows_total = block_tas_nblkrows_total(matrix)
       IF (PRESENT(nblkcols_total)) nblkcols_total = block_tas_nblkcols_total(matrix)
