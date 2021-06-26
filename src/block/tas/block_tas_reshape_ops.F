@@ -26,7 +26,7 @@ MODULE block_tas_reshape_ops
       block_matrix_blk_column_size, block_matrix_blk_row_size, &
       block_matrix_get_info, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
-      block_matrix_finalize
+      block_matrix_finalize, block_matrix_get_name
    USE block_tas_base, ONLY: &
       block_tas_blk_sizes, block_tas_create, block_tas_distribution_new, block_tas_finalize, &
       block_tas_get_data_type, block_tas_get_stored_coordinates, block_tas_info, &
@@ -351,7 +351,7 @@ CONTAINS
       END SELECT
 
       CALL block_tas_distribution_new(dist, mp_comm, row_dist_obj, col_dist_obj, split_info=info)
-      CALL block_tas_create(matrix_out, TRIM(matrix_in%name)//" replicated", &
+      CALL block_tas_create(matrix_out, TRIM(block_matrix_get_name(matrix_in))//" replicated", &
                             dist, data_type, row_bsize_obj, col_bsize_obj, own_dist=.TRUE.)
 
       IF (nodata_prv) THEN

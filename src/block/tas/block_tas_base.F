@@ -27,7 +27,7 @@ MODULE block_tas_base
       block_matrix_get_data_size, block_matrix_get_num_blocks, block_matrix_get_nze, &
       block_matrix_get_info, block_matrix_set, block_matrix_filter, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_mp_obj, block_matrix_type, block_matrix_type_no_symmetry, &
-      block_matrix_create, block_matrix_finalize
+      block_matrix_create, block_matrix_finalize, block_matrix_get_name
    USE block_tas_types, ONLY: &
       block_tas_distribution_type, block_tas_iterator, block_tas_split_info, block_tas_type
    USE block_tas_global, ONLY: &
@@ -237,7 +237,7 @@ CONTAINS
       INTEGER, INTENT(IN), OPTIONAL                        :: data_type
 
       CALL block_matrix_create(matrix%matrix, template=matrix_in%matrix, matrix_type=block_matrix_type_no_symmetry, &
-                        data_type=data_type)
+                        data_type=data_type, name=name)
       CALL block_matrix_finalize(matrix%matrix)
 
       CALL block_tas_copy_distribution(matrix_in%dist, matrix%dist)
@@ -249,12 +249,6 @@ CONTAINS
       matrix%nfullrows = matrix_in%nfullrows
       matrix%nfullcols = matrix_in%nfullcols
       matrix%valid = .TRUE.
-
-      IF (PRESENT(name)) THEN
-         matrix%matrix%name = name
-      ELSE
-         matrix%matrix%name = matrix_in%matrix%name
-      ENDIF
 
    END SUBROUTINE
 
@@ -555,7 +549,7 @@ CONTAINS
       CALL block_matrix_mp_release(mp_environ_tmp)
 
       CALL block_matrix_create(matrix=matrix_dbcsr, &
-                        name=TRIM(matrix_rect%matrix%name), &
+                        name=TRIM(block_matrix_get_name(matrix_rect%matrix)), &
                         dist=dist, &
                         matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size=row_size_vec, &

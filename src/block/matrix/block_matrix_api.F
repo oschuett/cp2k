@@ -180,6 +180,7 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_distribution_row_dist
    PUBLIC :: block_matrix_distribution_hold
    PUBLIC :: block_matrix_distribution_release
+   PUBLIC :: block_matrix_get_name
    PUBLIC :: block_matrix_get_data_type
    PUBLIC :: block_matrix_mp_release
    PUBLIC :: block_matrix_nblkcols_total
@@ -220,6 +221,8 @@ MODULE block_matrix_api
    PUBLIC :: swap
    PUBLIC :: block_matrix_row_block_sizes
    PUBLIC :: block_matrix_col_block_sizes
+   PUBLIC :: block_matrix_row_blk_size_obj
+   PUBLIC :: block_matrix_col_blk_size_obj
    PUBLIC :: block_matrix_checksum
    PUBLIC :: block_matrix_complete_redistribute
    PUBLIC :: block_matrix_lapack_larnv
@@ -231,10 +234,6 @@ MODULE block_matrix_api
 
    TYPE block_matrix_type
       TYPE(dbcsr_type), PRIVATE                    :: dbcsr
-      CHARACTER(LEN=default_string_length)         :: name = ""
-      TYPE(block_matrix_distribution_obj)          :: dist
-      TYPE(array_i1d_obj)                          :: row_blk_size
-      TYPE(array_i1d_obj)                          :: col_blk_size
    END TYPE block_matrix_type
 
    TYPE block_matrix_iterator
@@ -319,12 +318,6 @@ MODULE block_matrix_api
                         reuse=reuse, reuse_arrays=reuse_arrays, &
                         mutable_work=mutable_work, make_index=make_index, &
                         replication_type=replication_type)
-
-      ! TODO: remove these copies.
-      matrix%name = matrix%dbcsr%name
-      matrix%dist%dbcsr = matrix%dbcsr%dist
-      matrix%row_blk_size = matrix%dbcsr%row_blk_size
-      matrix%col_blk_size = matrix%dbcsr%col_blk_size
    END SUBROUTINE block_matrix_create_new
 
    !================================================================================================
@@ -363,12 +356,6 @@ MODULE block_matrix_api
                         row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
                         reuse_arrays=reuse_arrays, mutable_work=mutable_work, &
                         make_index=make_index, replication_type=replication_type)
-
-      ! TODO: remove these copies.
-      matrix%name = matrix%dbcsr%name
-      matrix%dist%dbcsr = matrix%dbcsr%dist
-      matrix%row_blk_size = matrix%dbcsr%row_blk_size
-      matrix%col_blk_size = matrix%dbcsr%col_blk_size
    END SUBROUTINE block_matrix_create_template
 
    !================================================================================================
@@ -596,6 +583,15 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
+   FUNCTION block_matrix_get_name(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      CHARACTER(len=default_string_length)               :: res
+
+      CALL dbcsr_get_info(matrix%dbcsr, name=res)
+   END FUNCTION block_matrix_get_name
+
+   !================================================================================================
+   !================================================================================================
    FUNCTION block_matrix_get_data_size(matrix) RESULT(res)
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
       INTEGER                                            :: res
@@ -665,6 +661,24 @@ MODULE block_matrix_api
 
       res => dbcsr_col_block_sizes(matrix%dbcsr)
    END FUNCTION block_matrix_col_block_sizes
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_row_blk_size_obj(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      TYPE(array_i1d_obj)                                :: res
+
+      res = matrix%dbcsr%row_blk_size
+   END FUNCTION block_matrix_row_blk_size_obj
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_col_blk_size_obj(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      TYPE(array_i1d_obj)                                :: res
+
+      res = matrix%dbcsr%col_blk_size
+   END FUNCTION block_matrix_col_blk_size_obj
 
    !================================================================================================
    !================================================================================================

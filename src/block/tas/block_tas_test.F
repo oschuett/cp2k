@@ -26,7 +26,8 @@ MODULE block_tas_test
       block_matrix_maxabs, &
       block_matrix_add, &
       block_matrix_complete_redistribute, &
-      block_matrix_lapack_larnv, block_matrix_set_larnv_seed
+      block_matrix_lapack_larnv, block_matrix_set_larnv_seed, block_matrix_get_name, &
+      block_matrix_row_blk_size_obj, block_matrix_col_blk_size_obj
    USE block_tas_base, ONLY: &
       block_tas_convert_to_dbcsr, block_tas_create, block_tas_distribution_new, &
       block_tas_finalize, block_tas_get_stored_coordinates, block_tas_nblkcols_total, &
@@ -237,19 +238,22 @@ CONTAINS
 
          row_blk_size => block_matrix_row_block_sizes(block_matrix_a)
          col_blk_size => block_matrix_col_block_sizes(block_matrix_a)
-         CALL block_matrix_create(matrix=block_matrix_a_mm, name=block_matrix_a%name, &
+         CALL block_matrix_create(matrix=block_matrix_a_mm, &
+                           name=block_matrix_get_name(block_matrix_a), &
                            dist=dist_a, matrix_type=block_matrix_type_no_symmetry, &
                            row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                            data_type=block_type_real_8)
          row_blk_size => block_matrix_row_block_sizes(block_matrix_b)
          col_blk_size => block_matrix_col_block_sizes(block_matrix_b)
-         CALL block_matrix_create(matrix=block_matrix_b_mm, name=block_matrix_b%name, &
+         CALL block_matrix_create(matrix=block_matrix_b_mm, &
+                           name=block_matrix_get_name(block_matrix_b), &
                            dist=dist_b, matrix_type=block_matrix_type_no_symmetry, &
                            row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                            data_type=block_type_real_8)
          row_blk_size => block_matrix_row_block_sizes(block_matrix_c)
          col_blk_size => block_matrix_col_block_sizes(block_matrix_c)
-         CALL block_matrix_create(matrix=block_matrix_c_mm, name=block_matrix_c%name, &
+         CALL block_matrix_create(matrix=block_matrix_c_mm, &
+                           name=block_matrix_get_name(block_matrix_c), &
                            dist=dist_c, matrix_type=block_matrix_type_no_symmetry, &
                            row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                            data_type=block_type_real_8)
@@ -350,21 +354,28 @@ CONTAINS
       CALL block_matrix_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
       CALL block_matrix_mp_release(mp_environ_tmp)
 
-      CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, matrix_type=block_matrix_type_no_symmetry, &
-                        row_blk_size_obj=block_matrix_a%row_blk_size, col_blk_size_obj=block_matrix_a%col_blk_size, &
+      CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, &
+                        matrix_type=block_matrix_type_no_symmetry, &
+                        row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_a), &
+                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_a), &
                         data_type=block_type_real_8)
 
-      CALL block_matrix_create(matrix=block_matrix_b_mm, name="matrix b", dist=dist_b, matrix_type=block_matrix_type_no_symmetry, &
-                        row_blk_size_obj=block_matrix_b%row_blk_size, col_blk_size_obj=block_matrix_b%col_blk_size, &
+      CALL block_matrix_create(matrix=block_matrix_b_mm, name="matrix b", dist=dist_b, &
+                        matrix_type=block_matrix_type_no_symmetry, &
+                        row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_b), &
+                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_b), &
                         data_type=block_type_real_8)
 
-      CALL block_matrix_create(matrix=block_matrix_c_mm, name="matrix c", dist=dist_c, matrix_type=block_matrix_type_no_symmetry, &
-                        row_blk_size_obj=block_matrix_c%row_blk_size, col_blk_size_obj=block_matrix_c%col_blk_size, &
+      CALL block_matrix_create(matrix=block_matrix_c_mm, name="matrix c", dist=dist_c, &
+                        matrix_type=block_matrix_type_no_symmetry, &
+                        row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_c), &
+                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_c), &
                         data_type=block_type_real_8)
 
       CALL block_matrix_create(matrix=block_matrix_c_mm_check, name="matrix c check", &
                         dist=dist_c, matrix_type=block_matrix_type_no_symmetry, &
-                        row_blk_size_obj=block_matrix_c%row_blk_size, col_blk_size_obj=block_matrix_c%col_blk_size, &
+                        row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_c), &
+                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_c), &
                         data_type=block_type_real_8)
 
       CALL block_matrix_finalize(block_matrix_a_mm)
@@ -397,14 +408,18 @@ CONTAINS
 
       IF (io_unit > 0) THEN
       IF (ABS(norm) .GT. test_tol) THEN
-         WRITE (io_unit, '(A, A, A, A, A, 1X, A)') TRIM(matrix_a%matrix%name), transa, ' X ', TRIM(matrix_b%matrix%name), &
-            transb, 'failed!'
+         WRITE (io_unit, '(A, A, A, A, A, 1X, A)') TRIM(block_matrix_get_name(matrix_a%matrix)), &
+                                                   transa, ' X ', &
+                                                   TRIM(block_matrix_get_name(matrix_b%matrix)), &
+                                                   transb, 'failed!'
          WRITE (io_unit, "(A,1X,E9.2,1X,E9.2)") "checksums", sq_cs, rc_cs
          WRITE (io_unit, "(A,1X,E9.2)") "difference norm", norm
          CPABORT("")
       ELSE
-         WRITE (io_unit, '(A, A, A, A, A, 1X, A)') TRIM(matrix_a%matrix%name), transa, ' X ', TRIM(matrix_b%matrix%name), &
-            transb, 'passed!'
+         WRITE (io_unit, '(A, A, A, A, A, 1X, A)') TRIM(block_matrix_get_name(matrix_a%matrix)), &
+                                                   transa, ' X ', &
+                                                   TRIM(block_matrix_get_name(matrix_b%matrix)), &
+                                                   transb, 'passed!'
          WRITE (io_unit, "(A,1X,E9.2,1X,E9.2)") "checksums", sq_cs, rc_cs
          WRITE (io_unit, "(A,1X,E9.2)") "difference norm", norm
       ENDIF

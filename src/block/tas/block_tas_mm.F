@@ -33,7 +33,7 @@ MODULE block_tas_mm
       block_matrix_get_nze, block_matrix_nfullrows_total, block_matrix_nfullcols_total, &
       block_matrix_cfg, &
       block_matrix_scale, block_matrix_get_info, block_matrix_copy, &
-      block_matrix_clear, block_matrix_add, block_matrix_zero
+      block_matrix_clear, block_matrix_add, block_matrix_zero, block_matrix_get_name
    USE block_tas_base, ONLY: &
       block_tas_create, block_tas_destroy, block_tas_distribution_destroy, block_tas_distribution_new, &
       block_tas_get_data_type, block_tas_info, block_tas_nblkcols_total, &
@@ -213,7 +213,9 @@ CONTAINS
       IF (unit_nr_prv .GT. 0) THEN
          WRITE (unit_nr_prv, '(A)') repeat("-", 80)
          WRITE (unit_nr_prv, '(A,1X,A,1X,A,1X,A,1X,A,1X,A)') "DBCSR TAS MATRIX MULTIPLICATION:", &
-            TRIM(matrix_a%matrix%name), 'x', TRIM(matrix_b%matrix%name), '=', TRIM(matrix_c%matrix%name)
+            TRIM(block_matrix_get_name(matrix_a%matrix)), 'x', &
+            TRIM(block_matrix_get_name(matrix_b%matrix)), '=', &
+            TRIM(block_matrix_get_name(matrix_c%matrix))
          WRITE (unit_nr_prv, '(A)') repeat("-", 80)
       ENDIF
       IF (do_batched) THEN
@@ -860,13 +862,15 @@ CONTAINS
          new_row_dist = block_tas_dist_arb_default(pdims(1), dims(1), matrix_in%row_blk_size)
          new_col_dist = block_tas_dist_arb_default(pdims(2), dims(2), matrix_in%col_blk_size)
          CALL block_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
-         CALL block_tas_create(matrix_out, matrix_in%matrix%name, dist, block_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), &
+                               dist, block_tas_get_data_type(matrix_in), &
                                matrix_in%row_blk_size, matrix_in%col_blk_size, own_dist=.TRUE.)
       ELSE
          new_row_dist = block_tas_dist_arb_default(pdims(1), dims(1), matrix_in%col_blk_size)
          new_col_dist = block_tas_dist_arb_default(pdims(2), dims(2), matrix_in%row_blk_size)
          CALL block_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
-         CALL block_tas_create(matrix_out, matrix_in%matrix%name, dist, block_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), &
+                               dist, block_tas_get_data_type(matrix_in), &
                                matrix_in%col_blk_size, matrix_in%row_blk_size, own_dist=.TRUE.)
 
       ENDIF
@@ -984,25 +988,31 @@ CONTAINS
          CALL change_split(matrix2_in, matrix2_out, nsplit_prv, split_rc_2, new2, &
                            move_data=move_data_2, nodata=nodata2, opt_nsplit=.FALSE.)
          IF (unit_nr_prv > 0) THEN
-            WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A,1X,A)") "No redistribution of", TRIM(matrix1_in%matrix%name), &
-               "and", TRIM(matrix2_in%matrix%name)
+            WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A,1X,A)") "No redistribution of", &
+               TRIM(block_matrix_get_name(matrix1_in%matrix)), &
+               "and", TRIM(block_matrix_get_name(matrix2_in%matrix))
             IF (new1) THEN
-               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A)") "Change split factor of", TRIM(matrix1_in%matrix%name), ": Yes"
+               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A)") "Change split factor of", &
+               TRIM(block_matrix_get_name(matrix1_in%matrix)), ": Yes"
             ELSE
-               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A)") "Change split factor of", TRIM(matrix1_in%matrix%name), ": No"
+               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A)") "Change split factor of", &
+               TRIM(block_matrix_get_name(matrix1_in%matrix)), ": No"
             ENDIF
             IF (new2) THEN
-               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A)") "Change split factor of", TRIM(matrix2_in%matrix%name), ": Yes"
+               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A)") "Change split factor of", &
+               TRIM(block_matrix_get_name(matrix2_in%matrix)), ": Yes"
             ELSE
-               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A)") "Change split factor of", TRIM(matrix2_in%matrix%name), ": No"
+               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A)") "Change split factor of", &
+               TRIM(block_matrix_get_name(matrix2_in%matrix)), ": No"
             ENDIF
          ENDIF
       ELSE
 
          IF (optimize_dist_prv) THEN
             IF (unit_nr_prv > 0) THEN
-               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A,1X,A)") "Optimizing distribution of", TRIM(matrix1_in%matrix%name), &
-                  "and", TRIM(matrix2_in%matrix%name)
+               WRITE (unit_nr_prv, "(T2,A,1X,A,1X,A,1X,A)") "Optimizing distribution of", &
+               TRIM(block_matrix_get_name(matrix1_in%matrix)), &
+                  "and", TRIM(block_matrix_get_name(matrix2_in%matrix))
             ENDIF
 
             trans1_newdist = (split_rc_1 == colsplit)
@@ -1054,20 +1064,24 @@ CONTAINS
 
             ALLOCATE (matrix1_out)
             IF (.NOT. trans1_newdist) THEN
-               CALL block_tas_create(matrix1_out, matrix1_in%matrix%name, dist_1, block_tas_get_data_type(matrix1_in), &
+               CALL block_tas_create(matrix1_out, block_matrix_get_name(matrix1_in%matrix), &
+                                     dist_1, block_tas_get_data_type(matrix1_in), &
                                      matrix1_in%row_blk_size, matrix1_in%col_blk_size, own_dist=.TRUE.)
 
             ELSE
-               CALL block_tas_create(matrix1_out, matrix1_in%matrix%name, dist_1, block_tas_get_data_type(matrix1_in), &
+               CALL block_tas_create(matrix1_out, block_matrix_get_name(matrix1_in%matrix), &
+                                     dist_1, block_tas_get_data_type(matrix1_in), &
                                      matrix1_in%col_blk_size, matrix1_in%row_blk_size, own_dist=.TRUE.)
             ENDIF
 
             ALLOCATE (matrix2_out)
             IF (.NOT. trans2_newdist) THEN
-               CALL block_tas_create(matrix2_out, matrix2_in%matrix%name, dist_2, block_tas_get_data_type(matrix2_in), &
+               CALL block_tas_create(matrix2_out, block_matrix_get_name(matrix2_in%matrix), &
+                                     dist_2, block_tas_get_data_type(matrix2_in), &
                                      matrix2_in%row_blk_size, matrix2_in%col_blk_size, own_dist=.TRUE.)
             ELSE
-               CALL block_tas_create(matrix2_out, matrix2_in%matrix%name, dist_2, block_tas_get_data_type(matrix2_in), &
+               CALL block_tas_create(matrix2_out, block_matrix_get_name(matrix2_in%matrix), &
+                                     dist_2, block_tas_get_data_type(matrix2_in), &
                                      matrix2_in%col_blk_size, matrix2_in%row_blk_size, own_dist=.TRUE.)
             ENDIF
 
@@ -1080,7 +1094,8 @@ CONTAINS
             SELECT CASE (ref)
             CASE (1)
                IF (unit_nr_prv > 0) THEN
-                  WRITE (unit_nr_prv, "(T2,A,1X,A)") "Redistribution of", TRIM(matrix2_in%matrix%name)
+                  WRITE (unit_nr_prv, "(T2,A,1X,A)") "Redistribution of", &
+                                                     TRIM(block_matrix_get_name(matrix2_in%matrix))
                ENDIF
 
                CALL change_split(matrix1_in, matrix1_out, nsplit_prv, split_rc_1, new1, &
@@ -1092,7 +1107,8 @@ CONTAINS
                new2 = .TRUE.
             CASE (2)
                IF (unit_nr_prv > 0) THEN
-                  WRITE (unit_nr_prv, "(T2,A,1X,A)") "Redistribution of", TRIM(matrix1_in%matrix%name)
+                  WRITE (unit_nr_prv, "(T2,A,1X,A)") "Redistribution of", &
+                                                     TRIM(block_matrix_get_name(matrix1_in%matrix))
                ENDIF
 
                CALL change_split(matrix2_in, matrix2_out, nsplit_prv, split_rc_2, new2, &
@@ -1337,10 +1353,12 @@ CONTAINS
       CALL block_tas_get_split_info(info_template, mp_comm=mp_comm)
       CALL block_tas_distribution_new(dist_new, mp_comm, row_dist, col_dist, split_info=info_template)
       IF (.NOT. transposed) THEN
-         CALL block_tas_create(matrix_out, matrix_in%matrix%name, dist_new, block_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), &
+                               dist_new, block_tas_get_data_type(matrix_in), &
                                matrix_in%row_blk_size, matrix_in%col_blk_size, own_dist=.TRUE.)
       ELSE
-         CALL block_tas_create(matrix_out, matrix_in%matrix%name, dist_new, block_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), &
+                               dist_new, block_tas_get_data_type(matrix_in), &
                                matrix_in%col_blk_size, matrix_in%row_blk_size, own_dist=.TRUE.)
       ENDIF
 

@@ -24,7 +24,8 @@ MODULE block_tas_io
    USE message_passing, ONLY: &
       mp_environ, mp_sum, mp_max
    USE block_matrix_api, ONLY: &
-      block_matrix_distribution_row_dist, block_matrix_distribution_col_dist
+      block_matrix_distribution_row_dist, block_matrix_distribution_col_dist, &
+      block_matrix_distribution_obj, block_matrix_get_info
 
    IMPLICIT NONE
    PRIVATE
@@ -119,6 +120,7 @@ CONTAINS
       REAL(KIND=real_8)                :: occupation
       INTEGER, DIMENSION(:), POINTER   :: rowdist, coldist
       INTEGER                          :: split_rowcol, icol, irow, unit_nr_prv
+      TYPE(block_matrix_distribution_obj) :: dist
 
       unit_nr_prv = prep_output_unit(unit_nr)
       IF (unit_nr_prv == 0) RETURN
@@ -151,8 +153,9 @@ CONTAINS
       occupation = -1.0_real_8
       IF (nblock_tot .NE. 0) occupation = 100.0_real_8*REAL(nblock_p_sum, real_8)/REAL(nblock_tot, real_8)
 
-      rowdist => block_matrix_distribution_row_dist(matrix%matrix%dist)
-      coldist => block_matrix_distribution_col_dist(matrix%matrix%dist)
+      CALL block_matrix_get_info(matrix%matrix, distribution=dist)
+      rowdist => block_matrix_distribution_row_dist(dist)
+      coldist => block_matrix_distribution_col_dist(dist)
 
       IF (unit_nr_prv > 0) THEN
          WRITE (unit_nr_prv, "(T2,A)") &
