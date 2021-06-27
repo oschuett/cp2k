@@ -17,7 +17,8 @@ MODULE block_tensor_test
    USE block_matrix_api, ONLY: &
       ${uselist(dtype_float_param)}$,&
       block_scalar_type, &
-      block_matrix_lapack_larnv, block_matrix_set_larnv_seed
+      block_matrix_lapack_larnv, block_matrix_set_larnv_seed, &
+      block_matrix_set_larnv_seed
    USE block_tas_base, ONLY: block_tas_info
    USE block_tensor, ONLY: &
       block_tensor_copy, block_tensor_get_block, block_tensor_iterator_type, block_tensor_iterator_blocks_left, &
@@ -436,7 +437,8 @@ CONTAINS
          IF (.NOT. enumerate) THEN
             blk_index_2d = INT(get_2d_indices_tensor(tensor%nd_index_blk, blk_index))
             CALL block_tensor_get_mapping_info(tensor%nd_index_blk, dims_2d=nblks_2d)
-            CALL set_larnv_seed(blk_index_2d(1), nblks_2d(1), blk_index_2d(2), nblks_2d(2), randmat_counter, iseed)
+            CALL block_matrix_set_larnv_seed(blk_index_2d(1), nblks_2d(1), &
+                                             blk_index_2d(2), nblks_2d(2), randmat_counter, iseed)
             nze = PRODUCT(blk_size)
          ENDIF
 

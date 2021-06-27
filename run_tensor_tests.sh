@@ -15,6 +15,8 @@ TESTOPTS="${TESTOPTS} -restrictdir QS/regtest-sos-mp2-lr"
 TESTOPTS="${TESTOPTS} -restrictdir QS/regtest-gw-ic-model"
 TESTOPTS="${TESTOPTS} -restrictdir QS/regtest-ri-rpa-rse"
 TESTOPTS="${TESTOPTS} -restrictdir QS/regtest-ri-laplace-mp2-cubic"
+TESTOPTS="${TESTOPTS} -restrictdir UNIT/block_tas_unittest"
+TESTOPTS="${TESTOPTS} -restrictdir UNIT/block_tensor_unittest"
 
 set -x
 
