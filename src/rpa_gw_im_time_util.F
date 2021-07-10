@@ -30,7 +30,7 @@ MODULE rpa_gw_im_time_util
         dbcsr_get_info, dbcsr_get_stored_coordinates, dbcsr_init_p, dbcsr_iterator_blocks_left, &
         dbcsr_iterator_next_block, dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, &
         dbcsr_multiply, dbcsr_p_type, dbcsr_release, dbcsr_release_p, dbcsr_reserve_all_blocks, &
-        dbcsr_scalar, dbcsr_set_diag, dbcsr_type, dbcsr_type_no_symmetry
+        dbcsr_set_diag, dbcsr_type, dbcsr_type_no_symmetry
    USE block_tensor_api,                ONLY: &
         block_tensor_contract, block_tensor_copy, block_tensor_copy_matrix_to_tensor, block_tensor_create, &
         block_tensor_default_distvec, block_tensor_destroy, block_tensor_get_info, block_tensor_get_num_blocks, &
@@ -292,7 +292,7 @@ CONTAINS
 
          CALL block_tensor_copy(t_3c_overl_int(1, 1), t_3c_overl_int_ao_ao, move_data=.TRUE.)
 
-         CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_ao_ao, dbcsr_scalar(1.0_dp), &
+         CALL block_tensor_contract(1.0_dp, mo_coeff_gw_t, t_3c_overl_int_ao_ao, 1.0_dp, &
                                t_3c_overl_int_ao_mo, contract_1=[1], notcontract_1=[2], &
                                contract_2=[3], notcontract_2=[1, 2], map_1=[3], map_2=[1, 2], &
                                bounds_2=ibounds, move_data=.FALSE., unit_nr=unit_nr_prv)
@@ -320,7 +320,7 @@ CONTAINS
          CALL block_tensor_pgrid_destroy(pgrid_ic)
 
          CALL block_tensor_copy(t_3c_overl_int_ao_mo, t_3c_overl_int_mo_ao, order=[1, 3, 2])
-         CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_mo_ao, dbcsr_scalar(0.0_dp), &
+         CALL block_tensor_contract(1.0_dp, mo_coeff_gw_t, t_3c_overl_int_mo_ao, 0.0_dp, &
                                t_3c_overl_int_mo_mo, contract_1=[1], notcontract_1=[2], &
                                contract_2=[3], notcontract_2=[1, 2], map_1=[3], map_2=[1, 2], &
                                bounds_2=bounds, move_data=.FALSE., unit_nr=unit_nr_prv)
@@ -387,13 +387,13 @@ CONTAINS
          CALL dbcsr_release(mat_mo_coeff_gw_reflected_norm)
          CALL block_tensor_copy(mo_coeff_gw_t_tmp, mo_coeff_gw_t)
 
-         CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_ao_ao, dbcsr_scalar(0.0_dp), &
+         CALL block_tensor_contract(1.0_dp, mo_coeff_gw_t, t_3c_overl_int_ao_ao, 0.0_dp, &
                                t_3c_overl_int_ao_mo, contract_1=[1], notcontract_1=[2], &
                                contract_2=[3], notcontract_2=[1, 2], map_1=[3], map_2=[1, 2], &
                                bounds_2=bounds, move_data=.FALSE., unit_nr=unit_nr_prv)
 
          CALL block_tensor_copy(t_3c_overl_int_ao_mo, t_3c_overl_int_mo_ao, order=[1, 3, 2])
-         CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_gw_t, t_3c_overl_int_mo_ao, dbcsr_scalar(0.0_dp), &
+         CALL block_tensor_contract(1.0_dp, mo_coeff_gw_t, t_3c_overl_int_mo_ao, 0.0_dp, &
                                t_3c_overl_int_mo_mo, contract_1=[1], notcontract_1=[2], &
                                contract_2=[3], notcontract_2=[1, 2], map_1=[3], map_2=[1, 2], &
                                bounds_2=bounds, move_data=.FALSE., unit_nr=unit_nr_prv)

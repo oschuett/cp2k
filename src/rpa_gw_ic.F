@@ -20,7 +20,7 @@ MODULE rpa_gw_ic
         dbcsr_add, dbcsr_create, dbcsr_get_info, dbcsr_get_stored_coordinates, dbcsr_init_p, &
         dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, dbcsr_iterator_start, &
         dbcsr_iterator_stop, dbcsr_iterator_type, dbcsr_p_type, dbcsr_release_p, &
-        dbcsr_reserve_all_blocks, dbcsr_scalar, dbcsr_set, dbcsr_transposed, dbcsr_type, &
+        dbcsr_reserve_all_blocks, dbcsr_set, dbcsr_transposed, dbcsr_type, &
         dbcsr_type_no_symmetry
    USE block_tensor_api,                ONLY: &
         block_tensor_contract, block_tensor_copy, block_tensor_copy_matrix_to_tensor, block_tensor_create, &
@@ -131,8 +131,8 @@ CONTAINS
       CALL block_tensor_copy(t_SinvVSinv_tmp, t_SinvVSinv)
       CALL block_tensor_destroy(t_SinvVSinv_tmp)
       CALL block_tensor_create(t_3c_overl_nnP_ic_reflected, t_3c_overl_nnP_ic_reflected_ctr)
-      CALL block_tensor_contract(dbcsr_scalar(0.5_dp), t_SinvVSinv, t_3c_overl_nnP_ic_reflected, &
-                            dbcsr_scalar(0.0_dp), t_3c_overl_nnP_ic_reflected_ctr, &
+      CALL block_tensor_contract(0.5_dp, t_SinvVSinv, t_3c_overl_nnP_ic_reflected, &
+                            0.0_dp, t_3c_overl_nnP_ic_reflected_ctr, &
                             contract_1=[2], notcontract_1=[1], &
                             contract_2=[1], notcontract_2=[2, 3], &
                             map_1=[1], map_2=[2, 3])

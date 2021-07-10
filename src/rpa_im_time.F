@@ -31,7 +31,7 @@ MODULE rpa_im_time
    USE dbcsr_api,                       ONLY: &
         dbcsr_add, dbcsr_clear, dbcsr_copy, dbcsr_create, dbcsr_distribution_get, &
         dbcsr_distribution_type, dbcsr_filter, dbcsr_get_info, dbcsr_init_p, dbcsr_p_type, &
-        dbcsr_release_p, dbcsr_reserve_all_blocks, dbcsr_scalar, dbcsr_scale, dbcsr_set, &
+        dbcsr_release_p, dbcsr_reserve_all_blocks, dbcsr_scale, dbcsr_set, &
         dbcsr_type, dbcsr_type_no_symmetry
    USE block_tensor_api,                ONLY: &
         block_tensor_batched_contract_finalize, block_tensor_batched_contract_init, block_tensor_contract, &
@@ -373,10 +373,10 @@ CONTAINS
                               CALL block_tensor_copy(t_3c_O(i_cell_R_1_minus_S, i_cell_R_2), &
                                                 t_3c_O_occ(i_cell_R_1_minus_S, i_cell_R_2), move_data=.TRUE.)
 
-                              CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), &
+                              CALL block_tensor_contract(alpha=1.0_dp, &
                                                     tensor_1=t_3c_O_occ(i_cell_R_1_minus_S, i_cell_R_2), &
                                                     tensor_2=t_dm_occ(i_cell_S), &
-                                                    beta=dbcsr_scalar(1.0_dp), &
+                                                    beta=1.0_dp, &
                                                     tensor_3=t_3c_M_occ_tmp, &
                                                     contract_1=[3], notcontract_1=[1, 2], &
                                                     contract_2=[2], notcontract_2=[1], &
@@ -422,11 +422,11 @@ CONTAINS
                                                 t_3c_O_virt(i_cell_R_2_minus_S_minus_T, i_cell_R_1_minus_T), move_data=.TRUE.)
 
                               CALL timeset(routineN//"_calc_M_virt_t", handle3)
-                              CALL block_tensor_contract(alpha=dbcsr_scalar(alpha/2.0_dp), &
+                              CALL block_tensor_contract(alpha=alpha/2.0_dp, &
                                                     tensor_1=t_3c_O_virt( &
                                                     i_cell_R_2_minus_S_minus_T, i_cell_R_1_minus_T), &
                                                     tensor_2=t_dm_virt(i_cell_S), &
-                                                    beta=dbcsr_scalar(1.0_dp), &
+                                                    beta=1.0_dp, &
                                                     tensor_3=t_3c_M_virt_tmp, &
                                                     contract_1=[3], notcontract_1=[1, 2], &
                                                     contract_2=[2], notcontract_2=[1], &
@@ -456,9 +456,9 @@ CONTAINS
 
                         CALL timeset(routineN//"_calc_P_t", handle3)
 
-                        CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=t_3c_M_occ, &
+                        CALL block_tensor_contract(alpha=1.0_dp, tensor_1=t_3c_M_occ, &
                                               tensor_2=t_3c_M_virt, &
-                                              beta=dbcsr_scalar(1.0_dp), &
+                                              beta=1.0_dp, &
                                               tensor_3=t_P, &
                                               contract_1=[2, 3], notcontract_1=[1], &
                                               contract_2=[2, 3], notcontract_2=[1], &

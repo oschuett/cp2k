@@ -47,7 +47,7 @@ MODULE xas_tdp_correction
    USE dbcsr_api,                       ONLY: &
         dbcsr_copy, dbcsr_create, dbcsr_distribution_get, dbcsr_distribution_new, &
         dbcsr_distribution_release, dbcsr_distribution_type, dbcsr_get_info, dbcsr_p_type, &
-        dbcsr_release, dbcsr_scalar, dbcsr_type
+        dbcsr_release, dbcsr_type
    USE block_tensor_api,                ONLY: &
         block_tensor_contract, block_tensor_copy, block_tensor_copy_matrix_to_tensor, block_tensor_create, &
         block_tensor_default_distvec, block_tensor_destroy, block_tensor_distribution_destroy, &
@@ -545,8 +545,8 @@ CONTAINS
                bounds_1d = [SUM(mo_blk_size(1:occ_bo(1) - 1)) + 1, SUM(mo_blk_size(1:occ_bo(2)))]
 
                CALL block_tensor_create(mo_template, ja_Ik)
-               CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=ja_X, tensor_2=oI_Y(ido_mo), &
-                                     beta=dbcsr_scalar(0.0_dp), tensor_3=ja_Ik, contract_1=[3], &
+               CALL block_tensor_contract(alpha=1.0_dp, tensor_1=ja_X, tensor_2=oI_Y(ido_mo), &
+                                     beta=0.0_dp, tensor_3=ja_Ik, contract_1=[3], &
                                      notcontract_1=[1, 2], contract_2=[2], notcontract_2=[1], &
                                      map_1=[1, 2], map_2=[3], bounds_3=bounds_1d)
 
@@ -565,8 +565,8 @@ CONTAINS
                   CALL block_tensor_create(ja_Ik, ja_Ik_diff, map1_2d=[1], map2_2d=[2, 3])
                   CALL block_tensor_copy(ja_Ik, ja_Ik_diff, move_data=.TRUE.)
 
-                  CALL block_tensor_contract(alpha=dbcsr_scalar(-1.0_dp), tensor_1=oI_Y(ido_mo), tensor_2=aj_X, &
-                                        beta=dbcsr_scalar(1.0_dp), tensor_3=ja_Ik_diff, contract_1=[2], &
+                  CALL block_tensor_contract(alpha=-1.0_dp, tensor_1=oI_Y(ido_mo), tensor_2=aj_X, &
+                                        beta=1.0_dp, tensor_3=ja_Ik_diff, contract_1=[2], &
                                         notcontract_1=[1], contract_2=[3], notcontract_2=[1, 2], &
                                         map_1=[1], map_2=[2, 3], bounds_2=[1, nhomo], bounds_3=bounds_2d)
 
@@ -585,8 +585,8 @@ CONTAINS
                             SUM(mo_blk_size(1:nblk_occ + virt_bo(2)))]
 
                CALL block_tensor_create(mo_template, aj_Ib)
-               CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=aj_X, tensor_2=oI_Y(ido_mo), &
-                                     beta=dbcsr_scalar(0.0_dp), tensor_3=aj_Ib, contract_1=[3], &
+               CALL block_tensor_contract(alpha=1.0_dp, tensor_1=aj_X, tensor_2=oI_Y(ido_mo), &
+                                     beta=0.0_dp, tensor_3=aj_Ib, contract_1=[3], &
                                      notcontract_1=[1, 2], contract_2=[2], notcontract_2=[1], &
                                      map_1=[1, 2], map_2=[3], bounds_3=bounds_1d)
 
@@ -604,8 +604,8 @@ CONTAINS
                   CALL block_tensor_create(aj_Ib, aj_Ib_diff, map1_2d=[1], map2_2d=[2, 3])
                   CALL block_tensor_copy(aj_Ib, aj_Ib_diff, move_data=.TRUE.)
 
-                  CALL block_tensor_contract(alpha=dbcsr_scalar(-1.0_dp), tensor_1=oI_Y(ido_mo), tensor_2=ja_X, &
-                                        beta=dbcsr_scalar(1.0_dp), tensor_3=aj_Ib_diff, contract_1=[2], &
+                  CALL block_tensor_contract(alpha=-1.0_dp, tensor_1=oI_Y(ido_mo), tensor_2=ja_X, &
+                                        beta=1.0_dp, tensor_3=aj_Ib_diff, contract_1=[2], &
                                         notcontract_1=[1], contract_2=[3], notcontract_2=[1, 2], &
                                         map_1=[1], map_2=[2, 3], &
                                         bounds_2=[nhomo + 1, nhomo + nlumo], bounds_3=bounds_2d)
@@ -782,9 +782,9 @@ CONTAINS
                   bounds_1d = [SUM(mo_blk_size(1:occ_bo(1) - 1)) + 1, SUM(mo_blk_size(1:occ_bo(2)))]
 
                   CALL block_tensor_create(mo_template(other_spin, ispin), ja_Ik)
-                  CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=ja_X(other_spin), &
+                  CALL block_tensor_contract(alpha=1.0_dp, tensor_1=ja_X(other_spin), &
                                         tensor_2=oI_Y((ispin - 1)*ndo_mo + ido_mo), &
-                                        beta=dbcsr_scalar(0.0_dp), tensor_3=ja_Ik, contract_1=[3], &
+                                        beta=0.0_dp, tensor_3=ja_Ik, contract_1=[3], &
                                         notcontract_1=[1, 2], contract_2=[2], notcontract_2=[1], &
                                         map_1=[1, 2], map_2=[3], bounds_3=bounds_1d)
 
@@ -800,9 +800,9 @@ CONTAINS
 
                      !same batching as opposite spin
                      CALL block_tensor_create(mo_template(ispin, ispin), ja_Ik)
-                     CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=ja_X(ispin), &
+                     CALL block_tensor_contract(alpha=1.0_dp, tensor_1=ja_X(ispin), &
                                            tensor_2=oI_Y((ispin - 1)*ndo_mo + ido_mo), &
-                                           beta=dbcsr_scalar(0.0_dp), tensor_3=ja_Ik, contract_1=[3], &
+                                           beta=0.0_dp, tensor_3=ja_Ik, contract_1=[3], &
                                            notcontract_1=[1, 2], contract_2=[2], notcontract_2=[1], &
                                            map_1=[1, 2], map_2=[3], bounds_3=bounds_1d)
 
@@ -814,8 +814,8 @@ CONTAINS
                      CALL block_tensor_create(ja_Ik, ja_Ik_diff, map1_2d=[1], map2_2d=[2, 3])
                      CALL block_tensor_copy(ja_Ik, ja_Ik_diff, move_data=.TRUE.)
 
-                     CALL block_tensor_contract(alpha=dbcsr_scalar(-1.0_dp), tensor_1=oI_Y((ispin - 1)*ndo_mo + ido_mo), &
-                                           tensor_2=aj_X(ispin), beta=dbcsr_scalar(1.0_dp), tensor_3=ja_Ik_diff, &
+                     CALL block_tensor_contract(alpha=-1.0_dp, tensor_1=oI_Y((ispin - 1)*ndo_mo + ido_mo), &
+                                           tensor_2=aj_X(ispin), beta=1.0_dp, tensor_3=ja_Ik_diff, &
                                            contract_1=[2], notcontract_1=[1], contract_2=[3], notcontract_2=[1, 2], &
                                            map_1=[1], map_2=[2, 3], bounds_2=[1, nhomo(ispin)], bounds_3=bounds_2d)
 
@@ -837,9 +837,9 @@ CONTAINS
                                SUM(mo_blk_size(1:nblk_occ + virt_bo(2)))]
 
                   CALL block_tensor_create(mo_template(other_spin, ispin), aj_Ib)
-                  CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=aj_X(other_spin), &
+                  CALL block_tensor_contract(alpha=1.0_dp, tensor_1=aj_X(other_spin), &
                                         tensor_2=oI_Y((ispin - 1)*ndo_mo + ido_mo), &
-                                        beta=dbcsr_scalar(0.0_dp), tensor_3=aj_Ib, contract_1=[3], &
+                                        beta=0.0_dp, tensor_3=aj_Ib, contract_1=[3], &
                                         notcontract_1=[1, 2], contract_2=[2], notcontract_2=[1], &
                                         map_1=[1, 2], map_2=[3], bounds_3=bounds_1d)
 
@@ -855,9 +855,9 @@ CONTAINS
 
                      !same batching as opposite spin
                      CALL block_tensor_create(mo_template(ispin, ispin), aj_Ib)
-                     CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=aj_X(ispin), &
+                     CALL block_tensor_contract(alpha=1.0_dp, tensor_1=aj_X(ispin), &
                                            tensor_2=oI_Y((ispin - 1)*ndo_mo + ido_mo), &
-                                           beta=dbcsr_scalar(0.0_dp), tensor_3=aj_Ib, contract_1=[3], &
+                                           beta=0.0_dp, tensor_3=aj_Ib, contract_1=[3], &
                                            notcontract_1=[1, 2], contract_2=[2], notcontract_2=[1], &
                                            map_1=[1, 2], map_2=[3], bounds_3=bounds_1d)
 
@@ -868,8 +868,8 @@ CONTAINS
                      CALL block_tensor_create(aj_Ib, aj_Ib_diff, map1_2d=[1], map2_2d=[2, 3])
                      CALL block_tensor_copy(aj_Ib, aj_Ib_diff, move_data=.TRUE.)
 
-                     CALL block_tensor_contract(alpha=dbcsr_scalar(-1.0_dp), tensor_1=oI_Y((ispin - 1)*ndo_mo + ido_mo), &
-                                           tensor_2=ja_X(ispin), beta=dbcsr_scalar(1.0_dp), tensor_3=aj_Ib_diff, &
+                     CALL block_tensor_contract(alpha=-1.0_dp, tensor_1=oI_Y((ispin - 1)*ndo_mo + ido_mo), &
+                                           tensor_2=ja_X(ispin), beta=1.0_dp, tensor_3=aj_Ib_diff, &
                                            contract_1=[2], notcontract_1=[1], contract_2=[3], &
                                            notcontract_2=[1, 2], map_1=[1], map_2=[2, 3], &
                                            bounds_2=[nhomo(ispin) + 1, nhomo(ispin) + nlumo(ispin)], &
@@ -1160,8 +1160,8 @@ CONTAINS
          CALL block_tensor_distribution_destroy(t_dist)
 
          !contract (pq|X) into (jq|X)
-         CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=pq_X, tensor_2=t_mo_coeffs, &
-                               beta=dbcsr_scalar(0.0_dp), tensor_3=jq_X, contract_1=[1], &
+         CALL block_tensor_contract(alpha=1.0_dp, tensor_1=pq_X, tensor_2=t_mo_coeffs, &
+                               beta=0.0_dp, tensor_3=jq_X, contract_1=[1], &
                                notcontract_1=[2, 3], contract_2=[1], notcontract_2=[2], &
                                map_1=[2, 3], map_2=[1], bounds_3=[1, nocc(ispin)]) !only want occupied MOs for j
 
@@ -1187,8 +1187,8 @@ CONTAINS
          CALL block_tensor_distribution_destroy(t_dist)
 
          !contract (jq|X) into (ja|X)
-         CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=jq_X, tensor_2=t_mo_coeffs, &
-                               beta=dbcsr_scalar(0.0_dp), tensor_3=ja_X(ispin), contract_1=[2], &
+         CALL block_tensor_contract(alpha=1.0_dp, tensor_1=jq_X, tensor_2=t_mo_coeffs, &
+                               beta=0.0_dp, tensor_3=ja_X(ispin), contract_1=[2], &
                                notcontract_1=[1, 3], contract_2=[1], notcontract_2=[2], &
                                map_1=[1, 3], map_2=[2], bounds_3=[nocc(ispin) + 1, nocc(ispin) + nvirt(ispin)])
 
@@ -1368,8 +1368,8 @@ CONTAINS
          CALL block_tensor_distribution_destroy(t_dist)
 
          !contract (pI|Y) into (oI|Y)
-         CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=t_work, tensor_2=t_mo_coeffs, &
-                               beta=dbcsr_scalar(0.0_dp), tensor_3=oI_Y(ido_mo), contract_1=[1], &
+         CALL block_tensor_contract(alpha=1.0_dp, tensor_1=t_work, tensor_2=t_mo_coeffs, &
+                               beta=0.0_dp, tensor_3=oI_Y(ido_mo), contract_1=[1], &
                                notcontract_1=[2], contract_2=[1], notcontract_2=[2], &
                                map_1=[2], map_2=[1]) !no bound, all MOs needed
 

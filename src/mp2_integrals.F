@@ -37,7 +37,7 @@ MODULE mp2_integrals
    USE cp_units,                        ONLY: cp_unit_from_cp2k
    USE dbcsr_api,                       ONLY: &
         dbcsr_copy, dbcsr_create, dbcsr_get_info, dbcsr_multiply, dbcsr_p_type, dbcsr_release, &
-        dbcsr_release_p, dbcsr_scalar, dbcsr_set, dbcsr_type, dbcsr_type_no_symmetry, &
+        dbcsr_release_p, dbcsr_set, dbcsr_type, dbcsr_type_no_symmetry, &
         dbcsr_type_real_8
    USE block_tensor_api,                ONLY: &
         block_tensor_clear, block_tensor_contract, block_tensor_copy, block_tensor_create, block_tensor_destroy, &
@@ -1128,8 +1128,8 @@ CONTAINS
       CALL block_tensor_split_blocks(tB_out, tB_out_split, [blk_size(2), blk_size(1), blk_size(1)])
 
       ! contract
-      CALL block_tensor_contract(alpha=dbcsr_scalar(1.0_dp), tensor_1=tB_in_split, tensor_2=tL_split, &
-                            beta=dbcsr_scalar(0.0_dp), tensor_3=tB_out_split, &
+      CALL block_tensor_contract(alpha=1.0_dp, tensor_1=tB_in_split, tensor_2=tL_split, &
+                            beta=0.0_dp, tensor_3=tB_out_split, &
                             contract_1=[1], notcontract_1=[2, 3], &
                             contract_2=[1], notcontract_2=[2], &
                             map_1=[2, 3], map_2=[1], optimize_dist=.TRUE.)

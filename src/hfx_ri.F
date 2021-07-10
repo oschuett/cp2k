@@ -34,7 +34,7 @@ MODULE hfx_ri
         dbcsr_add, dbcsr_add_on_diag, dbcsr_copy, dbcsr_create, dbcsr_distribution_get, &
         dbcsr_distribution_release, dbcsr_distribution_type, dbcsr_dot, dbcsr_filter, &
         dbcsr_frobenius_norm, dbcsr_get_info, dbcsr_get_num_blocks, dbcsr_multiply, dbcsr_p_type, &
-        dbcsr_release, dbcsr_scalar, dbcsr_scale, dbcsr_type, dbcsr_type_no_symmetry, &
+        dbcsr_release, dbcsr_scale, dbcsr_type, dbcsr_type_no_symmetry, &
         dbcsr_type_symmetric
    USE block_tensor_api,                ONLY: &
         block_tensor_batched_contract_finalize, block_tensor_batched_contract_init, block_tensor_clear, &
@@ -643,8 +643,8 @@ CONTAINS
             bounds_j(:, 1) = [ri_data%starts_array_mem(j_mem), ri_data%ends_array_mem(j_mem)]
             bounds_j(:, 2) = [1, dims_3c(3)]
             CALL timeset(routineN//"_RIx3C", handle2)
-            CALL block_tensor_contract(dbcsr_scalar(1.0_dp), ri_data%t_2c_int(1, 1), ri_data%t_3c_int_ctr_3(1, 1), &
-                                  dbcsr_scalar(0.0_dp), t_3c_2, &
+            CALL block_tensor_contract(1.0_dp, ri_data%t_2c_int(1, 1), ri_data%t_3c_int_ctr_3(1, 1), &
+                                  0.0_dp, t_3c_2, &
                                   contract_1=[2], notcontract_1=[1], &
                                   contract_2=[1], notcontract_2=[2, 3], &
                                   map_1=[1], map_2=[2, 3], filter_eps=ri_data%filter_eps_storage, &
@@ -1148,8 +1148,8 @@ CONTAINS
             CALL block_tensor_batched_contract_init(t_3c_int_mo_1(1, 1), &
                                                batch_range_3=batch_ranges_1)
             CALL timeset(routineN//"_MOx3C_R", handle2)
-            CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_t_split, ri_data%t_3c_int_ctr_1(1, 1), &
-                                  dbcsr_scalar(0.0_dp), t_3c_int_mo_1(1, 1), &
+            CALL block_tensor_contract(1.0_dp, mo_coeff_t_split, ri_data%t_3c_int_ctr_1(1, 1), &
+                                  0.0_dp, t_3c_int_mo_1(1, 1), &
                                   contract_1=[1], notcontract_1=[2], &
                                   contract_2=[3], notcontract_2=[1, 2], &
                                   map_1=[3], map_2=[1, 2], &
@@ -1176,8 +1176,8 @@ CONTAINS
                                                batch_range_1=batch_ranges_1)
 
             CALL timeset(routineN//"_MOx3C_L", handle2)
-            CALL block_tensor_contract(dbcsr_scalar(1.0_dp), mo_coeff_t_split, ri_data%t_3c_int_ctr_2(1, 1), &
-                                  dbcsr_scalar(0.0_dp), t_3c_int_mo_2(1, 1), &
+            CALL block_tensor_contract(1.0_dp, mo_coeff_t_split, ri_data%t_3c_int_ctr_2(1, 1), &
+                                  0.0_dp, t_3c_int_mo_2(1, 1), &
                                   contract_1=[1], notcontract_1=[2], &
                                   contract_2=[1], notcontract_2=[2, 3], &
                                   map_1=[1], map_2=[2, 3], &
@@ -1204,8 +1204,8 @@ CONTAINS
 
             CALL timeset(routineN//"_RIx3C", handle2)
 
-            CALL block_tensor_contract(dbcsr_scalar(1.0_dp), ri_data%t_2c_int(ispin, 1), ri_data%t_3c_int_mo(ispin, 1, 1), &
-                                  dbcsr_scalar(0.0_dp), ri_data%t_3c_ctr_RI(ispin, 1, 1), &
+            CALL block_tensor_contract(1.0_dp, ri_data%t_2c_int(ispin, 1), ri_data%t_3c_int_mo(ispin, 1, 1), &
+                                  0.0_dp, ri_data%t_3c_ctr_RI(ispin, 1, 1), &
                                   contract_1=[1], notcontract_1=[2], &
                                   contract_2=[1], notcontract_2=[2, 3], &
                                   map_1=[1], map_2=[2, 3], filter_eps=ri_data%filter_eps, &
@@ -1224,10 +1224,10 @@ CONTAINS
             CALL timestop(handle2)
 
             CALL timeset(routineN//"_3Cx3C", handle2)
-            CALL block_tensor_contract(dbcsr_scalar(1.0_dp), &
+            CALL block_tensor_contract(1.0_dp, &
                                        ri_data%t_3c_ctr_KS(ispin, 1, 1), &
                                        ri_data%t_3c_ctr_KS_copy(ispin, 1, 1), &
-                                       dbcsr_scalar(1.0_dp), ks_t, &
+                                       1.0_dp, ks_t, &
                                        contract_1=[1, 2], notcontract_1=[3], &
                                        contract_2=[1, 2], notcontract_2=[3], &
                                        map_1=[1], map_2=[2], filter_eps=ri_data%filter_eps/n_mem, &
@@ -1404,8 +1404,8 @@ CONTAINS
                bounds_j(:, 1) = [1, dims_3c(1)]
                bounds_j(:, 2) = [ri_data%starts_array_RI_mem(j_mem), ri_data%ends_array_RI_mem(j_mem)]
 
-               CALL block_tensor_contract(dbcsr_scalar(1.0_dp), rho_ao_t, ri_data%t_3c_int_ctr_2(1, 1), &
-                                     dbcsr_scalar(0.0_dp), t_3c_1, &
+               CALL block_tensor_contract(1.0_dp, rho_ao_t, ri_data%t_3c_int_ctr_2(1, 1), &
+                                     0.0_dp, t_3c_1, &
                                      contract_1=[2], notcontract_1=[1], &
                                      contract_2=[3], notcontract_2=[1, 2], &
                                      map_1=[3], map_2=[1, 2], filter_eps=ri_data%filter_eps, &
@@ -1442,8 +1442,8 @@ CONTAINS
                nze_3c_2 = nze_3c_2 + nze
                occ_3c_2 = occ_3c_2 + occ
                CALL timeset(routineN//"_KS", handle2)
-               CALL block_tensor_contract(dbcsr_scalar(1.0_dp), ri_data%t_3c_int_ctr_1(1, 1), t_3c_3, &
-                                     dbcsr_scalar(1.0_dp), ks_t, &
+               CALL block_tensor_contract(1.0_dp, ri_data%t_3c_int_ctr_1(1, 1), t_3c_3, &
+                                     1.0_dp, ks_t, &
                                      contract_1=[1, 2], notcontract_1=[3], &
                                      contract_2=[1, 2], notcontract_2=[3], &
                                      map_1=[1], map_2=[2], filter_eps=ri_data%filter_eps/n_mem, &

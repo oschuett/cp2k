@@ -44,7 +44,7 @@ MODULE rpa_gw
         dbcsr_add_on_diag, dbcsr_copy, dbcsr_create, dbcsr_desymmetrize, dbcsr_filter, &
         dbcsr_get_info, dbcsr_init_p, dbcsr_iterator_blocks_left, dbcsr_iterator_next_block, &
         dbcsr_iterator_start, dbcsr_iterator_stop, dbcsr_iterator_type, dbcsr_multiply, &
-        dbcsr_p_type, dbcsr_release_p, dbcsr_scalar, dbcsr_scale, dbcsr_set, dbcsr_type, &
+        dbcsr_p_type, dbcsr_release_p, dbcsr_scale, dbcsr_set, dbcsr_type, &
         dbcsr_type_no_symmetry
    USE block_tensor_api,                ONLY: &
         block_tensor_batched_contract_finalize, block_tensor_batched_contract_init, block_tensor_clear, &
@@ -5085,7 +5085,7 @@ CONTAINS
          ctr_bounds_mo(:, 1) = [1, bounds_3c(2)]
          ctr_bounds_mo(:, 2) = mo_bounds
 
-         CALL block_tensor_contract(dbcsr_scalar(prefac(1)), t_RI, t_3c_overl_int_gw_RI, dbcsr_scalar(0.0_dp), &
+         CALL block_tensor_contract(prefac(1), t_RI, t_3c_overl_int_gw_RI, 0.0_dp, &
                                t_3c_ctr_RI, &
                                contract_1=[2], notcontract_1=[1], &
                                contract_2=[1], notcontract_2=[2, 3], &
@@ -5099,7 +5099,7 @@ CONTAINS
       ctr_bounds_mo(:, 1) = [1, bounds_3c(2)]
       ctr_bounds_mo(:, 2) = mo_bounds
 
-      CALL block_tensor_contract(dbcsr_scalar(prefac(2)), t_AO, t_3c_overl_int_gw_AO, dbcsr_scalar(0.0_dp), &
+      CALL block_tensor_contract(prefac(2), t_AO, t_3c_overl_int_gw_AO, 0.0_dp, &
                             t_3c_ctr_AO, &
                             contract_1=[2], notcontract_1=[1], &
                             contract_2=[1], notcontract_2=[2, 3], &
