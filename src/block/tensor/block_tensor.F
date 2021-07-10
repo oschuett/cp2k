@@ -446,12 +446,12 @@ CONTAINS
       !! bounds_2, bounds_3 give the index ranges of the batches.
       !! @endnote
 
-      TYPE(block_scalar_type), INTENT(IN)            :: alpha
+      REAL(dp), INTENT(IN)            :: alpha
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
          !! first tensor (in)
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
          !! second tensor (in)
-      TYPE(block_scalar_type), INTENT(IN)            :: beta
+      REAL(dp), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
          !! indices of tensor_1 to contract
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
@@ -542,10 +542,10 @@ CONTAINS
                                       filter_eps, flop, move_data, retain_sparsity, &
                                       nblks_local, result_index, unit_nr, log_verbose)
       !! expert routine for tensor contraction. For internal use only.
-      TYPE(block_scalar_type), INTENT(IN)            :: alpha
+      REAL(dp), INTENT(IN)            :: alpha
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
-      TYPE(block_scalar_type), INTENT(IN)            :: beta
+      REAL(dp), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
       INTEGER, DIMENSION(:), INTENT(IN)              :: map_1
@@ -1785,10 +1785,10 @@ CONTAINS
       !! performing contraction.
       !! this is an estimate based on block norm multiplication.
       !! See documentation of block_tensor_contract.
-      TYPE(block_scalar_type), INTENT(IN)            :: alpha
+      REAL(dp), INTENT(IN)            :: alpha
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_1
       TYPE(block_tensor_type), INTENT(INOUT), TARGET      :: tensor_2
-      TYPE(block_scalar_type), INTENT(IN)            :: beta
+      REAL(dp), INTENT(IN)            :: beta
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_1
       INTEGER, DIMENSION(:), INTENT(IN)              :: contract_2
       INTEGER, DIMENSION(:), INTENT(IN)              :: map_1

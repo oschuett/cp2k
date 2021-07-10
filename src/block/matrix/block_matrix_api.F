@@ -261,21 +261,6 @@ MODULE block_matrix_api
       MODULE PROCEDURE block_matrix_iterator_next_block_area
    END INTERFACE block_matrix_iterator_next_block
 
-   INTERFACE block_matrix_scale
-      MODULE PROCEDURE block_matrix_scale_d
-      MODULE PROCEDURE block_matrix_scale_anytype
-   END INTERFACE block_matrix_scale
-
-   INTERFACE block_matrix_multiply
-      MODULE PROCEDURE block_matrix_multiply_d
-      MODULE PROCEDURE block_matrix_multiply_anytype
-   END INTERFACE block_matrix_multiply
-
-   INTERFACE block_matrix_add
-      MODULE PROCEDURE block_matrix_add_d
-      MODULE PROCEDURE block_matrix_add_anytype
-   END INTERFACE block_matrix_add
-
    CONTAINS
 
    !================================================================================================
@@ -508,10 +493,10 @@ MODULE block_matrix_api
       TYPE(block_matrix_data_obj)                        :: block
       INTEGER, DIMENSION(2), INTENT(INOUT), OPTIONAL     :: lb_row_col
       LOGICAL, INTENT(IN), OPTIONAL                      :: transposed, summation
-      TYPE(block_scalar_type), INTENT(IN), OPTIONAL      :: scale
+      REAL(dp), INTENT(IN), OPTIONAL      :: scale
 
 
-      CALL dbcsr_put_block(matrix%dbcsr, row, col, block, lb_row_col, &
+      CALL dbcsr_put_block(matrix%dbcsr, row, col, block_matrix_get_data_p_2d_d(block), lb_row_col, &
                            transposed=transposed, summation=summation, scale=scale)
     END SUBROUTINE block_matrix_put_block_area
 
@@ -790,23 +775,13 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_scale_d(matrix, alpha, last_column)
+   SUBROUTINE block_matrix_scale(matrix, alpha, last_column)
       TYPE(block_matrix_type), INTENT(INOUT)    :: matrix
        REAL(dp), INTENT(IN)                     :: alpha
       INTEGER, INTENT(IN), OPTIONAL             :: last_column
 
       CALL dbcsr_scale(matrix%dbcsr, alpha, last_column)
-   END SUBROUTINE block_matrix_scale_d
-
-   !================================================================================================
-   !================================================================================================
-   SUBROUTINE block_matrix_scale_anytype(matrix, alpha, limits)
-      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
-      TYPE(block_scalar_type), INTENT(IN)                :: alpha
-      INTEGER, DIMENSION(4), INTENT(IN), OPTIONAL        :: limits
-
-      CALL dbcsr_scale(matrix%dbcsr, alpha, limits)
-   END SUBROUTINE block_matrix_scale_anytype
+   END SUBROUTINE block_matrix_scale
 
    !================================================================================================
    !================================================================================================
@@ -855,7 +830,7 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_multiply_d(transa, transb, &
+   SUBROUTINE block_matrix_multiply(transa, transb, &
                                       alpha, matrix_a, matrix_b, beta, matrix_c, &
                                       first_row, last_row, &
                                       first_column, last_column, first_k, last_k, &
@@ -879,59 +854,19 @@ MODULE block_matrix_api
                           first_column=first_column, last_column=last_column, &
                           first_k=first_k, last_k=last_k, &
                           retain_sparsity=retain_sparsity, filter_eps=filter_eps, flop=flop)
-   END SUBROUTINE block_matrix_multiply_d
+   END SUBROUTINE block_matrix_multiply
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_multiply_anytype(transa, transb, &
-                                      alpha, matrix_a, matrix_b, beta, matrix_c, &
-                                      first_row, last_row, &
-                                      first_column, last_column, first_k, last_k, &
-                                      retain_sparsity, filter_eps, flop)
-      CHARACTER(LEN=1), INTENT(IN)                   :: transa, transb
-      TYPE(block_scalar_type), INTENT(IN)            :: alpha
-      TYPE(block_matrix_type), INTENT(IN)            :: matrix_a, matrix_b
-      TYPE(block_scalar_type), INTENT(IN)            :: beta
-      TYPE(block_matrix_type), INTENT(INOUT)         :: matrix_c
-      INTEGER, INTENT(IN), OPTIONAL                  :: first_row, last_row, &
-                                                        first_column, last_column, &
-                                                        first_k, last_k
-      LOGICAL, INTENT(IN), OPTIONAL                  :: retain_sparsity
-      REAL(kind=dp), INTENT(IN), OPTIONAL            :: filter_eps
-      INTEGER(int_8), INTENT(OUT), OPTIONAL          :: flop
-
-      CALL dbcsr_multiply(transa=transa, transb=transb, &
-                          alpha=alpha, matrix_a=matrix_a%dbcsr, &
-                          matrix_b=matrix_b%dbcsr, beta=beta, matrix_c=matrix_c%dbcsr, &
-                          first_row=first_row, last_row=last_row, &
-                          first_column=first_column, last_column=last_column, &
-                          first_k=first_k, last_k=last_k, &
-                          retain_sparsity=retain_sparsity, filter_eps=filter_eps, flop=flop)
-   END SUBROUTINE block_matrix_multiply_anytype
-
-   !================================================================================================
-   !================================================================================================
-   SUBROUTINE block_matrix_add_d(matrix_a, matrix_b, alpha_scalar, beta_scalar)
+   SUBROUTINE block_matrix_add(matrix_a, matrix_b, alpha_scalar, beta_scalar)
       TYPE(block_matrix_type), INTENT(INOUT)   :: matrix_a
       TYPE(block_matrix_type), INTENT(IN)      :: matrix_b
-     REAL(kind=dp), INTENT(IN)                 :: alpha_scalar, beta_scalar
+     REAL(kind=dp), INTENT(IN), OPTIONAL       :: alpha_scalar, beta_scalar
 
       CALL dbcsr_add(matrix_a%dbcsr, matrix_b%dbcsr, &
                      alpha_scalar=alpha_scalar, beta_scalar=beta_scalar)
 
-   END SUBROUTINE block_matrix_add_d
-
-   !================================================================================================
-   !================================================================================================
-   SUBROUTINE block_matrix_add_anytype(matrix_a, matrix_b, alpha_scalar, beta_scalar)
-      TYPE(block_matrix_type), INTENT(INOUT)        :: matrix_a
-      TYPE(block_matrix_type), INTENT(IN)           :: matrix_b
-      TYPE(block_scalar_type), INTENT(IN), OPTIONAL :: alpha_scalar, beta_scalar
-
-      CALL dbcsr_add(matrix_a%dbcsr, matrix_b%dbcsr, &
-                     alpha_scalar=alpha_scalar, beta_scalar=beta_scalar)
-
-   END SUBROUTINE block_matrix_add_anytype
+   END SUBROUTINE block_matrix_add
 
    !================================================================================================
    !================================================================================================

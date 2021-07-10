@@ -39,7 +39,7 @@ MODULE block_tas_base
    USE block_tas_util, ONLY: &
       block_mp_environ, index_unique
    USE kinds, ONLY: &
-      default_string_length, int_8, real_8, real_4
+      default_string_length, int_8, real_8, real_4, dp
    USE message_passing, ONLY: &
       mp_cart_rank, mp_environ, mp_sum, mp_max
 #include "../../base/base_uses.f90"
@@ -756,7 +756,7 @@ CONTAINS
       INTEGER(KIND=int_8), INTENT(IN)                    :: row, col
       TYPE(block_matrix_data_obj)                               :: block
       LOGICAL, INTENT(IN), OPTIONAL                      :: transposed, summation
-      TYPE(block_scalar_type), INTENT(IN), OPTIONAL      :: scale
+      REAL(dp), INTENT(IN), OPTIONAL      :: scale
 
       INTEGER                                            :: col_group, row_group
 

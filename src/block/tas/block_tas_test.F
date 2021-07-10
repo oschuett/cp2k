@@ -11,7 +11,7 @@ MODULE block_tas_test
 
    !! testing infrastructure for tall-and-skinny matrices
    USE block_matrix_api, ONLY: &
-      block_type_real_8, block_scalar, &
+      block_type_real_8, &
       block_matrix_release, block_matrix_nblkcols_total, block_matrix_nblkrows_total, &
       block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
       block_matrix_mp_release, block_matrix_distribution_release, &
@@ -43,8 +43,7 @@ MODULE block_tas_test
                               block_tas_get_split_info
    USE block_tas_util, ONLY: block_mp_environ, &
                              invert_transpose_flag
-   USE kinds, ONLY: int_8, &
-                          real_8
+   USE kinds, ONLY: int_8, real_8, dp
    USE message_passing, ONLY: mp_environ, &
                             mp_cart_create, &
                             mp_comm_free
@@ -196,8 +195,8 @@ CONTAINS
       ENDIF
       ENDIF
       CALL timeset("benchmark_tas_mm", handle1)
-      CALL block_tas_multiply(transa, transb, transc, block_scalar(1.0_real_8), matrix_a, matrix_b, &
-                              block_scalar(0.0_real_8), matrix_c, &
+      CALL block_tas_multiply(transa, transb, transc, 1.0_dp, matrix_a, matrix_b, &
+                              0.0_dp, matrix_c, &
                               filter_eps=filter_eps, unit_nr=io_unit)
       CALL timestop(handle1)
       IF (PRESENT(io_unit)) THEN
@@ -271,8 +270,8 @@ CONTAINS
          ENDIF
          ENDIF
          CALL timeset("benchmark_block_mm", handle2)
-         CALL block_matrix_multiply(transa, transb, block_scalar(1.0_real_8), block_matrix_a_mm, block_matrix_b_mm, &
-                             block_scalar(0.0_real_8), block_matrix_c_mm, filter_eps=filter_eps)
+         CALL block_matrix_multiply(transa, transb, 1.0_dp, block_matrix_a_mm, block_matrix_b_mm, &
+                                    0.0_dp, block_matrix_c_mm, filter_eps=filter_eps)
          CALL timestop(handle2)
          IF (PRESENT(io_unit)) THEN
          IF (io_unit > 0) THEN
@@ -322,8 +321,8 @@ CONTAINS
       io_unit = -1
       IF (mynode .EQ. 0) io_unit = unit_nr
 
-      CALL block_tas_multiply(transa, transb, transc, block_scalar(1.0_real_8), matrix_a, matrix_b, &
-                              block_scalar(0.0_real_8), matrix_c, &
+      CALL block_tas_multiply(transa, transb, transc, 1.0_dp, matrix_a, matrix_b, &
+                              0.0_dp, matrix_c, &
                               filter_eps=filter_eps, unit_nr=io_unit, log_verbose=log_verbose, optimize_dist=.TRUE.)
 
       CALL block_tas_convert_to_dbcsr(matrix_a, block_matrix_a)
@@ -391,15 +390,15 @@ CONTAINS
       transa_prv = transa; transb_prv = transb
 
       IF (transc == block_matrix_no_transpose) THEN
-         CALL block_matrix_multiply(transa_prv, transb_prv, block_scalar(1.0_real_8), &
+         CALL block_matrix_multiply(transa_prv, transb_prv, 1.0_dp, &
                              block_matrix_a_mm, block_matrix_b_mm, &
-                             block_scalar(0.0_real_8), block_matrix_c_mm, filter_eps=filter_eps)
+                             0.0_dp, block_matrix_c_mm, filter_eps=filter_eps)
       ELSEIF (transc == block_matrix_transpose) THEN
          CALL invert_transpose_flag(transa_prv)
          CALL invert_transpose_flag(transb_prv)
-         CALL block_matrix_multiply(transb_prv, transa_prv, block_scalar(1.0_real_8), &
+         CALL block_matrix_multiply(transb_prv, transa_prv, 1.0_dp, &
                              block_matrix_b_mm, block_matrix_a_mm, &
-                             block_scalar(0.0_real_8), block_matrix_c_mm, filter_eps=filter_eps)
+                             0.0_dp, block_matrix_c_mm, filter_eps=filter_eps)
       ENDIF
 
       sq_cs = block_matrix_checksum(block_matrix_c_mm)

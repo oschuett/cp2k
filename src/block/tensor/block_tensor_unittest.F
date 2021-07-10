@@ -28,8 +28,8 @@ PROGRAM block_tensor_unittest
       block_tensor_pgrid_create, block_tensor_get_info, block_tensor_pgrid_destroy, &
       ndims_tensor, block_tensor_default_distvec
 
-   USE block_matrix_api, ONLY: block_scalar, block_type_real_8, block_matrix_set_larnv_seed
-   USE kinds, ONLY: real_8
+   USE block_matrix_api, ONLY: block_type_real_8, block_matrix_set_larnv_seed
+   USE kinds, ONLY: real_8,dp
 
 #include "../../base/base_uses.f90"
 
@@ -334,7 +334,7 @@ PROGRAM block_tensor_unittest
 
       CALL block_tensor_setup_test_tensor(tensor_C, mp_comm, .FALSE., blk_ind_1_3, blk_ind_2_3, blk_ind_4_3)
 
-      CALL block_tensor_contract_test(block_scalar(0.9_real_8), tensor_A, tensor_B, block_scalar(0.1_real_8), tensor_C, &
+      CALL block_tensor_contract_test(0.9_dp, tensor_A, tensor_B, 0.1_dp, tensor_C, &
                                  [3], [2, 1], &
                                  [1], [2], &
                                  [2, 1], [3], &
@@ -378,7 +378,7 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_3_2, blk_ind_4_2)
       CALL block_tensor_setup_test_tensor(tensor_C, mp_comm, .FALSE., blk_ind_1_3, blk_ind_2_3, blk_ind_4_3)
 
-      CALL block_tensor_contract_test(block_scalar(0.9_real_8), tensor_A, tensor_B, block_scalar(0.1_real_8), tensor_C, &
+      CALL block_tensor_contract_test(0.9_dp, tensor_A, tensor_B, 0.1_dp, tensor_C, &
                                  [3], [1, 2], &
                                  [1], [2], &
                                  [1, 2], [3], &
@@ -429,7 +429,7 @@ PROGRAM block_tensor_unittest
       bounds(1, 1) = 1
       bounds(2, 1) = bounds_t(1) - 21
 
-      CALL block_tensor_contract_test(block_scalar(0.9_real_8), tensor_B, tensor_A, block_scalar(0.1_real_8), tensor_C, &
+      CALL block_tensor_contract_test(0.9_dp, tensor_B, tensor_A, 0.1_dp, tensor_C, &
                                  [1], [2], &
                                  [3], [1, 2], &
                                  [3], [1, 2], &
@@ -484,7 +484,7 @@ PROGRAM block_tensor_unittest
       bounds(2, 2) = bounds_t(2) - 10
       DEALLOCATE (bounds_t)
 
-      CALL block_tensor_contract_test(block_scalar(0.2_real_8), tensor_C, tensor_B, block_scalar(0.8_real_8), tensor_A, &
+      CALL block_tensor_contract_test(0.2_dp, tensor_C, tensor_B, 0.8_dp, tensor_A, &
                                  [3], [1, 2], &
                                  [2], [1], &
                                  [1, 2], [3], &
@@ -547,7 +547,7 @@ PROGRAM block_tensor_unittest
       bounds_2(2, 2) = bounds_t(4) - 18
       DEALLOCATE (bounds_t)
 
-      CALL block_tensor_contract_test(block_scalar(0.2_real_8), tensor_A, tensor_B, block_scalar(0.8_real_8), tensor_C, &
+      CALL block_tensor_contract_test(0.2_dp, tensor_A, tensor_B, 0.8_dp, tensor_C, &
                                  [2, 1], [3], &
                                  [2, 1], [3, 4], &
                                  [1], [2, 3], &
@@ -593,7 +593,7 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
       CALL block_tensor_setup_test_tensor(tensor_C, mp_comm, .FALSE., blk_ind_3_5, blk_ind_4_5, blk_ind_5_5)
 
-      CALL block_tensor_contract_test(block_scalar(0.2_real_8), tensor_A, tensor_B, block_scalar(0.8_real_8), tensor_C, &
+      CALL block_tensor_contract_test(0.2_dp, tensor_A, tensor_B, 0.8_dp, tensor_C, &
                                  [2, 1], [3], &
                                  [2, 1], [3, 4], &
                                  [1], [2, 3], &
@@ -637,7 +637,7 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
       CALL block_tensor_setup_test_tensor(tensor_C, mp_comm, .FALSE., blk_ind_3_5, blk_ind_4_5, blk_ind_5_5)
 
-      CALL block_tensor_contract_test(block_scalar(0.2_real_8), tensor_A, tensor_B, block_scalar(0.8_real_8), tensor_C, &
+      CALL block_tensor_contract_test(0.2_dp, tensor_A, tensor_B, 0.8_dp, tensor_C, &
                                  [1, 2], [3], &
                                  [1, 2], [3, 4], &
                                  [1], [2, 3], &
@@ -681,7 +681,7 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
       CALL block_tensor_setup_test_tensor(tensor_C, mp_comm, .FALSE., blk_ind_3_5, blk_ind_4_5, blk_ind_5_5)
 
-      CALL block_tensor_contract_test(block_scalar(0.2_real_8), tensor_B, tensor_A, block_scalar(0.8_real_8), tensor_C, &
+      CALL block_tensor_contract_test(0.2_dp, tensor_B, tensor_A, 0.8_dp, tensor_C, &
                                  [2, 1], [4, 3], &
                                  [2, 1], [3], &
                                  [3, 2], [1], &
@@ -725,7 +725,7 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
       CALL block_tensor_setup_test_tensor(tensor_C, mp_comm, .FALSE., blk_ind_3_5, blk_ind_4_5, blk_ind_5_5)
 
-      CALL block_tensor_contract_test(block_scalar(0.6_real_8), tensor_B, tensor_A, block_scalar(0.4_real_8), tensor_C, &
+      CALL block_tensor_contract_test(0.6_dp, tensor_B, tensor_A, 0.4_dp, tensor_C, &
                                  [2, 1], [3, 4], &
                                  [2, 1], [3], &
                                  [2, 3], [1], &
@@ -769,7 +769,7 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
       CALL block_tensor_setup_test_tensor(tensor_C, mp_comm, .FALSE., blk_ind_3_5, blk_ind_4_5, blk_ind_5_5)
 
-      CALL block_tensor_contract_test(block_scalar(0.2_real_8), tensor_C, tensor_A, block_scalar(0.8_real_8), tensor_B, &
+      CALL block_tensor_contract_test(0.2_dp, tensor_C, tensor_A, 0.8_dp, tensor_B, &
                                  [1], [2, 3], &
                                  [3], [1, 2], &
                                  [3, 4], [1, 2], &

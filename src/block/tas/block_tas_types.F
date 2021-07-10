@@ -15,7 +15,7 @@ MODULE block_tas_types
       block_tas_distribution, block_tas_rowcol_data
    USE block_matrix_api, ONLY: &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, block_scalar_type
-   USE kinds, ONLY: int_8
+   USE kinds, ONLY: int_8, dp
 
 #include "../../base/base_uses.f90"
 
@@ -62,7 +62,7 @@ MODULE block_tas_types
       TYPE(block_tas_type), POINTER :: store_batched_repl => NULL() ! intermediate replicated matrix
       LOGICAL :: batched_out ! whether replicated matrix has been changed in mm and should be copied to actual matrix
       LOGICAL :: batched_trans
-      TYPE(block_scalar_type) :: batched_beta
+      REAL(dp) :: batched_beta
    END TYPE
 
    ! type for tall-and-skinny matrices

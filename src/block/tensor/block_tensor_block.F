@@ -30,7 +30,7 @@ MODULE block_tensor_block
       block_tas_iterator_next_block, block_tas_iterator_blocks_left, block_tas_iterator_start, &
       block_tas_iterator_stop, block_tas_get_block_p, block_tas_put_block, block_tas_reserve_blocks
    USE kinds, ONLY: &
-      ${uselist(dtype_float_prec)}$, int_8
+      ${uselist(dtype_float_prec)}$, int_8, dp
    USE block_tensor_index, ONLY: &
       nd_to_2d_mapping, ndims_mapping, get_nd_indices_tensor, destroy_nd_to_2d_mapping, get_2d_indices_tensor, &
       create_nd_to_2d_mapping
@@ -475,7 +475,7 @@ CONTAINS
          !! block to put
       LOGICAL, INTENT(IN), OPTIONAL                :: summation
          !! whether block should be summed to existing block
-      TYPE(block_scalar_type), INTENT(IN), OPTIONAL :: scale
+      REAL(dp), INTENT(IN), OPTIONAL :: scale
          !! scaling factor
 
       SELECT CASE (block%data_type)
@@ -484,7 +484,7 @@ CONTAINS
          IF (.NOT. PRESENT(scale)) THEN
             CALL block_tensor_put_anyd_block_${dsuffix}$ (tensor, ind, block%${dsuffix}$, summation)
          ELSE
-            CALL block_tensor_put_anyd_block_${dsuffix}$ (tensor, ind, block%${dsuffix}$, summation, scale=scale%${dsuffix}$)
+            CALL block_tensor_put_anyd_block_${dsuffix}$ (tensor, ind, block%${dsuffix}$, summation, scale=scale)
          ENDIF
 #:endfor
       END SELECT

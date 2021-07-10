@@ -1476,7 +1476,7 @@ CONTAINS
    SUBROUTINE block_tensor_scale(tensor, alpha)
       !! as block_scale
       TYPE(block_tensor_type), INTENT(INOUT) :: tensor
-      TYPE(block_scalar_type), INTENT(IN) :: alpha
+      REAL(dp), INTENT(IN) :: alpha
       CALL block_matrix_scale(tensor%matrix_rep%matrix, alpha)
    END SUBROUTINE
 

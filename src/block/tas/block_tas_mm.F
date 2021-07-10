@@ -19,8 +19,8 @@ MODULE block_tas_mm
 #:include "block_tas.fypp"
 
    USE block_matrix_api, ONLY: &
-      block_scalar_zero, block_scalar, block_matrix_scalar_multiply, &
-      block_scalar_type, block_type_real_8, block_type_real_4, &
+      block_matrix_scale, &
+      block_type_real_8, block_type_real_4, &
       block_type_complex_8, block_type_complex_4, &
       block_matrix_multiply, &
       block_matrix_no_transpose, block_matrix_transpose, block_matrix_type, &
@@ -32,7 +32,7 @@ MODULE block_tas_mm
       block_mp_release, block_matrix_release, block_matrix_distribution_release, &
       block_matrix_get_nze, block_matrix_nfullrows_total, block_matrix_nfullcols_total, &
       block_matrix_cfg, &
-      block_matrix_scale, block_matrix_get_info, block_matrix_copy, &
+      block_matrix_get_info, block_matrix_copy, &
       block_matrix_clear, block_matrix_add, block_matrix_zero, block_matrix_get_name
    USE block_tas_base, ONLY: &
       block_tas_create, block_tas_destroy, block_tas_distribution_destroy, block_tas_distribution_new, &
@@ -54,7 +54,7 @@ MODULE block_tas_mm
    USE block_tas_util, ONLY: &
       swap, invert_transpose_flag, array_eq, block_mp_environ
    USE kinds, ONLY: &
-      int_8, real_8, real_4, default_string_length
+      int_8, real_8, real_4, default_string_length, dp
    USE message_passing, ONLY: &
       mp_comm_compare, mp_environ, mp_sum, mp_comm_free, mp_cart_create, mp_max, mp_sync
    USE block_tas_io, ONLY: &
@@ -84,7 +84,7 @@ CONTAINS
       !! arguments of block_matrix_multiply (see block_matrix_mm, block_matrix_multiply_generic).
 
       CHARACTER(LEN=1), INTENT(IN)               :: transa, transb, transc
-      TYPE(block_scalar_type), INTENT(IN)        :: alpha, beta
+      REAL(dp), INTENT(IN)        :: alpha, beta
       TYPE(block_tas_type), TARGET, &
          INTENT(INOUT)                           :: matrix_a, matrix_b, matrix_c
       LOGICAL, INTENT(IN), OPTIONAL              :: optimize_dist
@@ -119,7 +119,6 @@ CONTAINS
                                                     mp_comm_group, mp_comm_mm, split_rc, split_a, split_b, split_c, &
                                                     mp_comm_opt, batched_repl, max_mm_dim_batched, nsplit_batched
       CHARACTER(LEN=1)                           :: tr_case, transa_prv, transb_prv, transc_prv
-      TYPE(block_scalar_type)                    :: zero
       LOGICAL                                    :: new_a, new_b, new_c, simple_split_prv, opt_pgrid, &
                                                     move_a, move_b, do_batched, &
                                                     nodata_3
@@ -348,8 +347,7 @@ CONTAINS
          IF (matrix_c%do_batched == 1) THEN
             matrix_c%mm_storage%batched_beta = beta
          ELSEIF (matrix_c%do_batched > 1) THEN
-            matrix_c%mm_storage%batched_beta = &
-               block_matrix_scalar_multiply(matrix_c%mm_storage%batched_beta, beta)
+            matrix_c%mm_storage%batched_beta = matrix_c%mm_storage%batched_beta * beta
          ENDIF
 
          IF (matrix_c%do_batched <= 2) THEN
@@ -437,8 +435,6 @@ CONTAINS
             ENDIF
          ENDIF
       ENDIF
-
-      zero = block_scalar_zero(data_type)
 
       pdims = 0
       CALL mp_cart_create(mp_comm_group, 2, pdims, pcoord, mp_comm_mm)
@@ -789,7 +785,7 @@ CONTAINS
       TYPE(block_matrix_type), INTENT(IN) :: matrix_in
       TYPE(block_matrix_type), INTENT(INOUT) :: matrix_out
       LOGICAL, INTENT(IN), OPTIONAL :: local_copy
-      TYPE(block_scalar_type), INTENT(IN), OPTIONAL :: alpha
+      REAL(dp), INTENT(IN), OPTIONAL :: alpha
       TYPE(block_matrix_type) :: matrix_tmp
       LOGICAL :: local_copy_prv
 
@@ -1401,8 +1397,8 @@ CONTAINS
          CALL create_block_norms_matrix(matrix_b, matrix_b_bnorm)
          CALL create_block_norms_matrix(matrix_c, matrix_c_bnorm, nodata=.TRUE.)
 
-         CALL block_tas_multiply(transa, transb, transc, block_scalar(1.0_real_8), matrix_a_bnorm, &
-                                 matrix_b_bnorm, block_scalar(0.0_real_8), matrix_c_bnorm, &
+         CALL block_tas_multiply(transa, transb, transc, 1.0_dp, matrix_a_bnorm, &
+                                 matrix_b_bnorm, 0.0_dp, matrix_c_bnorm, &
                                  filter_eps=filter_eps, move_data_a=.TRUE., move_data_b=.TRUE., &
                                  simple_split=.TRUE., unit_nr=unit_nr)
          CALL block_tas_destroy(matrix_a_bnorm)

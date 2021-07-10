@@ -36,7 +36,7 @@ MODULE block_tensor_test
       block_tensor_write_blocks, block_tensor_write_block_indices
    USE kinds, ONLY: ${uselist(dtype_float_prec)}$, &
                           default_string_length, &
-                          int_8
+                          int_8, dp
    USE message_passing, ONLY: mp_environ, &
                             mp_bcast, &
                             mp_comm_free, &
@@ -549,9 +549,9 @@ CONTAINS
       !! @note for testing/debugging, simply replace a call to block_tensor_contract with a call to this routine
       !! @endnote
 
-      TYPE(block_scalar_type), INTENT(IN) :: alpha
+      REAL(dp), INTENT(IN) :: alpha
       TYPE(block_tensor_type), INTENT(INOUT)    :: tensor_1, tensor_2, tensor_3
-      TYPE(block_scalar_type), INTENT(IN) :: beta
+      REAL(dp), INTENT(IN) :: beta
       INTEGER, DIMENSION(:), INTENT(IN)    :: contract_1, contract_2, &
                                               notcontract_1, notcontract_2, &
                                               map_1, map_2
@@ -733,7 +733,7 @@ CONTAINS
 #:endfor
          END SELECT
 
-         array_3_test_mm(:, :) = beta%r_dp*array_3_test_mm(:, :) + alpha%r_dp*MATMUL(array_1_mm, transpose(array_2_mm))
+         array_3_test_mm(:, :) = beta*array_3_test_mm(:, :) + alpha*MATMUL(array_1_mm, transpose(array_2_mm))
 
       END ASSOCIATE
 
