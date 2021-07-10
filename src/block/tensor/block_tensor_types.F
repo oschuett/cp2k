@@ -21,10 +21,8 @@ MODULE block_tensor_types
       sizes_of_arrays, sum_of_arrays, array_sublist, get_arrays, get_ith_array, array_eq_i
    USE block_matrix_api, ONLY: &
       block_matrix_distribution_get, block_matrix_distribution_obj, block_matrix_get_info, block_matrix_type, &
-      ${uselist(dtype_float_param)}$
-   USE kinds, ONLY: &
-      ${uselist(dtype_float_prec)}$, &
-      default_string_length
+      block_type_real_8
+   USE kinds, ONLY: real_8, dp, default_string_length
    USE block_tas_base, ONLY: &
       block_tas_create, block_tas_distribution_new, &
       block_tas_distribution_destroy, block_tas_finalize, block_tas_get_info, &
@@ -180,18 +178,6 @@ MODULE block_tensor_types
 
    INTERFACE block_tas_blk_size_t
       MODULE PROCEDURE new_block_tas_blk_size_t
-   END INTERFACE
-
-   INTERFACE block_tensor_set
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_tensor_set_${dsuffix}$
-#:endfor
-   END INTERFACE
-
-   INTERFACE block_tensor_filter
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_tensor_filter_${dsuffix}$
-#:endfor
    END INTERFACE
 
 CONTAINS
@@ -480,7 +466,7 @@ CONTAINS
          lb_ratio_prv = 0.1_real_8
       ENDIF
 
-      CALL allocate_any(dims_store, source=dims)
+      ALLOCATE(dims_store, source=dims)
 
       ! get default process grid dimensions
       IF (any(dims == 0)) THEN
@@ -491,7 +477,7 @@ CONTAINS
       ALLOCATE (sort_key(SIZE(tensor_dims)))
       sort_key(:) = REAL(tensor_dims, real_8)/dims
 
-      CALL allocate_any(tensor_dims_sorted, source=tensor_dims)
+      ALLOCATE(tensor_dims_sorted, source=tensor_dims)
       ALLOCATE (sort_indices(SIZE(sort_key)))
       CALL sort(sort_key, SIZE(sort_key), sort_indices)
       tensor_dims_sorted(:) = tensor_dims_sorted(sort_indices)
@@ -898,8 +884,8 @@ CONTAINS
             dist_prv = block_tensor_distribution(tensor_in)
          ENDIF
          IF (PRESENT(map1_2d) .AND. PRESENT(map2_2d)) THEN
-            CALL allocate_any(map1_2d_prv, source=map1_2d)
-            CALL allocate_any(map2_2d_prv, source=map2_2d)
+            ALLOCATE(map1_2d_prv, source=map1_2d)
+            ALLOCATE(map2_2d_prv, source=map2_2d)
          ELSE
             ALLOCATE (map1_2d_prv(ndims_matrix_row(tensor_in)))
             ALLOCATE (map2_2d_prv(ndims_matrix_column(tensor_in)))
@@ -1336,28 +1322,24 @@ CONTAINS
       task_coor = get_nd_indices_pgrid(pgrid%nd_index_grid, task_coor_2d)
    END SUBROUTINE
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_tensor_set_${dsuffix}$ (tensor, alpha)
+   SUBROUTINE block_tensor_set (tensor, alpha)
       !! As block_set
       TYPE(block_tensor_type), INTENT(INOUT)                   :: tensor
-      ${dtype}$, INTENT(IN)                               :: alpha
+      REAL(dp), INTENT(IN)                               :: alpha
       CALL block_tas_set(tensor%matrix_rep, alpha)
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_tensor_filter_${dsuffix}$ (tensor, eps, method, use_absolute)
+   SUBROUTINE block_tensor_filter (tensor, eps, method, use_absolute)
       !! As block_filter
 
       TYPE(block_tensor_type), INTENT(INOUT)    :: tensor
-      ${dtype}$, INTENT(IN)                :: eps
+      REAL(dp), INTENT(IN)                :: eps
       INTEGER, INTENT(IN), OPTIONAL        :: method
       LOGICAL, INTENT(IN), OPTIONAL        :: use_absolute
 
       CALL block_tas_filter(tensor%matrix_rep, eps, method, use_absolute)
 
    END SUBROUTINE
-#:endfor
 
    SUBROUTINE block_tensor_get_info(tensor, nblks_total, &
                                nfull_total, &

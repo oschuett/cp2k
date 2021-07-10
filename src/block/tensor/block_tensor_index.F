@@ -89,11 +89,11 @@ CONTAINS
       map%ndim2_2d = SIZE(map2_2d)
       map%ndim_nd = SIZE(dims)
 
-      CALL allocate_any(map%map1_2d, source=map1_2d)
-      CALL allocate_any(map%map2_2d, source=map2_2d)
-      CALL allocate_any(map%dims_nd, source=dims)
-      CALL allocate_any(map%dims1_2d, source=dims(map1_2d))
-      CALL allocate_any(map%dims2_2d, source=dims(map2_2d))
+      ALLOCATE(map%map1_2d, source=map1_2d)
+      ALLOCATE(map%map2_2d, source=map2_2d)
+      ALLOCATE(map%dims_nd, source=dims)
+      ALLOCATE(map%dims1_2d, source=dims(map1_2d))
+      ALLOCATE(map%dims2_2d, source=dims(map2_2d))
 
       ALLOCATE (map%map_nd(map%ndim_nd))
       map%map_nd(map1_2d) = (/(i, i=1, SIZE(map1_2d))/)

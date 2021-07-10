@@ -44,8 +44,8 @@ MODULE block_tensor_split
                                  ndims_matrix_column, &
                                  block_tensor_filter, &
                                  block_tensor_copy_contraction_storage
-   USE block_matrix_api, ONLY: ${uselist(dtype_float_param)}$
-   USE kinds, ONLY: ${uselist(dtype_float_prec)}$, dp
+   USE block_matrix_api, ONLY: block_type_real_8
+   USE kinds, ONLY: real_8, dp
 
 #include "../../base/base_uses.f90"
    IMPLICIT NONE
@@ -89,10 +89,8 @@ CONTAINS
       INTEGER, DIMENSION(${maxdim}$) :: bi_split, inblock_offset
       LOGICAL :: found
 
-#:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
-      ${dtype}$, DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${dsuffix}$_${ndim}$d
-#:endfor
+      REAL(dp), DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${ndim}$d
 #:endfor
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_split_blocks_generic'
 
@@ -112,7 +110,7 @@ CONTAINS
             ALLOCATE (blk_nsplit_${idim}$ (SIZE(dist_d)))
             ! data offset of split blocks w.r.t. corresponding normal block
             ALLOCATE (inblock_offset_${idim}$ (SIZE(blk_size_${idim}$)))
-            CALL allocate_any(blk_size_split_d, source=blk_size_${idim}$)
+            ALLOCATE(blk_size_split_d, source=blk_size_${idim}$)
          ENDIF
 #:endfor
 
@@ -143,8 +141,8 @@ CONTAINS
 
 #:for idim in range(1, maxdim+1)
          IF (idim == ${idim}$) THEN
-            CALL allocate_any(nd_dist_split_${idim}$, source=dist_split_d)
-            CALL allocate_any(nd_blk_size_split_${idim}$, source=blk_size_split_d)
+            ALLOCATE(nd_dist_split_${idim}$, source=dist_split_d)
+            ALLOCATE(nd_blk_size_split_${idim}$, source=blk_size_split_d)
          ENDIF
 #:endfor
          DEALLOCATE (dist_split_d)
@@ -222,14 +220,10 @@ CONTAINS
 
       DO WHILE (block_tensor_iterator_blocks_left(iter))
          CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
-#:for dparam, dtype, dsuffix in dtype_float_list
-         IF (block_tensor_get_data_type(tensor_in) == ${dparam}$) THEN
 #:for ndim in ndims
-            IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
-               CALL block_tensor_get_block(tensor_in, blk_index, block_${dsuffix}$_${ndim}$d, found)
-               CPASSERT(found)
-            ENDIF
-#:endfor
+         IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
+            CALL block_tensor_get_block(tensor_in, blk_index, block_${ndim}$d, found)
+            CPASSERT(found)
          ENDIF
 #:endfor
 #:for ndim in ndims
@@ -241,30 +235,19 @@ CONTAINS
                blk_shape(${idim}$) = blk_size_${idim}$ (bi_split(${idim}$))
 #:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-
-               IF (block_tensor_get_data_type(tensor_in) == ${dparam}$) THEN
-
 #:for idim in range(1,ndim+1)
-                  inblock_offset(${idim}$) = inblock_offset_${idim}$ (bi_split(${idim}$))
+               inblock_offset(${idim}$) = inblock_offset_${idim}$ (bi_split(${idim}$))
 #:endfor
-                  CALL block_tensor_put_block(tensor_out, bi_split(1:${ndim}$), &
-                                         blk_shape, &
-                                         block_${dsuffix}$_${ndim}$d( &
-                                         ${", ".join(["inblock_offset("+str(idim)+") + 1:inblock_offset("+str(idim)+") + blk_shape("+str(idim)+")" for idim in range(1, ndim+1)])}$))
-
-               ENDIF
-#:endfor
+               CALL block_tensor_put_block(tensor_out, bi_split(1:${ndim}$), &
+                                      blk_shape, &
+                                      block_${ndim}$d( &
+                                      ${", ".join(["inblock_offset("+str(idim)+") + 1:inblock_offset("+str(idim)+") + blk_shape("+str(idim)+")" for idim in range(1, ndim+1)])}$))
 
 #:for idim in range(1,ndim+1)
             ENDDO
 #:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-            IF (block_tensor_get_data_type(tensor_in) == ${dparam}$) THEN
-               DEALLOCATE (block_${dsuffix}$_${ndim}$d)
-            ENDIF
-#:endfor
+            DEALLOCATE (block_${ndim}$d)
          ENDIF
 #:endfor
       ENDDO
@@ -321,7 +304,7 @@ CONTAINS
 
 #:for idim in range(1, maxdim+1)
          IF (idim == ${idim}$) THEN
-            CALL allocate_any(nd_blk_size_split_${idim}$, source=blk_size_split_d)
+            ALLOCATE(nd_blk_size_split_${idim}$, source=blk_size_split_d)
          ENDIF
 #:endfor
          DEALLOCATE (blk_size_split_d)
@@ -359,11 +342,9 @@ CONTAINS
       INTEGER, DIMENSION(${maxdim}$)                  :: inblock_offset
       INTEGER                                            :: handle
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_split_copyback'
-#:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
-      ${dtype}$, DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${dsuffix}$_${ndim}$d
-      ${dtype}$, DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_split_${dsuffix}$_${ndim}$d
-#:endfor
+      REAL(dp), DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${ndim}$d
+      REAL(dp), DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_split_${ndim}$d
 #:endfor
 
       CALL timeset(routineN, handle)
@@ -409,9 +390,9 @@ CONTAINS
          ENDDO
 #:for idim in range(1, maxdim+1)
          IF (idim == ${idim}$) THEN
-            CALL allocate_any(first_split_${idim}$, source=first_split_d)
-            CALL allocate_any(last_split_${idim}$, source=last_split_d)
-            CALL allocate_any(blk_size_split_${idim}$, source=blk_size_split_d)
+            ALLOCATE(first_split_${idim}$, source=first_split_d)
+            ALLOCATE(last_split_${idim}$, source=last_split_d)
+            ALLOCATE(blk_size_split_${idim}$, source=blk_size_split_d)
          ENDIF
 #:endfor
          DEALLOCATE (first_split_d, last_split_d)
@@ -440,36 +421,32 @@ CONTAINS
       CALL block_tensor_iterator_start(iter, tensor_out)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
          CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
-#:for dprec, dparam, dtype, dsuffix in dtype_float_list_prec
-         IF (block_tensor_get_data_type(tensor_out) == ${dparam}$) THEN
 
 #:for ndim in ndims
-            IF (ndims_tensor(tensor_out) == ${ndim}$) THEN
-               CALL allocate_any(block_${dsuffix}$_${ndim}$d, blk_size)
-               block_${dsuffix}$_${ndim}$d = 0.0_${dprec}$
+         IF (ndims_tensor(tensor_out) == ${ndim}$) THEN
+            CALL allocate_any(block_${ndim}$d, blk_size)
+            block_${ndim}$d = 0.0_dp
 #:for idim in range(1,ndim+1)
-               DO iblk_${idim}$ = first_split_${idim}$ (blk_index(${idim}$)), last_split_${idim}$ (blk_index(${idim}$))
+            DO iblk_${idim}$ = first_split_${idim}$ (blk_index(${idim}$)), last_split_${idim}$ (blk_index(${idim}$))
 #:endfor
 #:for idim in range(1,ndim+1)
-                  inblock_offset(${idim}$) = inblock_offset_${idim}$ (iblk_${idim}$)
+               inblock_offset(${idim}$) = inblock_offset_${idim}$ (iblk_${idim}$)
 #:endfor
 
-                  CALL block_tensor_get_block(tensor_split_in, [${", ".join(["iblk_"+str(idim) for idim in range(1, ndim+1)])}$], &
-                                         block_split_${dsuffix}$_${ndim}$d, found)
-                  IF (found) THEN
-                     blk_shape(1:${ndim}$) = SHAPE(block_split_${dsuffix}$_${ndim}$d)
-                     block_${dsuffix}$_${ndim}$d( &
-                        ${", ".join(["inblock_offset("+str(idim)+") + 1:inblock_offset("+str(idim)+") + blk_shape("+str(idim)+")" for idim in range(1, ndim+1)])}$) = &
-                        block_split_${dsuffix}$_${ndim}$d
-                  ENDIF
+               CALL block_tensor_get_block(tensor_split_in, [${", ".join(["iblk_"+str(idim) for idim in range(1, ndim+1)])}$], &
+                                      block_split_${ndim}$d, found)
+               IF (found) THEN
+                  blk_shape(1:${ndim}$) = SHAPE(block_split_${ndim}$d)
+                  block_${ndim}$d( &
+                     ${", ".join(["inblock_offset("+str(idim)+") + 1:inblock_offset("+str(idim)+") + blk_shape("+str(idim)+")" for idim in range(1, ndim+1)])}$) = &
+                     block_split_${ndim}$d
+               ENDIF
 
 #:for idim in range(1,ndim+1)
-               ENDDO
+            ENDDO
 #:endfor
-               CALL block_tensor_put_block(tensor_out, blk_index, blk_size, block_${dsuffix}$_${ndim}$d, summation=summation)
-               DEALLOCATE (block_${dsuffix}$_${ndim}$d)
-            ENDIF
-#:endfor
+            CALL block_tensor_put_block(tensor_out, blk_index, blk_size, block_${ndim}$d, summation=summation)
+            DEALLOCATE (block_${ndim}$d)
          ENDIF
 #:endfor
       ENDDO
@@ -580,13 +557,13 @@ CONTAINS
 
 #:for idim in range(1, maxdim+1)
          IF (order_prv(idim) == ${idim}$) THEN
-            CALL allocate_any(blk_size_split_1_${idim}$, source=blk_size_d_split(:isplit))
+            ALLOCATE(blk_size_split_1_${idim}$, source=blk_size_d_split(:isplit))
          ENDIF
 #:endfor
 
 #:for idim in range(1, maxdim+1)
          IF (idim == ${idim}$) THEN
-            CALL allocate_any(blk_size_split_2_${idim}$, source=blk_size_d_split(:isplit))
+            ALLOCATE(blk_size_split_2_${idim}$, source=blk_size_d_split(:isplit))
          ENDIF
 #:endfor
 
@@ -615,10 +592,8 @@ CONTAINS
       LOGICAL :: found, move_data_prv
       INTEGER :: idim, blk, iblk, iblk_all, nblk
       INTEGER, DIMENSION(:, :), ALLOCATABLE :: blk_ind, blk_ind_tmp
-#:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
-      ${dtype}$, DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${dsuffix}$_${ndim}$d, block_put_${dsuffix}$_${ndim}$d
-#:endfor
+      REAL(dp), DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${ndim}$d, block_put_${ndim}$d
 #:endfor
 
       IF (PRESENT(move_data)) THEN
@@ -663,21 +638,17 @@ CONTAINS
             blk_bounds(2, idim) = MIN(bounds(2, idim) - blk_offset(idim) + 1, blk_size(idim))
          ENDDO
 
-#:for dprec, dparam, dtype, dsuffix in dtype_float_list_prec
-         IF (block_tensor_get_data_type(tensor_in) == ${dparam}$) THEN
 #:for ndim in ndims
-            IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
-               CALL block_tensor_get_block(tensor_in, blk_index, block_${dsuffix}$_${ndim}$d, found)
+         IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
+            CALL block_tensor_get_block(tensor_in, blk_index, block_${ndim}$d, found)
 
-               CALL allocate_any(block_put_${dsuffix}$_${ndim}$d, blk_size)
-               block_put_${dsuffix}$_${ndim}$d = 0.0_${dprec}$
-               block_put_${dsuffix}$_${ndim}$d(${", ".join(["blk_bounds(1, "+str(idim)+"):blk_bounds(2,"+str(idim)+")" for idim in range(1, ndim+1)])}$) = &
-                  block_${dsuffix}$_${ndim}$d(${", ".join(["blk_bounds(1, "+str(idim)+"):blk_bounds(2,"+str(idim)+")" for idim in range(1, ndim+1)])}$)
-               CALL block_tensor_put_block(tensor_out, blk_index, blk_size, block_put_${dsuffix}$_${ndim}$d)
-               DEALLOCATE (block_${dsuffix}$_${ndim}$d)
-               DEALLOCATE (block_put_${dsuffix}$_${ndim}$d)
-            ENDIF
-#:endfor
+            ALLOCATE(block_put_${ndim}$d(${", ".join(["blk_size("+str(idim)+")" for idim in range(1, ndim+1)])}$))
+            block_put_${ndim}$d = 0.0_dp
+            block_put_${ndim}$d(${", ".join(["blk_bounds(1, "+str(idim)+"):blk_bounds(2,"+str(idim)+")" for idim in range(1, ndim+1)])}$) = &
+               block_${ndim}$d(${", ".join(["blk_bounds(1, "+str(idim)+"):blk_bounds(2,"+str(idim)+")" for idim in range(1, ndim+1)])}$)
+            CALL block_tensor_put_block(tensor_out, blk_index, blk_size, block_put_${ndim}$d)
+            DEALLOCATE (block_${ndim}$d)
+            DEALLOCATE (block_put_${ndim}$d)
          ENDIF
 #:endfor
       ENDDO iter_loop

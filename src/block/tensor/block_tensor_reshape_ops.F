@@ -28,8 +28,8 @@ MODULE block_tensor_reshape_ops
                                  block_tensor_get_stored_coordinates, &
                                  block_tensor_clear
    USE kinds, ONLY: default_string_length
-   USE kinds, ONLY: ${uselist(dtype_float_prec)}$
-   USE block_matrix_api, ONLY: ${uselist(dtype_float_param)}$
+   USE kinds, ONLY: real_8, dp
+   USE block_matrix_api, ONLY: block_type_real_8
    USE message_passing, ONLY: mp_alltoall, &
                             mp_environ, &
                             mp_irecv, &
@@ -42,25 +42,16 @@ MODULE block_tensor_reshape_ops
    PRIVATE
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_tensor_reshape_ops'
 
-   PUBLIC :: &
-      block_tensor_reshape
+   PUBLIC :: block_tensor_reshape
 
    TYPE block_buffer_type
       INTEGER                                    :: ndim = -1
       INTEGER                                    :: nblock = -1
       INTEGER, DIMENSION(:, :), ALLOCATABLE      :: indx
-#:for dparam, dtype, dsuffix in dtype_float_list
-      ${dtype}$, DIMENSION(:), ALLOCATABLE       :: msg_${dsuffix}$
-#:endfor
+      REAL(dp), DIMENSION(:), ALLOCATABLE        :: msg
       INTEGER                                    :: data_type = -1
       INTEGER                                    :: endpos = -1
    END TYPE
-
-   INTERFACE block_buffer_add_block
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_buffer_add_block_${dsuffix}$
-#:endfor
-   END INTERFACE
 
 CONTAINS
 
@@ -170,7 +161,7 @@ CONTAINS
             CALL block_buffer_get_next_anyd_block(buffer_recv(iproc), ndata, index)
             CALL block_tensor_blk_sizes(tensor_in, index, blk_size)
             ! create block
-            CALL create_block(blk_data, blk_size, block_tensor_get_data_type(tensor_in))
+            CALL create_block(blk_data, blk_size)
             ! get actual block data
             CALL block_buffer_get_next_anyd_block(buffer_recv(iproc), ndata, index, blk_data)
             CALL block_tensor_put_block(tensor_out, index, blk_data, summation=summation)
@@ -194,24 +185,14 @@ CONTAINS
       buffer%data_type = data_type
       buffer%endpos = 0
       buffer%ndim = ndim
-      SELECT CASE (data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         ALLOCATE (buffer%msg_${dsuffix}$ (ndata))
-#:endfor
-      END SELECT
+      ALLOCATE (buffer%msg(ndata))
       ALLOCATE (buffer%indx(nblock, ndim + 1))
    END SUBROUTINE block_buffer_create
 
    SUBROUTINE block_buffer_destroy(buffer)
       TYPE(block_buffer_type), INTENT(INOUT) :: buffer
 
-      SELECT CASE (buffer%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         DEALLOCATE (buffer%msg_${dsuffix}$)
-#:endfor
-      END SELECT
+      DEALLOCATE (buffer%msg)
       DEALLOCATE (buffer%indx)
       buffer%nblock = -1
       buffer%data_type = -1
@@ -236,12 +217,7 @@ CONTAINS
       TYPE(block_nd), INTENT(IN)                  :: block
          !! block
 
-      SELECT CASE (block%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         CALL block_buffer_add_block_${dsuffix}$ (buffer, SIZE(block%${dsuffix}$%blk), index, block%${dsuffix}$%blk)
-#:endfor
-      END SELECT
+      CALL block_buffer_add_block(buffer, SIZE(block%blk), index, block%blk)
    END SUBROUTINE
 
    SUBROUTINE block_buffer_get_next_anyd_block(buffer, ndata, index, block, advance_iter)
@@ -253,16 +229,11 @@ CONTAINS
       TYPE(block_nd), INTENT(INOUT), OPTIONAL     :: block
       LOGICAL, INTENT(IN), OPTIONAL               :: advance_iter
 
-      SELECT CASE (buffer%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         IF (PRESENT(block)) THEN
-            CALL block_buffer_get_next_block_${dsuffix}$ (buffer, ndata, index, block%${dsuffix}$%blk, advance_iter=advance_iter)
-         ELSE
-            CALL block_buffer_get_next_block_${dsuffix}$ (buffer, ndata, index, advance_iter=advance_iter)
-         ENDIF
-#:endfor
-      END SELECT
+      IF (PRESENT(block)) THEN
+         CALL block_buffer_get_next_block(buffer, ndata, index, block%blk, advance_iter=advance_iter)
+      ELSE
+         CALL block_buffer_get_next_block(buffer, ndata, index, advance_iter=advance_iter)
+      ENDIF
    END SUBROUTINE
 
    SUBROUTINE block_buffer_get_index(buffer, index)
@@ -272,7 +243,7 @@ CONTAINS
       INTEGER, DIMENSION(2)                             :: indx_shape
 
       indx_shape = SHAPE(buffer%indx) - [0, 1]
-      CALL allocate_any(index, source=buffer%indx(1:indx_shape(1), 1:indx_shape(2)))
+      ALLOCATE(index, source=buffer%indx(1:indx_shape(1), 1:indx_shape(2)))
    END SUBROUTINE
 
    PURE FUNCTION block_buffer_blocks_left(buffer)
@@ -306,12 +277,7 @@ CONTAINS
             IF (buffer_recv(iproc)%nblock > 0) THEN
                rec_counter = rec_counter + 1
                CALL mp_irecv(buffer_recv(iproc)%indx, iproc, mp_comm, req_array(rec_counter, 3), tag=4)
-               SELECT CASE (buffer_recv(iproc)%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-               CASE (${dparam}$)
-                  CALL mp_irecv(buffer_recv(iproc)%msg_${dsuffix}$, iproc, mp_comm, req_array(rec_counter, 4), tag=7)
-#:endfor
-               END SELECT
+               CALL mp_irecv(buffer_recv(iproc)%msg, iproc, mp_comm, req_array(rec_counter, 4), tag=7)
             END IF
          END DO
 
@@ -319,12 +285,7 @@ CONTAINS
             IF (buffer_send(iproc)%nblock > 0) THEN
                send_counter = send_counter + 1
                CALL mp_isend(buffer_send(iproc)%indx, iproc, mp_comm, req_array(send_counter, 1), tag=4)
-               SELECT CASE (buffer_recv(iproc)%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-               CASE (${dparam}$)
-                  CALL mp_isend(buffer_send(iproc)%msg_${dsuffix}$, iproc, mp_comm, req_array(send_counter, 2), tag=7)
-#:endfor
-               END SELECT
+               CALL mp_isend(buffer_send(iproc)%msg, iproc, mp_comm, req_array(send_counter, 2), tag=7)
             END IF
          END DO
 
@@ -338,27 +299,20 @@ CONTAINS
       ELSE
          IF (buffer_recv(0)%nblock > 0) THEN
             buffer_recv(0)%indx(:, :) = buffer_send(0)%indx(:, :)
-            SELECT CASE (buffer_recv(0)%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-            CASE (${dparam}$)
-               buffer_recv(0)%msg_${dsuffix}$ (:) = buffer_send(0)%msg_${dsuffix}$ (:)
-#:endfor
-            END SELECT
+            buffer_recv(0)%msg(:) = buffer_send(0)%msg(:)
          ENDIF
       ENDIF
       CALL timestop(handle)
 
    END SUBROUTINE
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_buffer_add_block_${dsuffix}$ (buffer, ndata, index, block)
+   SUBROUTINE block_buffer_add_block(buffer, ndata, index, block)
       !! add block to buffer.
       TYPE(block_buffer_type), INTENT(INOUT)               :: buffer
       INTEGER, INTENT(IN)                                  :: ndata
-      ${dtype}$, DIMENSION(ndata), INTENT(IN)              :: block
+      REAL(dp), DIMENSION(ndata), INTENT(IN)               :: block
       INTEGER, DIMENSION(ndims_buffer(buffer)), INTENT(IN) :: index
       INTEGER                                              :: p, ndims, p_data
-      CPASSERT(buffer%data_type .EQ. ${dparam}$)
       ndims = ndims_buffer(buffer)
       p = buffer%endpos
       IF (p .EQ. 0) THEN
@@ -367,7 +321,7 @@ CONTAINS
          p_data = buffer%indx(p, ndims + 1)
       ENDIF
 
-      buffer%msg_${dsuffix}$ (p_data + 1:p_data + ndata) = block(:)
+      buffer%msg(p_data + 1:p_data + ndata) = block(:)
       buffer%indx(p + 1, 1:ndims) = index(:)
       IF (p > 0) THEN
          buffer%indx(p + 1, ndims + 1) = buffer%indx(p, ndims + 1) + ndata
@@ -376,15 +330,13 @@ CONTAINS
       ENDIF
       buffer%endpos = buffer%endpos + 1
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_buffer_get_next_block_${dsuffix}$ (buffer, ndata, index, block, advance_iter)
+   SUBROUTINE block_buffer_get_next_block(buffer, ndata, index, block, advance_iter)
       !! get next block from buffer. Iterator is advanced only if block is retrieved or advance_iter.
 
       TYPE(block_buffer_type), INTENT(INOUT)                      :: buffer
       INTEGER, INTENT(OUT)                                        :: ndata
-      ${dtype}$, DIMENSION(:), ALLOCATABLE, OPTIONAL, INTENT(OUT) :: block
+      REAL(dp), DIMENSION(:), ALLOCATABLE, OPTIONAL, INTENT(OUT) :: block
       INTEGER, DIMENSION(ndims_buffer(buffer)), INTENT(OUT)       :: index
       INTEGER                                                     :: p, ndims, p_data
       LOGICAL, INTENT(IN), OPTIONAL                               :: advance_iter
@@ -397,7 +349,6 @@ CONTAINS
          do_advance = .TRUE.
       ENDIF
 
-      CPASSERT(buffer%data_type .EQ. ${dparam}$)
       ndims = ndims_buffer(buffer)
       p = buffer%endpos
       IF (p .EQ. 0) THEN
@@ -412,11 +363,10 @@ CONTAINS
       ENDIF
       index(:) = buffer%indx(p + 1, 1:ndims)
       IF (PRESENT(block)) THEN
-         CALL allocate_any(block, source=buffer%msg_${dsuffix}$ (p_data + 1:p_data + ndata))
+         CALL allocate_any(block, source=buffer%msg(p_data + 1:p_data + ndata))
       ENDIF
 
       IF (do_advance) buffer%endpos = buffer%endpos + 1
    END SUBROUTINE
-#:endfor
 
 END MODULE block_tensor_reshape_ops

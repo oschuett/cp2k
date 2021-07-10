@@ -16,7 +16,7 @@ MODULE block_allocate_wrap
 #:include "block_tensor.fypp"
 #:set maxdim = fortran_max_ndim
 
-   USE kinds, ONLY: ${uselist(dtype_float_prec)}$
+   USE kinds, ONLY: dp
 
 #include "../../base/base_uses.f90"
    IMPLICIT NONE
@@ -25,28 +25,24 @@ MODULE block_allocate_wrap
    PUBLIC :: allocate_any
 
    INTERFACE allocate_any
-#:for dparam, dtype, dsuffix in dtype_all_list
 #:for dim in range(1, maxdim+1)
-      MODULE PROCEDURE allocate_${dim}$d_${dsuffix}$
-#:endfor
+      MODULE PROCEDURE allocate_${dim}$d
 #:endfor
    END INTERFACE
 
 CONTAINS
 
-#:for dparam, dtype, dsuffix in dtype_all_list
 #:for dim in range(1, maxdim+1)
-
-   SUBROUTINE allocate_${dim}$d_${dsuffix}$ (array, shape_spec, source, order)
+   SUBROUTINE allocate_${dim}$d (array, shape_spec, source, order)
       !! Allocate array according to shape_spec. Possibly assign array from source.
       !! @note  this does not fully replace Fortran RESHAPE intrinsic since source and target array must
       !! have same rank.
 
-      ${dtype}$, DIMENSION(${shape_colon(dim)}$), ALLOCATABLE, INTENT(OUT) :: array
+      REAL(dp), DIMENSION(${shape_colon(dim)}$), ALLOCATABLE, INTENT(OUT) :: array
          !! target array.
       INTEGER, DIMENSION(${dim}$), INTENT(IN), OPTIONAL                    :: shape_spec
          !! shape of array to be allocated. If shape is not specified, it is derived from source.
-      ${dtype}$, DIMENSION(${shape_colon(dim)}$), INTENT(IN), OPTIONAL     :: source
+      REAL(dp), DIMENSION(${shape_colon(dim)}$), INTENT(IN), OPTIONAL     :: source
          !! source array to be copied to target array, must have same rank as target array.
       INTEGER, DIMENSION(${dim}$), INTENT(IN), OPTIONAL                    :: order
          !! in which order to copy source to array (same convention as RESHAPE intrinsic).
@@ -80,6 +76,5 @@ CONTAINS
       ENDIF
 
    END SUBROUTINE
-#:endfor
 #:endfor
 END MODULE

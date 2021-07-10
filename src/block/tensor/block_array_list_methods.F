@@ -165,7 +165,7 @@ CONTAINS
       ASSOCIATE (ptr => list%ptr, col_data => list%col_data)
 #:for dim in range(1, maxdim+1)
          IF (ndata > ${dim-1}$) THEN
-            CALL allocate_any(data_${dim}$, source=col_data(ptr(o(${dim}$)):ptr(o(${dim}$) + 1) - 1))
+            ALLOCATE(data_${dim}$, source=col_data(ptr(o(${dim}$)):ptr(o(${dim}$) + 1) - 1))
          ENDIF
 #:endfor
       END ASSOCIATE
@@ -197,7 +197,7 @@ CONTAINS
       ASSOCIATE (ptr => list%ptr, col_data => list%col_data)
          CPASSERT(i <= number_of_arrays(list))
 
-         CALL allocate_any(array, source=col_data(ptr(i):ptr(i + 1) - 1))
+         ALLOCATE(array, source=col_data(ptr(i):ptr(i + 1) - 1))
       END ASSOCIATE
    END SUBROUTINE
 
@@ -238,7 +238,7 @@ CONTAINS
       INTEGER                       :: i_data, i_ptr, num_data, partial_sum
 
       num_data = number_of_arrays(list_in)
-      CALL allocate_any(list_out%ptr, source=list_in%ptr)
+      ALLOCATE(list_out%ptr, source=list_in%ptr)
       ALLOCATE (list_out%col_data(SIZE(list_in%col_data)))
       DO i_data = 1, num_data
          partial_sum = 1

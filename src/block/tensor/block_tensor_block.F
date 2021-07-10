@@ -21,16 +21,13 @@ MODULE block_tensor_block
       dbcsr_reserve_blocks, dbcsr_finalize
    USE block_allocate_wrap, ONLY: &
       allocate_any
-   USE block_matrix_api, ONLY: &
-      ${uselist(dtype_float_param)}$, &
-      checker_tr, swap
+   USE block_matrix_api, ONLY: block_type_real_8, checker_tr, swap
    USE block_tas_types, ONLY: &
       block_tas_iterator
    USE block_tas_base, ONLY: &
       block_tas_iterator_next_block, block_tas_iterator_blocks_left, block_tas_iterator_start, &
       block_tas_iterator_stop, block_tas_get_block_p, block_tas_put_block, block_tas_reserve_blocks
-   USE kinds, ONLY: &
-      ${uselist(dtype_float_prec)}$, int_8, dp
+   USE kinds, ONLY: real_8, int_8, dp
    USE block_tensor_index, ONLY: &
       nd_to_2d_mapping, ndims_mapping, get_nd_indices_tensor, destroy_nd_to_2d_mapping, get_2d_indices_tensor, &
       create_nd_to_2d_mapping
@@ -69,47 +66,27 @@ MODULE block_tensor_block
       TYPE(array_list)            :: blk_sizes, blk_offsets
    END TYPE block_tensor_iterator_type
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   PUBLIC :: block_nd_${dsuffix}$
-#:endfor
-
-#:for dparam, dtype, dsuffix in dtype_float_list
-   TYPE block_nd_${dsuffix}$
-      INTEGER, DIMENSION(:), ALLOCATABLE   :: sizes
-      ${dtype}$, DIMENSION(:), ALLOCATABLE :: blk
-   END TYPE
-
-#:endfor
-
    TYPE block_nd
-#:for dparam, dtype, dsuffix in dtype_float_list
-      TYPE(block_nd_${dsuffix}$) :: ${dsuffix}$
-#:endfor
-      INTEGER          :: data_type = -1
+      INTEGER, DIMENSION(:), ALLOCATABLE   :: sizes
+      REAL(dp), DIMENSION(:), ALLOCATABLE :: blk
    END TYPE
 
    INTERFACE create_block
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE create_block_data_${dsuffix}$
-#:endfor
+      MODULE PROCEDURE create_block_data
       MODULE PROCEDURE create_block_nodata
    END INTERFACE
 
    INTERFACE block_tensor_put_block
-#:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
-      MODULE PROCEDURE block_tensor_put_${ndim}$d_block_${dsuffix}$
-#:endfor
+      MODULE PROCEDURE block_tensor_put_${ndim}$d_block
 #:endfor
       MODULE PROCEDURE block_tensor_put_anyd_block
    END INTERFACE
 
    INTERFACE block_tensor_get_block
-#:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
-      MODULE PROCEDURE block_tensor_get_${ndim}$d_block_${dsuffix}$
-      MODULE PROCEDURE block_tensor_allocate_and_get_${ndim}$d_block_${dsuffix}$
-#:endfor
+      MODULE PROCEDURE block_tensor_get_${ndim}$d_block
+      MODULE PROCEDURE block_tensor_allocate_and_get_${ndim}$d_block
 #:endfor
       MODULE PROCEDURE block_tensor_get_anyd_block
    END INTERFACE
@@ -124,46 +101,12 @@ MODULE block_tensor_block
 
 CONTAINS
 
-   SUBROUTINE create_block_nodata(block, sizes, data_type)
-      !! Create block without data
-      TYPE(block_nd), INTENT(OUT)       :: block
-      INTEGER, DIMENSION(:), INTENT(IN) :: sizes
-      INTEGER, INTENT(IN)               :: data_type
-
-      block%data_type = data_type
-      SELECT CASE (data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         CALL create_block_nodata_${dsuffix}$ (block%${dsuffix}$, sizes)
-#:endfor
-      END SELECT
-   END SUBROUTINE
-
-   SUBROUTINE destroy_block(block)
-      !! Destroy block
-      TYPE(block_nd), INTENT(INOUT) :: block
-
-      SELECT CASE (block%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         CALL destroy_block_${dsuffix}$ (block%${dsuffix}$)
-#:endfor
-      END SELECT
-
-   END SUBROUTINE
-
    FUNCTION block_size(block)
       !! block size
       TYPE(block_nd), INTENT(IN)         :: block
       INTEGER, ALLOCATABLE, DIMENSION(:) :: block_size
 
-      block_size = 0 ! invalid
-      SELECT CASE (block%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         CALL allocate_any(block_size, source=block%${dsuffix}$%sizes)
-#:endfor
-      END SELECT
+      ALLOCATE(block_size, source=block%sizes)
    END FUNCTION
 
    SUBROUTINE block_tensor_iterator_start(iterator, tensor)
@@ -411,96 +354,40 @@ CONTAINS
 
    END SUBROUTINE
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE create_block_data_${dsuffix}$ (block, sizes, array)
+   SUBROUTINE create_block_data (block, sizes, array)
       !! Create block from array, array can be n-dimensional.
       TYPE(block_nd), INTENT(OUT)                       :: block
       INTEGER, DIMENSION(:), INTENT(IN)                 :: sizes
-      ${dtype}$, DIMENSION(PRODUCT(sizes)), INTENT(IN) :: array
+      REAL(dp), DIMENSION(PRODUCT(sizes)), INTENT(IN) :: array
 
-      ASSOCIATE (blk => block%${dsuffix}$)
-         block%data_type = ${dparam}$
-         CALL allocate_any(blk%sizes, source=sizes)
-         CALL allocate_any(blk%blk, source=array)
-      END ASSOCIATE
+      ALLOCATE(block%sizes, source=sizes)
+      ALLOCATE(block%blk, source=array)
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE create_block_nodata_${dsuffix}$ (block, sizes)
+   SUBROUTINE create_block_nodata (block, sizes)
       !! Create and allocate block, but no data.
       INTEGER, INTENT(IN), DIMENSION(:)       :: sizes
-      TYPE(block_nd_${dsuffix}$), INTENT(OUT) :: block
-      CALL allocate_any(block%sizes, source=sizes)
-      ALLOCATE (block%blk(PRODUCT(sizes)))
+      TYPE(block_nd), INTENT(OUT) :: block
+      ALLOCATE(block%sizes, source=sizes)
+      ALLOCATE(block%blk(PRODUCT(sizes)))
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE destroy_block_${dsuffix}$ (block)
-      TYPE(block_nd_${dsuffix}$), INTENT(INOUT) :: block
+   SUBROUTINE destroy_block (block)
+      TYPE(block_nd), INTENT(INOUT) :: block
       DEALLOCATE (block%blk)
       DEALLOCATE (block%sizes)
    END SUBROUTINE
-#:endfor
 
-   SUBROUTINE block_tensor_get_anyd_block(tensor, ind, block, found)
-      !! Generic implementation of block_tensor_get_block (arbitrary tensor rank and arbitrary datatype)
 
-      TYPE(block_tensor_type), INTENT(INOUT)            :: tensor
-      INTEGER, DIMENSION(ndims_tensor(tensor)), &
-         INTENT(IN)                                :: ind
-         !! block index
-      TYPE(block_nd), INTENT(OUT)                  :: block
-         !! block to get
-      LOGICAL, INTENT(OUT)                         :: found
-         !! whether block was found
+   SUBROUTINE block_tensor_put_anyd_block (tensor, ind, block, summation, scale)
+      !! Generic implementation of block_tensor_put_block, template for datatype
 
-      SELECT CASE (block_tensor_get_data_type(tensor))
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         CALL block_tensor_get_anyd_block_${dsuffix}$ (tensor, ind, block, found)
-#:endfor
-      END SELECT
-   END SUBROUTINE
-
-   SUBROUTINE block_tensor_put_anyd_block(tensor, ind, block, summation, scale)
-      !! Generic implementation of block_tensor_put_block (arbitrary tensor rank and arbitrary datatype)
-
-      TYPE(block_tensor_type), INTENT(INOUT)            :: tensor
-      INTEGER, DIMENSION(ndims_tensor(tensor)), &
-         INTENT(IN)                                :: ind
-         !! block index
-      TYPE(block_nd), INTENT(IN)                   :: block
+      TYPE(block_nd), INTENT(IN)       :: block
          !! block to put
+      TYPE(block_tensor_type), INTENT(INOUT)            :: tensor
       LOGICAL, INTENT(IN), OPTIONAL                :: summation
          !! whether block should be summed to existing block
       REAL(dp), INTENT(IN), OPTIONAL :: scale
-         !! scaling factor
-
-      SELECT CASE (block%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         IF (.NOT. PRESENT(scale)) THEN
-            CALL block_tensor_put_anyd_block_${dsuffix}$ (tensor, ind, block%${dsuffix}$, summation)
-         ELSE
-            CALL block_tensor_put_anyd_block_${dsuffix}$ (tensor, ind, block%${dsuffix}$, summation, scale=scale)
-         ENDIF
-#:endfor
-      END SELECT
-
-   END SUBROUTINE
-
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_tensor_put_anyd_block_${dsuffix}$ (tensor, ind, block, summation, scale)
-      !! Generic implementation of block_tensor_put_block, template for datatype
-
-      TYPE(block_nd_${dsuffix}$), INTENT(IN)       :: block
-         !! block to put
-      TYPE(block_tensor_type), INTENT(INOUT)            :: tensor
-      LOGICAL, INTENT(IN), OPTIONAL                :: summation
-         !! whether block should be summed to existing block
-      ${dtype}$, INTENT(IN), OPTIONAL :: scale
          !! scaling factor
       INTEGER, DIMENSION(ndims_tensor(tensor)), &
          INTENT(IN)                                :: ind
@@ -509,14 +396,12 @@ CONTAINS
       SELECT CASE (ndims_tensor(tensor))
 #:for ndim in ndims
       CASE (${ndim}$)
-         CALL block_tensor_put_${ndim}$d_block_${dsuffix}$ (tensor, ind, block%sizes, block%blk, summation=summation, scale=scale)
+         CALL block_tensor_put_${ndim}$d_block(tensor, ind, block%sizes, block%blk, summation=summation, scale=scale)
 #:endfor
       END SELECT
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_tensor_get_anyd_block_${dsuffix}$ (tensor, ind, block, found)
+   SUBROUTINE block_tensor_get_anyd_block (tensor, ind, block, found)
       !! Generic implementation of block_tensor_get_block (arbitrary tensor rank)
 
       TYPE(block_nd), INTENT(OUT)                  :: block
@@ -528,7 +413,7 @@ CONTAINS
          INTENT(IN)                                :: ind
          !! block index
       INTEGER, DIMENSION(ndims_tensor(tensor))    :: blk_size
-      ${dtype}$, DIMENSION(:), ALLOCATABLE         :: block_arr
+      REAL(dp), DIMENSION(:), ALLOCATABLE         :: block_arr
 
       CALL block_tensor_blk_sizes(tensor, ind, blk_size)
       ALLOCATE (block_arr(PRODUCT(blk_size)))
@@ -536,16 +421,14 @@ CONTAINS
       SELECT CASE (ndims_tensor(tensor))
 #:for ndim in ndims
       CASE (${ndim}$)
-         CALL block_tensor_get_${ndim}$d_block_${dsuffix}$ (tensor, ind, blk_size, block_arr, found)
+         CALL block_tensor_get_${ndim}$d_block (tensor, ind, blk_size, block_arr, found)
 #:endfor
       END SELECT
       CALL create_block(block, blk_size, block_arr)
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
-   SUBROUTINE block_tensor_put_${ndim}$d_block_${dsuffix}$ (tensor, ind, sizes, block, summation, scale)
+   SUBROUTINE block_tensor_put_${ndim}$d_block (tensor, ind, sizes, block, summation, scale)
       !! Template for block_tensor_put_block.
 
       TYPE(block_tensor_type), INTENT(INOUT)                     :: tensor
@@ -553,19 +436,19 @@ CONTAINS
          !! block index
       INTEGER, DIMENSION(${ndim}$), INTENT(IN) :: sizes
          !! block size
-      ${dtype}$, DIMENSION(${arrlist("sizes", nmax=ndim)}$), &
+      REAL(dp), DIMENSION(${arrlist("sizes", nmax=ndim)}$), &
          INTENT(IN), TARGET                                 :: block
          !! block to put
       LOGICAL, INTENT(IN), OPTIONAL                         :: summation
          !! whether block should be summed to existing block
-      ${dtype}$, INTENT(IN), OPTIONAL                       :: scale
+      REAL(dp), INTENT(IN), OPTIONAL                       :: scale
          !! scaling factor
       INTEGER(KIND=int_8), DIMENSION(2)                     :: ind_2d
       INTEGER, DIMENSION(2)                                 :: shape_2d
-      ${dtype}$, POINTER, DIMENSION(:, :)                   :: block_2d
+      REAL(dp), POINTER, DIMENSION(:, :)                   :: block_2d
       INTEGER, DIMENSION(${ndim}$)                          :: shape_nd
       LOGICAL :: found, new_block
-      ${dtype}$, DIMENSION(${arrlist("sizes", nmax=ndim)}$) :: block_check
+      REAL(dp), DIMENSION(${arrlist("sizes", nmax=ndim)}$) :: block_check
 
       LOGICAL, PARAMETER :: debug = .FALSE.
       INTEGER :: i
@@ -605,17 +488,15 @@ CONTAINS
 
    END SUBROUTINE
 #:endfor
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
-   SUBROUTINE block_tensor_allocate_and_get_${ndim}$d_block_${dsuffix}$ (tensor, ind, block, found)
+   SUBROUTINE block_tensor_allocate_and_get_${ndim}$d_block (tensor, ind, block, found)
       !! allocate and get block
 
       TYPE(block_tensor_type), INTENT(INOUT)                     :: tensor
       INTEGER, DIMENSION(${ndim}$), INTENT(IN)  :: ind
          !! block index
-      ${dtype}$, DIMENSION(${shape_colon(ndim)}$), &
+      REAL(dp), DIMENSION(${shape_colon(ndim)}$), &
          ALLOCATABLE, INTENT(OUT)                           :: block
          !! block to get
       LOGICAL, INTENT(OUT)                                  :: found
@@ -624,15 +505,13 @@ CONTAINS
 
       CALL block_tensor_blk_sizes(tensor, ind, blk_size)
       CALL allocate_any(block, shape_spec=blk_size)
-      CALL block_tensor_get_${ndim}$d_block_${dsuffix}$ (tensor, ind, blk_size, block, found)
+      CALL block_tensor_get_${ndim}$d_block (tensor, ind, blk_size, block, found)
 
    END SUBROUTINE
 #:endfor
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
 #:for ndim in ndims
-   SUBROUTINE block_tensor_get_${ndim}$d_block_${dsuffix}$ (tensor, ind, sizes, block, found)
+   SUBROUTINE block_tensor_get_${ndim}$d_block (tensor, ind, sizes, block, found)
       !! Template for block_tensor_get_block.
 
       TYPE(block_tensor_type), INTENT(INOUT)                     :: tensor
@@ -640,17 +519,17 @@ CONTAINS
          !! block index
       INTEGER, DIMENSION(${ndim}$), INTENT(IN) :: sizes
          !! block size
-      ${dtype}$, DIMENSION(${arrlist("sizes", nmax=ndim)}$), &
+      REAL(dp), DIMENSION(${arrlist("sizes", nmax=ndim)}$), &
          INTENT(OUT)                                        :: block
          !! block to get
       LOGICAL, INTENT(OUT)                                  :: found
          !! whether block was found
 
       INTEGER(KIND=int_8), DIMENSION(2)                     :: ind_2d
-      ${dtype}$, DIMENSION(:, :), POINTER, CONTIGUOUS       :: block_2d_ptr
+      REAL(dp), DIMENSION(:, :), POINTER, CONTIGUOUS       :: block_2d_ptr
       LOGICAL                                               :: tr
       INTEGER                                               :: i
-      ${dtype}$, DIMENSION(${shape_colon(ndim)}$), POINTER  :: block_ptr
+      REAL(dp), DIMENSION(${shape_colon(ndim)}$), POINTER  :: block_ptr
 
       NULLIFY (block_2d_ptr)
 
@@ -676,7 +555,6 @@ CONTAINS
       END ASSOCIATE
 
    END SUBROUTINE
-#:endfor
 #:endfor
 
 END MODULE

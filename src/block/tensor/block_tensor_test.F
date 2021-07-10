@@ -15,7 +15,7 @@ MODULE block_tensor_test
 #:set ndims = range(2,maxdim+1)
 
    USE block_matrix_api, ONLY: &
-      ${uselist(dtype_float_param)}$,&
+      block_type_real_8,&
       block_matrix_lapack_larnv, block_matrix_set_larnv_seed, &
       block_matrix_set_larnv_seed
    USE block_tas_base, ONLY: block_tas_info
@@ -33,9 +33,7 @@ MODULE block_tensor_test
       block_tensor_default_distvec
    USE block_tensor_io, ONLY: &
       block_tensor_write_blocks, block_tensor_write_block_indices
-   USE kinds, ONLY: ${uselist(dtype_float_prec)}$, &
-                          default_string_length, &
-                          int_8, dp
+   USE kinds, ONLY: real_8, default_string_length, int_8, dp
    USE message_passing, ONLY: mp_environ, &
                             mp_bcast, &
                             mp_comm_free, &
@@ -61,10 +59,8 @@ MODULE block_tensor_test
       block_tensor_reset_randmat_seed
 
    INTERFACE dist_sparse_tensor_to_repl_dense_array
-#:for dparam, dtype, dsuffix in [dtype_float_list[0]]
 #:for ndim in ndims
-      MODULE PROCEDURE dist_sparse_tensor_to_repl_dense_${ndim}$d_array_${dsuffix}$
-#:endfor
+      MODULE PROCEDURE dist_sparse_tensor_to_repl_dense_${ndim}$d_array
 #:endfor
    END INTERFACE
 
@@ -117,12 +113,7 @@ CONTAINS
       TYPE(block_nd), INTENT(IN) :: block1, block2
       LOGICAL                    :: blocks_equal
 
-      SELECT CASE (block1%data_type)
-#:for dprec, dparam, dtype, dsuffix in dtype_float_list_prec
-      CASE (${dparam}$)
-         blocks_equal = MAXVAL(ABS(block1%${dsuffix}$%blk - block2%${dsuffix}$%blk)) .LT. 1.0E-12_${dprec}$
-#:endfor
-      END SELECT
+      blocks_equal = MAXVAL(ABS(block1%blk - block2%blk)) .LT. 1.0E-12_dp
 
    END FUNCTION
 
@@ -205,8 +196,8 @@ CONTAINS
       IF (mynode .EQ. 0) io_unit = unit_nr
 
       CALL permute(ndims, perm)
-      CALL allocate_any(map1_ref, source=perm(1:ndims/2, 1))
-      CALL allocate_any(map2_ref, source=perm(ndims/2 + 1:ndims, 1))
+      ALLOCATE(map1_ref, source=perm(1:ndims/2, 1))
+      ALLOCATE(map2_ref, source=perm(ndims/2 + 1:ndims, 1))
 
       IF (io_unit > 0) THEN
          WRITE (io_unit, *)
@@ -254,8 +245,8 @@ CONTAINS
          DO isep = 1, ndims - 1
             icount = icount + 1
 
-            CALL allocate_any(map1, source=perm(1:isep, iperm))
-            CALL allocate_any(map2, source=perm(isep + 1:ndims, iperm))
+            ALLOCATE(map1, source=perm(1:isep, iperm))
+            ALLOCATE(map2, source=perm(isep + 1:ndims, iperm))
 
             CALL mp_environ(numnodes, mynode, mp_comm)
             CALL mp_environ_pgrid(comm_nd, pdims, myploc)
@@ -494,26 +485,25 @@ CONTAINS
 
    END SUBROUTINE
 
-#:for dprec, dparam, dtype, dsuffix in [dtype_float_list_prec[0]]
 #:for ndim in ndims
-   SUBROUTINE dist_sparse_tensor_to_repl_dense_${ndim}$d_array_${dsuffix}$ (tensor, array)
+   SUBROUTINE dist_sparse_tensor_to_repl_dense_${ndim}$d_array(tensor, array)
       !! Transform a distributed sparse tensor to a replicated dense array. This is only useful for
       !! testing tensor contraction by matrix multiplication of dense arrays.
 
       TYPE(block_tensor_type), INTENT(INOUT)                          :: tensor
-      ${dtype}$, ALLOCATABLE, DIMENSION(${shape_colon(ndim)}$), &
+      REAL(dp), ALLOCATABLE, DIMENSION(${shape_colon(ndim)}$), &
          INTENT(OUT)                                             :: array
-      ${dtype}$, ALLOCATABLE, DIMENSION(${shape_colon(ndim)}$)   :: block
+      REAL(dp), ALLOCATABLE, DIMENSION(${shape_colon(ndim)}$)   :: block
       INTEGER, DIMENSION(ndims_tensor(tensor))                  :: dims_nd, ind_nd, blk_size, blk_offset
       TYPE(block_tensor_iterator_type)                                     :: iterator
       INTEGER                                                    :: blk, idim
-      INTEGER, DIMENSION(ndims_tensor(tensor))                  :: blk_start, blk_end
+      INTEGER, DIMENSION(ndims_tensor(tensor))                   :: blk_start, blk_end
       LOGICAL                                                    :: found
 
       CPASSERT(ndims_tensor(tensor) .EQ. ${ndim}$)
       CALL block_tensor_get_info(tensor, nfull_total=dims_nd)
       CALL allocate_any(array, shape_spec=dims_nd)
-      array(${shape_colon(ndim)}$) = 0.0_${dprec}$
+      array(${shape_colon(ndim)}$) = 0.0_dp
 
       CALL block_tensor_iterator_start(iterator, tensor)
       DO WHILE (block_tensor_iterator_blocks_left(iterator))
@@ -534,7 +524,6 @@ CONTAINS
       CALL mp_sum(array, tensor%pgrid%mp_comm_2d)
 
    END SUBROUTINE
-#:endfor
 #:endfor
 
    SUBROUTINE block_tensor_contract_test(alpha, tensor_1, tensor_2, beta, tensor_3, &
@@ -696,7 +685,7 @@ CONTAINS
       SELECT CASE (ndims_tensor(tensor_${i}$))
 #:for ndim in ndims
       CASE (${ndim}$)
-         CALL allocate_any(size_${i}$, source=SHAPE(array_${i}$_${ndim}$d))
+         ALLOCATE(size_${i}$, source=SHAPE(array_${i}$_${ndim}$d))
 
 #:endfor
       END SELECT
@@ -737,9 +726,9 @@ CONTAINS
       END ASSOCIATE
 
       eql_diff = MAXVAL(ABS(array_3_test_mm(:, :) - array_3_mm(:, :)))
-      notzero = MAXVAL(ABS(array_3_test_mm(:, :))) .GT. 1.0E-12_${dprec}$
+      notzero = MAXVAL(ABS(array_3_test_mm(:, :))) .GT. 1.0E-12_dp
 
-      eql = eql_diff .LT. 1.0E-11_${dprec}$
+      eql = eql_diff .LT. 1.0E-11_dp
 
       IF (.NOT. eql .OR. .NOT. notzero) THEN
          IF (io_unit > 0) WRITE (io_unit, *) 'Test failed!', eql_diff

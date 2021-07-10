@@ -29,7 +29,7 @@ MODULE block_tensor
       create_array_list, destroy_array_list, sizes_of_arrays
    USE block_matrix_api, ONLY: &
       block_matrix_transpose, block_matrix_no_transpose, &
-      ${uselist(dtype_float_param)}$, block_matrix_clear, &
+      block_type_real_8, block_matrix_clear, &
       swap, checker_tr
    USE block_tas_types, ONLY: &
       block_tas_split_info
@@ -55,7 +55,7 @@ MODULE block_tensor
       block_tensor_max_nblks_local, block_tensor_default_distvec, block_tensor_contraction_storage, block_tensor_nblks_total, &
       block_tensor_distribution_new, block_tensor_copy_contraction_storage, block_tensor_pgrid_destroy
    USE kinds, ONLY: &
-      ${uselist(dtype_float_prec)}$, default_string_length, int_8, dp
+      real_8, default_string_length, int_8, dp
    USE message_passing, ONLY: &
       mp_environ, mp_max, mp_sum, mp_comm_free, mp_cart_create, mp_sync
    USE util, ONLY: &
@@ -2005,7 +2005,7 @@ CONTAINS
 #:for idim in range(1, maxdim+1)
       IF (ndims_tensor(tensor) >= ${idim}$) THEN
          IF (PRESENT(batch_range_${idim}$)) THEN
-            CALL allocate_any(batch_range_prv_${idim}$, source=batch_range_${idim}$)
+            ALLOCATE(batch_range_prv_${idim}$, source=batch_range_${idim}$)
             static_range = .FALSE.
          ELSE
             ALLOCATE (batch_range_prv_${idim}$ (2))
