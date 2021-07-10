@@ -16,8 +16,6 @@ MODULE block_tas_mm
    !! (group sizes and process grid dimensions) can not be derived from matrix dimensions and need to be
    !! set manually.
 
-#:include "block_tas.fypp"
-
    USE block_matrix_api, ONLY: &
       block_matrix_scale, &
       block_type_real_8, block_type_real_4, &
@@ -1487,10 +1485,8 @@ CONTAINS
       CHARACTER(len=default_string_length)       :: name
       INTEGER                                    :: data_type
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-      ${dtype}$, DIMENSION(:, :), POINTER        :: block_get_${dsuffix}$
-      ${dtype}$, DIMENSION(:, :), POINTER        :: block_put_${dsuffix}$
-#:endfor
+      REAL(dp), DIMENSION(:, :), POINTER        :: block_get
+      REAL(dp), DIMENSION(:, :), POINTER        :: block_put
       LOGICAL                                    :: tr, nodata_prv, found
 
       CPASSERT(matrix_in%valid)
@@ -1518,15 +1514,10 @@ CONTAINS
          CALL block_tas_iterator_start(iter, matrix_in)
 
          DO WHILE (block_tas_iterator_blocks_left(iter))
-
-#:for dparam, dtype, dsuffix in dtype_float_list
-            IF (data_type == ${dparam}$) THEN
-               CALL block_tas_iterator_next_block(iter, row, column, block_get_${dsuffix}$, tr)
-               CALL block_tas_get_block_p(matrix_out, row, column, block_put_${dsuffix}$, tr, found)
-               CPASSERT(found)
-               block_put_${dsuffix}$ (1, 1) = SQRT(SUM(block_get_${dsuffix}$**2)) ! norm2 works only for real
-            ENDIF
-#:endfor
+            CALL block_tas_iterator_next_block(iter, row, column, block_get, tr)
+            CALL block_tas_get_block_p(matrix_out, row, column, block_put, tr, found)
+            CPASSERT(found)
+            block_put(1, 1) = NORM2(block_get)
          ENDDO
          CALL block_tas_iterator_stop(iter)
       ENDIF

@@ -9,7 +9,6 @@
 
 MODULE block_tas_reshape_ops
    !! communication routines to reshape / replicate / merge tall-and-skinny matrices.
-#:include "block_tas.fypp"
 
    USE block_matrix_api, ONLY: &
       block_matrix_put_block, block_matrix_reserve_blocks, &
@@ -41,7 +40,7 @@ MODULE block_tas_reshape_ops
    USE block_tas_split, ONLY: &
       colsplit, block_tas_get_split_info, rowsplit
    USE kinds, ONLY: &
-      int_8, real_8, real_4
+      int_8, real_8, real_4, dp
    USE message_passing, ONLY: &
       mp_alltoall, mp_environ, mp_isend, mp_irecv, mp_waitall
    USE block_tas_util, ONLY: &
@@ -61,25 +60,19 @@ MODULE block_tas_reshape_ops
    TYPE block_buffer_type
       INTEGER :: nblock = -1
       INTEGER(KIND=int_8), DIMENSION(:, :), ALLOCATABLE :: indx
-#:for dparam, dtype, dsuffix in dtype_float_list
-      ${dtype}$, DIMENSION(:), ALLOCATABLE :: msg_${dsuffix}$
-#:endfor
+      REAL(dp), DIMENSION(:), ALLOCATABLE :: msg
       INTEGER :: data_type = -1
       INTEGER :: endpos = -1
    END TYPE
 
    INTERFACE block_buffer_get_next_block
       MODULE PROCEDURE block_buffer_get_next_area_block
-#!for dparam, dtype, dsuffix in dtype_float_list
-      !MODULE PROCEDURE block_buffer_get_next_block_${dsuffix}$ ! issue: ambiguous interface
-#!endfor
+      !MODULE PROCEDURE block_buffer_get_next_block_d ! issue: ambiguous interface
    END INTERFACE
 
    INTERFACE block_buffer_add_block
       MODULE PROCEDURE block_buffer_add_area_block
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_buffer_add_block_${dsuffix}$
-#:endfor
+      MODULE PROCEDURE block_buffer_add_block_d
    END INTERFACE
 
 CONTAINS
@@ -647,24 +640,14 @@ CONTAINS
       buffer%nblock = nblock
       buffer%data_type = data_type
       buffer%endpos = 0
-      SELECT CASE (data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         ALLOCATE (buffer%msg_${dsuffix}$ (ndata))
-#:endfor
-      END SELECT
+      ALLOCATE (buffer%msg(ndata))
       ALLOCATE (buffer%indx(nblock, 3))
    END SUBROUTINE
 
    SUBROUTINE block_buffer_destroy(buffer)
       TYPE(block_buffer_type), INTENT(INOUT) :: buffer
 
-      SELECT CASE (buffer%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         DEALLOCATE (buffer%msg_${dsuffix}$)
-#:endfor
-      END SELECT
+      DEALLOCATE (buffer%msg)
       DEALLOCATE (buffer%indx)
       buffer%nblock = -1
       buffer%data_type = -1
@@ -675,20 +658,12 @@ CONTAINS
       TYPE(block_buffer_type), INTENT(INOUT)      :: buffer
       INTEGER(KIND=int_8), DIMENSION(2), &
          INTENT(IN)                               :: index
-      TYPE(block_matrix_data_obj), INTENT(IN)         :: block
+      TYPE(block_matrix_data_obj), INTENT(IN)     :: block
       LOGICAL, INTENT(IN), OPTIONAL :: transposed
+      REAL(dp), DIMENSION(:, :), POINTER :: block_raw
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-      ${dtype}$, DIMENSION(:, :), POINTER :: block_${dsuffix}$
-#:endfor
-
-      SELECT CASE (buffer%data_type)
-#:for dparam, dtype, dsuffix, dsuffix_dbcsr in dtype_float_list_dbcsr
-      CASE (${dparam}$)
-         block_${dsuffix}$ => block_matrix_get_data_p_2d_${dsuffix_dbcsr}$ (block)
-         CALL block_buffer_add_block_${dsuffix}$ (buffer, index, block_${dsuffix}$, transposed)
-#:endfor
-      END SELECT
+      block_raw => block_matrix_get_data_p_2d_d(block)
+      CALL block_buffer_add_block(buffer, index, block_raw, transposed)
    END SUBROUTINE
 
    SUBROUTINE block_buffer_get_next_area_block(buffer, ndata, index, block, advance_iter)
@@ -700,9 +675,7 @@ CONTAINS
       LOGICAL, INTENT(IN), OPTIONAL               :: advance_iter
       LOGICAL :: valid
       INTEGER, DIMENSION(2) :: sizes
-#:for dparam, dtype, dsuffix in dtype_float_list
-      ${dtype}$, DIMENSION(:, :), POINTER :: data_${dsuffix}$
-#:endfor
+      REAL(dp), DIMENSION(:, :), POINTER :: data
 
       IF (PRESENT(block)) THEN
          CALL block_matrix_data_get_sizes(block, sizes, valid)
@@ -710,29 +683,23 @@ CONTAINS
          CALL internal_data_deallocate(block%d)
       ENDIF
 
-      SELECT CASE (buffer%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-      CASE (${dparam}$)
-         IF (PRESENT(block)) THEN
-            ALLOCATE (data_${dsuffix}$ (sizes(1), sizes(2)))
-            CALL block_buffer_get_next_block_${dsuffix}$ (buffer, ndata, index, data_${dsuffix}$, advance_iter=advance_iter)
-            CALL block_matrix_data_set_pointer(block, data_${dsuffix}$)
-         ELSE
-            CALL block_buffer_get_next_block_${dsuffix}$ (buffer, ndata, index, advance_iter=advance_iter)
-         ENDIF
-#:endfor
-      END SELECT
+      IF (PRESENT(block)) THEN
+         ALLOCATE (data(sizes(1), sizes(2)))
+         CALL block_buffer_get_next_block_d(buffer, ndata, index, data, advance_iter=advance_iter)
+         CALL block_matrix_data_set_pointer(block, data)
+      ELSE
+         CALL block_buffer_get_next_block(buffer, ndata, index, advance_iter=advance_iter)
+      ENDIF
    END SUBROUTINE
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_buffer_add_block_${dsuffix}$ (buffer, index, block, transposed)
+   SUBROUTINE block_buffer_add_block_d(buffer, index, block, transposed)
       !! insert a block into block buffer (at current iterator position)
 
       TYPE(block_buffer_type), INTENT(INOUT)      :: buffer
       INTEGER(KIND=int_8), DIMENSION(2), &
          INTENT(IN)                               :: index
          !! index of block
-      ${dtype}$, DIMENSION(:, :), INTENT(IN)                  :: block
+      REAL(dp), DIMENSION(:, :), INTENT(IN)                  :: block
          !! block
       LOGICAL, INTENT(IN), OPTIONAL :: transposed
       INTEGER(KIND=int_8), DIMENSION(2)   :: index_prv
@@ -754,7 +721,6 @@ CONTAINS
       ENDIF
       ndata = PRODUCT(SHAPE(block))
 
-      CPASSERT(buffer%data_type .EQ. ${dparam}$)
       p = buffer%endpos
       IF (p .EQ. 0) THEN
          p_data = 0
@@ -763,9 +729,9 @@ CONTAINS
       ENDIF
 
       IF (tr) THEN
-         buffer%msg_${dsuffix}$ (p_data + 1:p_data + ndata) = RESHAPE(TRANSPOSE(block), [ndata])
+         buffer%msg (p_data + 1:p_data + ndata) = RESHAPE(TRANSPOSE(block), [ndata])
       ELSE
-         buffer%msg_${dsuffix}$ (p_data + 1:p_data + ndata) = RESHAPE(block, [ndata])
+         buffer%msg (p_data + 1:p_data + ndata) = RESHAPE(block, [ndata])
       ENDIF
 
       buffer%indx(p + 1, 1:2) = index_prv(:)
@@ -776,16 +742,14 @@ CONTAINS
       ENDIF
       buffer%endpos = buffer%endpos + 1
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_buffer_get_next_block_${dsuffix}$ (buffer, ndata, index, block, advance_iter)
+   SUBROUTINE block_buffer_get_next_block_d(buffer, ndata, index, block, advance_iter)
       !! get next block from buffer. Iterator is advanced only if block is retrieved or advance_iter.
       TYPE(block_buffer_type), INTENT(INOUT)      :: buffer
       INTEGER, INTENT(OUT)                        :: ndata
       INTEGER(KIND=int_8), DIMENSION(2), &
          INTENT(OUT)                              :: index
-      ${dtype}$, DIMENSION(:, :), INTENT(OUT), OPTIONAL     :: block
+      REAL(dp), DIMENSION(:, :), INTENT(OUT), OPTIONAL     :: block
       LOGICAL, INTENT(IN), OPTIONAL               :: advance_iter
       INTEGER :: p, p_data
       LOGICAL :: do_advance
@@ -796,8 +760,6 @@ CONTAINS
       ELSE IF (PRESENT(block)) THEN
          do_advance = .TRUE.
       ENDIF
-
-      CPASSERT(buffer%data_type .EQ. ${dparam}$)
 
       p = buffer%endpos
       IF (p .EQ. 0) THEN
@@ -814,12 +776,11 @@ CONTAINS
       index(:) = buffer%indx(p + 1, 1:2)
 
       IF (PRESENT(block)) THEN
-         block(:, :) = RESHAPE(buffer%msg_${dsuffix}$ (p_data + 1:p_data + ndata), SHAPE(block))
+         block(:, :) = RESHAPE(buffer%msg(p_data + 1:p_data + ndata), SHAPE(block))
       ENDIF
 
       IF (do_advance) buffer%endpos = buffer%endpos + 1
    END SUBROUTINE
-#:endfor
 
    SUBROUTINE block_tas_communicate_buffer(mp_comm, buffer_recv, buffer_send, req_array)
       !! communicate buffer
@@ -844,12 +805,7 @@ CONTAINS
             IF (buffer_recv(iproc)%nblock > 0) THEN
                rec_counter = rec_counter + 1
                CALL mp_irecv(buffer_recv(iproc)%indx, iproc, mp_comm, req_array(rec_counter, 3), tag=4)
-               SELECT CASE (buffer_recv(iproc)%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-               CASE (${dparam}$)
-                  CALL mp_irecv(buffer_recv(iproc)%msg_${dsuffix}$, iproc, mp_comm, req_array(rec_counter, 4), tag=7)
-#:endfor
-               END SELECT
+               CALL mp_irecv(buffer_recv(iproc)%msg, iproc, mp_comm, req_array(rec_counter, 4), tag=7)
             END IF
          END DO
 
@@ -857,12 +813,7 @@ CONTAINS
             IF (buffer_send(iproc)%nblock > 0) THEN
                send_counter = send_counter + 1
                CALL mp_isend(buffer_send(iproc)%indx, iproc, mp_comm, req_array(send_counter, 1), tag=4)
-               SELECT CASE (buffer_recv(iproc)%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-               CASE (${dparam}$)
-                  CALL mp_isend(buffer_send(iproc)%msg_${dsuffix}$, iproc, mp_comm, req_array(send_counter, 2), tag=7)
-#:endfor
-               END SELECT
+               CALL mp_isend(buffer_send(iproc)%msg, iproc, mp_comm, req_array(send_counter, 2), tag=7)
             END IF
          END DO
 
@@ -876,12 +827,7 @@ CONTAINS
       ELSE
          IF (buffer_recv(0)%nblock > 0) THEN
             buffer_recv(0)%indx(:, :) = buffer_send(0)%indx(:, :)
-            SELECT CASE (buffer_recv(0)%data_type)
-#:for dparam, dtype, dsuffix in dtype_float_list
-            CASE (${dparam}$)
-               buffer_recv(0)%msg_${dsuffix}$ (:) = buffer_send(0)%msg_${dsuffix}$ (:)
-#:endfor
-            END SELECT
+            buffer_recv(0)%msg(:) = buffer_send(0)%msg(:)
          ENDIF
       ENDIF
       CALL timestop(handle)

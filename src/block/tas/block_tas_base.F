@@ -11,8 +11,6 @@ MODULE block_tas_base
    !! Tall-and-skinny matrices: base routines similar to DBCSR API, mostly wrappers around existing
    !! DBCSR routines.
 
-#:include "block_tas.fypp"
-
    USE block_matrix_api, ONLY: &
       block_matrix_get_block_p, block_matrix_put_block, block_matrix_reserve_blocks, &
       block_matrix_data_new, block_matrix_data_release, block_matrix_type_1d_to_2d, &
@@ -95,10 +93,12 @@ MODULE block_tas_base
    END INTERFACE
 
    INTERFACE block_tas_get_block_p
+      MODULE PROCEDURE block_tas_get_block_p_d
       MODULE PROCEDURE block_tas_get_block_p_area
    END INTERFACE
 
    INTERFACE block_tas_put_block
+      MODULE PROCEDURE block_tas_put_block_d
       MODULE PROCEDURE block_tas_put_block_area
    END INTERFACE
 
@@ -108,38 +108,9 @@ MODULE block_tas_base
    END INTERFACE
 
    INTERFACE block_tas_iterator_next_block
+      MODULE PROCEDURE block_tas_iterator_next_block_d
       MODULE PROCEDURE block_tas_iterator_next_area_block
       MODULE PROCEDURE block_tas_iterator_next_block_index
-   END INTERFACE
-
-   INTERFACE block_tas_iterator_next_block
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_tas_iterator_next_block_${dsuffix}$
-#:endfor
-   END INTERFACE
-
-   INTERFACE block_tas_put_block
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_tas_put_block_${dsuffix}$
-#:endfor
-   END INTERFACE
-
-   INTERFACE block_tas_get_block_p
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_tas_get_block_p_${dsuffix}$
-#:endfor
-   END INTERFACE
-
-   INTERFACE block_tas_set
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_tas_set_${dsuffix}$
-#:endfor
-   END INTERFACE
-
-   INTERFACE block_tas_filter
-#:for dparam, dtype, dsuffix in dtype_float_list
-      MODULE PROCEDURE block_tas_filter_${dsuffix}$
-#:endfor
    END INTERFACE
 
 CONTAINS
@@ -1013,13 +984,12 @@ CONTAINS
 
    END SUBROUTINE
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_tas_iterator_next_block_${dsuffix}$ (iterator, row, column, block, transposed, block_number, &
+   SUBROUTINE block_tas_iterator_next_block_d (iterator, row, column, block, transposed, block_number, &
       !! As block_matrix_iterator_next_block
                                                          row_size, col_size)
       TYPE(block_tas_iterator), INTENT(INOUT) :: iterator
       INTEGER(KIND=int_8), INTENT(OUT)      :: row, column
-      ${dtype}$, DIMENSION(:, :), POINTER   :: block
+      REAL(dp), DIMENSION(:, :), POINTER   :: block
       LOGICAL, INTENT(OUT)                  :: transposed
       INTEGER, INTENT(OUT), OPTIONAL        :: block_number
       INTEGER, INTENT(OUT), OPTIONAL        :: row_size, col_size
@@ -1033,17 +1003,15 @@ CONTAINS
                                        row=row, column=column)
 
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
    !! As block_matrix_put_block
-   SUBROUTINE block_tas_put_block_${dsuffix}$ (matrix, row, col, block, transposed, summation, &
+   SUBROUTINE block_tas_put_block_d (matrix, row, col, block, transposed, summation, &
                                                scale)
       TYPE(block_tas_type), INTENT(INOUT)     :: matrix
-      ${dtype}$, DIMENSION(:, :), INTENT(IN) :: block
+      REAL(dp), DIMENSION(:, :), INTENT(IN) :: block
       LOGICAL, INTENT(IN), OPTIONAL         :: transposed, summation
       INTEGER(KIND=int_8), INTENT(IN)       :: row, col
-      ${dtype}$, INTENT(IN), OPTIONAL       :: scale
+      REAL(dp), INTENT(IN), OPTIONAL       :: scale
 
       INTEGER                     :: col_group, row_group
 
@@ -1054,14 +1022,12 @@ CONTAINS
                                   transposed=transposed, summation=summation, scale=scale)
 
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_tas_get_block_p_${dsuffix}$ (matrix, row, col, block, transposed, found, row_size, col_size)
+   SUBROUTINE block_tas_get_block_p_d(matrix, row, col, block, transposed, found, row_size, col_size)
       !! As block_matrix_get_block_p
       TYPE(block_tas_type), INTENT(INOUT)  :: matrix
       INTEGER(KIND=int_8), INTENT(IN)    :: row, col
-      ${dtype}$, DIMENSION(:, :), POINTER :: block
+      REAL(dp), DIMENSION(:, :), POINTER :: block
       LOGICAL, INTENT(OUT)               :: transposed
       LOGICAL, INTENT(OUT)               :: found
       INTEGER, INTENT(OUT), OPTIONAL     :: row_size, col_size
@@ -1075,28 +1041,23 @@ CONTAINS
                                     found, row_size=row_size, col_size=col_size)
 
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_tas_set_${dsuffix}$ (matrix, alpha)
+   SUBROUTINE block_tas_set(matrix, alpha)
       !! As block_matrix_set
       TYPE(block_tas_type), INTENT(INOUT)    :: matrix
-      ${dtype}$, INTENT(IN)                :: alpha
+      REAL(dp), INTENT(IN)                :: alpha
       CALL block_matrix_set(matrix%matrix, alpha)
    END SUBROUTINE
-#:endfor
 
-#:for dparam, dtype, dsuffix in dtype_float_list
-   SUBROUTINE block_tas_filter_${dsuffix}$ (matrix, eps, method, use_absolute)
+   SUBROUTINE block_tas_filter (matrix, eps, method, use_absolute)
       !! As block_matrix_filter
       TYPE(block_tas_type), INTENT(INOUT)    :: matrix
-      ${dtype}$, INTENT(IN)                :: eps
+      REAL(dp), INTENT(IN)                :: eps
       INTEGER, INTENT(IN), OPTIONAL        :: method
       LOGICAL, INTENT(IN), OPTIONAL        :: use_absolute
 
       CALL block_matrix_filter(matrix%matrix, eps, method, use_absolute)
 
    END SUBROUTINE
-#:endfor
 
 END MODULE
