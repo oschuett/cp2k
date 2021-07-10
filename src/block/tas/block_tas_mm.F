@@ -515,7 +515,7 @@ CONTAINS
          IF (.NOT. new_c) THEN
             CALL redistribute_and_sum(matrix_c_mm, matrix_c_rs%matrix, local_copy=.NOT. opt_pgrid, alpha=beta)
          ELSE
-            CALL redistribute_and_sum(matrix_c_mm, matrix_c_rs%matrix, local_copy=.NOT. opt_pgrid)
+            CALL redistribute_and_sum(matrix_c_mm, matrix_c_rs%matrix, local_copy=.NOT. opt_pgrid, alpha=1.0_dp)
          ENDIF
 
          CALL block_matrix_release(matrix_c_mm)
@@ -693,7 +693,7 @@ CONTAINS
          IF (.NOT. new_c) THEN
             CALL redistribute_and_sum(matrix_c_mm, matrix_c_rs%matrix, local_copy=.NOT. opt_pgrid, alpha=beta)
          ELSE
-            CALL redistribute_and_sum(matrix_c_mm, matrix_c_rs%matrix, local_copy=.NOT. opt_pgrid)
+            CALL redistribute_and_sum(matrix_c_mm, matrix_c_rs%matrix, local_copy=.NOT. opt_pgrid, alpha=1.0_dp)
          ENDIF
 
          CALL block_matrix_release(matrix_c_mm)
@@ -783,7 +783,7 @@ CONTAINS
       TYPE(block_matrix_type), INTENT(IN) :: matrix_in
       TYPE(block_matrix_type), INTENT(INOUT) :: matrix_out
       LOGICAL, INTENT(IN), OPTIONAL :: local_copy
-      REAL(dp), INTENT(IN), OPTIONAL :: alpha
+      REAL(dp), INTENT(IN)          :: alpha
       TYPE(block_matrix_type) :: matrix_tmp
       LOGICAL :: local_copy_prv
 
@@ -796,10 +796,10 @@ CONTAINS
       IF (.NOT. local_copy_prv) THEN
          CALL block_matrix_create(matrix_tmp, template=matrix_out)
          CALL block_matrix_redistribute(matrix_in, matrix_tmp)
-         CALL block_matrix_add(matrix_out, matrix_tmp, alpha=alpha)
+         CALL block_matrix_add(matrix_out, matrix_tmp, alpha=alpha, beta=1.0_dp)
          CALL block_matrix_release(matrix_tmp)
       ELSE
-         CALL block_matrix_add(matrix_out, matrix_in, alpha=alpha)
+         CALL block_matrix_add(matrix_out, matrix_in, alpha=alpha, beta=1.0_dp)
       ENDIF
 
    END SUBROUTINE

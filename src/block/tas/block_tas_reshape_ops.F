@@ -688,7 +688,7 @@ CONTAINS
          CALL block_buffer_get_next_block_d(buffer, ndata, index, data, advance_iter=advance_iter)
          CALL block_matrix_data_set_pointer(block, data)
       ELSE
-         CALL block_buffer_get_next_block(buffer, ndata, index, advance_iter=advance_iter)
+         CALL block_buffer_get_next_block_d(buffer, ndata, index, advance_iter=advance_iter)
       ENDIF
    END SUBROUTINE
 

@@ -850,7 +850,7 @@ MODULE block_matrix_api
    SUBROUTINE block_matrix_add(matrix_a, matrix_b, alpha, beta)
       TYPE(block_matrix_type), INTENT(INOUT)   :: matrix_a
       TYPE(block_matrix_type), INTENT(IN)      :: matrix_b
-     REAL(kind=dp), INTENT(IN), OPTIONAL       :: alpha, beta
+      REAL(kind=dp), INTENT(IN)                 :: alpha, beta
 
       CALL dbcsr_add(matrix_a%dbcsr, matrix_b%dbcsr, alpha_scalar=alpha, beta_scalar=beta)
 
