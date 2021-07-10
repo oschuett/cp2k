@@ -28,9 +28,9 @@ MODULE block_tensor
       get_arrays, reorder_arrays, get_ith_array, array_list, array_sublist, check_equal, array_eq_i, &
       create_array_list, destroy_array_list, sizes_of_arrays
    USE block_matrix_api, ONLY: &
-      block_matrix_transpose, block_matrix_no_transpose, block_scalar, &
+      block_matrix_transpose, block_matrix_no_transpose, &
       ${uselist(dtype_float_param)}$, block_matrix_clear, &
-      block_scalar_type, swap, checker_tr
+      swap, checker_tr
    USE block_tas_types, ONLY: &
       block_tas_split_info
    USE block_tas_base, ONLY: &

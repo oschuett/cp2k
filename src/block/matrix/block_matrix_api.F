@@ -30,8 +30,7 @@ MODULE block_matrix_api
       dbcsr_copy, &
       dbcsr_add, &
       dbcsr_maxabs, &
-      dbcsr_zero, &
-      dbcsr_conform_scalar
+      dbcsr_zero
 
  USE dbcsr_block_access, ONLY: &
       dbcsr_get_block_p, &
@@ -69,8 +68,6 @@ MODULE block_matrix_api
       checker_tr
 
  USE dbcsr_data_methods, ONLY: &
-      block_scalar => dbcsr_scalar, &
-      block_scalar_zero => dbcsr_scalar_zero, &
       block_matrix_data_new             => dbcsr_data_new, &
       block_matrix_data_release         => dbcsr_data_release, &
       block_matrix_type_1d_to_2d        => dbcsr_type_1d_to_2d, &
@@ -80,7 +77,6 @@ MODULE block_matrix_api
       block_matrix_data_set_pointer     => dbcsr_data_set_pointer
 
  USE dbcsr_data_methods_low, ONLY: &
-      block_matrix_scalar_multiply => dbcsr_scalar_multiply, &
       internal_data_allocate, &
       internal_data_deallocate, &
       block_matrix_get_data_p_2d_d      => dbcsr_get_data_p_2d_d, &
@@ -93,7 +89,6 @@ MODULE block_matrix_api
       block_type_real_4 => dbcsr_type_real_4, &
       block_type_complex_8 => dbcsr_type_complex_8, &
       block_type_complex_4 => dbcsr_type_complex_4, &
-      block_scalar_type => dbcsr_scalar_type, &
       block_matrix_transpose => dbcsr_transpose, &
       block_matrix_no_transpose => dbcsr_no_transpose, &
       block_matrix_type_no_symmetry => dbcsr_type_no_symmetry, &
@@ -113,7 +108,6 @@ MODULE block_matrix_api
       dp
 
  USE dbcsr_data_types, ONLY: &
-      block_scalar_type => dbcsr_scalar_type, &
       block_matrix_data_obj             => dbcsr_data_obj
 
  USE dbcsr_mp_methods, ONLY: &
@@ -153,8 +147,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_no_transpose
    PUBLIC :: block_matrix_clear
    PUBLIC :: block_matrix_release
-   PUBLIC :: block_scalar
-   PUBLIC :: block_scalar_type
    PUBLIC :: block_type_real_8
    PUBLIC :: block_type_real_4
    PUBLIC :: block_type_complex_8
@@ -206,8 +198,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_get_stored_coordinates
    PUBLIC :: block_matrix_blk_column_size
    PUBLIC :: block_matrix_blk_row_size
-   PUBLIC :: block_scalar_zero
-   PUBLIC :: block_matrix_scalar_multiply
    PUBLIC :: block_matrix_multiply
    PUBLIC :: block_matrix_redistribute
    PUBLIC :: block_mp_release
@@ -432,8 +422,7 @@ MODULE block_matrix_api
       INTEGER, INTENT(IN), OPTIONAL                      :: method
       LOGICAL, INTENT(in), OPTIONAL                      :: use_absolute, filter_diag
 
-      CALL dbcsr_filter(matrix%dbcsr, dbcsr_conform_scalar(eps, matrix%dbcsr), &
-                        method, use_absolute, filter_diag)
+      CALL dbcsr_filter(matrix%dbcsr, eps, method, use_absolute, filter_diag)
    END SUBROUTINE block_matrix_filter
 
    !================================================================================================
@@ -858,13 +847,12 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_add(matrix_a, matrix_b, alpha_scalar, beta_scalar)
+   SUBROUTINE block_matrix_add(matrix_a, matrix_b, alpha, beta)
       TYPE(block_matrix_type), INTENT(INOUT)   :: matrix_a
       TYPE(block_matrix_type), INTENT(IN)      :: matrix_b
-     REAL(kind=dp), INTENT(IN), OPTIONAL       :: alpha_scalar, beta_scalar
+     REAL(kind=dp), INTENT(IN), OPTIONAL       :: alpha, beta
 
-      CALL dbcsr_add(matrix_a%dbcsr, matrix_b%dbcsr, &
-                     alpha_scalar=alpha_scalar, beta_scalar=beta_scalar)
+      CALL dbcsr_add(matrix_a%dbcsr, matrix_b%dbcsr, alpha_scalar=alpha, beta_scalar=beta)
 
    END SUBROUTINE block_matrix_add
 

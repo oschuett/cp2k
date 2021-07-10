@@ -798,10 +798,10 @@ CONTAINS
       IF (.NOT. local_copy_prv) THEN
          CALL block_matrix_create(matrix_tmp, template=matrix_out)
          CALL block_matrix_redistribute(matrix_in, matrix_tmp)
-         CALL block_matrix_add(matrix_out, matrix_tmp, alpha_scalar=alpha)
+         CALL block_matrix_add(matrix_out, matrix_tmp, alpha=alpha)
          CALL block_matrix_release(matrix_tmp)
       ELSE
-         CALL block_matrix_add(matrix_out, matrix_in, alpha_scalar=alpha)
+         CALL block_matrix_add(matrix_out, matrix_in, alpha=alpha)
       ENDIF
 
    END SUBROUTINE

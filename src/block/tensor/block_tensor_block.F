@@ -23,7 +23,7 @@ MODULE block_tensor_block
       allocate_any
    USE block_matrix_api, ONLY: &
       ${uselist(dtype_float_param)}$, &
-      block_scalar_type, checker_tr, swap
+      checker_tr, swap
    USE block_tas_types, ONLY: &
       block_tas_iterator
    USE block_tas_base, ONLY: &

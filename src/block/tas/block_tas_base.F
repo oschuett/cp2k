@@ -17,7 +17,7 @@ MODULE block_tas_base
       block_matrix_get_block_p, block_matrix_put_block, block_matrix_reserve_blocks, &
       block_matrix_data_new, block_matrix_data_release, block_matrix_type_1d_to_2d, &
       block_matrix_data_clear_pointer, block_matrix_data_init, &
-      block_matrix_data_obj, block_scalar_type, &
+      block_matrix_data_obj, &
       block_matrix_distribution_col_dist, block_matrix_distribution_new, &
       block_matrix_distribution_row_dist, block_matrix_distribution_hold, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &

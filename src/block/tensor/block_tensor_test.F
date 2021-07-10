@@ -16,7 +16,6 @@ MODULE block_tensor_test
 
    USE block_matrix_api, ONLY: &
       ${uselist(dtype_float_param)}$,&
-      block_scalar_type, &
       block_matrix_lapack_larnv, block_matrix_set_larnv_seed, &
       block_matrix_set_larnv_seed
    USE block_tas_base, ONLY: block_tas_info

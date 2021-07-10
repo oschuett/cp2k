@@ -46,7 +46,6 @@ MODULE block_tensor_types
       mp_cart_create, mp_cart_rank, mp_environ, mp_dims_create, mp_comm_free, mp_comm_dup, mp_sum, mp_max
    USE block_tas_global, ONLY: block_tas_distribution, block_tas_rowcol_data, block_tas_default_distvec
    USE block_allocate_wrap, ONLY: allocate_any
-   USE block_matrix_api, ONLY: block_scalar_type
    USE block_matrix_api, ONLY: block_matrix_scale
    USE util, ONLY: sort
 #include "../../base/base_uses.f90"

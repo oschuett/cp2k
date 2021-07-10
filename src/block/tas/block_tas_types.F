@@ -14,7 +14,7 @@ MODULE block_tas_types
    USE block_tas_global, ONLY: &
       block_tas_distribution, block_tas_rowcol_data
    USE block_matrix_api, ONLY: &
-      block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, block_scalar_type
+      block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type
    USE kinds, ONLY: int_8, dp
 
 #include "../../base/base_uses.f90"
