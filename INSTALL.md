@@ -180,7 +180,7 @@ the FFTW3 threading library libfftw3_threads (or libfftw3_omp) is required.
 - Specify OFFLOAD_CC (e.g. `OFFLOAD_CC = nvcc`) and
   OFFLOAD_FLAGS (e.g. `OFFLOAD_FLAGS = -O3 -g -w --std=c++11`) variables.
 - Use the `-D__DBCSR_ACC` to enable accelerator support for matrix multiplications.
-- Add `-lstdc++ -lcudart -lnvrtc -lcuda -lcublas` to LIBS.
+- Add `-lstdc++ -lcudart -lnvrtc -lcuda -lcublas -lnvToolsExt` to LIBS.
 - Specify the GPU type (e.g. `GPUVER   = P100`),
   possible values are K20X, K40, K80, P100, V100.
 - Specify the C++ compiler (e.g. `CXX = g++`). Remember to set the flags to
@@ -189,8 +189,6 @@ the FFTW3 threading library libfftw3_threads (or libfftw3_omp) is required.
 - CUFFT 7.0 has a known bug and is therefore disabled by default.
   NVIDIA's webpage list a patch (an upgraded version cufft i.e. >= 7.0.35) -
   use this together with `-D__HAS_PATCHED_CUFFT_70`.
-- Use `-D__CUDA_PROFILING` to turn on Nvidia Tools Extensions.
-  It requires to link `-lnvToolsExt`.
 - Link to a blas/scalapack library that accelerates large DGEMMs (e.g. libsci_acc)
 - Use the `-D__GRID_CUDA` to compile the GPU and HYBRID backends for the grid library.
 

@@ -51,4 +51,45 @@ void offload_set_device(void) {
 #endif
 }
 
+/*******************************************************************************
+ * \brief Starts a timing range.
+ * \author Ole Schuett
+ ******************************************************************************/
+void offload_timeset(const char *message) {
+#if defined(__OFFLOAD_CUDA)
+  nvtxRangePushA(message);
+#elif defined(__OFFLOAD_HIP)
+  roctxRangePushA(message);
+#else
+  (void)message; // Pretend argument is used.
+#endif
+}
+
+/*******************************************************************************
+ * \brief Ends a timing range.
+ * \author Ole Schuett
+ ******************************************************************************/
+void offload_timestop(void) {
+#if defined(__OFFLOAD_CUDA)
+  nvtxRangePop();
+#elif defined(__OFFLOAD_HIP)
+  roctxRangePop();
+#endif
+}
+
+/*******************************************************************************
+ * \brief Gets free and total device memory.
+ * \author Ole Schuett
+ ******************************************************************************/
+void offload_mem_info(size_t *free, size_t *total) {
+#if defined(__OFFLOAD_CUDA)
+  OFFLOAD_CHECK(cudaMemGetInfo(free, total));
+#elif defined(__OFFLOAD_HIP)
+  OFFLOAD_CHECK(hipMemGetInfo(free, total));
+#else
+  *free = 0;
+  *total = 0;
+#endif
+}
+
 // EOF

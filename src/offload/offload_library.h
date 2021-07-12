@@ -24,6 +24,7 @@
 #ifdef __OFFLOAD_CUDA
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <nvToolsExt.h>
 
 /*******************************************************************************
  * \brief Checks given Cuda status and upon failure abort with a nice message.
@@ -40,6 +41,7 @@
 
 #ifdef __OFFLOAD_HIP
 #include <hip/hip_runtime_api.h>
+#include <roctracer/roctx.h>
 
 /*******************************************************************************
  * \brief Checks given rocm status and upon failure abort with a nice message.
@@ -79,6 +81,24 @@ int offload_get_device_id(void);
  * \author Ole Schuett
  ******************************************************************************/
 void offload_set_device(void);
+
+/*******************************************************************************
+ * \brief Starts a timing range.
+ * \author Ole Schuett
+ ******************************************************************************/
+void offload_timeset(const char *message);
+
+/*******************************************************************************
+ * \brief Ends a timing range.
+ * \author Ole Schuett
+ ******************************************************************************/
+void offload_timestop(void);
+
+/*******************************************************************************
+ * \brief Gets free and total device memory.
+ * \author Ole Schuett
+ ******************************************************************************/
+void offload_mem_info(size_t *free, size_t *total);
 
 #ifdef __cplusplus
 }

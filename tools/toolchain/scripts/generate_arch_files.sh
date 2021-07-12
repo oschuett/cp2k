@@ -108,8 +108,8 @@ LDFLAGS="IF_STATIC(${STATIC_FLAGS}|) \$(FCFLAGS) ${CP_LDFLAGS}"
 LIBS="${CP_LIBS} -lstdc++"
 
 # CUDA handling
-CUDA_LIBS="-lcudart -lnvrtc -lcuda -lcufft -lcublas -lrt IF_DEBUG(-lnvToolsExt|)"
-CUDA_DFLAGS="-D__GRID_CUDA -D__DBCSR_ACC -D__PW_CUDA IF_DEBUG(-D__CUDA_PROFILING|)"
+CUDA_LIBS="-lcudart -lnvrtc -lcuda -lcufft -lcublas -lrt -lnvToolsExt"
+CUDA_DFLAGS="-D__GRID_CUDA -D__DBCSR_ACC -D__PW_CUDA"
 if [ "${ENABLE_CUDA}" = __TRUE__ ] && [ "${GPUVER}" != no ]; then
   LIBS="${LIBS} IF_CUDA(${CUDA_LIBS}|)"
   DFLAGS="IF_CUDA(${CUDA_DFLAGS}|) ${DFLAGS}"
@@ -156,7 +156,7 @@ if [ "${ENABLE_HIP}" = __TRUE__ ] && [ "${GPUVER}" != no ]; then
       check_lib -lamdhip64 "hip"
       add_lib_from_paths HIP_LDFLAGS "libamdhip64.*" $LIB_PATHS
       HIP_FLAGS+="-fPIE -D__HIP_PLATFORM_AMD__ -g --offload-arch=gfx906 -O3 --std=c++11 \$(DFLAGS)"
-      LIBS+=" IF_HIP(-lhipblas -lamdhip64|)"
+      LIBS+=" IF_HIP(-lhipblas -lamdhip64 -lroctx64 -lroctracer64|)"
       PLATFORM_FLAGS='-D__HIP_PLATFORM_AMD__'
       DFLAGS+=' IF_HIP(-D__GRID_HIP -D__HIP_PLATFORM_AMD__|)'
       ;;
