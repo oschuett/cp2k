@@ -22,14 +22,12 @@ MODULE block_tensor_reshape_ops
       block_tensor_reserve_blocks, block_tensor_put_block
    USE block_tensor_types, ONLY: block_tensor_blk_sizes, &
                                  block_tensor_create, &
-                                 block_tensor_get_data_type, &
                                  block_tensor_type, &
                                  ndims_tensor, &
                                  block_tensor_get_stored_coordinates, &
                                  block_tensor_clear
    USE kinds, ONLY: default_string_length
    USE kinds, ONLY: real_8, dp
-   USE block_matrix_api, ONLY: block_type_real_8
    USE message_passing, ONLY: mp_alltoall, &
                             mp_environ, &
                             mp_irecv, &
@@ -49,7 +47,6 @@ MODULE block_tensor_reshape_ops
       INTEGER                                    :: nblock = -1
       INTEGER, DIMENSION(:, :), ALLOCATABLE      :: indx
       REAL(dp), DIMENSION(:), ALLOCATABLE        :: msg
-      INTEGER                                    :: data_type = -1
       INTEGER                                    :: endpos = -1
    END TYPE
 
@@ -120,9 +117,9 @@ CONTAINS
          num_blocks_send(iproc) = num_send(2*iproc + 1)
 
          CALL block_buffer_create(buffer_send(iproc), num_blocks_send(iproc), num_entries_send(iproc), &
-                                  block_tensor_get_data_type(tensor_in), ndims_tensor(tensor_in))
+                                  ndims_tensor(tensor_in))
          CALL block_buffer_create(buffer_recv(iproc), num_blocks_recv(iproc), num_entries_recv(iproc), &
-                                  block_tensor_get_data_type(tensor_in), ndims_tensor(tensor_in))
+                                  ndims_tensor(tensor_in))
       ENDDO
       CALL block_tensor_iterator_start(iter, tensor_in)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
@@ -171,18 +168,17 @@ CONTAINS
       ENDDO
    END SUBROUTINE
 
-   SUBROUTINE block_buffer_create(buffer, nblock, ndata, data_type, ndim)
+   SUBROUTINE block_buffer_create(buffer, nblock, ndata, ndim)
       !! Create block buffer for MPI communication.
 
       TYPE(block_buffer_type), INTENT(OUT) :: buffer
          !! block buffer
-      INTEGER, INTENT(IN)                  :: nblock, ndata, data_type, ndim
+      INTEGER, INTENT(IN)                  :: nblock, ndata, ndim
          !! number of blocks
          !! total number of block entries
          !! number of dimensions
 
       buffer%nblock = nblock
-      buffer%data_type = data_type
       buffer%endpos = 0
       buffer%ndim = ndim
       ALLOCATE (buffer%msg(ndata))
@@ -195,7 +191,6 @@ CONTAINS
       DEALLOCATE (buffer%msg)
       DEALLOCATE (buffer%indx)
       buffer%nblock = -1
-      buffer%data_type = -1
       buffer%ndim = -1
       buffer%endpos = -1
    END SUBROUTINE block_buffer_destroy

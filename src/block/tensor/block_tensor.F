@@ -29,12 +29,12 @@ MODULE block_tensor
       create_array_list, destroy_array_list, sizes_of_arrays
    USE block_matrix_api, ONLY: &
       block_matrix_transpose, block_matrix_no_transpose, &
-      block_type_real_8, block_matrix_clear, &
+      block_matrix_clear, &
       swap, checker_tr
    USE block_tas_types, ONLY: &
       block_tas_split_info
    USE block_tas_base, ONLY: &
-      block_tas_copy, block_tas_finalize, block_tas_get_data_type, block_tas_get_info, block_tas_info
+      block_tas_copy, block_tas_finalize, block_tas_get_info, block_tas_info
    USE block_tas_mm, ONLY: &
       block_tas_multiply, block_tas_batched_mm_init, block_tas_batched_mm_finalize, block_tas_result_index, &
       block_tas_batched_mm_complete, block_tas_set_batched_state
@@ -46,7 +46,7 @@ MODULE block_tensor
       block_tensor_get_mapping_info, nd_to_2d_mapping, block_tensor_inverse_order, permute_index, get_nd_indices_tensor, &
       ndims_mapping_row, ndims_mapping_column, ndims_mapping
    USE block_tensor_types, ONLY: &
-      block_tensor_create, block_tensor_get_data_type, block_tensor_type, ndims_tensor, dims_tensor, &
+      block_tensor_create, block_tensor_type, ndims_tensor, dims_tensor, &
       block_tensor_distribution_type, block_tensor_distribution, block_tensor_nd_mp_comm, block_tensor_destroy, &
       block_tensor_distribution_destroy, block_tensor_distribution_new_expert, block_tensor_get_stored_coordinates, &
       blk_dims_tensor, block_tensor_hold, block_tensor_pgrid_type, mp_environ_pgrid, block_tensor_filter, &
@@ -586,7 +586,7 @@ CONTAINS
 
       INTEGER(int_8), DIMENSION(:, :), ALLOCATABLE  :: result_index_2d
       LOGICAL                                        :: assert_stmt, tensors_remapped
-      INTEGER                                        :: data_type, max_mm_dim, max_tensor, mp_comm, &
+      INTEGER                                        :: max_mm_dim, max_tensor, mp_comm, &
                                                         iblk, nblk, unit_nr_prv, ref_tensor, mp_comm_opt, &
                                                         handle
       INTEGER, DIMENSION(SIZE(contract_1))           :: contract_1_mod
@@ -640,9 +640,6 @@ CONTAINS
       CPASSERT(assert_stmt)
 
       assert_stmt = SIZE(map_1) + SIZE(map_2) .EQ. ndims_tensor(tensor_3)
-      CPASSERT(assert_stmt)
-
-      assert_stmt = block_tensor_get_data_type(tensor_1) .EQ. block_tensor_get_data_type(tensor_2)
       CPASSERT(assert_stmt)
 
       unit_nr_prv = prep_output_unit(unit_nr)
@@ -723,8 +720,6 @@ CONTAINS
          CALL block_tensor_write_tensor_info(tensor_crop_2, unit_nr_prv, full_info=log_verbose)
          CALL block_tensor_write_tensor_dist(tensor_crop_2, unit_nr_prv)
       ENDIF
-
-      data_type = block_tensor_get_data_type(tensor_crop_1)
 
       ! align tensor index with data, tensor data is not modified
       ndims1 = ndims_tensor(tensor_crop_1)
@@ -1679,9 +1674,8 @@ CONTAINS
 
 #:for ndim in ndims
       IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
-         CALL block_tensor_create(tensor_out, name_tmp, dist, &
-                             map1_2d, map2_2d, block_tas_get_data_type(tensor_in%matrix_rep), &
-                             ${varlist("blk_sizes", nmax=ndim)}$)
+         CALL block_tensor_create(tensor_out, name_tmp, dist, map1_2d, map2_2d, &
+                                  ${varlist("blk_sizes", nmax=ndim)}$)
       ENDIF
 #:endfor
 
@@ -2147,7 +2141,7 @@ CONTAINS
 #:for ndim in ndims
       IF (ndims_tensor(tensor) == ${ndim}$) THEN
          CALL block_tensor_distribution_new(dist, pgrid, ${varlist("dist", nmax=ndim)}$)
-         CALL block_tensor_create(t_tmp, name, dist, map1, map2, block_type_real_8, ${varlist("bs", nmax=ndim)}$)
+         CALL block_tensor_create(t_tmp, name, dist, map1, map2, ${varlist("bs", nmax=ndim)}$)
       ENDIF
 #:endfor
       CALL block_tensor_distribution_destroy(dist)

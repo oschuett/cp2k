@@ -20,15 +20,14 @@ MODULE block_tensor_types
       array_list, array_offsets, create_array_list, destroy_array_list, get_array_elements, &
       sizes_of_arrays, sum_of_arrays, array_sublist, get_arrays, get_ith_array, array_eq_i
    USE block_matrix_api, ONLY: &
-      block_matrix_distribution_get, block_matrix_distribution_obj, block_matrix_get_info, block_matrix_type, &
-      block_type_real_8
+      block_matrix_distribution_get, block_matrix_distribution_obj, block_matrix_get_info, block_matrix_type
    USE kinds, ONLY: real_8, dp, default_string_length
    USE block_tas_base, ONLY: &
       block_tas_create, block_tas_distribution_new, &
       block_tas_distribution_destroy, block_tas_finalize, block_tas_get_info, &
       block_tas_destroy, block_tas_get_stored_coordinates, block_tas_set, block_tas_filter, &
       block_tas_get_num_blocks, block_tas_get_num_blocks_total, block_tas_get_data_size, block_tas_get_nze, &
-      block_tas_get_nze_total, block_tas_clear, block_tas_get_data_type
+      block_tas_get_nze_total, block_tas_clear
    USE block_tas_types, ONLY: &
       block_tas_type, block_tas_distribution_type, block_tas_split_info, block_tas_mm_storage
    USE block_tas_mm, ONLY: block_tas_set_batched_state
@@ -67,7 +66,6 @@ MODULE block_tensor_types
       block_tensor_filter, &
       block_tensor_finalize, &
       block_tensor_get_data_size, &
-      block_tensor_get_data_type, &
       block_tensor_get_info, &
       block_tensor_get_num_blocks, &
       block_tensor_get_num_blocks_total, &
@@ -726,7 +724,7 @@ CONTAINS
       block_tensor_distribution%refcount => block_tensor_distribution%refcount
    END FUNCTION
 
-   SUBROUTINE block_tensor_create_new(tensor, name, dist, map1_2d, map2_2d, data_type, &
+   SUBROUTINE block_tensor_create_new(tensor, name, dist, map1_2d, map2_2d, &
                                  ${varlist("blk_size")}$)
       !! create a tensor.
       !! For performance, the arguments map1_2d and map2_2d (controlling matrix representation of tensor) should be
@@ -738,7 +736,6 @@ CONTAINS
       !! which nd-indices to map to first 2d index and in which order
       INTEGER, DIMENSION(:), INTENT(IN)                 :: map2_2d
       !! which nd-indices to map to first 2d index and in which order
-      INTEGER, INTENT(IN), OPTIONAL                     :: data_type
       INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL       :: ${varlist("blk_size")}$
       !! blk sizes in each dimension
       INTEGER                                           :: ndims
@@ -773,8 +770,7 @@ CONTAINS
                             name=TRIM(name)//" matrix", &
                             dist=dist_new%dist, &
                             row_blk_size=row_blk_size_obj, &
-                            col_blk_size=col_blk_size_obj, &
-                            data_type=data_type)
+                            col_blk_size=col_blk_size_obj)
 
       tensor%owns_matrix = .TRUE.
 
@@ -856,7 +852,7 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE block_tensor_create_template(tensor_in, tensor, name, dist, map1_2d, map2_2d, data_type)
+   SUBROUTINE block_tensor_create_template(tensor_in, tensor, name, dist, map1_2d, map2_2d)
       !! create a tensor from template
       TYPE(block_tensor_type), INTENT(INOUT)      :: tensor_in
       TYPE(block_tensor_type), INTENT(OUT)        :: tensor
@@ -865,14 +861,12 @@ CONTAINS
          INTENT(INOUT), OPTIONAL             :: dist
       INTEGER, DIMENSION(:), INTENT(IN), &
          OPTIONAL                            :: map1_2d, map2_2d
-      INTEGER, INTENT(IN), OPTIONAL          :: data_type
       INTEGER                                :: handle
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_create_template'
       INTEGER, DIMENSION(:), ALLOCATABLE     :: ${varlist("bsize")}$
       INTEGER, DIMENSION(:), ALLOCATABLE     :: map1_2d_prv, map2_2d_prv
       CHARACTER(len=default_string_length)   :: name_prv
       TYPE(block_tensor_distribution_type)        :: dist_prv
-      INTEGER                                :: data_type_prv
 
       CALL timeset(routineN, handle)
 
@@ -896,16 +890,12 @@ CONTAINS
          ELSE
             name_prv = tensor_in%name
          ENDIF
-         IF (PRESENT(data_type)) THEN
-            data_type_prv = data_type
-         ELSE
-            data_type_prv = block_tensor_get_data_type(tensor_in)
-         ENDIF
+
 #:for ndim in range(1, maxdim+1)
          IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
             CALL get_arrays(tensor_in%blk_sizes, ${varlist("bsize", nmax=ndim)}$)
             CALL block_tensor_create(tensor, name_prv, dist_prv, map1_2d_prv, map2_2d_prv, &
-                                data_type_prv, ${varlist("bsize", nmax=ndim)}$)
+                                     ${varlist("bsize", nmax=ndim)}$)
          ENDIF
 #:endfor
       ELSE
@@ -913,9 +903,9 @@ CONTAINS
          ALLOCATE (tensor%matrix_rep)
          IF (.NOT. PRESENT(name)) THEN
             CALL block_tas_create(tensor_in%matrix_rep, tensor%matrix_rep, &
-                                  name=TRIM(tensor_in%name)//" matrix", data_type=data_type)
+                                  name=TRIM(tensor_in%name)//" matrix")
          ELSE
-            CALL block_tas_create(tensor_in%matrix_rep, tensor%matrix_rep, name=TRIM(name)//" matrix", data_type=data_type)
+            CALL block_tas_create(tensor_in%matrix_rep, tensor%matrix_rep, name=TRIM(name)//" matrix")
          ENDIF
          tensor%owns_matrix = .TRUE.
          CALL block_tas_finalize(tensor%matrix_rep)
@@ -954,7 +944,7 @@ CONTAINS
 
       CHARACTER(len=default_string_length)        :: name_in
       INTEGER, DIMENSION(2)                       :: order_in
-      INTEGER                                     :: comm_2d, data_type
+      INTEGER                                     :: comm_2d
       TYPE(dbcsr_distribution_type)               :: matrix_dist
       TYPE(block_tensor_distribution_type)        :: dist
       INTEGER, DIMENSION(:), POINTER              :: row_blk_size, col_blk_size
@@ -990,14 +980,10 @@ CONTAINS
          [order_in(1)], [order_in(2)], &
          row_dist, col_dist, own_comm=.TRUE.)
 
-      CALL dbcsr_get_info(matrix_in, &
-                          data_type=data_type, &
-                          row_blk_size=row_blk_size, &
-                          col_blk_size=col_blk_size)
+      CALL dbcsr_get_info(matrix_in, row_blk_size=row_blk_size, col_blk_size=col_blk_size)
 
       CALL block_tensor_create_new(tensor, name_in, dist, &
                               [order_in(1)], [order_in(2)], &
-                              data_type, &
                               row_blk_size, &
                               col_blk_size)
 
@@ -1085,14 +1071,6 @@ CONTAINS
       CPASSERT(tensor%valid)
       dims = tensor%nd_index_blk%dims_nd
    END SUBROUTINE
-
-   FUNCTION block_tensor_get_data_type(tensor) RESULT(data_type)
-      !! tensor data type
-      TYPE(block_tensor_type), INTENT(IN) :: tensor
-      INTEGER                        :: data_type
-
-      data_type = block_tas_get_data_type(tensor%matrix_rep)
-   END FUNCTION
 
    SUBROUTINE block_tensor_blk_sizes(tensor, ind, blk_size)
       !! Size of tensor block
@@ -1352,8 +1330,7 @@ CONTAINS
                                ${varlist("blk_size")}$, &
                                ${varlist("blk_offset")}$, &
                                distribution, &
-                               name, &
-                               data_type)
+                               name)
       !! As block_get_info but for tensors
       TYPE(block_tensor_type), INTENT(IN) :: tensor
       INTEGER, INTENT(OUT), OPTIONAL, DIMENSION(ndims_tensor(tensor)) :: nblks_total
@@ -1382,8 +1359,6 @@ CONTAINS
          !! distribution object
       CHARACTER(len=*), INTENT(OUT), OPTIONAL                   :: name
          !! name of tensor
-      INTEGER, INTENT(OUT), OPTIONAL                            :: data_type
-         !! data type of tensor
       INTEGER, DIMENSION(ndims_tensor(tensor))                  :: pdims_tmp, my_ploc_tmp
 
       IF (PRESENT(nblks_total)) CALL block_tensor_get_mapping_info(tensor%nd_index_blk, dims_nd=nblks_total)
@@ -1414,7 +1389,6 @@ CONTAINS
 
       IF (PRESENT(distribution)) distribution = block_tensor_distribution(tensor)
       IF (PRESENT(name)) name = tensor%name
-      IF (PRESENT(data_type)) data_type = block_tensor_get_data_type(tensor)
 
    END SUBROUTINE
 

@@ -11,7 +11,6 @@ MODULE block_tas_test
 
    !! testing infrastructure for tall-and-skinny matrices
    USE block_matrix_api, ONLY: &
-      block_type_real_8, &
       block_matrix_release, block_matrix_nblkcols_total, block_matrix_nblkrows_total, &
       block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
       block_matrix_mp_release, block_matrix_distribution_release, &
@@ -126,7 +125,7 @@ CONTAINS
       cbsize_obj = block_tas_blk_size_arb(cbsizes)
 
       CALL block_tas_distribution_new(dist, mp_comm_out, row_dist_obj, col_dist_obj)
-      CALL block_tas_create(matrix, name, dist=dist, data_type=block_type_real_8, &
+      CALL block_tas_create(matrix, name, dist=dist, &
                             row_blk_size=rbsize_obj, col_blk_size=cbsize_obj, own_dist=.TRUE.)
 
       max_row_size = MAXVAL(rbsizes)
@@ -241,22 +240,19 @@ CONTAINS
          CALL block_matrix_create(matrix=block_matrix_a_mm, &
                            name=block_matrix_get_name(block_matrix_a), &
                            dist=dist_a, matrix_type=block_matrix_type_no_symmetry, &
-                           row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                           data_type=block_type_real_8)
+                           row_blk_size=row_blk_size, col_blk_size=col_blk_size)
          row_blk_size => block_matrix_row_block_sizes(block_matrix_b)
          col_blk_size => block_matrix_col_block_sizes(block_matrix_b)
          CALL block_matrix_create(matrix=block_matrix_b_mm, &
                            name=block_matrix_get_name(block_matrix_b), &
                            dist=dist_b, matrix_type=block_matrix_type_no_symmetry, &
-                           row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                           data_type=block_type_real_8)
+                           row_blk_size=row_blk_size, col_blk_size=col_blk_size)
          row_blk_size => block_matrix_row_block_sizes(block_matrix_c)
          col_blk_size => block_matrix_col_block_sizes(block_matrix_c)
          CALL block_matrix_create(matrix=block_matrix_c_mm, &
                            name=block_matrix_get_name(block_matrix_c), &
                            dist=dist_c, matrix_type=block_matrix_type_no_symmetry, &
-                           row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                           data_type=block_type_real_8)
+                           row_blk_size=row_blk_size, col_blk_size=col_blk_size)
 
          CALL block_matrix_finalize(block_matrix_a_mm)
          CALL block_matrix_finalize(block_matrix_b_mm)
@@ -357,26 +353,22 @@ CONTAINS
       CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, &
                         matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_a), &
-                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_a), &
-                        data_type=block_type_real_8)
+                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_a))
 
       CALL block_matrix_create(matrix=block_matrix_b_mm, name="matrix b", dist=dist_b, &
                         matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_b), &
-                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_b), &
-                        data_type=block_type_real_8)
+                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_b))
 
       CALL block_matrix_create(matrix=block_matrix_c_mm, name="matrix c", dist=dist_c, &
                         matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_c), &
-                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_c), &
-                        data_type=block_type_real_8)
+                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_c))
 
       CALL block_matrix_create(matrix=block_matrix_c_mm_check, name="matrix c check", &
                         dist=dist_c, matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_c), &
-                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_c), &
-                        data_type=block_type_real_8)
+                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_c))
 
       CALL block_matrix_finalize(block_matrix_a_mm)
       CALL block_matrix_finalize(block_matrix_b_mm)

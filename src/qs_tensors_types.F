@@ -21,7 +21,6 @@ MODULE qs_tensors_types
    USE cp_para_env,                     ONLY: cp_para_env_create,&
                                               cp_para_env_release
    USE cp_para_types,                   ONLY: cp_para_env_type
-   USE dbcsr_api,                       ONLY: dbcsr_type_real_8
    USE block_tensor_api,                ONLY: block_tensor_create,&
                                               block_tensor_default_distvec,&
                                               block_tensor_distribution_destroy,&
@@ -350,8 +349,7 @@ CONTAINS
       CALL block_tensor_default_distvec(size_3, pdims(3), sizes_3, dist_3)
 
       CALL block_tensor_distribution_new(dist, pgrid, dist_1, dist_2, dist_3)
-      CALL block_tensor_create(t3c, name, dist, map1, map2, dbcsr_type_real_8, sizes_1, &
-                          sizes_2, sizes_3)
+      CALL block_tensor_create(t3c, name, dist, map1, map2, sizes_1, sizes_2, sizes_3)
       CALL block_tensor_distribution_destroy(dist)
 
       CALL timestop(handle)
@@ -402,7 +400,7 @@ CONTAINS
       CALL block_tensor_default_distvec(size_2, pdims(2), sizes_2, dist_2)
 
       CALL block_tensor_distribution_new(dist, pgrid, dist_1, dist_2)
-      CALL block_tensor_create(t2c, name, dist, [order_in(1)], [order_in(2)], dbcsr_type_real_8, sizes_1, sizes_2)
+      CALL block_tensor_create(t2c, name, dist, [order_in(1)], [order_in(2)], sizes_1, sizes_2)
       CALL block_tensor_distribution_destroy(dist)
 
       CALL timestop(handle)

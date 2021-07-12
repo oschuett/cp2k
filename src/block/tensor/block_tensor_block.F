@@ -21,7 +21,7 @@ MODULE block_tensor_block
       dbcsr_reserve_blocks, dbcsr_finalize
    USE block_allocate_wrap, ONLY: &
       allocate_any
-   USE block_matrix_api, ONLY: block_type_real_8, checker_tr, swap
+   USE block_matrix_api, ONLY: checker_tr, swap
    USE block_tas_types, ONLY: &
       block_tas_iterator
    USE block_tas_base, ONLY: &
@@ -35,7 +35,7 @@ MODULE block_tensor_block
       array_list, get_array_elements, destroy_array_list, sizes_of_arrays, create_array_list, &
       get_arrays
    USE block_tensor_types, ONLY: &
-      block_tensor_type, ndims_tensor, block_tensor_get_data_type, block_tensor_blk_sizes, block_tensor_get_num_blocks, &
+      block_tensor_type, ndims_tensor, block_tensor_blk_sizes, block_tensor_get_num_blocks, &
       block_tensor_finalize, ndims_matrix_row, ndims_matrix_column
 
 #include "../../base/base_uses.f90"

@@ -13,14 +13,14 @@ MODULE block_tas_base
 
    USE block_matrix_api, ONLY: &
       block_matrix_get_block_p, block_matrix_put_block, block_matrix_reserve_blocks, &
-      block_matrix_data_new, block_matrix_data_release, block_matrix_type_1d_to_2d, &
+      block_matrix_data_new, block_matrix_data_release, &
       block_matrix_data_clear_pointer, block_matrix_data_init, &
       block_matrix_data_obj, &
       block_matrix_distribution_col_dist, block_matrix_distribution_new, &
       block_matrix_distribution_row_dist, block_matrix_distribution_hold, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
       block_matrix_iterator_start, block_matrix_iterator_stop, &
-      block_matrix_distribution_release, block_matrix_get_data_type, block_matrix_mp_release, block_matrix_nblkcols_total, &
+      block_matrix_distribution_release, block_matrix_mp_release, block_matrix_nblkcols_total, &
       block_matrix_nblkrows_total, block_matrix_nfullrows_total, block_matrix_nfullcols_total, block_matrix_release, &
       block_matrix_get_data_size, block_matrix_get_num_blocks, block_matrix_get_nze, &
       block_matrix_get_info, block_matrix_set, block_matrix_filter, block_matrix_clear, &
@@ -60,7 +60,6 @@ MODULE block_tas_base
       block_tas_finalize, &
       block_tas_get_block_p, &
       block_tas_get_data_size, &
-      block_tas_get_data_type, &
       block_tas_get_info, &
       block_tas_get_num_blocks, &
       block_tas_get_nze, &
@@ -115,8 +114,7 @@ MODULE block_tas_base
 
 CONTAINS
 
-   SUBROUTINE block_tas_create_new(matrix, name, dist, data_type, &
-                                   row_blk_size, col_blk_size, own_dist)
+   SUBROUTINE block_tas_create_new(matrix, name, dist, row_blk_size, col_blk_size, own_dist)
       !! Create new tall-and-skinny matrix.
       !! Exactly like block_create_new but with custom types for row_blk_size and col_blk_size instead of
       !! arrays.
@@ -124,7 +122,6 @@ CONTAINS
       TYPE(block_tas_type), INTENT(OUT)              :: matrix
       CHARACTER(len=*), INTENT(IN)                   :: name
       TYPE(block_tas_distribution_type), INTENT(INOUT) :: dist
-      INTEGER, INTENT(IN), OPTIONAL                  :: data_type
       CLASS(block_tas_rowcol_data), INTENT(IN)       :: row_blk_size, col_blk_size
       LOGICAL, INTENT(IN), OPTIONAL                  :: own_dist
          !! whether matrix should own distribution
@@ -192,7 +189,6 @@ CONTAINS
                         matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size=row_blk_size_vec, &
                         col_blk_size=col_blk_size_vec, &
-                        data_type=data_type, &
                         reuse_arrays=.TRUE.)
 
       matrix%valid = .TRUE.
@@ -200,15 +196,14 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE block_tas_create_template(matrix_in, matrix, name, data_type)
+   SUBROUTINE block_tas_create_template(matrix_in, matrix, name)
       !! Create matrix from template
       TYPE(block_tas_type), INTENT(INOUT)                  :: matrix_in
       TYPE(block_tas_type), INTENT(OUT)                    :: matrix
       CHARACTER(len=*), INTENT(IN), OPTIONAL               :: name
-      INTEGER, INTENT(IN), OPTIONAL                        :: data_type
 
       CALL block_matrix_create(matrix%matrix, template=matrix_in%matrix, matrix_type=block_matrix_type_no_symmetry, &
-                        data_type=data_type, name=name)
+                        name=name)
       CALL block_matrix_finalize(matrix%matrix)
 
       CALL block_tas_copy_distribution(matrix_in%dist, matrix%dist)
@@ -246,13 +241,10 @@ CONTAINS
       TYPE(block_tas_iterator)                             :: iter
       TYPE(block_matrix_data_obj)                               :: block
       LOGICAL :: transposed
-      INTEGER   :: data_type
       INTEGER(KIND=int_8)                                :: row, column
 
       CALL timeset(routineN, handle)
       CPASSERT(matrix_b%valid)
-
-      CALL block_tas_get_info(matrix_a, data_type=data_type)
 
       IF (PRESENT(summation)) THEN
          IF (.NOT. summation) CALL block_tas_clear(matrix_b)
@@ -263,7 +255,7 @@ CONTAINS
       CALL block_tas_reserve_blocks(matrix_a, matrix_b)
 
       CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block, block_matrix_type_1d_to_2d(data_type))
+      CALL block_matrix_data_new(block)
       CALL block_tas_iterator_start(iter, matrix_a)
       DO WHILE (block_tas_iterator_blocks_left(iter))
          CALL block_tas_iterator_next_block(iter, row, column, block, transposed)
@@ -525,13 +517,12 @@ CONTAINS
                         matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size=row_size_vec, &
                         col_blk_size=col_size_vec, &
-                        data_type=block_matrix_get_data_type(matrix_rect%matrix), &
                         reuse_arrays=.TRUE.)
 
       CALL block_matrix_distribution_release(dist)
 
       CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block, block_matrix_type_1d_to_2d(block_tas_get_data_type(matrix_rect)))
+      CALL block_matrix_data_new(block)
 
       nblks_local = block_tas_get_num_blocks(matrix_rect)
       CALL block_tas_iterator_start(iter, matrix_rect)
@@ -573,7 +564,7 @@ CONTAINS
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_convert_to_tas'
 
       CHARACTER(len=default_string_length)               :: name
-      INTEGER                                            :: col, data_type, handle, numnodes, row
+      INTEGER                                            :: col, handle, numnodes, row
       INTEGER(KIND=int_8)                                :: nbcols, nbrows
       INTEGER, DIMENSION(2)                              :: pcoord, pdims
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: col_blk_size, row_blk_size
@@ -588,7 +579,7 @@ CONTAINS
       NULLIFY (col_blk_size, row_blk_size)
       CALL timeset(routineN, handle)
       CALL mp_environ(numnodes, pdims, pcoord, info%mp_comm)
-      CALL block_matrix_get_info(matrix_dbcsr, distribution=block_matrix_dist, name=name, data_type=data_type, &
+      CALL block_matrix_get_info(matrix_dbcsr, distribution=block_matrix_dist, name=name, &
                           row_blk_size=row_blk_size, col_blk_size=col_blk_size)
 
       nbrows = block_matrix_nblkrows_total(matrix_dbcsr)
@@ -603,11 +594,11 @@ CONTAINS
       CALL block_tas_distribution_new(dist, info%mp_comm, row_dist_obj, col_dist_obj)
 
       CALL block_tas_create(matrix_rect, TRIM(name)//"_compressed", &
-                            dist, data_type, row_blk_size_obj, col_blk_size_obj)
+                            dist, row_blk_size_obj, col_blk_size_obj)
 
       CALL block_matrix_data_init(block)
 
-      CALL block_matrix_data_new(block, block_matrix_type_1d_to_2d(data_type))
+      CALL block_matrix_data_new(block)
       CALL block_matrix_iterator_start(iter, matrix_dbcsr)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
          CALL block_matrix_iterator_next_block(iter, row, col, block, tr)
@@ -885,14 +876,6 @@ CONTAINS
       CALL mp_sum(block_tas_get_nze_total, info%mp_comm)
    END FUNCTION
 
-   FUNCTION block_tas_get_data_type(matrix) RESULT(data_type)
-      !! As block_get_data_type
-      TYPE(block_tas_type), INTENT(IN) :: matrix
-      INTEGER                          :: data_type
-
-      data_type = block_matrix_get_data_type(matrix%matrix)
-   END FUNCTION
-
    FUNCTION block_tas_get_data_size(matrix) RESULT(data_size)
       !! As block_get_data_size
       TYPE(block_tas_type), INTENT(IN) :: matrix
@@ -916,7 +899,7 @@ CONTAINS
                                  local_rows, local_cols, proc_row_dist, proc_col_dist, &
                                  row_blk_size, col_blk_size, distribution, name, &
                                  !data_area, &
-                                 matrix_type, data_type)
+                                 matrix_type)
 
       TYPE(block_tas_type), INTENT(IN)                                :: matrix
       INTEGER(KIND=int_8), INTENT(OUT), OPTIONAL                      :: nblkrows_total, nblkcols_total, nfullrows_total, &
@@ -932,7 +915,6 @@ CONTAINS
       CHARACTER(len=*), INTENT(OUT), OPTIONAL                         :: name
       !TYPE(block_matrix_data_obj), INTENT(OUT), OPTIONAL              :: data_area
       CHARACTER, OPTIONAL                                             :: matrix_type
-      INTEGER, OPTIONAL                                               :: data_type
 
       TYPE(block_tas_split_info)                                      :: info
       INTEGER                                                         :: numnodes, irow, icol
@@ -945,7 +927,7 @@ CONTAINS
                           local_rows=local_rows_local, local_cols=local_cols_local, &
                           name=name, &
                           !data_area=data_area, &
-                          matrix_type=matrix_type, data_type=data_type)
+                          matrix_type=matrix_type)
 
       IF (PRESENT(nblkrows_total)) nblkrows_total = block_tas_nblkrows_total(matrix)
       IF (PRESENT(nblkcols_total)) nblkcols_total = block_tas_nblkcols_total(matrix)

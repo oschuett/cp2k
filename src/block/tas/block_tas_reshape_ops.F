@@ -13,11 +13,10 @@ MODULE block_tas_reshape_ops
    USE block_matrix_api, ONLY: &
       block_matrix_put_block, block_matrix_reserve_blocks, &
       block_matrix_data_clear_pointer, block_matrix_data_init, block_matrix_data_new, block_matrix_data_release, &
-      block_matrix_type_1d_to_2d, block_matrix_data_get_sizes, block_matrix_data_set_pointer, &
+      block_matrix_data_get_sizes, block_matrix_data_set_pointer, &
       internal_data_allocate, internal_data_deallocate, block_matrix_get_data_p_2d_d, block_matrix_get_data_p_2d_s, &
       block_matrix_get_data_p_2d_z, block_matrix_get_data_p_2d_c, &
-      block_matrix_data_obj, block_type_real_8, block_type_real_4, &
-      block_type_complex_8, block_type_complex_4, &
+      block_matrix_data_obj, &
       block_matrix_distribution_col_dist, block_matrix_distribution_row_dist, &
       block_matrix_get_stored_coordinates, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
@@ -28,7 +27,7 @@ MODULE block_tas_reshape_ops
       block_matrix_finalize, block_matrix_get_name
    USE block_tas_base, ONLY: &
       block_tas_blk_sizes, block_tas_create, block_tas_distribution_new, block_tas_finalize, &
-      block_tas_get_data_type, block_tas_get_stored_coordinates, block_tas_info, &
+      block_tas_get_stored_coordinates, block_tas_info, &
       block_tas_iterator_blocks_left, block_tas_iterator_next_block, block_tas_iterator_start, &
       block_tas_iterator_stop, block_tas_put_block, block_tas_reserve_blocks, &
       block_repl_get_stored_coordinates, block_tas_clear
@@ -61,7 +60,6 @@ MODULE block_tas_reshape_ops
       INTEGER :: nblock = -1
       INTEGER(KIND=int_8), DIMENSION(:, :), ALLOCATABLE :: indx
       REAL(dp), DIMENSION(:), ALLOCATABLE :: msg
-      INTEGER :: data_type = -1
       INTEGER :: endpos = -1
    END TYPE
 
@@ -171,16 +169,14 @@ CONTAINS
          num_entries_send(iproc) = num_send(2*iproc)
          num_blocks_send(iproc) = num_send(2*iproc + 1)
 
-         CALL block_buffer_create(buffer_send(iproc), num_blocks_send(iproc), num_entries_send(iproc), &
-                                  block_tas_get_data_type(matrix_in))
+         CALL block_buffer_create(buffer_send(iproc), num_blocks_send(iproc), num_entries_send(iproc))
 
-         CALL block_buffer_create(buffer_recv(iproc), num_blocks_recv(iproc), num_entries_recv(iproc), &
-                                  block_tas_get_data_type(matrix_in))
+         CALL block_buffer_create(buffer_recv(iproc), num_blocks_recv(iproc), num_entries_recv(iproc))
 
       ENDDO
 
       CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block, block_matrix_type_1d_to_2d(block_tas_get_data_type(matrix_in))) ! need to convert to 2d data type
+      CALL block_matrix_data_new(block)
       CALL block_tas_iterator_start(iter, matrix_in)
       DO WHILE (block_tas_iterator_blocks_left(iter))
          CALL block_tas_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
@@ -260,7 +256,7 @@ CONTAINS
       LOGICAL, INTENT(IN), OPTIONAL                      :: move_data
          !! memory optimization: move data to matrix_out such that matrix_in is empty on return
 
-      INTEGER                                            :: data_type, nblkcols, nblkrows
+      INTEGER                                            :: nblkcols, nblkrows
       INTEGER, DIMENSION(2)                              :: pcoord, pdims
       INTEGER, DIMENSION(:), POINTER                     :: col_blk_size, col_dist, &
                                                             row_blk_size, row_dist
@@ -311,7 +307,7 @@ CONTAINS
          move_prv = .FALSE.
       ENDIF
 
-      CALL block_matrix_get_info(matrix_in, distribution=block_matrix_dist, data_type=data_type, &
+      CALL block_matrix_get_info(matrix_in, distribution=block_matrix_dist,  &
                           nblkrows_total=nblkrows, nblkcols_total=nblkcols, &
                           row_blk_size=row_blk_size, col_blk_size=col_blk_size)
       row_dist => block_matrix_distribution_row_dist(block_matrix_dist)
@@ -345,7 +341,7 @@ CONTAINS
 
       CALL block_tas_distribution_new(dist, mp_comm, row_dist_obj, col_dist_obj, split_info=info)
       CALL block_tas_create(matrix_out, TRIM(block_matrix_get_name(matrix_in))//" replicated", &
-                            dist, data_type, row_bsize_obj, col_bsize_obj, own_dist=.TRUE.)
+                            dist, row_bsize_obj, col_bsize_obj, own_dist=.TRUE.)
 
       IF (nodata_prv) THEN
          CALL block_tas_finalize(matrix_out)
@@ -387,16 +383,14 @@ CONTAINS
          num_entries_send(iproc) = num_send(2*iproc)
          num_blocks_send(iproc) = num_send(2*iproc + 1)
 
-         CALL block_buffer_create(buffer_send(iproc), num_blocks_send(iproc), num_entries_send(iproc), &
-                                  data_type)
+         CALL block_buffer_create(buffer_send(iproc), num_blocks_send(iproc), num_entries_send(iproc))
 
-         CALL block_buffer_create(buffer_recv(iproc), num_blocks_recv(iproc), num_entries_recv(iproc), &
-                                  data_type)
+         CALL block_buffer_create(buffer_recv(iproc), num_blocks_recv(iproc), num_entries_recv(iproc))
 
       ENDDO
 
       CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block, block_matrix_type_1d_to_2d(data_type))
+      CALL block_matrix_data_new(block)
       CALL block_matrix_iterator_start(iter, matrix_in)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
          CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
@@ -466,7 +460,7 @@ CONTAINS
          !! memory optimization: move data to matrix_out such that matrix_in is empty on return
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_merge'
-      INTEGER                                            :: data_type, handle, handle2, iproc, mp_comm, &
+      INTEGER                                            :: handle, handle2, iproc, mp_comm, &
                                                             mynode, nblock, ndata, numnodes, nblk, bcount
       INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:, :)  :: index_recv
       INTEGER(KIND=int_8), DIMENSION(2)                  :: blk_index_i8
@@ -494,8 +488,6 @@ CONTAINS
       ELSE
          move_prv = .FALSE.
       ENDIF
-
-      data_type = block_tas_get_data_type(matrix_in)
 
       info = block_tas_info(matrix_in)
       CALL block_tas_get_split_info(info, mp_comm=mp_comm)
@@ -534,16 +526,14 @@ CONTAINS
          num_entries_send(iproc) = num_send(2*iproc)
          num_blocks_send(iproc) = num_send(2*iproc + 1)
 
-         CALL block_buffer_create(buffer_send(iproc), num_blocks_send(iproc), num_entries_send(iproc), &
-                                  data_type)
+         CALL block_buffer_create(buffer_send(iproc), num_blocks_send(iproc), num_entries_send(iproc))
 
-         CALL block_buffer_create(buffer_recv(iproc), num_blocks_recv(iproc), num_entries_recv(iproc), &
-                                  data_type)
+         CALL block_buffer_create(buffer_recv(iproc), num_blocks_recv(iproc), num_entries_recv(iproc))
 
       ENDDO
 
       CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block, block_matrix_type_1d_to_2d(data_type))
+      CALL block_matrix_data_new(block)
       CALL block_matrix_iterator_start(iter, matrix_in%matrix)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
          CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
@@ -628,17 +618,16 @@ CONTAINS
       block_buffer_blocks_left = buffer%endpos .LT. buffer%nblock
    END FUNCTION
 
-   SUBROUTINE block_buffer_create(buffer, nblock, ndata, data_type)
+   SUBROUTINE block_buffer_create(buffer, nblock, ndata)
       !! Create block buffer for MPI communication.
 
       TYPE(block_buffer_type), INTENT(OUT) :: buffer
          !! block buffer
-      INTEGER, INTENT(IN) :: nblock, ndata, data_type
+      INTEGER, INTENT(IN) :: nblock, ndata
          !! number of blocks
          !! total number of block entries
 
       buffer%nblock = nblock
-      buffer%data_type = data_type
       buffer%endpos = 0
       ALLOCATE (buffer%msg(ndata))
       ALLOCATE (buffer%indx(nblock, 3))
@@ -650,7 +639,6 @@ CONTAINS
       DEALLOCATE (buffer%msg)
       DEALLOCATE (buffer%indx)
       buffer%nblock = -1
-      buffer%data_type = -1
       buffer%endpos = -1
    END SUBROUTINE block_buffer_destroy
 

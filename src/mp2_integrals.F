@@ -37,8 +37,7 @@ MODULE mp2_integrals
    USE cp_units,                        ONLY: cp_unit_from_cp2k
    USE dbcsr_api,                       ONLY: &
         dbcsr_copy, dbcsr_create, dbcsr_get_info, dbcsr_multiply, dbcsr_p_type, dbcsr_release, &
-        dbcsr_release_p, dbcsr_set, dbcsr_type, dbcsr_type_no_symmetry, &
-        dbcsr_type_real_8
+        dbcsr_release_p, dbcsr_set, dbcsr_type, dbcsr_type_no_symmetry
    USE block_tensor_api,                ONLY: &
         block_tensor_clear, block_tensor_contract, block_tensor_copy, block_tensor_create, block_tensor_destroy, &
         block_tensor_distribution_destroy, block_tensor_distribution_new, block_tensor_distribution_type, &
@@ -1078,9 +1077,9 @@ CONTAINS
       CALL block_tensor_distribution_new(dist_B, mp_comm_B, dist_L_P, dist_B_a, dist_B_i)
       CALL block_tensor_distribution_new(dist_L, mp_comm_L, dist_L_R, dist_L_P)
 
-      CALL block_tensor_create(tB_in, "(R|ai)", dist_B, map_B_1, map_B_2, dbcsr_type_real_8, sizes_L, sizes_B, sizes_i)
-      CALL block_tensor_create(tB_out, "(P|ai)", dist_B, map_B_1, map_B_2, dbcsr_type_real_8, sizes_L, sizes_B, sizes_i)
-      CALL block_tensor_create(tL, "(R|P)", dist_L, map_L_1, map_L_2, dbcsr_type_real_8, sizes_L, sizes_L)
+      CALL block_tensor_create(tB_in, "(R|ai)", dist_B, map_B_1, map_B_2, sizes_L, sizes_B, sizes_i)
+      CALL block_tensor_create(tB_out, "(P|ai)", dist_B, map_B_1, map_B_2, sizes_L, sizes_B, sizes_i)
+      CALL block_tensor_create(tL, "(R|P)", dist_L, map_L_1, map_L_2, sizes_L, sizes_L)
 
       IF (debug) THEN
          ! check that tensor distribution is correct

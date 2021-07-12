@@ -28,7 +28,6 @@ MODULE block_tensor_split
    USE block_tensor_index, ONLY: block_tensor_get_mapping_info, &
                                  block_tensor_inverse_order
    USE block_tensor_types, ONLY: block_tensor_create, &
-                                 block_tensor_get_data_type, &
                                  block_tensor_type, &
                                  ndims_tensor, &
                                  block_tensor_distribution_type, &
@@ -44,7 +43,6 @@ MODULE block_tensor_split
                                  ndims_matrix_column, &
                                  block_tensor_filter, &
                                  block_tensor_copy_contraction_storage
-   USE block_matrix_api, ONLY: block_type_real_8
    USE kinds, ONLY: real_8, dp
 
 #include "../../base/base_uses.f90"
@@ -157,7 +155,7 @@ CONTAINS
          CALL block_tensor_distribution_new_expert(dist_split, tensor_in%pgrid, map1_2d, map2_2d, &
                                               ${varlist("nd_dist_split", nmax=ndim)}$)
          CALL block_tensor_create(tensor_out, tensor_in%name, dist_split, map1_2d, map2_2d, &
-                             block_tensor_get_data_type(tensor_in), ${varlist("nd_blk_size_split", nmax=ndim)}$)
+                                  ${varlist("nd_blk_size_split", nmax=ndim)}$)
       ENDIF
 #:endfor
 

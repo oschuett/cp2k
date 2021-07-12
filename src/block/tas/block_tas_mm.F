@@ -18,8 +18,6 @@ MODULE block_tas_mm
 
    USE block_matrix_api, ONLY: &
       block_matrix_scale, &
-      block_type_real_8, block_type_real_4, &
-      block_type_complex_8, block_type_complex_4, &
       block_matrix_multiply, &
       block_matrix_no_transpose, block_matrix_transpose, block_matrix_type, &
       block_matrix_distribution_obj, block_mp_obj, &
@@ -34,7 +32,7 @@ MODULE block_tas_mm
       block_matrix_clear, block_matrix_add, block_matrix_zero, block_matrix_get_name
    USE block_tas_base, ONLY: &
       block_tas_create, block_tas_destroy, block_tas_distribution_destroy, block_tas_distribution_new, &
-      block_tas_get_data_type, block_tas_info, block_tas_nblkcols_total, &
+      block_tas_info, block_tas_nblkcols_total, &
       block_tas_nblkrows_total, block_tas_filter, block_tas_get_info, block_tas_iterator_blocks_left, &
       block_tas_get_nze_total, block_tas_reserve_blocks, block_tas_iterator_start, block_tas_iterator_next_block, &
       block_tas_iterator_stop, block_tas_copy, block_tas_get_block_p, block_tas_clear, block_tas_get_num_blocks, &
@@ -111,7 +109,7 @@ CONTAINS
       INTEGER(KIND=int_8), DIMENSION(2)          :: dims_a, dims_b, dims_c
       INTEGER, DIMENSION(2)                      :: pdims, pcoord, pcoord_sub, pdims_sub
       INTEGER(KIND=int_8), DIMENSION(3)          :: dims
-      INTEGER                                    :: max_mm_dim, data_type, mp_comm, comm_tmp, &
+      INTEGER                                    :: max_mm_dim, mp_comm, comm_tmp, &
                                                     handle, handle2, handle3, handle4, &
                                                     unit_nr_prv, nsplit, nsplit_opt, numproc, numproc_sub, iproc, &
                                                     mp_comm_group, mp_comm_mm, split_rc, split_a, split_b, split_c, &
@@ -194,12 +192,6 @@ CONTAINS
 
       IF (PRESENT(move_data_a)) move_a = move_data_a
       IF (PRESENT(move_data_b)) move_b = move_data_b
-
-      IF (.NOT. block_tas_get_data_type(matrix_a) .EQ. block_tas_get_data_type(matrix_b)) THEN
-         CPABORT("matrices must have same datatype")
-      ENDIF
-
-      data_type = block_tas_get_data_type(matrix_a)
 
       transa_prv = transa; transb_prv = transb; transc_prv = transc
 
@@ -856,15 +848,13 @@ CONTAINS
          new_row_dist = block_tas_dist_arb_default(pdims(1), dims(1), matrix_in%row_blk_size)
          new_col_dist = block_tas_dist_arb_default(pdims(2), dims(2), matrix_in%col_blk_size)
          CALL block_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
-         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), &
-                               dist, block_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), dist, &
                                matrix_in%row_blk_size, matrix_in%col_blk_size, own_dist=.TRUE.)
       ELSE
          new_row_dist = block_tas_dist_arb_default(pdims(1), dims(1), matrix_in%col_blk_size)
          new_col_dist = block_tas_dist_arb_default(pdims(2), dims(2), matrix_in%row_blk_size)
          CALL block_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
-         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), &
-                               dist, block_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), dist, &
                                matrix_in%col_blk_size, matrix_in%row_blk_size, own_dist=.TRUE.)
 
       ENDIF
@@ -1058,24 +1048,20 @@ CONTAINS
 
             ALLOCATE (matrix1_out)
             IF (.NOT. trans1_newdist) THEN
-               CALL block_tas_create(matrix1_out, block_matrix_get_name(matrix1_in%matrix), &
-                                     dist_1, block_tas_get_data_type(matrix1_in), &
+               CALL block_tas_create(matrix1_out, block_matrix_get_name(matrix1_in%matrix), dist_1, &
                                      matrix1_in%row_blk_size, matrix1_in%col_blk_size, own_dist=.TRUE.)
 
             ELSE
-               CALL block_tas_create(matrix1_out, block_matrix_get_name(matrix1_in%matrix), &
-                                     dist_1, block_tas_get_data_type(matrix1_in), &
+               CALL block_tas_create(matrix1_out, block_matrix_get_name(matrix1_in%matrix), dist_1, &
                                      matrix1_in%col_blk_size, matrix1_in%row_blk_size, own_dist=.TRUE.)
             ENDIF
 
             ALLOCATE (matrix2_out)
             IF (.NOT. trans2_newdist) THEN
-               CALL block_tas_create(matrix2_out, block_matrix_get_name(matrix2_in%matrix), &
-                                     dist_2, block_tas_get_data_type(matrix2_in), &
+               CALL block_tas_create(matrix2_out, block_matrix_get_name(matrix2_in%matrix), dist_2,  &
                                      matrix2_in%row_blk_size, matrix2_in%col_blk_size, own_dist=.TRUE.)
             ELSE
-               CALL block_tas_create(matrix2_out, block_matrix_get_name(matrix2_in%matrix), &
-                                     dist_2, block_tas_get_data_type(matrix2_in), &
+               CALL block_tas_create(matrix2_out, block_matrix_get_name(matrix2_in%matrix), dist_2,  &
                                      matrix2_in%col_blk_size, matrix2_in%row_blk_size, own_dist=.TRUE.)
             ENDIF
 
@@ -1143,7 +1129,7 @@ CONTAINS
          !! memory optimization: move data such that matrix_in is empty on return.
 
       INTEGER                                    :: &
-         mp_comm, split_rc, nsplit_old, handle, data_type, nsplit_new, nsplit_prv
+         mp_comm, split_rc, nsplit_old, handle, nsplit_new, nsplit_prv
       TYPE(block_tas_split_info)                 :: split_info
       CHARACTER(len=default_string_length)       :: name
       TYPE(block_tas_distribution_type)          :: dist
@@ -1176,7 +1162,7 @@ CONTAINS
       nodata_prv = .FALSE.
       IF (PRESENT(nodata)) nodata_prv = nodata
 
-      CALL block_tas_get_info(matrix_in, data_type=data_type, name=name, &
+      CALL block_tas_get_info(matrix_in, name=name, &
                               row_blk_size=rbsize, col_blk_size=cbsize, &
                               proc_row_dist=rdist, proc_col_dist=cdist)
 
@@ -1198,9 +1184,7 @@ CONTAINS
       CALL block_tas_release_info(split_info)
 
       ALLOCATE (matrix_out)
-      CALL block_tas_create(matrix_out, name, dist, &
-                            data_type, &
-                            rbsize, cbsize, own_dist=.TRUE.)
+      CALL block_tas_create(matrix_out, name, dist, rbsize, cbsize, own_dist=.TRUE.)
 
       IF (.NOT. nodata_prv) CALL block_tas_copy(matrix_out, matrix_in)
 
@@ -1347,12 +1331,10 @@ CONTAINS
       CALL block_tas_get_split_info(info_template, mp_comm=mp_comm)
       CALL block_tas_distribution_new(dist_new, mp_comm, row_dist, col_dist, split_info=info_template)
       IF (.NOT. transposed) THEN
-         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), &
-                               dist_new, block_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), dist_new, &
                                matrix_in%row_blk_size, matrix_in%col_blk_size, own_dist=.TRUE.)
       ELSE
-         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), &
-                               dist_new, block_tas_get_data_type(matrix_in), &
+         CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), dist_new, &
                                matrix_in%col_blk_size, matrix_in%row_blk_size, own_dist=.TRUE.)
       ENDIF
 
@@ -1483,7 +1465,6 @@ CONTAINS
       TYPE(block_tas_iterator)                   :: iter
       INTEGER(KIND=int_8)                        :: row, column, nblkrows, nblkcols
       CHARACTER(len=default_string_length)       :: name
-      INTEGER                                    :: data_type
 
       REAL(dp), DIMENSION(:, :), POINTER        :: block_get
       REAL(dp), DIMENSION(:, :), POINTER        :: block_put
@@ -1497,16 +1478,13 @@ CONTAINS
          nodata_prv = .FALSE.
       ENDIF
 
-      CALL block_tas_get_info(matrix_in, data_type=data_type, name=name, &
-                              nblkrows_total=nblkrows, nblkcols_total=nblkcols)
+      CALL block_tas_get_info(matrix_in, name=name, nblkrows_total=nblkrows, nblkcols_total=nblkcols)
 
       row_blk_size = block_tas_blk_size_one(nblkrows)
       col_blk_size = block_tas_blk_size_one(nblkcols)
 
       ! not sure if assumption that same distribution can be taken still holds
-      CALL block_tas_create(matrix_out, name, matrix_in%dist, &
-                            data_type, &
-                            row_blk_size, col_blk_size)
+      CALL block_tas_create(matrix_out, name, matrix_in%dist, row_blk_size, col_blk_size)
 
       IF (.NOT. nodata_prv) THEN
          CALL block_tas_reserve_blocks(matrix_in, matrix_out)
@@ -1537,8 +1515,7 @@ CONTAINS
       LOGICAL, INTENT(IN), OPTIONAL              :: optimize_pgrid
          !! Whether to change process grid
 
-      INTEGER                                    :: &
-         nbrows, nbcols, data_type, nproc, handle
+      INTEGER                                    :: nbrows, nbcols, nproc, handle
       INTEGER, DIMENSION(2)                      :: pdims, pcoord
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS :: row_dist, col_dist, rbsize, rcsize
       TYPE(block_matrix_distribution_obj)               :: dist, dist_old
@@ -1572,7 +1549,7 @@ CONTAINS
 
       CALL block_matrix_get_info(matrix_in, nblkrows_total=nbrows, nblkcols_total=nbcols, &
                           row_blk_size=rbsize, col_blk_size=rcsize, &
-                          data_type=data_type, distribution=dist_old, name=name)
+                          distribution=dist_old, name=name)
       CALL mp_environ(nproc, pdims, pcoord, mp_comm_cart)
 
       ALLOCATE (row_dist(nbrows), col_dist(nbcols))
@@ -1583,7 +1560,7 @@ CONTAINS
       CALL block_matrix_distribution_new(dist, mp_obj, row_dist, col_dist, reuse_arrays=.TRUE.)
       CALL block_mp_release(mp_obj)
 
-      CALL block_matrix_create(matrix_out, name, dist, block_matrix_type_no_symmetry, rbsize, rcsize, data_type=data_type)
+      CALL block_matrix_create(matrix_out, name, dist, block_matrix_type_no_symmetry, rbsize, rcsize)
       CALL block_matrix_distribution_release(dist)
 
       IF (.NOT. nodata_prv) THEN

@@ -39,7 +39,6 @@ MODULE block_matrix_api
 
  USE dbcsr_methods, ONLY: &
       dbcsr_release, &
-      dbcsr_get_data_type, &
       block_matrix_mp_release           => dbcsr_mp_release, &
       dbcsr_nblkcols_total, &
       dbcsr_nblkrows_total, &
@@ -68,9 +67,9 @@ MODULE block_matrix_api
       checker_tr
 
  USE dbcsr_data_methods, ONLY: &
-      block_matrix_data_new             => dbcsr_data_new, &
+      dbcsr_data_new, &
+      dbcsr_type_1d_to_2d, &
       block_matrix_data_release         => dbcsr_data_release, &
-      block_matrix_type_1d_to_2d        => dbcsr_type_1d_to_2d, &
       block_matrix_data_clear_pointer   => dbcsr_data_clear_pointer, &
       block_matrix_data_init            => dbcsr_data_init, &
       block_matrix_data_get_sizes       => dbcsr_data_get_sizes, &
@@ -85,10 +84,7 @@ MODULE block_matrix_api
       block_matrix_get_data_p_2d_s      => dbcsr_get_data_p_2d_s
 
  USE dbcsr_types, ONLY: &
-      block_type_real_8 => dbcsr_type_real_8, &
-      block_type_real_4 => dbcsr_type_real_4, &
-      block_type_complex_8 => dbcsr_type_complex_8, &
-      block_type_complex_4 => dbcsr_type_complex_4, &
+      dbcsr_type_real_8, &
       block_matrix_transpose => dbcsr_transpose, &
       block_matrix_no_transpose => dbcsr_no_transpose, &
       block_matrix_type_no_symmetry => dbcsr_type_no_symmetry, &
@@ -143,14 +139,8 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_iterator_next_block
    PUBLIC :: block_matrix_iterator_start
    PUBLIC :: block_matrix_iterator_stop
-   PUBLIC :: block_matrix_transpose
-   PUBLIC :: block_matrix_no_transpose
    PUBLIC :: block_matrix_clear
    PUBLIC :: block_matrix_release
-   PUBLIC :: block_type_real_8
-   PUBLIC :: block_type_real_4
-   PUBLIC :: block_type_complex_8
-   PUBLIC :: block_type_complex_4
    PUBLIC :: block_matrix_distribution_get
    PUBLIC :: block_matrix_distribution_obj
    PUBLIC :: block_matrix_get_info
@@ -161,19 +151,12 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_get_block_p
    PUBLIC :: block_matrix_put_block
    PUBLIC :: block_matrix_reserve_blocks
-   PUBLIC :: block_matrix_data_new
-   PUBLIC :: block_matrix_data_release
-   PUBLIC :: block_matrix_type_1d_to_2d
-   PUBLIC :: block_matrix_data_clear_pointer
-   PUBLIC :: block_matrix_data_init
-   PUBLIC :: block_matrix_data_obj
    PUBLIC :: block_matrix_distribution_col_dist
    PUBLIC :: block_matrix_distribution_new
    PUBLIC :: block_matrix_distribution_row_dist
    PUBLIC :: block_matrix_distribution_hold
    PUBLIC :: block_matrix_distribution_release
    PUBLIC :: block_matrix_get_name
-   PUBLIC :: block_matrix_get_data_type
    PUBLIC :: block_matrix_mp_release
    PUBLIC :: block_matrix_nblkcols_total
    PUBLIC :: block_matrix_nblkrows_total
@@ -186,15 +169,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_filter
    PUBLIC :: block_matrix_create
    PUBLIC :: block_matrix_finalize
-   PUBLIC :: block_matrix_type_no_symmetry
-   PUBLIC :: block_matrix_data_get_sizes
-   PUBLIC :: block_matrix_data_set_pointer
-   PUBLIC :: block_matrix_get_data_p_2d_d
-   PUBLIC :: block_matrix_get_data_p_2d_z
-   PUBLIC :: block_matrix_get_data_p_2d_c
-   PUBLIC :: block_matrix_get_data_p_2d_s
-   PUBLIC :: internal_data_allocate
-   PUBLIC :: internal_data_deallocate
    PUBLIC :: block_matrix_get_stored_coordinates
    PUBLIC :: block_matrix_blk_column_size
    PUBLIC :: block_matrix_blk_row_size
@@ -206,17 +180,35 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_add
    PUBLIC :: block_matrix_maxabs
    PUBLIC :: block_matrix_zero
-   PUBLIC :: block_matrix_get_matrix_type
-   PUBLIC :: checker_tr
-   PUBLIC :: swap
    PUBLIC :: block_matrix_row_block_sizes
    PUBLIC :: block_matrix_col_block_sizes
    PUBLIC :: block_matrix_row_blk_size_obj
    PUBLIC :: block_matrix_col_blk_size_obj
    PUBLIC :: block_matrix_checksum
+
+   ! TODO: remove these
+   PUBLIC :: checker_tr
+   PUBLIC :: swap
    PUBLIC :: block_matrix_complete_redistribute
    PUBLIC :: block_matrix_lapack_larnv
    PUBLIC :: block_matrix_set_larnv_seed
+   PUBLIC :: block_matrix_transpose
+   PUBLIC :: block_matrix_no_transpose
+   PUBLIC :: block_matrix_get_matrix_type
+   PUBLIC :: block_matrix_data_new
+   PUBLIC :: block_matrix_data_release
+   PUBLIC :: block_matrix_data_clear_pointer
+   PUBLIC :: block_matrix_data_init
+   PUBLIC :: block_matrix_data_obj
+   PUBLIC :: block_matrix_type_no_symmetry
+   PUBLIC :: block_matrix_data_get_sizes
+   PUBLIC :: block_matrix_data_set_pointer
+   PUBLIC :: block_matrix_get_data_p_2d_d
+   PUBLIC :: block_matrix_get_data_p_2d_z
+   PUBLIC :: block_matrix_get_data_p_2d_c
+   PUBLIC :: block_matrix_get_data_p_2d_s
+   PUBLIC :: internal_data_allocate
+   PUBLIC :: internal_data_deallocate
 
    TYPE block_matrix_distribution_obj
       TYPE(dbcsr_distribution_obj), PRIVATE        :: dbcsr
@@ -255,10 +247,17 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
+   SUBROUTINE block_matrix_data_new(area)
+      TYPE(block_matrix_data_obj), INTENT(INOUT)         :: area
+
+      CALL dbcsr_data_new(area, data_type=dbcsr_type_1d_to_2d(dbcsr_type_real_8))
+   END SUBROUTINE block_matrix_data_new
+
+   !================================================================================================
+   !================================================================================================
    SUBROUTINE block_matrix_create_new(matrix, name, dist, matrix_type, &
                                       row_blk_size, col_blk_size, row_blk_size_obj, col_blk_size_obj, &
-                                      nze, data_type, data_buffer, &
-                                      !data_memory_type, index_memory_type, &
+                                      nze, data_buffer, &
                                       max_rbs, max_cbs, &
                                       row_blk_offset, col_blk_offset, &
                                       thread_dist, &
@@ -271,9 +270,8 @@ MODULE block_matrix_api
       INTEGER, DIMENSION(:), INTENT(IN), POINTER, &
          CONTIGUOUS, OPTIONAL                            :: row_blk_size, col_blk_size
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
-      INTEGER, INTENT(IN), OPTIONAL                      :: nze, data_type
+      INTEGER, INTENT(IN), OPTIONAL                      :: nze
       TYPE(block_matrix_data_obj), INTENT(IN), OPTIONAL  :: data_buffer
-      !TYPE(dbcsr_memtype_type), INTENT(IN), OPTIONAL     :: data_memory_type, index_memory_type
       INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_offset, col_blk_offset
       TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: thread_dist
@@ -285,8 +283,7 @@ MODULE block_matrix_api
                         matrix_type=matrix_type, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                         row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
-                        nze=nze, data_type=data_type, data_buffer=data_buffer, &
-                        !data_memory_type, index_memory_type, &
+                        nze=nze, data_type=dbcsr_type_real_8, data_buffer=data_buffer, &
                         max_rbs=max_rbs, max_cbs=max_cbs, &
                         row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
                         thread_dist=thread_dist%dbcsr, &
@@ -300,8 +297,7 @@ MODULE block_matrix_api
    SUBROUTINE block_matrix_create_template(matrix, template, name, dist, matrix_type, &
                                            row_blk_size, col_blk_size, &
                                            row_blk_size_obj, col_blk_size_obj, &
-                                           nze, data_type, data_buffer, &
-                                           !data_memory_type, index_memory_type, &
+                                           nze, data_buffer, &
                                            max_rbs, max_cbs, &
                                            row_blk_offset, col_blk_offset, &
                                            reuse_arrays, mutable_work, make_index, replication_type)
@@ -314,9 +310,8 @@ MODULE block_matrix_api
       INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL, &
          POINTER, CONTIGUOUS                             :: row_blk_size, col_blk_size
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
-      INTEGER, INTENT(IN), OPTIONAL                      :: nze, data_type
+      INTEGER, INTENT(IN), OPTIONAL                      :: nze
       TYPE(block_matrix_data_obj), INTENT(IN), OPTIONAL  :: data_buffer
-      !TYPE(dbcsr_memtype_type), INTENT(IN), OPTIONAL     :: data_memory_type, index_memory_type
       INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_offset, col_blk_offset
       LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays, mutable_work, make_index
@@ -326,7 +321,7 @@ MODULE block_matrix_api
                         matrix_type=matrix_type, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                         row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
-                        nze=nze, data_type=data_type, data_buffer=data_buffer, &
+                        nze=nze, data_type=dbcsr_type_real_8, data_buffer=data_buffer, &
                         max_rbs=max_rbs, max_cbs=max_cbs, &
                         row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
                         reuse_arrays=reuse_arrays, mutable_work=mutable_work, &
@@ -498,7 +493,7 @@ MODULE block_matrix_api
                                     my_prow, my_pcol, &
                                     local_rows, local_cols, proc_row_dist, proc_col_dist, &
                                     row_blk_size, col_blk_size, row_blk_offset, col_blk_offset, &
-                                    distribution, name, matrix_type, data_type, &
+                                    distribution, name, matrix_type, &
                                     group)
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
       INTEGER, INTENT(OUT), OPTIONAL :: nblkrows_total, nblkcols_total, nfullrows_total, &
@@ -512,7 +507,7 @@ MODULE block_matrix_api
          OPTIONAL                                        :: distribution
       CHARACTER(len=*), INTENT(OUT), OPTIONAL            :: name
       CHARACTER, INTENT(OUT), OPTIONAL                   :: matrix_type
-      INTEGER, INTENT(OUT), OPTIONAL                     :: data_type, group
+      INTEGER, INTENT(OUT), OPTIONAL                     :: group
 
       TYPE(dbcsr_distribution_obj)                       :: dist
 
@@ -538,7 +533,6 @@ MODULE block_matrix_api
                           distribution=dist, &
                           name=name, &
                           matrix_type=matrix_type, &
-                          data_type=data_type, &
                           group=group)
 
       IF (PRESENT(distribution)) THEN
@@ -572,15 +566,6 @@ MODULE block_matrix_api
 
       res = dbcsr_get_data_size(matrix%dbcsr)
    END FUNCTION block_matrix_get_data_size
-
-   !================================================================================================
-   !================================================================================================
-   FUNCTION block_matrix_get_data_type(matrix) RESULT(res)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      INTEGER                                            :: res
-
-      res = dbcsr_get_data_type(matrix%dbcsr)
-   END FUNCTION block_matrix_get_data_type
 
    !================================================================================================
    !================================================================================================

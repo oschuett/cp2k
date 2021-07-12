@@ -28,7 +28,7 @@ PROGRAM block_tensor_unittest
       block_tensor_pgrid_create, block_tensor_get_info, block_tensor_pgrid_destroy, &
       ndims_tensor, block_tensor_default_distvec
 
-   USE block_matrix_api, ONLY: block_type_real_8, block_matrix_set_larnv_seed
+   USE block_matrix_api, ONLY: block_matrix_set_larnv_seed
    USE kinds, ONLY: real_8,dp
 
 #include "../../base/base_uses.f90"
@@ -322,12 +322,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_2d, dist2_1, dist2_2)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist3_1, dist3_2, dist3_3)
 
-      CALL block_tensor_create(tensor_A, "(12|3)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(3|4)", dist2, map21, map22, block_type_real_8, &
-                          size_3, size_4)
-      CALL block_tensor_create(tensor_C, "(12|4)", dist3, map31, map32, block_type_real_8, &
-                          size_1, size_2, size_4)
+      CALL block_tensor_create(tensor_A, "(12|3)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(3|4)", dist2, map21, map22, size_3, size_4)
+      CALL block_tensor_create(tensor_C, "(12|4)", dist3, map31, map32, size_1, size_2, size_4)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_3_2, blk_ind_4_2)
@@ -367,12 +364,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_2d, dist2_1, dist2_2)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist3_1, dist3_2, dist3_3)
 
-      CALL block_tensor_create(tensor_A, "(2|31)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(4|3)", dist2, map21, map22, block_type_real_8, &
-                          size_3, size_4)
-      CALL block_tensor_create(tensor_C, "(24|1)", dist3, map31, map32, block_type_real_8, &
-                          size_1, size_2, size_4)
+      CALL block_tensor_create(tensor_A, "(2|31)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(4|3)", dist2, map21, map22, size_3, size_4)
+      CALL block_tensor_create(tensor_C, "(24|1)", dist3, map31, map32, size_1, size_2, size_4)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_3_2, blk_ind_4_2)
@@ -411,12 +405,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_2d, dist2_1, dist2_2)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist3_1, dist3_2, dist3_3)
 
-      CALL block_tensor_create(tensor_A, "(1|32)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(4|3)", dist2, map21, map22, block_type_real_8, &
-                          size_3, size_4)
-      CALL block_tensor_create(tensor_C, "(24|1)", dist3, map31, map32, block_type_real_8, &
-                          size_1, size_2, size_4)
+      CALL block_tensor_create(tensor_A, "(1|32)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(4|3)", dist2, map21, map22, size_3, size_4)
+      CALL block_tensor_create(tensor_C, "(24|1)", dist3, map31, map32, size_1, size_2, size_4)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_3_2, blk_ind_4_2)
@@ -463,12 +454,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_2d, dist2_1, dist2_2)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist3_1, dist3_2, dist3_3)
 
-      CALL block_tensor_create(tensor_A, "(21|3)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(3|4)", dist2, map21, map22, block_type_real_8, &
-                          size_3, size_4)
-      CALL block_tensor_create(tensor_C, "(1|24)", dist3, map31, map32, block_type_real_8, &
-                          size_1, size_2, size_4)
+      CALL block_tensor_create(tensor_A, "(21|3)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(3|4)", dist2, map21, map22, size_3, size_4)
+      CALL block_tensor_create(tensor_C, "(1|24)", dist3, map31, map32, size_1, size_2, size_4)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_3_2, blk_ind_4_2)
@@ -518,12 +506,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_4d, dist4_1, dist4_2, dist4_3, dist4_4)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist5_1, dist5_2, dist5_3)
 
-      CALL block_tensor_create(tensor_A, "(12|3)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(12|45)", dist2, map21, map22, block_type_real_8, &
-                          size_1, size_2, size_4, size_5)
-      CALL block_tensor_create(tensor_C, "(3|45)", dist3, map31, map32, block_type_real_8, &
-                          size_3, size_4, size_5)
+      CALL block_tensor_create(tensor_A, "(12|3)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(12|45)", dist2, map21, map22, size_1, size_2, size_4, size_5)
+      CALL block_tensor_create(tensor_C, "(3|45)", dist3, map31, map32, size_3, size_4, size_5)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
@@ -582,12 +567,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_4d, dist4_1, dist4_2, dist4_3, dist4_4)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist5_1, dist5_2, dist5_3)
 
-      CALL block_tensor_create(tensor_A, "(3|21)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(12|45)", dist2, map21, map22, block_type_real_8, &
-                          size_1, size_2, size_4, size_5)
-      CALL block_tensor_create(tensor_C, "(3|45)", dist3, map31, map32, block_type_real_8, &
-                          size_3, size_4, size_5)
+      CALL block_tensor_create(tensor_A, "(3|21)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(12|45)", dist2, map21, map22, size_1, size_2, size_4, size_5)
+      CALL block_tensor_create(tensor_C, "(3|45)", dist3, map31, map32, size_3, size_4, size_5)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
@@ -626,12 +608,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_4d, dist4_1, dist4_2, dist4_3, dist4_4)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist5_1, dist5_2, dist5_3)
 
-      CALL block_tensor_create(tensor_A, "(13|2)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(54|21)", dist2, map21, map22, block_type_real_8, &
-                          size_1, size_2, size_4, size_5)
-      CALL block_tensor_create(tensor_C, "(3|45)", dist3, map31, map32, block_type_real_8, &
-                          size_3, size_4, size_5)
+      CALL block_tensor_create(tensor_A, "(13|2)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(54|21)", dist2, map21, map22, size_1, size_2, size_4, size_5)
+      CALL block_tensor_create(tensor_C, "(3|45)", dist3, map31, map32, size_3, size_4, size_5)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
@@ -670,12 +649,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_4d, dist4_1, dist4_2, dist4_3, dist4_4)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist5_1, dist5_2, dist5_3)
 
-      CALL block_tensor_create(tensor_A, "(2|31)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(54|21)", dist2, map21, map22, block_type_real_8, &
-                          size_1, size_2, size_4, size_5)
-      CALL block_tensor_create(tensor_C, "(43|5)", dist3, map31, map32, block_type_real_8, &
-                          size_3, size_4, size_5)
+      CALL block_tensor_create(tensor_A, "(2|31)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(54|21)", dist2, map21, map22, size_1, size_2, size_4, size_5)
+      CALL block_tensor_create(tensor_C, "(43|5)", dist3, map31, map32, size_3, size_4, size_5)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
@@ -714,12 +690,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_4d, dist4_1, dist4_2, dist4_3, dist4_4)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist5_1, dist5_2, dist5_3)
 
-      CALL block_tensor_create(tensor_A, "(31|2)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(241|5)", dist2, map21, map22, block_type_real_8, &
-                          size_1, size_2, size_4, size_5)
-      CALL block_tensor_create(tensor_C, "(5|43)", dist3, map31, map32, block_type_real_8, &
-                          size_3, size_4, size_5)
+      CALL block_tensor_create(tensor_A, "(31|2)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(241|5)", dist2, map21, map22, size_1, size_2, size_4, size_5)
+      CALL block_tensor_create(tensor_C, "(5|43)", dist3, map31, map32, size_3, size_4, size_5)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)
@@ -758,12 +731,9 @@ PROGRAM block_tensor_unittest
       CALL block_tensor_distribution_new(dist2, pgrid_4d, dist4_1, dist4_2, dist4_3, dist4_4)
       CALL block_tensor_distribution_new(dist3, pgrid_3d, dist5_1, dist5_2, dist5_3)
 
-      CALL block_tensor_create(tensor_A, "(12|3)", dist1, map11, map12, block_type_real_8, &
-                          size_1, size_2, size_3)
-      CALL block_tensor_create(tensor_B, "(14|25)", dist2, map21, map22, block_type_real_8, &
-                          size_1, size_2, size_4, size_5)
-      CALL block_tensor_create(tensor_C, "(34|5)", dist3, map31, map32, block_type_real_8, &
-                          size_3, size_4, size_5)
+      CALL block_tensor_create(tensor_A, "(12|3)", dist1, map11, map12, size_1, size_2, size_3)
+      CALL block_tensor_create(tensor_B, "(14|25)", dist2, map21, map22, size_1, size_2, size_4, size_5)
+      CALL block_tensor_create(tensor_C, "(34|5)", dist3, map31, map32, size_3, size_4, size_5)
 
       CALL block_tensor_setup_test_tensor(tensor_A, mp_comm, .FALSE., blk_ind_1_1, blk_ind_2_1, blk_ind_3_1)
       CALL block_tensor_setup_test_tensor(tensor_B, mp_comm, .FALSE., blk_ind_1_4, blk_ind_2_4, blk_ind_4_4, blk_ind_5_4)

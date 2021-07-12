@@ -15,7 +15,6 @@ MODULE block_tensor_test
 #:set ndims = range(2,maxdim+1)
 
    USE block_matrix_api, ONLY: &
-      block_type_real_8,&
       block_matrix_lapack_larnv, block_matrix_set_larnv_seed, &
       block_matrix_set_larnv_seed
    USE block_tas_base, ONLY: block_tas_info
@@ -28,7 +27,7 @@ MODULE block_tensor_test
    USE block_tensor_types, ONLY: &
       block_tensor_create, block_tensor_destroy, block_tensor_type, block_tensor_distribution_type, &
       block_tensor_distribution_destroy, &
-      dims_tensor, ndims_tensor, block_tensor_distribution_new, block_tensor_nd_mp_comm, block_tensor_get_data_type, &
+      dims_tensor, ndims_tensor, block_tensor_distribution_new, block_tensor_nd_mp_comm, &
       mp_environ_pgrid, block_tensor_pgrid_type, block_tensor_pgrid_create, block_tensor_pgrid_destroy, block_tensor_get_info, &
       block_tensor_default_distvec
    USE block_tensor_io, ONLY: &
@@ -303,7 +302,7 @@ CONTAINS
             IF (ndims == ${ndim}$) THEN
                CALL block_tensor_distribution_new(dist2, comm_nd, ${varlist("dist2", nmax=ndim)}$)
                CALL block_tensor_create(tensor2, "Ref", dist2, map1_ref, map2_ref, &
-                                   block_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
+                                        ${varlist("blk_size", nmax=ndim)}$)
                CALL block_tensor_setup_test_tensor(tensor2, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
             ENDIF
 #:endfor
@@ -314,7 +313,7 @@ CONTAINS
             IF (ndims == ${ndim}$) THEN
                CALL block_tensor_distribution_new(dist1, comm_nd, ${varlist("dist1", nmax=ndim)}$)
                CALL block_tensor_create(tensor1, tensor_name, dist1, map1, map2, &
-                                   block_type_real_8, ${varlist("blk_size", nmax=ndim)}$)
+                                        ${varlist("blk_size", nmax=ndim)}$)
                CALL block_tensor_setup_test_tensor(tensor1, comm_nd%mp_comm_2d, .TRUE., ${varlist("blk_ind", nmax=ndim)}$)
             ENDIF
 #:endfor
