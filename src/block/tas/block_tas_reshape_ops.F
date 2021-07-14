@@ -12,10 +12,7 @@ MODULE block_tas_reshape_ops
 
    USE block_matrix_api, ONLY: &
       block_matrix_put_block, block_matrix_reserve_blocks, &
-      block_matrix_data_clear_pointer, block_matrix_data_init, block_matrix_data_new, block_matrix_data_release, &
-      block_matrix_data_get_sizes, block_matrix_data_set_pointer, &
-      internal_data_allocate, internal_data_deallocate, block_matrix_get_data_p_2d_d, &
-      block_matrix_data_obj, &
+      internal_data_allocate, internal_data_deallocate, &
       block_matrix_distribution_col_dist, block_matrix_distribution_row_dist, &
       block_matrix_get_stored_coordinates, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
@@ -62,16 +59,6 @@ MODULE block_tas_reshape_ops
       INTEGER :: endpos = -1
    END TYPE
 
-   INTERFACE block_buffer_get_next_block
-      MODULE PROCEDURE block_buffer_get_next_area_block
-      !MODULE PROCEDURE block_buffer_get_next_block_d ! issue: ambiguous interface
-   END INTERFACE
-
-   INTERFACE block_buffer_add_block
-      MODULE PROCEDURE block_buffer_add_area_block
-      MODULE PROCEDURE block_buffer_add_block_d
-   END INTERFACE
-
 CONTAINS
 
    RECURSIVE SUBROUTINE block_tas_reshape(matrix_in, matrix_out, summation, transposed, move_data)
@@ -97,7 +84,7 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: blk_size
       LOGICAL                                            :: tr, tr_in, move_prv
       TYPE(block_buffer_type), ALLOCATABLE, DIMENSION(:) :: buffer_recv, buffer_send
-      TYPE(block_matrix_data_obj)                               :: block
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
       TYPE(block_tas_iterator)                           :: iter
       TYPE(block_tas_split_info)                         :: info
 
@@ -174,8 +161,6 @@ CONTAINS
 
       ENDDO
 
-      CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block)
       CALL block_tas_iterator_start(iter, matrix_in)
       DO WHILE (block_tas_iterator_blocks_left(iter))
          CALL block_tas_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
@@ -191,7 +176,6 @@ CONTAINS
          CALL block_buffer_add_block(buffer_send(iproc), blk_index, block, transposed=tr_in)
       ENDDO
       CALL block_tas_iterator_stop(iter)
-      CALL block_matrix_data_clear_pointer(block)
 
       IF (move_prv) CALL block_tas_clear(matrix_in)
 
@@ -227,15 +211,13 @@ CONTAINS
          DO WHILE (block_buffer_blocks_left(buffer_recv(iproc)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index)
             CALL block_tas_blk_sizes(matrix_out, blk_index(1), blk_index(2), blk_size(1), blk_size(2))
-            CALL internal_data_allocate(block%d, blk_size)
+            ALLOCATE(block(blk_size(1), blk_size(2)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index, block)
             CALL block_tas_put_block(matrix_out, blk_index(1), blk_index(2), block, summation=summation)
-            CALL internal_data_deallocate(block%d)
+            DEALLOCATE(block)
          ENDDO
          CALL block_buffer_destroy(buffer_recv(iproc))
       ENDDO
-      CALL block_matrix_data_clear_pointer(block)
-      CALL block_matrix_data_release(block)
 
       CALL timestop(handle2)
 
@@ -284,7 +266,7 @@ CONTAINS
       INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:, :) :: index_recv
       INTEGER :: ndata
 
-      TYPE(block_matrix_data_obj) :: block
+      REAL(KIND=dp), DIMENSION(:, :), POINTER :: block
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_replicate'
 
@@ -388,8 +370,6 @@ CONTAINS
 
       ENDDO
 
-      CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block)
       CALL block_matrix_iterator_start(iter, matrix_in)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
          CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
@@ -400,7 +380,6 @@ CONTAINS
          ENDDO
       ENDDO
       CALL block_matrix_iterator_stop(iter)
-      CALL block_matrix_data_clear_pointer(block)
 
       IF (move_prv) CALL block_matrix_clear(matrix_in)
 
@@ -432,16 +411,14 @@ CONTAINS
          DO WHILE (block_buffer_blocks_left(buffer_recv(iproc)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8)
             CALL block_tas_blk_sizes(matrix_out, blk_index_i8(1), blk_index_i8(2), blk_size(1), blk_size(2))
-            CALL internal_data_allocate(block%d, blk_size)
+            ALLOCATE(block(blk_size(1), blk_size(2)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8, block)
             CALL block_matrix_put_block(matrix_out%matrix, INT(blk_index_i8(1)), INT(blk_index_i8(2)), block)
-            CALL internal_data_deallocate(block%d)
+            DEALLOCATE(block)
          ENDDO
 
          CALL block_buffer_destroy(buffer_recv(iproc))
       ENDDO
-      CALL block_matrix_data_clear_pointer(block)
-      CALL block_matrix_data_release(block)
 
       CALL block_tas_finalize(matrix_out)
 
@@ -470,7 +447,7 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: blk_index, blk_size
       LOGICAL                                            :: tr, move_prv
       TYPE(block_buffer_type), ALLOCATABLE, DIMENSION(:) :: buffer_recv, buffer_send
-      TYPE(block_matrix_data_obj)                               :: block
+      REAL(dp), DIMENSION(:, :), POINTER                 :: block
       TYPE(block_matrix_iterator)                               :: iter
       TYPE(block_tas_split_info)                         :: info
 
@@ -531,12 +508,10 @@ CONTAINS
 
       ENDDO
 
-      CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block)
       CALL block_matrix_iterator_start(iter, matrix_in%matrix)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
          CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
-                                        row_size=blk_size(1), col_size=blk_size(2))
+                                               row_size=blk_size(1), col_size=blk_size(2))
          CALL block_matrix_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iproc)
          CALL block_buffer_add_block(buffer_send(iproc), INT(blk_index, KIND=int_8), block)
       ENDDO
@@ -576,15 +551,13 @@ CONTAINS
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8)
             blk_size(1) = block_matrix_blk_row_size(matrix_out, INT(blk_index_i8(1)))
             blk_size(2) = block_matrix_blk_column_size(matrix_out, INT(blk_index_i8(2)))
-            CALL internal_data_allocate(block%d, blk_size)
+            ALLOCATE(block(blk_size(1), blk_size(2)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8, block)
             CALL block_matrix_put_block(matrix_out, INT(blk_index_i8(1)), INT(blk_index_i8(2)), block, summation=.TRUE.)
-            CALL internal_data_deallocate(block%d)
+            DEALLOCATE(block)
          ENDDO
          CALL block_buffer_destroy(buffer_recv(iproc))
       ENDDO
-      CALL block_matrix_data_clear_pointer(block)
-      CALL block_matrix_data_release(block)
 
       CALL block_matrix_finalize(matrix_out)
 
@@ -641,52 +614,14 @@ CONTAINS
       buffer%endpos = -1
    END SUBROUTINE block_buffer_destroy
 
-   SUBROUTINE block_buffer_add_area_block(buffer, index, block, transposed)
-      TYPE(block_buffer_type), INTENT(INOUT)      :: buffer
-      INTEGER(KIND=int_8), DIMENSION(2), &
-         INTENT(IN)                               :: index
-      TYPE(block_matrix_data_obj), INTENT(IN)     :: block
-      LOGICAL, INTENT(IN), OPTIONAL :: transposed
-      REAL(dp), DIMENSION(:, :), POINTER :: block_raw
-
-      block_raw => block_matrix_get_data_p_2d_d(block)
-      CALL block_buffer_add_block(buffer, index, block_raw, transposed)
-   END SUBROUTINE
-
-   SUBROUTINE block_buffer_get_next_area_block(buffer, ndata, index, block, advance_iter)
-      TYPE(block_buffer_type), INTENT(INOUT)      :: buffer
-      INTEGER, INTENT(OUT)                        :: ndata
-      INTEGER(KIND=int_8), DIMENSION(2), &
-         INTENT(OUT)                              :: index
-      TYPE(block_matrix_data_obj), INTENT(INOUT), OPTIONAL           :: block
-      LOGICAL, INTENT(IN), OPTIONAL               :: advance_iter
-      LOGICAL :: valid
-      INTEGER, DIMENSION(2) :: sizes
-      REAL(dp), DIMENSION(:, :), POINTER :: data
-
-      IF (PRESENT(block)) THEN
-         CALL block_matrix_data_get_sizes(block, sizes, valid)
-         CPASSERT(valid)
-         CALL internal_data_deallocate(block%d)
-      ENDIF
-
-      IF (PRESENT(block)) THEN
-         ALLOCATE (data(sizes(1), sizes(2)))
-         CALL block_buffer_get_next_block_d(buffer, ndata, index, data, advance_iter=advance_iter)
-         CALL block_matrix_data_set_pointer(block, data)
-      ELSE
-         CALL block_buffer_get_next_block_d(buffer, ndata, index, advance_iter=advance_iter)
-      ENDIF
-   END SUBROUTINE
-
-   SUBROUTINE block_buffer_add_block_d(buffer, index, block, transposed)
+   SUBROUTINE block_buffer_add_block(buffer, index, block, transposed)
       !! insert a block into block buffer (at current iterator position)
 
       TYPE(block_buffer_type), INTENT(INOUT)      :: buffer
       INTEGER(KIND=int_8), DIMENSION(2), &
          INTENT(IN)                               :: index
          !! index of block
-      REAL(dp), DIMENSION(:, :), INTENT(IN)                  :: block
+      REAL(dp), DIMENSION(:, :), INTENT(IN)       :: block
          !! block
       LOGICAL, INTENT(IN), OPTIONAL :: transposed
       INTEGER(KIND=int_8), DIMENSION(2)   :: index_prv
@@ -730,7 +665,7 @@ CONTAINS
       buffer%endpos = buffer%endpos + 1
    END SUBROUTINE
 
-   SUBROUTINE block_buffer_get_next_block_d(buffer, ndata, index, block, advance_iter)
+   SUBROUTINE block_buffer_get_next_block(buffer, ndata, index, block, advance_iter)
       !! get next block from buffer. Iterator is advanced only if block is retrieved or advance_iter.
       TYPE(block_buffer_type), INTENT(INOUT)      :: buffer
       INTEGER, INTENT(OUT)                        :: ndata

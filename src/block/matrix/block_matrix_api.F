@@ -180,6 +180,8 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_row_blk_size_obj
    PUBLIC :: block_matrix_col_blk_size_obj
    PUBLIC :: block_matrix_checksum
+   PUBLIC :: block_matrix_transpose
+   PUBLIC :: block_matrix_no_transpose
 
    ! TODO: remove these
    PUBLIC :: checker_tr
@@ -187,16 +189,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_complete_redistribute
    PUBLIC :: block_matrix_lapack_larnv
    PUBLIC :: block_matrix_set_larnv_seed
-   PUBLIC :: block_matrix_transpose
-   PUBLIC :: block_matrix_no_transpose
-   PUBLIC :: block_matrix_data_new
-   PUBLIC :: block_matrix_data_release
-   PUBLIC :: block_matrix_data_clear_pointer
-   PUBLIC :: block_matrix_data_init
-   PUBLIC :: block_matrix_data_obj
-   PUBLIC :: block_matrix_data_get_sizes
-   PUBLIC :: block_matrix_data_set_pointer
-   PUBLIC :: block_matrix_get_data_p_2d_d
    PUBLIC :: internal_data_allocate
    PUBLIC :: internal_data_deallocate
 

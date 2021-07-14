@@ -13,9 +13,6 @@ MODULE block_tas_base
 
    USE block_matrix_api, ONLY: &
       block_matrix_get_block_p, block_matrix_put_block, block_matrix_reserve_blocks, &
-      block_matrix_data_new, block_matrix_data_release, &
-      block_matrix_data_clear_pointer, block_matrix_data_init, &
-      block_matrix_data_obj, &
       block_matrix_distribution_col_dist, block_matrix_distribution_new, &
       block_matrix_distribution_row_dist, block_matrix_distribution_hold, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
@@ -91,16 +88,6 @@ MODULE block_tas_base
       MODULE PROCEDURE block_tas_create_template
    END INTERFACE
 
-   INTERFACE block_tas_get_block_p
-      MODULE PROCEDURE block_tas_get_block_p_d
-      MODULE PROCEDURE block_tas_get_block_p_area
-   END INTERFACE
-
-   INTERFACE block_tas_put_block
-      MODULE PROCEDURE block_tas_put_block_d
-      MODULE PROCEDURE block_tas_put_block_area
-   END INTERFACE
-
    INTERFACE block_tas_reserve_blocks
       MODULE PROCEDURE block_tas_reserve_blocks_template
       MODULE PROCEDURE block_tas_reserve_blocks_index
@@ -108,7 +95,6 @@ MODULE block_tas_base
 
    INTERFACE block_tas_iterator_next_block
       MODULE PROCEDURE block_tas_iterator_next_block_d
-      MODULE PROCEDURE block_tas_iterator_next_area_block
       MODULE PROCEDURE block_tas_iterator_next_block_index
    END INTERFACE
 
@@ -237,7 +223,7 @@ CONTAINS
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_copy'
       INTEGER                                            :: handle
       TYPE(block_tas_iterator)                             :: iter
-      TYPE(block_matrix_data_obj)                               :: block
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
       LOGICAL :: transposed
       INTEGER(KIND=int_8)                                :: row, column
 
@@ -252,16 +238,12 @@ CONTAINS
 
       CALL block_tas_reserve_blocks(matrix_a, matrix_b)
 
-      CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block)
       CALL block_tas_iterator_start(iter, matrix_a)
       DO WHILE (block_tas_iterator_blocks_left(iter))
          CALL block_tas_iterator_next_block(iter, row, column, block, transposed)
          CALL block_tas_put_block(matrix_b, row, column, block, transposed, summation=summation)
       ENDDO
       CALL block_tas_iterator_stop(iter)
-      CALL block_matrix_data_clear_pointer(block)
-      CALL block_matrix_data_release(block)
       CALL timestop(handle)
    END SUBROUTINE
 
@@ -478,7 +460,7 @@ CONTAINS
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: col_dist_vec, col_size_vec, &
                                                             row_dist_vec, row_size_vec
       LOGICAL                                            :: tr
-      TYPE(block_matrix_data_obj)                               :: block
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
       TYPE(block_matrix_distribution_obj)                       :: dist
       TYPE(block_mp_obj)                                 :: mp_environ_tmp
       TYPE(block_tas_iterator)                           :: iter
@@ -518,9 +500,6 @@ CONTAINS
 
       CALL block_matrix_distribution_release(dist)
 
-      CALL block_matrix_data_init(block)
-      CALL block_matrix_data_new(block)
-
       nblks_local = block_tas_get_num_blocks(matrix_rect)
       CALL block_tas_iterator_start(iter, matrix_rect)
       ALLOCATE (nz_rows(nblks_local), nz_cols(nblks_local))
@@ -542,8 +521,6 @@ CONTAINS
       ENDDO
 
       CALL block_tas_iterator_stop(iter)
-      CALL block_matrix_data_clear_pointer(block)
-      CALL block_matrix_data_release(block)
 
       CALL block_matrix_finalize(matrix_dbcsr)
 
@@ -566,7 +543,7 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: pcoord, pdims
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: col_blk_size, row_blk_size
       LOGICAL                                            :: tr
-      TYPE(block_matrix_data_obj)                               :: block
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
       TYPE(block_matrix_distribution_obj)                       :: block_matrix_dist
       TYPE(block_matrix_iterator)                               :: iter
       TYPE(block_tas_blk_size_arb)                         :: col_blk_size_obj, row_blk_size_obj
@@ -593,17 +570,12 @@ CONTAINS
       CALL block_tas_create(matrix_rect, TRIM(name)//"_compressed", &
                             dist, row_blk_size_obj, col_blk_size_obj)
 
-      CALL block_matrix_data_init(block)
-
-      CALL block_matrix_data_new(block)
       CALL block_matrix_iterator_start(iter, matrix_dbcsr)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
          CALL block_matrix_iterator_next_block(iter, row, col, block, tr)
          CALL block_tas_put_block(matrix_rect, INT(row, KIND=int_8), INT(col, KIND=int_8), block)
       ENDDO
       CALL block_matrix_iterator_stop(iter)
-      CALL block_matrix_data_clear_pointer(block)
-      CALL block_matrix_data_release(block)
 
       CALL block_tas_finalize(matrix_rect)
 
@@ -633,25 +605,6 @@ CONTAINS
       TYPE(block_tas_iterator), INTENT(INOUT)              :: iter
 
       CALL block_matrix_iterator_stop(iter%iter)
-   END SUBROUTINE
-
-   SUBROUTINE block_tas_iterator_next_area_block(iterator, row, column, block, transposed, block_number, &
-      !! As block_matrix_iterator_next_block
-                                                 row_size, col_size)
-      TYPE(block_tas_iterator), INTENT(INOUT)            :: iterator
-      INTEGER(KIND=int_8), INTENT(OUT)                   :: row, column
-      TYPE(block_matrix_data_obj), INTENT(INOUT)         :: block
-      LOGICAL, INTENT(OUT)                               :: transposed
-      INTEGER, INTENT(OUT), OPTIONAL                     :: block_number, row_size, col_size
-
-      INTEGER                                            :: column_group, row_group
-
-      CALL block_matrix_iterator_next_block(iterator%iter, row_group, column_group, block, transposed, block_number, &
-                                     row_size, col_size)
-
-      CALL block_index_local_to_global(iterator%dist%info, iterator%dist, row_group=row_group, column_group=column_group, &
-                                       row=row, column=column)
-
    END SUBROUTINE
 
    SUBROUTINE block_tas_iterator_next_block_index(iterator, row, column, block_number, &
@@ -706,42 +659,6 @@ CONTAINS
       CALL block_matrix_reserve_blocks(matrix%matrix, rowcols_group_u(:, 1), rowcols_group_u(:, 2))
 
       CALL timestop(handle)
-   END SUBROUTINE
-
-   SUBROUTINE block_tas_put_block_area(matrix, row, col, block, transposed, summation, &
-      !! As block_matrix_put_block
-                                       scale)
-      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix
-      INTEGER(KIND=int_8), INTENT(IN)                    :: row, col
-      TYPE(block_matrix_data_obj)                               :: block
-      LOGICAL, INTENT(IN), OPTIONAL                      :: transposed, summation
-      REAL(dp), INTENT(IN), OPTIONAL      :: scale
-
-      INTEGER                                            :: col_group, row_group
-
-      CALL block_index_global_to_local(block_tas_info(matrix), matrix%dist, row=row, column=col, &
-                                       row_group=row_group, column_group=col_group)
-      CALL block_matrix_put_block(matrix%matrix, row_group, col_group, block, &
-                                  transposed=transposed, summation=summation, scale=scale)
-
-   END SUBROUTINE
-
-   SUBROUTINE block_tas_get_block_p_area(matrix, row, col, block, transposed, found, row_size, col_size)
-      !! As block_matrix_get_block_p
-      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix
-      INTEGER(KIND=int_8), INTENT(IN)                    :: row, col
-      TYPE(block_matrix_data_obj), INTENT(INOUT)                :: block
-      LOGICAL, INTENT(OUT)                               :: transposed, found
-      INTEGER, INTENT(OUT), OPTIONAL                     :: row_size, col_size
-
-      INTEGER                                            :: col_group, row_group
-
-      CALL block_index_global_to_local(block_tas_info(matrix), matrix%dist, row=row, column=col, &
-                                       row_group=row_group, column_group=col_group)
-
-      CALL block_matrix_get_block_p(matrix%matrix, row_group, col_group, block, &
-                                    transposed, found, row_size=row_size, col_size=col_size)
-
    END SUBROUTINE
 
    SUBROUTINE block_tas_copy_distribution(dist_in, dist_out, own_dist)
@@ -978,7 +895,7 @@ CONTAINS
    END SUBROUTINE
 
    !! As block_matrix_put_block
-   SUBROUTINE block_tas_put_block_d (matrix, row, col, block, transposed, summation, &
+   SUBROUTINE block_tas_put_block(matrix, row, col, block, transposed, summation, &
                                                scale)
       TYPE(block_tas_type), INTENT(INOUT)     :: matrix
       REAL(dp), DIMENSION(:, :), INTENT(IN) :: block
@@ -996,7 +913,7 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE block_tas_get_block_p_d(matrix, row, col, block, transposed, found, row_size, col_size)
+   SUBROUTINE block_tas_get_block_p(matrix, row, col, block, transposed, found, row_size, col_size)
       !! As block_matrix_get_block_p
       TYPE(block_tas_type), INTENT(INOUT)  :: matrix
       INTEGER(KIND=int_8), INTENT(IN)    :: row, col
