@@ -64,19 +64,9 @@ MODULE block_matrix_api
       dbcsr_get_stored_coordinates, &
       checker_tr
 
- USE dbcsr_data_methods, ONLY: &
-      dbcsr_data_new, &
-      dbcsr_type_1d_to_2d, &
-      block_matrix_data_release         => dbcsr_data_release, &
-      block_matrix_data_clear_pointer   => dbcsr_data_clear_pointer, &
-      block_matrix_data_init            => dbcsr_data_init, &
-      block_matrix_data_get_sizes       => dbcsr_data_get_sizes, &
-      block_matrix_data_set_pointer     => dbcsr_data_set_pointer
-
  USE dbcsr_data_methods_low, ONLY: &
       internal_data_allocate, &
-      internal_data_deallocate, &
-      block_matrix_get_data_p_2d_d      => dbcsr_get_data_p_2d_d
+      internal_data_deallocate
 
  USE dbcsr_types, ONLY: &
       dbcsr_type_real_8, &
@@ -97,9 +87,6 @@ MODULE block_matrix_api
       default_string_length, &
       int_8, &
       dp
-
- USE dbcsr_data_types, ONLY: &
-      block_matrix_data_obj             => dbcsr_data_obj
 
  USE dbcsr_mp_methods, ONLY: &
       block_mp_new => dbcsr_mp_new
@@ -209,37 +196,18 @@ MODULE block_matrix_api
       MODULE PROCEDURE block_matrix_create_template
    END INTERFACE block_matrix_create
 
-   INTERFACE block_matrix_get_block_p
-      MODULE PROCEDURE block_matrix_get_block_p_d
-      MODULE PROCEDURE block_matrix_get_block_p_area
-   END INTERFACE block_matrix_get_block_p
-
-   INTERFACE block_matrix_put_block
-      MODULE PROCEDURE block_matrix_put_block_d
-      MODULE PROCEDURE block_matrix_put_block_area
-   END INTERFACE block_matrix_put_block
-
    INTERFACE block_matrix_iterator_next_block
       MODULE PROCEDURE block_matrix_iterator_next_block_d
       MODULE PROCEDURE block_matrix_iterator_next_block_index
-      MODULE PROCEDURE block_matrix_iterator_next_block_area
    END INTERFACE block_matrix_iterator_next_block
 
    CONTAINS
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_data_new(area)
-      TYPE(block_matrix_data_obj), INTENT(INOUT)         :: area
-
-      CALL dbcsr_data_new(area, data_type=dbcsr_type_1d_to_2d(dbcsr_type_real_8))
-   END SUBROUTINE block_matrix_data_new
-
-   !================================================================================================
-   !================================================================================================
    SUBROUTINE block_matrix_create_new(matrix, name, dist, &
                                       row_blk_size, col_blk_size, row_blk_size_obj, col_blk_size_obj, &
-                                      nze, data_buffer, &
+                                      nze, &
                                       max_rbs, max_cbs, &
                                       row_blk_offset, col_blk_offset, &
                                       thread_dist, &
@@ -252,7 +220,6 @@ MODULE block_matrix_api
          CONTIGUOUS, OPTIONAL                            :: row_blk_size, col_blk_size
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
       INTEGER, INTENT(IN), OPTIONAL                      :: nze
-      TYPE(block_matrix_data_obj), INTENT(IN), OPTIONAL  :: data_buffer
       INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_offset, col_blk_offset
       TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: thread_dist
@@ -264,7 +231,7 @@ MODULE block_matrix_api
                         matrix_type=dbcsr_type_no_symmetry, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                         row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
-                        nze=nze, data_type=dbcsr_type_real_8, data_buffer=data_buffer, &
+                        nze=nze, data_type=dbcsr_type_real_8, &
                         max_rbs=max_rbs, max_cbs=max_cbs, &
                         row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
                         thread_dist=thread_dist%dbcsr, &
@@ -278,7 +245,7 @@ MODULE block_matrix_api
    SUBROUTINE block_matrix_create_template(matrix, template, name, dist, &
                                            row_blk_size, col_blk_size, &
                                            row_blk_size_obj, col_blk_size_obj, &
-                                           nze, data_buffer, &
+                                           nze, &
                                            max_rbs, max_cbs, &
                                            row_blk_offset, col_blk_offset, &
                                            reuse_arrays, mutable_work, make_index, replication_type)
@@ -291,7 +258,6 @@ MODULE block_matrix_api
          POINTER, CONTIGUOUS                             :: row_blk_size, col_blk_size
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
       INTEGER, INTENT(IN), OPTIONAL                      :: nze
-      TYPE(block_matrix_data_obj), INTENT(IN), OPTIONAL  :: data_buffer
       INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_offset, col_blk_offset
       LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays, mutable_work, make_index
@@ -301,7 +267,7 @@ MODULE block_matrix_api
                         matrix_type=dbcsr_type_no_symmetry, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                         row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
-                        nze=nze, data_type=dbcsr_type_real_8, data_buffer=data_buffer, &
+                        nze=nze, data_type=dbcsr_type_real_8, &
                         max_rbs=max_rbs, max_cbs=max_cbs, &
                         row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
                         reuse_arrays=reuse_arrays, mutable_work=mutable_work, &
@@ -373,24 +339,6 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_iterator_next_block_area(iterator, row, column, block, &
-                                                    transposed, block_number, row_size, col_size, &
-                                                    row_offset, col_offset)
-      TYPE(block_matrix_iterator), INTENT(INOUT)         :: iterator
-      INTEGER, INTENT(OUT)                               :: row, column
-      TYPE(block_matrix_data_obj), INTENT(INOUT)         :: block
-      LOGICAL, INTENT(OUT)                               :: transposed
-      INTEGER, INTENT(OUT), OPTIONAL                     :: block_number, row_size, col_size, &
-                                                            row_offset, col_offset
-
-      CALL dbcsr_iterator_next_block(iterator%dbcsr, row=row, column=column, block=block, &
-                                     transposed=transposed, block_number=block_number, &
-                                     row_size=row_size, col_size=col_size, &
-                                     row_offset=row_offset, col_offset=col_offset)
-   END SUBROUTINE block_matrix_iterator_next_block_area
-
-   !================================================================================================
-   !================================================================================================
    SUBROUTINE block_matrix_filter(matrix, eps, method, use_absolute, filter_diag)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
       REAL(dp), INTENT(IN)                               :: eps
@@ -411,7 +359,7 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_get_block_p_d(matrix, row, col, block, tr, found, row_size, col_size)
+   SUBROUTINE block_matrix_get_block_p(matrix, row, col, block, tr, found, row_size, col_size)
       TYPE(block_matrix_type), INTENT(INOUT)   :: matrix
       INTEGER, INTENT(IN)                      :: row, col
       REAL(dp), DIMENSION(:, :), POINTER       :: block
@@ -420,24 +368,11 @@ MODULE block_matrix_api
       INTEGER, INTENT(OUT), OPTIONAL           :: row_size, col_size
 
       CALL dbcsr_get_block_p(matrix%dbcsr, row, col, block, tr, found, row_size, col_size)
-   END SUBROUTINE block_matrix_get_block_p_d
+   END SUBROUTINE block_matrix_get_block_p
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_get_block_p_area(matrix, row, col, block, tr, found, &
-                                     row_size, col_size)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      INTEGER, INTENT(IN)                                :: row, col
-      TYPE(block_matrix_data_obj), INTENT(INOUT)         :: block
-      LOGICAL, INTENT(OUT)                               :: tr, found
-      INTEGER, INTENT(OUT), OPTIONAL                     :: row_size, col_size
-
-      CALL dbcsr_get_block_p(matrix%dbcsr, row, col, block, tr, found, row_size, col_size)
-    END SUBROUTINE block_matrix_get_block_p_area
-
-   !================================================================================================
-   !================================================================================================
-   SUBROUTINE block_matrix_put_block_d(matrix, row, col, block, transposed, summation, scale)
+   SUBROUTINE block_matrix_put_block(matrix, row, col, block, transposed, summation, scale)
       TYPE(block_matrix_type), INTENT(INOUT)   :: matrix
       INTEGER, INTENT(IN)                      :: row, col
       REAL(dp), DIMENSION(:, :), INTENT(IN)    :: block
@@ -446,23 +381,7 @@ MODULE block_matrix_api
 
       CALL dbcsr_put_block(matrix%dbcsr, row, col, block, &
                            transposed=transposed, summation=summation, scale=scale)
-   END SUBROUTINE block_matrix_put_block_d
-
-   !================================================================================================
-   !================================================================================================
-   SUBROUTINE block_matrix_put_block_area(matrix, row, col, block, lb_row_col, transposed, &
-                                          summation, scale)
-      TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
-      INTEGER, INTENT(IN)                                :: row, col
-      TYPE(block_matrix_data_obj)                        :: block
-      INTEGER, DIMENSION(2), INTENT(INOUT), OPTIONAL     :: lb_row_col
-      LOGICAL, INTENT(IN), OPTIONAL                      :: transposed, summation
-      REAL(dp), INTENT(IN), OPTIONAL      :: scale
-
-
-      CALL dbcsr_put_block(matrix%dbcsr, row, col, block_matrix_get_data_p_2d_d(block), lb_row_col, &
-                           transposed=transposed, summation=summation, scale=scale)
-    END SUBROUTINE block_matrix_put_block_area
+   END SUBROUTINE block_matrix_put_block
 
    !================================================================================================
    !================================================================================================
