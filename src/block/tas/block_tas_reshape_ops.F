@@ -14,8 +14,7 @@ MODULE block_tas_reshape_ops
       block_matrix_put_block, block_matrix_reserve_blocks, &
       block_matrix_data_clear_pointer, block_matrix_data_init, block_matrix_data_new, block_matrix_data_release, &
       block_matrix_data_get_sizes, block_matrix_data_set_pointer, &
-      internal_data_allocate, internal_data_deallocate, block_matrix_get_data_p_2d_d, block_matrix_get_data_p_2d_s, &
-      block_matrix_get_data_p_2d_z, block_matrix_get_data_p_2d_c, &
+      internal_data_allocate, internal_data_deallocate, block_matrix_get_data_p_2d_d, &
       block_matrix_data_obj, &
       block_matrix_distribution_col_dist, block_matrix_distribution_row_dist, &
       block_matrix_get_stored_coordinates, &

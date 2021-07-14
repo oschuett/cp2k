@@ -76,10 +76,7 @@ MODULE block_matrix_api
  USE dbcsr_data_methods_low, ONLY: &
       internal_data_allocate, &
       internal_data_deallocate, &
-      block_matrix_get_data_p_2d_d      => dbcsr_get_data_p_2d_d, &
-      block_matrix_get_data_p_2d_z      => dbcsr_get_data_p_2d_z, &
-      block_matrix_get_data_p_2d_c      => dbcsr_get_data_p_2d_c, &
-      block_matrix_get_data_p_2d_s      => dbcsr_get_data_p_2d_s
+      block_matrix_get_data_p_2d_d      => dbcsr_get_data_p_2d_d
 
  USE dbcsr_types, ONLY: &
       dbcsr_type_real_8, &
@@ -200,9 +197,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_data_get_sizes
    PUBLIC :: block_matrix_data_set_pointer
    PUBLIC :: block_matrix_get_data_p_2d_d
-   PUBLIC :: block_matrix_get_data_p_2d_z
-   PUBLIC :: block_matrix_get_data_p_2d_c
-   PUBLIC :: block_matrix_get_data_p_2d_s
    PUBLIC :: internal_data_allocate
    PUBLIC :: internal_data_deallocate
 
