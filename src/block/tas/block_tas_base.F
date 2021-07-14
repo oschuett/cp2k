@@ -17,8 +17,8 @@ MODULE block_tas_base
       block_matrix_distribution_row_dist, block_matrix_distribution_hold, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
       block_matrix_iterator_start, block_matrix_iterator_stop, &
-      block_matrix_distribution_release, block_matrix_mp_release, block_matrix_nblkcols_total, &
-      block_matrix_nblkrows_total, block_matrix_nfullrows_total, block_matrix_nfullcols_total, block_matrix_release, &
+      block_matrix_distribution_release, block_mp_release, block_matrix_nblkcols_total, &
+      block_matrix_nblkrows_total, block_matrix_release, &
       block_matrix_get_data_size, block_matrix_get_num_blocks, block_matrix_get_nze, &
       block_matrix_get_info, block_matrix_set, block_matrix_filter, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_mp_obj, block_matrix_type, &
@@ -361,7 +361,7 @@ CONTAINS
       CALL block_matrix_distribution_new(dist%block_matrix_dist, mp_environ_tmp, row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
       ALLOCATE (dist%row_dist, source=row_dist)
       ALLOCATE (dist%col_dist, source=col_dist)
-      CALL block_matrix_mp_release(mp_environ_tmp)
+      CALL block_mp_release(mp_environ_tmp)
 
       !IF(PRESENT(strict_split)) dist%strict_split = strict_split
 
@@ -489,7 +489,7 @@ CONTAINS
 
       mp_environ_tmp = block_mp_environ(info%mp_comm)
       CALL block_matrix_distribution_new(dist, mp_environ_tmp, row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
-      CALL block_matrix_mp_release(mp_environ_tmp)
+      CALL block_mp_release(mp_environ_tmp)
 
       CALL block_matrix_create(matrix=matrix_dbcsr, &
                         name=TRIM(block_matrix_get_name(matrix_rect%matrix)), &

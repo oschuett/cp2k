@@ -13,7 +13,7 @@ MODULE block_tas_test
    USE block_matrix_api, ONLY: &
       block_matrix_release, block_matrix_nblkcols_total, block_matrix_nblkrows_total, &
       block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
-      block_matrix_mp_release, block_matrix_distribution_release, &
+      block_mp_release, block_matrix_distribution_release, &
       block_matrix_multiply, &
       block_matrix_type, block_matrix_distribution_obj, block_mp_obj, &
       block_matrix_no_transpose, block_matrix_transpose, &
@@ -232,7 +232,7 @@ CONTAINS
          CALL block_matrix_distribution_new(dist_a, mp_environ_tmp, rd_a, cd_a, reuse_arrays=.TRUE.)
          CALL block_matrix_distribution_new(dist_b, mp_environ_tmp, rd_b, cd_b, reuse_arrays=.TRUE.)
          CALL block_matrix_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
-         CALL block_matrix_mp_release(mp_environ_tmp)
+         CALL block_mp_release(mp_environ_tmp)
 
          row_blk_size => block_matrix_row_block_sizes(block_matrix_a)
          col_blk_size => block_matrix_col_block_sizes(block_matrix_a)
@@ -347,7 +347,7 @@ CONTAINS
       CALL block_matrix_distribution_new(dist_a, mp_environ_tmp, rd_a, cd_a, reuse_arrays=.TRUE.)
       CALL block_matrix_distribution_new(dist_b, mp_environ_tmp, rd_b, cd_b, reuse_arrays=.TRUE.)
       CALL block_matrix_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
-      CALL block_matrix_mp_release(mp_environ_tmp)
+      CALL block_mp_release(mp_environ_tmp)
 
       CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, &
                         row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_a), &

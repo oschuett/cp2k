@@ -37,23 +37,20 @@ MODULE block_matrix_api
       dbcsr_put_block
 
  USE dbcsr_methods, ONLY: &
-      dbcsr_release, &
       block_matrix_mp_release           => dbcsr_mp_release, &
+      block_mp_release                  => dbcsr_mp_release, &
       dbcsr_nblkcols_total, &
       dbcsr_nblkrows_total, &
-      block_matrix_nfullrows_total      => dbcsr_nfullrows_total, &
-      block_matrix_nfullcols_total      => dbcsr_nfullcols_total, &
       dbcsr_get_data_size, &
       dbcsr_get_num_blocks, &
       dbcsr_get_nze, &
-      block_mp_release                  => dbcsr_mp_release, &
       dbcsr_blk_column_size, &
       dbcsr_blk_row_size, &
       dbcsr_row_block_sizes, &
-      dbcsr_col_block_sizes
+      dbcsr_col_block_sizes, &
+      dbcsr_release
 
  USE dbcsr_dist_methods, ONLY: &
-      block_matrix_distribution_get => dbcsr_distribution_get, &
       dbcsr_distribution_col_dist, &
       dbcsr_distribution_new, &
       dbcsr_distribution_row_dist, &
@@ -69,11 +66,11 @@ MODULE block_matrix_api
       internal_data_deallocate
 
  USE dbcsr_types, ONLY: &
-      dbcsr_type_real_8, &
-      dbcsr_type_no_symmetry, &
       block_matrix_transpose => dbcsr_transpose, &
       block_matrix_no_transpose => dbcsr_no_transpose, &
       block_mp_obj => dbcsr_mp_obj, &
+      dbcsr_type_real_8, &
+      dbcsr_type_no_symmetry, &
       dbcsr_iterator, &
       dbcsr_distribution_obj
 
@@ -115,6 +112,10 @@ MODULE block_matrix_api
 
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_matrix_api'
 
+   PUBLIC :: block_mp_new
+   PUBLIC :: block_mp_obj
+   PUBLIC :: block_mp_release
+
    PUBLIC :: block_matrix_type
    PUBLIC :: block_matrix_iterator
    PUBLIC :: block_matrix_iterator_blocks_left
@@ -123,12 +124,9 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_iterator_stop
    PUBLIC :: block_matrix_clear
    PUBLIC :: block_matrix_release
-   PUBLIC :: block_matrix_distribution_get
    PUBLIC :: block_matrix_distribution_obj
    PUBLIC :: block_matrix_get_info
    PUBLIC :: block_matrix_scale
-   PUBLIC :: block_mp_new
-   PUBLIC :: block_mp_obj
    PUBLIC :: block_matrix_sort_indices
    PUBLIC :: block_matrix_get_block_p
    PUBLIC :: block_matrix_put_block
@@ -139,11 +137,8 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_distribution_hold
    PUBLIC :: block_matrix_distribution_release
    PUBLIC :: block_matrix_get_name
-   PUBLIC :: block_matrix_mp_release
    PUBLIC :: block_matrix_nblkcols_total
    PUBLIC :: block_matrix_nblkrows_total
-   PUBLIC :: block_matrix_nfullrows_total
-   PUBLIC :: block_matrix_nfullcols_total
    PUBLIC :: block_matrix_get_data_size
    PUBLIC :: block_matrix_get_num_blocks
    PUBLIC :: block_matrix_get_nze
@@ -156,7 +151,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_blk_row_size
    PUBLIC :: block_matrix_multiply
    PUBLIC :: block_matrix_redistribute
-   PUBLIC :: block_mp_release
    PUBLIC :: block_matrix_cfg
    PUBLIC :: block_matrix_copy
    PUBLIC :: block_matrix_add

@@ -25,7 +25,7 @@ MODULE block_tas_mm
       block_matrix_redistribute, &
       block_matrix_distribution_new, &
       block_mp_release, block_matrix_release, block_matrix_distribution_release, &
-      block_matrix_get_nze, block_matrix_nfullrows_total, block_matrix_nfullcols_total, &
+      block_matrix_get_nze, &
       block_matrix_cfg, &
       block_matrix_get_info, block_matrix_copy, &
       block_matrix_clear, block_matrix_add, block_matrix_zero, block_matrix_get_name
