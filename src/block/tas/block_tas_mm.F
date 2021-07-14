@@ -21,7 +21,6 @@ MODULE block_tas_mm
       block_matrix_multiply, &
       block_matrix_no_transpose, block_matrix_transpose, block_matrix_type, &
       block_matrix_distribution_obj, block_mp_obj, &
-      block_matrix_type_no_symmetry, &
       block_matrix_create, block_matrix_finalize, &
       block_matrix_redistribute, &
       block_matrix_distribution_new, &
@@ -1560,7 +1559,7 @@ CONTAINS
       CALL block_matrix_distribution_new(dist, mp_obj, row_dist, col_dist, reuse_arrays=.TRUE.)
       CALL block_mp_release(mp_obj)
 
-      CALL block_matrix_create(matrix_out, name, dist, block_matrix_type_no_symmetry, rbsize, rcsize)
+      CALL block_matrix_create(matrix_out, name, dist, rbsize, rcsize)
       CALL block_matrix_distribution_release(dist)
 
       IF (.NOT. nodata_prv) THEN

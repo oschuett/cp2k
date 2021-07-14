@@ -17,7 +17,6 @@ MODULE block_matrix_api
     dbcsr_iterator_stop
 
  USE dbcsr_transformations, ONLY: &
-    dbcsr_desymmetrize_deep, &
     dbcsr_redistribute, &
     dbcsr_complete_redistribute
 
@@ -48,7 +47,6 @@ MODULE block_matrix_api
       dbcsr_get_num_blocks, &
       dbcsr_get_nze, &
       block_mp_release                  => dbcsr_mp_release, &
-      block_matrix_get_matrix_type      => dbcsr_get_matrix_type, &
       dbcsr_blk_column_size, &
       dbcsr_blk_row_size, &
       dbcsr_row_block_sizes, &
@@ -85,9 +83,9 @@ MODULE block_matrix_api
 
  USE dbcsr_types, ONLY: &
       dbcsr_type_real_8, &
+      dbcsr_type_no_symmetry, &
       block_matrix_transpose => dbcsr_transpose, &
       block_matrix_no_transpose => dbcsr_no_transpose, &
-      block_matrix_type_no_symmetry => dbcsr_type_no_symmetry, &
       block_mp_obj => dbcsr_mp_obj, &
       dbcsr_iterator, &
       dbcsr_distribution_obj
@@ -194,13 +192,11 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_set_larnv_seed
    PUBLIC :: block_matrix_transpose
    PUBLIC :: block_matrix_no_transpose
-   PUBLIC :: block_matrix_get_matrix_type
    PUBLIC :: block_matrix_data_new
    PUBLIC :: block_matrix_data_release
    PUBLIC :: block_matrix_data_clear_pointer
    PUBLIC :: block_matrix_data_init
    PUBLIC :: block_matrix_data_obj
-   PUBLIC :: block_matrix_type_no_symmetry
    PUBLIC :: block_matrix_data_get_sizes
    PUBLIC :: block_matrix_data_set_pointer
    PUBLIC :: block_matrix_get_data_p_2d_d
@@ -255,7 +251,7 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_create_new(matrix, name, dist, matrix_type, &
+   SUBROUTINE block_matrix_create_new(matrix, name, dist, &
                                       row_blk_size, col_blk_size, row_blk_size_obj, col_blk_size_obj, &
                                       nze, data_buffer, &
                                       max_rbs, max_cbs, &
@@ -266,7 +262,6 @@ MODULE block_matrix_api
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
       CHARACTER(len=*), INTENT(IN)                       :: name
       TYPE(block_matrix_distribution_obj), INTENT(IN)    :: dist
-      CHARACTER, INTENT(IN)                              :: matrix_type
       INTEGER, DIMENSION(:), INTENT(IN), POINTER, &
          CONTIGUOUS, OPTIONAL                            :: row_blk_size, col_blk_size
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
@@ -280,7 +275,7 @@ MODULE block_matrix_api
       CHARACTER, INTENT(IN), OPTIONAL                    :: replication_type
 
       CALL dbcsr_create(matrix%dbcsr, name=name, dist=dist%dbcsr, &
-                        matrix_type=matrix_type, &
+                        matrix_type=dbcsr_type_no_symmetry, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                         row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
                         nze=nze, data_type=dbcsr_type_real_8, data_buffer=data_buffer, &
@@ -294,7 +289,7 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_create_template(matrix, template, name, dist, matrix_type, &
+   SUBROUTINE block_matrix_create_template(matrix, template, name, dist, &
                                            row_blk_size, col_blk_size, &
                                            row_blk_size_obj, col_blk_size_obj, &
                                            nze, data_buffer, &
@@ -306,7 +301,6 @@ MODULE block_matrix_api
       TYPE(block_matrix_type), INTENT(IN)                :: template
       CHARACTER(len=*), INTENT(IN), OPTIONAL             :: name
       TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: dist
-      CHARACTER, INTENT(IN), OPTIONAL                    :: matrix_type
       INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL, &
          POINTER, CONTIGUOUS                             :: row_blk_size, col_blk_size
       TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
@@ -318,7 +312,7 @@ MODULE block_matrix_api
       CHARACTER, INTENT(IN), OPTIONAL                    :: replication_type
 
       CALL dbcsr_create(matrix%dbcsr, template=template%dbcsr, name=name, dist=dist%dbcsr, &
-                        matrix_type=matrix_type, &
+                        matrix_type=dbcsr_type_no_symmetry, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                         row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
                         nze=nze, data_type=dbcsr_type_real_8, data_buffer=data_buffer, &
@@ -493,7 +487,7 @@ MODULE block_matrix_api
                                     my_prow, my_pcol, &
                                     local_rows, local_cols, proc_row_dist, proc_col_dist, &
                                     row_blk_size, col_blk_size, row_blk_offset, col_blk_offset, &
-                                    distribution, name, matrix_type, &
+                                    distribution, name, &
                                     group)
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
       INTEGER, INTENT(OUT), OPTIONAL :: nblkrows_total, nblkcols_total, nfullrows_total, &
@@ -506,7 +500,6 @@ MODULE block_matrix_api
       TYPE(block_matrix_distribution_obj), INTENT(OUT), &
          OPTIONAL                                        :: distribution
       CHARACTER(len=*), INTENT(OUT), OPTIONAL            :: name
-      CHARACTER, INTENT(OUT), OPTIONAL                   :: matrix_type
       INTEGER, INTENT(OUT), OPTIONAL                     :: group
 
       TYPE(dbcsr_distribution_obj)                       :: dist
@@ -532,7 +525,6 @@ MODULE block_matrix_api
                           col_blk_offset=col_blk_offset, &
                           distribution=dist, &
                           name=name, &
-                          matrix_type=matrix_type, &
                           group=group)
 
       IF (PRESENT(distribution)) THEN
@@ -760,16 +752,15 @@ MODULE block_matrix_api
    !================================================================================================
    !================================================================================================
    SUBROUTINE block_matrix_copy(matrix_b, matrix_a, name, keep_sparsity, &
-                                shallow_data, keep_imaginary, matrix_type)
+                                shallow_data, keep_imaginary)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix_b
       TYPE(block_matrix_type), INTENT(IN)                :: matrix_a
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL             :: name
       LOGICAL, INTENT(IN), OPTIONAL                      :: keep_sparsity, shallow_data, &
                                                             keep_imaginary
-      CHARACTER, INTENT(IN), OPTIONAL                    :: matrix_type
 
       CALL dbcsr_copy(matrix_b%dbcsr, matrix_a%dbcsr, name, keep_sparsity, &
-                      shallow_data, keep_imaginary, matrix_type)
+                      shallow_data, keep_imaginary, dbcsr_type_no_symmetry)
 
    END SUBROUTINE block_matrix_copy
 

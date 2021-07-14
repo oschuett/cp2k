@@ -24,7 +24,7 @@ MODULE block_tas_base
       block_matrix_nblkrows_total, block_matrix_nfullrows_total, block_matrix_nfullcols_total, block_matrix_release, &
       block_matrix_get_data_size, block_matrix_get_num_blocks, block_matrix_get_nze, &
       block_matrix_get_info, block_matrix_set, block_matrix_filter, block_matrix_clear, &
-      block_matrix_distribution_obj, block_matrix_iterator, block_mp_obj, block_matrix_type, block_matrix_type_no_symmetry, &
+      block_matrix_distribution_obj, block_matrix_iterator, block_mp_obj, block_matrix_type, &
       block_matrix_create, block_matrix_finalize, block_matrix_get_name
    USE block_tas_types, ONLY: &
       block_tas_distribution_type, block_tas_iterator, block_tas_split_info, block_tas_type
@@ -186,7 +186,6 @@ CONTAINS
       CALL block_matrix_create(matrix=matrix%matrix, &
                         name=name, &
                         dist=dist%block_matrix_dist, &
-                        matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size=row_blk_size_vec, &
                         col_blk_size=col_blk_size_vec, &
                         reuse_arrays=.TRUE.)
@@ -202,8 +201,7 @@ CONTAINS
       TYPE(block_tas_type), INTENT(OUT)                    :: matrix
       CHARACTER(len=*), INTENT(IN), OPTIONAL               :: name
 
-      CALL block_matrix_create(matrix%matrix, template=matrix_in%matrix, matrix_type=block_matrix_type_no_symmetry, &
-                        name=name)
+      CALL block_matrix_create(matrix%matrix, template=matrix_in%matrix, name=name)
       CALL block_matrix_finalize(matrix%matrix)
 
       CALL block_tas_copy_distribution(matrix_in%dist, matrix%dist)
@@ -514,7 +512,6 @@ CONTAINS
       CALL block_matrix_create(matrix=matrix_dbcsr, &
                         name=TRIM(block_matrix_get_name(matrix_rect%matrix)), &
                         dist=dist, &
-                        matrix_type=block_matrix_type_no_symmetry, &
                         row_blk_size=row_size_vec, &
                         col_blk_size=col_size_vec, &
                         reuse_arrays=.TRUE.)
@@ -897,9 +894,7 @@ CONTAINS
                                  nfullrows_local, nfullcols_local, &
                                  nprow, npcol, my_prow, my_pcol, &
                                  local_rows, local_cols, proc_row_dist, proc_col_dist, &
-                                 row_blk_size, col_blk_size, distribution, name, &
-                                 !data_area, &
-                                 matrix_type)
+                                 row_blk_size, col_blk_size, distribution, name)
 
       TYPE(block_tas_type), INTENT(IN)                                :: matrix
       INTEGER(KIND=int_8), INTENT(OUT), OPTIONAL                      :: nblkrows_total, nblkcols_total, nfullrows_total, &
@@ -913,8 +908,6 @@ CONTAINS
          INTENT(OUT)                                                  :: row_blk_size, col_blk_size
       TYPE(block_tas_distribution_type), OPTIONAL                     :: distribution
       CHARACTER(len=*), INTENT(OUT), OPTIONAL                         :: name
-      !TYPE(block_matrix_data_obj), INTENT(OUT), OPTIONAL              :: data_area
-      CHARACTER, OPTIONAL                                             :: matrix_type
 
       TYPE(block_tas_split_info)                                      :: info
       INTEGER                                                         :: numnodes, irow, icol
@@ -925,9 +918,7 @@ CONTAINS
       CALL block_matrix_get_info(matrix%matrix, nblkrows_local=nblkrows_local, nblkcols_local=nblkcols_local, &
                           nfullrows_local=nfullrows_local, nfullcols_local=nfullcols_local, &
                           local_rows=local_rows_local, local_cols=local_cols_local, &
-                          name=name, &
-                          !data_area=data_area, &
-                          matrix_type=matrix_type)
+                          name=name)
 
       IF (PRESENT(nblkrows_total)) nblkrows_total = block_tas_nblkrows_total(matrix)
       IF (PRESENT(nblkcols_total)) nblkcols_total = block_tas_nblkcols_total(matrix)
