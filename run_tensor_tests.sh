@@ -20,6 +20,7 @@ TESTOPTS="${TESTOPTS} -restrictdir UNIT/block_tensor_unittest"
 
 set -x
 
-make VERSION=sdbg test TESTOPTS="${TESTOPTS}"
+#make VERSION=sdbg test TESTOPTS="${TESTOPTS}"
+make VERSION=pdbg test TESTOPTS="${TESTOPTS}"
 
 #EOF

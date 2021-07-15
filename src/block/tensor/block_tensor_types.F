@@ -26,7 +26,7 @@ MODULE block_tensor_types
       block_tas_create, block_tas_distribution_new, &
       block_tas_distribution_destroy, block_tas_finalize, block_tas_get_info, &
       block_tas_destroy, block_tas_get_stored_coordinates, block_tas_set, block_tas_filter, &
-      block_tas_get_num_blocks, block_tas_get_num_blocks_total, block_tas_get_data_size, block_tas_get_nze, &
+      block_tas_get_num_blocks, block_tas_get_num_blocks_total, block_tas_get_nze, &
       block_tas_get_nze_total, block_tas_clear
    USE block_tas_types, ONLY: &
       block_tas_type, block_tas_distribution_type, block_tas_split_info, block_tas_mm_storage
@@ -65,7 +65,6 @@ MODULE block_tensor_types
       block_tensor_distribution_type, &
       block_tensor_filter, &
       block_tensor_finalize, &
-      block_tensor_get_data_size, &
       block_tensor_get_info, &
       block_tensor_get_num_blocks, &
       block_tensor_get_num_blocks_total, &
@@ -1404,13 +1403,6 @@ CONTAINS
       TYPE(block_tensor_type), INTENT(IN)    :: tensor
       INTEGER(KIND=int_8)               :: num_blocks
       num_blocks = block_tas_get_num_blocks_total(tensor%matrix_rep)
-   END FUNCTION
-
-   FUNCTION block_tensor_get_data_size(tensor) RESULT(data_size)
-      !! As block_get_data_size
-      TYPE(block_tensor_type), INTENT(IN)    :: tensor
-      INTEGER                           :: data_size
-      data_size = block_tas_get_data_size(tensor%matrix_rep)
    END FUNCTION
 
    SUBROUTINE block_tensor_clear(tensor)

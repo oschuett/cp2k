@@ -40,7 +40,6 @@ MODULE block_matrix_api
       dbcsr_mp_release, &
       dbcsr_nblkcols_total, &
       dbcsr_nblkrows_total, &
-      dbcsr_get_data_size, &
       dbcsr_get_num_blocks, &
       dbcsr_get_nze, &
       dbcsr_blk_column_size, &
@@ -150,18 +149,18 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_get_name
    PUBLIC :: block_matrix_nblkcols_total
    PUBLIC :: block_matrix_nblkrows_total
-   PUBLIC :: block_matrix_get_data_size
    PUBLIC :: block_matrix_get_num_blocks
    PUBLIC :: block_matrix_get_nze
    PUBLIC :: block_matrix_get_stored_coordinates
-   PUBLIC :: block_matrix_blk_column_size
-   PUBLIC :: block_matrix_blk_row_size
-   PUBLIC :: block_matrix_row_block_sizes
-   PUBLIC :: block_matrix_col_block_sizes
    PUBLIC :: block_matrix_row_blk_size_obj
    PUBLIC :: block_matrix_col_blk_size_obj
 
    ! TODO: remove these
+   PUBLIC :: block_matrix_blk_column_size
+   PUBLIC :: block_matrix_blk_row_size
+   PUBLIC :: block_matrix_row_block_sizes
+   PUBLIC :: block_matrix_col_block_sizes
+
    PUBLIC :: checker_tr
    PUBLIC :: swap
    PUBLIC :: block_matrix_complete_redistribute
@@ -443,15 +442,6 @@ MODULE block_matrix_api
 
       CALL dbcsr_get_info(matrix%dbcsr, name=res)
    END FUNCTION block_matrix_get_name
-
-   !================================================================================================
-   !================================================================================================
-   FUNCTION block_matrix_get_data_size(matrix) RESULT(res)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      INTEGER                                            :: res
-
-      res = dbcsr_get_data_size(matrix%dbcsr)
-   END FUNCTION block_matrix_get_data_size
 
    !================================================================================================
    !================================================================================================

@@ -19,7 +19,7 @@ MODULE block_tas_base
       block_matrix_iterator_start, block_matrix_iterator_stop, &
       block_matrix_distribution_release, block_matrix_nblkcols_total, &
       block_matrix_nblkrows_total, block_matrix_release, &
-      block_matrix_get_data_size, block_matrix_get_num_blocks, block_matrix_get_nze, &
+      block_matrix_get_num_blocks, block_matrix_get_nze, &
       block_matrix_get_info, block_matrix_set, block_matrix_filter, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
       block_matrix_create, block_matrix_finalize, block_matrix_get_name
@@ -55,7 +55,6 @@ MODULE block_tas_base
       block_tas_filter, &
       block_tas_finalize, &
       block_tas_get_block_p, &
-      block_tas_get_data_size, &
       block_tas_get_info, &
       block_tas_get_num_blocks, &
       block_tas_get_nze, &
@@ -781,14 +780,6 @@ CONTAINS
       block_tas_get_nze_total = block_tas_get_nze(matrix)
       info = block_tas_info(matrix)
       CALL mp_sum(block_tas_get_nze_total, info%mp_comm)
-   END FUNCTION
-
-   FUNCTION block_tas_get_data_size(matrix) RESULT(data_size)
-      !! As block_get_data_size
-      TYPE(block_tas_type), INTENT(IN) :: matrix
-      INTEGER                          :: data_size
-
-      data_size = block_matrix_get_data_size(matrix%matrix)
    END FUNCTION
 
    SUBROUTINE block_tas_clear(matrix)
