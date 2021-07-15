@@ -128,7 +128,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_distribution_hold
    PUBLIC :: block_matrix_distribution_release
 
-   PUBLIC :: block_matrix_get_info
    PUBLIC :: block_matrix_get_name
    PUBLIC :: block_matrix_get_num_blocks
    PUBLIC :: block_matrix_get_nze
@@ -140,6 +139,7 @@ MODULE block_matrix_api
 
    ! TODO: remove these
    PUBLIC :: block_matrix_complete_redistribute
+   PUBLIC :: block_matrix_get_info
 
    TYPE block_matrix_distribution_obj
       TYPE(dbcsr_distribution_obj), PRIVATE        :: dbcsr
