@@ -110,15 +110,16 @@ MODULE block_matrix_api
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_matrix_api'
 
    PUBLIC :: block_matrix_type
+   PUBLIC :: block_matrix_release
+   PUBLIC :: block_matrix_create
+
    PUBLIC :: block_matrix_iterator
-   PUBLIC :: block_matrix_iterator_blocks_left
-   PUBLIC :: block_matrix_iterator_next_block
    PUBLIC :: block_matrix_iterator_start
    PUBLIC :: block_matrix_iterator_stop
+   PUBLIC :: block_matrix_iterator_blocks_left
+   PUBLIC :: block_matrix_iterator_next_block
+
    PUBLIC :: block_matrix_clear
-   PUBLIC :: block_matrix_release
-   PUBLIC :: block_matrix_distribution_obj
-   PUBLIC :: block_matrix_get_info
    PUBLIC :: block_matrix_scale
    PUBLIC :: block_matrix_sort_indices
    PUBLIC :: block_matrix_get_block_p
@@ -126,7 +127,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_reserve_blocks
    PUBLIC :: block_matrix_set
    PUBLIC :: block_matrix_filter
-   PUBLIC :: block_matrix_create
    PUBLIC :: block_matrix_finalize
    PUBLIC :: block_matrix_multiply
    PUBLIC :: block_matrix_redistribute
@@ -139,12 +139,14 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_transpose
    PUBLIC :: block_matrix_no_transpose
 
+   PUBLIC :: block_matrix_distribution_obj
    PUBLIC :: block_matrix_distribution_col_dist
    PUBLIC :: block_matrix_distribution_new
    PUBLIC :: block_matrix_distribution_row_dist
    PUBLIC :: block_matrix_distribution_hold
    PUBLIC :: block_matrix_distribution_release
 
+   PUBLIC :: block_matrix_get_info
    PUBLIC :: block_matrix_get_name
    PUBLIC :: block_matrix_nblkcols_total
    PUBLIC :: block_matrix_nblkrows_total
