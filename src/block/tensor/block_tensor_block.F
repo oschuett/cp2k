@@ -21,7 +21,6 @@ MODULE block_tensor_block
       dbcsr_reserve_blocks, dbcsr_finalize
    USE block_allocate_wrap, ONLY: &
       allocate_any
-   USE block_matrix_api, ONLY: checker_tr, swap
    USE block_tas_types, ONLY: &
       block_tas_iterator
    USE block_tas_base, ONLY: &
@@ -57,6 +56,7 @@ MODULE block_tensor_block
       block_tensor_reserve_blocks, &
       block_tensor_reserved_block_indices, &
       destroy_block, &
+      checker_tr, &
       ndims_iterator
 
    TYPE block_tensor_iterator_type
@@ -333,6 +333,20 @@ CONTAINS
       CALL timestop(handle)
    END SUBROUTINE
 
+   ELEMENTAL SUBROUTINE swap(a, b)
+      !! Swaps two integers
+
+      INTEGER, INTENT(INOUT)                             :: a, b
+         !! Integers to swap
+         !! Integers to swap
+
+      INTEGER                                            :: tmp
+
+      tmp = a
+      a = b
+      b = tmp
+   END SUBROUTINE swap
+
    SUBROUTINE block_tensor_reserved_block_indices(tensor, blk_ind)
       !! indices of non-zero blocks
       TYPE(block_tensor_type), INTENT(IN)            :: tensor
@@ -378,6 +392,17 @@ CONTAINS
       DEALLOCATE (block%sizes)
    END SUBROUTINE
 
+   ELEMENTAL FUNCTION checker_tr(row, column) RESULT(transpose)
+      !! Determines whether a transpose must be applied
+
+      INTEGER, INTENT(IN)                                :: row, column
+         !! The absolute matrix row.
+         !! The absolute matrix column.
+      LOGICAL                                            :: transpose
+
+      transpose = BTEST(column + row, 0) .EQV. column .GE. row
+
+   END FUNCTION checker_tr
 
    SUBROUTINE block_tensor_put_anyd_block (tensor, ind, block, summation, scale)
       !! Generic implementation of block_tensor_put_block, template for datatype

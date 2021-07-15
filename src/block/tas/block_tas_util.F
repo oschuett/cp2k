@@ -12,10 +12,10 @@ MODULE block_tas_util
    !! often used utilities for tall-and-skinny matrices
 
    USE block_matrix_api, ONLY: block_matrix_transpose, &
-                               block_matrix_no_transpose, &
-                               block_matrix_sort_indices
+                               block_matrix_no_transpose
 
-   USE kinds, ONLY: int_8
+   USE kinds, ONLY: int_4, int_8
+   USE util, ONLY: sort
 
 #include "../../base/base_uses.f90"
 
@@ -84,7 +84,7 @@ CONTAINS
       orig_size = SIZE(index_in, 1)
       ALLOCATE (index_tmp(orig_size, 2))
       index_sorted(:, :) = index_in(:, :)
-      CALL block_matrix_sort_indices(orig_size, index_sorted(:, 1), index_sorted(:, 2))
+      CALL sort_indices(orig_size, index_sorted(:, 1), index_sorted(:, 2))
       count = 0
       prev_index(:) = [0, 0]
       DO blk = 1, orig_size
@@ -98,6 +98,84 @@ CONTAINS
       ALLOCATE (index_out(count, 2))
       index_out(:, :) = index_tmp(1:count, :)
    END SUBROUTINE
+
+   !================================================================================================
+   !TODO: Simplify using array_sort.fypp and merge with index_unique above.
+   !================================================================================================
+   SUBROUTINE sort_indices(n, row_i, col_i, blk_p, blk_d)
+      !! Sorts the rows & columns of a work matrix
+      !!
+      !! Description
+      !! Sorts the row and column indices so that the rows monotonically
+      !! increase and the columns monotonically increase within each row.
+      !! Passing the blk_p array rearranges the block pointers accordingly.
+      !! This must be done if they are pointing to valid data, otherwise
+      !! they become invalid.
+
+      INTEGER, INTENT(IN)                                :: n
+         !! number of blocks (elements) to sort
+      INTEGER, DIMENSION(1:), INTENT(INOUT)              :: row_i, col_i
+         !! row indices
+         !! column indices
+      INTEGER, DIMENSION(1:), INTENT(INOUT), OPTIONAL    :: blk_p, blk_d
+         !! block pointers
+         !! data storage
+
+      CHARACTER(len=*), PARAMETER :: routineN = 'sort_indices'
+      INTEGER(KIND=int_8), PARAMETER                     :: lmask8 = 4294967295_int_8
+
+      INTEGER                                            :: error_handle, i
+      INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:)     :: sort_keys
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: buf, buf_d
+
+!   ---------------------------------------------------------------------------
+
+      IF (SIZE(row_i) .EQ. 0) RETURN
+
+      CALL timeset(routineN, error_handle)
+
+      IF (SIZE(row_i) < n) CPABORT('row_i too small')
+      IF (SIZE(col_i) < n) CPABORT('col_i too small')
+      IF (PRESENT(blk_p)) THEN
+         IF (SIZE(blk_p) < n) CPABORT('blk_p too small')
+         ALLOCATE (buf(n))
+         buf(1:n) = blk_p(1:n)
+      ENDIF
+      IF (PRESENT(blk_d)) THEN
+         ALLOCATE (buf_d(n))
+         buf_d(1:n) = blk_d(1:n)
+      ENDIF
+      ! Create an ordering for both rows and columns. If the blk_p must
+      ! be rearranged, then the col_i array will be used as a
+      ! permutation vector.
+      ALLOCATE (sort_keys(n))
+      sort_keys(:) = IOR(ISHFT(INT(row_i(1:n), int_8), 32), INT(col_i(1:n), int_8))
+      IF (PRESENT(blk_p)) col_i(1:n) = (/(i, i=1, n)/)
+      ! Now do a nice quicksort.
+      CALL sort(sort_keys, n, col_i)
+      ! Since blk_d is usually not present we can have two loops that
+      ! are essentially the same.
+      IF (PRESENT(blk_p)) THEN
+         DO i = 1, n
+            blk_p(i) = buf(col_i(i))
+         ENDDO
+         DEALLOCATE (buf)
+      END IF
+      IF (PRESENT(blk_d)) THEN
+         DO i = 1, n
+            blk_d(i) = buf_d(col_i(i))
+         ENDDO
+         DEALLOCATE (buf_d)
+      ENDIF
+      DO i = 1, n
+         col_i(i) = INT(IAND(sort_keys(i), lmask8), int_4)
+         row_i(i) = INT(ISHFT(sort_keys(i), -32), int_4)
+      ENDDO
+      DEALLOCATE (sort_keys)
+      CALL timestop(error_handle)
+
+   END SUBROUTINE sort_indices
+
 
    SUBROUTINE invert_transpose_flag(trans_flag)
       CHARACTER(LEN=1), INTENT(INOUT)                    :: trans_flag

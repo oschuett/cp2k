@@ -51,8 +51,7 @@ MODULE block_matrix_api
       dbcsr_distribution_release
 
  USE dbcsr_dist_operations, ONLY: &
-      dbcsr_get_stored_coordinates, &
-      checker_tr
+      dbcsr_get_stored_coordinates
 
  USE dbcsr_types, ONLY: &
       block_matrix_transpose => dbcsr_transpose, &
@@ -77,13 +76,7 @@ MODULE block_matrix_api
  USE dbcsr_mp_methods, ONLY: &
       dbcsr_mp_new
 
- USE dbcsr_index_operations, ONLY: &
-      block_matrix_sort_indices => dbcsr_sort_indices
-
  USE dbcsr_config, ONLY: block_matrix_cfg => dbcsr_cfg
-
- USE dbcsr_toollib, ONLY: &
-      swap
 
  USE dbcsr_dist_util, ONLY: &
       dbcsr_checksum
@@ -111,7 +104,6 @@ MODULE block_matrix_api
 
    PUBLIC :: block_matrix_clear
    PUBLIC :: block_matrix_scale
-   PUBLIC :: block_matrix_sort_indices
    PUBLIC :: block_matrix_get_block_p
    PUBLIC :: block_matrix_put_block
    PUBLIC :: block_matrix_reserve_blocks
@@ -147,8 +139,6 @@ MODULE block_matrix_api
    PUBLIC :: generate_larnv_seed
 
    ! TODO: remove these
-   PUBLIC :: checker_tr
-   PUBLIC :: swap
    PUBLIC :: block_matrix_complete_redistribute
 
    TYPE block_matrix_distribution_obj
@@ -698,6 +688,5 @@ MODULE block_matrix_api
       iseed(2) = INT(MODULO(IEOR(map, 1153_int_8), 2_int_8**12)); map = map/2_int_8**12
       iseed(1) = INT(MODULO(IEOR(map, 2029_int_8), 2_int_8**12)); map = map/2_int_8**12
    END FUNCTION generate_larnv_seed
-
 
 END MODULE block_matrix_api

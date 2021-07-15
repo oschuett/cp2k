@@ -29,8 +29,7 @@ MODULE block_tensor
       create_array_list, destroy_array_list, sizes_of_arrays
    USE block_matrix_api, ONLY: &
       block_matrix_transpose, block_matrix_no_transpose, &
-      block_matrix_clear, &
-      swap, checker_tr
+      block_matrix_clear
    USE block_tas_types, ONLY: &
       block_tas_split_info
    USE block_tas_base, ONLY: &
@@ -41,7 +40,7 @@ MODULE block_tensor
    USE block_tensor_block, ONLY: &
       block_tensor_iterator_type, block_tensor_get_block, block_tensor_put_block, block_tensor_iterator_start, &
       block_tensor_iterator_blocks_left, block_tensor_iterator_stop, block_tensor_iterator_next_block, &
-      ndims_iterator, block_tensor_reserve_blocks, block_nd, destroy_block
+      ndims_iterator, block_tensor_reserve_blocks, block_nd, destroy_block, checker_tr
    USE block_tensor_index, ONLY: &
       block_tensor_get_mapping_info, nd_to_2d_mapping, block_tensor_inverse_order, permute_index, get_nd_indices_tensor, &
       ndims_mapping_row, ndims_mapping_column, ndims_mapping
