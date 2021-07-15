@@ -25,7 +25,6 @@ MODULE block_tas_test
       block_matrix_add, &
       block_matrix_complete_redistribute, &
       block_matrix_lapack_larnv, block_matrix_set_larnv_seed, block_matrix_get_name, &
-      block_matrix_row_blk_size_obj, block_matrix_col_blk_size_obj, &
       block_matrix_set_larnv_seed
    USE block_tas_base, ONLY: &
       block_tas_convert_to_dbcsr, block_tas_create, block_tas_distribution_new, &
@@ -343,21 +342,21 @@ CONTAINS
       CALL block_matrix_distribution_new(dist_c, comm_dbcsr, rd_c, cd_c, reuse_arrays=.TRUE.)
 
       CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, &
-                        row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_a), &
-                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_a))
+                        row_blk_size=block_matrix_row_block_sizes(block_matrix_a), &
+                        col_blk_size=block_matrix_col_block_sizes(block_matrix_a))
 
       CALL block_matrix_create(matrix=block_matrix_b_mm, name="matrix b", dist=dist_b, &
-                        row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_b), &
-                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_b))
+                        row_blk_size=block_matrix_row_block_sizes(block_matrix_b), &
+                        col_blk_size=block_matrix_col_block_sizes(block_matrix_b))
 
       CALL block_matrix_create(matrix=block_matrix_c_mm, name="matrix c", dist=dist_c, &
-                        row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_c), &
-                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_c))
+                        row_blk_size=block_matrix_row_block_sizes(block_matrix_c), &
+                        col_blk_size=block_matrix_col_block_sizes(block_matrix_c))
 
       CALL block_matrix_create(matrix=block_matrix_c_mm_check, name="matrix c check", &
                         dist=dist_c, &
-                        row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_c), &
-                        col_blk_size_obj=block_matrix_col_blk_size_obj(block_matrix_c))
+                        row_blk_size=block_matrix_row_block_sizes(block_matrix_c), &
+                        col_blk_size=block_matrix_col_block_sizes(block_matrix_c))
 
       CALL block_matrix_finalize(block_matrix_a_mm)
       CALL block_matrix_finalize(block_matrix_b_mm)

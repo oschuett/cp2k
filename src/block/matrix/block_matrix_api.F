@@ -6,7 +6,6 @@
 !--------------------------------------------------------------------------------------------------!
 MODULE block_matrix_api
 
- USE dbcsr_array_types, ONLY: array_i1d_obj
  USE dbcsr_types, ONLY: &
      dbcsr_type
 
@@ -147,19 +146,17 @@ MODULE block_matrix_api
 
    PUBLIC :: block_matrix_get_info
    PUBLIC :: block_matrix_get_name
-   PUBLIC :: block_matrix_nblkcols_total
-   PUBLIC :: block_matrix_nblkrows_total
    PUBLIC :: block_matrix_get_num_blocks
    PUBLIC :: block_matrix_get_nze
    PUBLIC :: block_matrix_get_stored_coordinates
-   PUBLIC :: block_matrix_row_blk_size_obj
-   PUBLIC :: block_matrix_col_blk_size_obj
-
-   ! TODO: remove these
-   PUBLIC :: block_matrix_blk_column_size
-   PUBLIC :: block_matrix_blk_row_size
    PUBLIC :: block_matrix_row_block_sizes
    PUBLIC :: block_matrix_col_block_sizes
+
+   ! TODO: remove these
+   PUBLIC :: block_matrix_nblkcols_total
+   PUBLIC :: block_matrix_nblkrows_total
+   PUBLIC :: block_matrix_blk_column_size
+   PUBLIC :: block_matrix_blk_row_size
 
    PUBLIC :: checker_tr
    PUBLIC :: swap
@@ -194,10 +191,9 @@ MODULE block_matrix_api
    !================================================================================================
    !================================================================================================
    SUBROUTINE block_matrix_create_new(matrix, name, dist, &
-                                      row_blk_size, col_blk_size, row_blk_size_obj, col_blk_size_obj, &
+                                      row_blk_size, col_blk_size, &
                                       nze, &
                                       max_rbs, max_cbs, &
-                                      row_blk_offset, col_blk_offset, &
                                       thread_dist, &
                                       reuse, reuse_arrays, mutable_work, make_index, replication_type)
 
@@ -206,10 +202,8 @@ MODULE block_matrix_api
       TYPE(block_matrix_distribution_obj), INTENT(IN)    :: dist
       INTEGER, DIMENSION(:), INTENT(IN), POINTER, &
          CONTIGUOUS, OPTIONAL                            :: row_blk_size, col_blk_size
-      TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
       INTEGER, INTENT(IN), OPTIONAL                      :: nze
       INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
-      TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_offset, col_blk_offset
       TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: thread_dist
       LOGICAL, INTENT(IN), OPTIONAL                      :: reuse, reuse_arrays, mutable_work, &
                                                             make_index
@@ -218,10 +212,8 @@ MODULE block_matrix_api
       CALL dbcsr_create(matrix%dbcsr, name=name, dist=dist%dbcsr, &
                         matrix_type=dbcsr_type_no_symmetry, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                        row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
                         nze=nze, data_type=dbcsr_type_real_8, &
                         max_rbs=max_rbs, max_cbs=max_cbs, &
-                        row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
                         thread_dist=thread_dist%dbcsr, &
                         reuse=reuse, reuse_arrays=reuse_arrays, &
                         mutable_work=mutable_work, make_index=make_index, &
@@ -232,10 +224,8 @@ MODULE block_matrix_api
    !================================================================================================
    SUBROUTINE block_matrix_create_template(matrix, template, name, dist, &
                                            row_blk_size, col_blk_size, &
-                                           row_blk_size_obj, col_blk_size_obj, &
                                            nze, &
                                            max_rbs, max_cbs, &
-                                           row_blk_offset, col_blk_offset, &
                                            reuse_arrays, mutable_work, make_index, replication_type)
 
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
@@ -244,20 +234,16 @@ MODULE block_matrix_api
       TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: dist
       INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL, &
          POINTER, CONTIGUOUS                             :: row_blk_size, col_blk_size
-      TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_size_obj, col_blk_size_obj
       INTEGER, INTENT(IN), OPTIONAL                      :: nze
       INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
-      TYPE(array_i1d_obj), INTENT(IN), OPTIONAL          :: row_blk_offset, col_blk_offset
       LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays, mutable_work, make_index
       CHARACTER, INTENT(IN), OPTIONAL                    :: replication_type
 
       CALL dbcsr_create(matrix%dbcsr, template=template%dbcsr, name=name, dist=dist%dbcsr, &
                         matrix_type=dbcsr_type_no_symmetry, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                        row_blk_size_obj=row_blk_size_obj, col_blk_size_obj=col_blk_size_obj,&
                         nze=nze, data_type=dbcsr_type_real_8, &
                         max_rbs=max_rbs, max_cbs=max_cbs, &
-                        row_blk_offset=row_blk_offset, col_blk_offset=col_blk_offset, &
                         reuse_arrays=reuse_arrays, mutable_work=mutable_work, &
                         make_index=make_index, replication_type=replication_type)
    END SUBROUTINE block_matrix_create_template
@@ -496,24 +482,6 @@ MODULE block_matrix_api
 
       res => dbcsr_col_block_sizes(matrix%dbcsr)
    END FUNCTION block_matrix_col_block_sizes
-
-   !================================================================================================
-   !================================================================================================
-   FUNCTION block_matrix_row_blk_size_obj(matrix) RESULT(res)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      TYPE(array_i1d_obj)                                :: res
-
-      res = matrix%dbcsr%row_blk_size
-   END FUNCTION block_matrix_row_blk_size_obj
-
-   !================================================================================================
-   !================================================================================================
-   FUNCTION block_matrix_col_blk_size_obj(matrix) RESULT(res)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      TYPE(array_i1d_obj)                                :: res
-
-      res = matrix%dbcsr%col_blk_size
-   END FUNCTION block_matrix_col_blk_size_obj
 
    !================================================================================================
    !================================================================================================
