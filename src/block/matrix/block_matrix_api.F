@@ -37,8 +37,7 @@ MODULE block_matrix_api
       dbcsr_put_block
 
  USE dbcsr_methods, ONLY: &
-      block_matrix_mp_release           => dbcsr_mp_release, &
-      block_mp_release                  => dbcsr_mp_release, &
+      dbcsr_mp_release, &
       dbcsr_nblkcols_total, &
       dbcsr_nblkrows_total, &
       dbcsr_get_data_size, &
@@ -64,7 +63,7 @@ MODULE block_matrix_api
  USE dbcsr_types, ONLY: &
       block_matrix_transpose => dbcsr_transpose, &
       block_matrix_no_transpose => dbcsr_no_transpose, &
-      block_mp_obj => dbcsr_mp_obj, &
+      dbcsr_mp_obj, &
       dbcsr_type_real_8, &
       dbcsr_type_no_symmetry, &
       dbcsr_iterator, &
@@ -82,7 +81,7 @@ MODULE block_matrix_api
       dp
 
  USE dbcsr_mp_methods, ONLY: &
-      block_mp_new => dbcsr_mp_new
+      dbcsr_mp_new
 
  USE dbcsr_index_operations, ONLY: &
       block_matrix_sort_indices => dbcsr_sort_indices
@@ -99,6 +98,8 @@ MODULE block_matrix_api
      block_matrix_lapack_larnv => dbcsr_lapack_larnv, &
      block_matrix_set_larnv_seed => set_larnv_seed
 
+ USE message_passing, ONLY: mp_cart_rank, mp_environ
+
 
 #include "../../base/base_uses.f90"
 
@@ -107,10 +108,6 @@ MODULE block_matrix_api
    PRIVATE
 
    CHARACTER(len=*), PARAMETER, PRIVATE :: moduleN = 'block_matrix_api'
-
-   PUBLIC :: block_mp_new
-   PUBLIC :: block_mp_obj
-   PUBLIC :: block_mp_release
 
    PUBLIC :: block_matrix_type
    PUBLIC :: block_matrix_iterator
@@ -127,24 +124,10 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_get_block_p
    PUBLIC :: block_matrix_put_block
    PUBLIC :: block_matrix_reserve_blocks
-   PUBLIC :: block_matrix_distribution_col_dist
-   PUBLIC :: block_matrix_distribution_new
-   PUBLIC :: block_matrix_distribution_row_dist
-   PUBLIC :: block_matrix_distribution_hold
-   PUBLIC :: block_matrix_distribution_release
-   PUBLIC :: block_matrix_get_name
-   PUBLIC :: block_matrix_nblkcols_total
-   PUBLIC :: block_matrix_nblkrows_total
-   PUBLIC :: block_matrix_get_data_size
-   PUBLIC :: block_matrix_get_num_blocks
-   PUBLIC :: block_matrix_get_nze
    PUBLIC :: block_matrix_set
    PUBLIC :: block_matrix_filter
    PUBLIC :: block_matrix_create
    PUBLIC :: block_matrix_finalize
-   PUBLIC :: block_matrix_get_stored_coordinates
-   PUBLIC :: block_matrix_blk_column_size
-   PUBLIC :: block_matrix_blk_row_size
    PUBLIC :: block_matrix_multiply
    PUBLIC :: block_matrix_redistribute
    PUBLIC :: block_matrix_cfg
@@ -152,13 +135,29 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_add
    PUBLIC :: block_matrix_maxabs
    PUBLIC :: block_matrix_zero
+   PUBLIC :: block_matrix_checksum
+   PUBLIC :: block_matrix_transpose
+   PUBLIC :: block_matrix_no_transpose
+
+   PUBLIC :: block_matrix_distribution_col_dist
+   PUBLIC :: block_matrix_distribution_new
+   PUBLIC :: block_matrix_distribution_row_dist
+   PUBLIC :: block_matrix_distribution_hold
+   PUBLIC :: block_matrix_distribution_release
+
+   PUBLIC :: block_matrix_get_name
+   PUBLIC :: block_matrix_nblkcols_total
+   PUBLIC :: block_matrix_nblkrows_total
+   PUBLIC :: block_matrix_get_data_size
+   PUBLIC :: block_matrix_get_num_blocks
+   PUBLIC :: block_matrix_get_nze
+   PUBLIC :: block_matrix_get_stored_coordinates
+   PUBLIC :: block_matrix_blk_column_size
+   PUBLIC :: block_matrix_blk_row_size
    PUBLIC :: block_matrix_row_block_sizes
    PUBLIC :: block_matrix_col_block_sizes
    PUBLIC :: block_matrix_row_blk_size_obj
    PUBLIC :: block_matrix_col_blk_size_obj
-   PUBLIC :: block_matrix_checksum
-   PUBLIC :: block_matrix_transpose
-   PUBLIC :: block_matrix_no_transpose
 
    ! TODO: remove these
    PUBLIC :: checker_tr
@@ -582,19 +581,38 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_distribution_new(dist, mp_env, row_dist_block, col_dist_block, &
+   SUBROUTINE block_matrix_distribution_new(dist, mp_comm, row_dist_block, col_dist_block, &
                                             local_rows, local_cols, reuse_arrays)
       TYPE(block_matrix_distribution_obj), INTENT(OUT)       :: dist
-      TYPE(block_mp_obj), INTENT(IN)                         :: mp_env
+      INTEGER, INTENT(IN)                                    :: mp_comm
       INTEGER, DIMENSION(:), INTENT(IN), POINTER, CONTIGUOUS :: row_dist_block, col_dist_block
       INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL, &
          POINTER, CONTIGUOUS                                 :: local_rows, local_cols
       LOGICAL, OPTIONAL                                      :: reuse_arrays
 
+      TYPE(dbcsr_mp_obj)                                 :: mp_env
+      INTEGER                                            :: mynode, numnodes, pcol, prow
+      INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: pgrid
+      INTEGER, DIMENSION(2)                              :: coord, mycoord, npdims
+
+      ! Create a dbcsr mp environment from communicator
+      CALL mp_environ(numnodes, npdims, mycoord, mp_comm)
+      CALL mp_environ(numnodes, mynode, mp_comm)
+      ALLOCATE (pgrid(0:npdims(1) - 1, 0:npdims(2) - 1))
+      DO prow = 0, npdims(1) - 1
+         DO pcol = 0, npdims(2) - 1
+            coord = (/prow, pcol/)
+            CALL mp_cart_rank(mp_comm, coord, pgrid(prow, pcol))
+         ENDDO
+      ENDDO
+      CPASSERT(mynode == pgrid(mycoord(1), mycoord(2)))
+
+      CALL dbcsr_mp_new(mp_env, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
       CALL dbcsr_distribution_new(dist=dist%dbcsr, mp_env=mp_env, &
                                  row_dist_block=row_dist_block, col_dist_block=col_dist_block, &
                                  local_rows=local_rows, local_cols=local_cols, &
                                  reuse_arrays=reuse_arrays)
+      CALL dbcsr_mp_release(mp_env)
    END SUBROUTINE block_matrix_distribution_new
 
    !================================================================================================

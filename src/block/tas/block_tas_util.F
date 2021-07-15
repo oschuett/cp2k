@@ -11,13 +11,11 @@ MODULE block_tas_util
 
    !! often used utilities for tall-and-skinny matrices
 
-   USE block_matrix_api, ONLY: block_mp_new, block_mp_obj, &
-                               block_matrix_transpose, &
+   USE block_matrix_api, ONLY: block_matrix_transpose, &
                                block_matrix_no_transpose, &
                                block_matrix_sort_indices
 
    USE kinds, ONLY: int_8
-   USE message_passing, ONLY: mp_cart_rank, mp_environ
 
 #include "../../base/base_uses.f90"
 
@@ -35,7 +33,6 @@ MODULE block_tas_util
 
    PUBLIC :: &
       array_eq, &
-      block_mp_environ, &
       index_unique, &
       invert_transpose_flag, &
       swap
@@ -51,29 +48,6 @@ MODULE block_tas_util
    END INTERFACE
 
 CONTAINS
-   FUNCTION block_mp_environ(mp_comm)
-      !! Create a dbcsr mp environment from communicator
-      INTEGER, INTENT(IN)                                :: mp_comm
-      TYPE(block_mp_obj)                                 :: block_mp_environ
-
-      INTEGER                                            :: mynode, numnodes, pcol, prow
-      INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: pgrid
-      INTEGER, DIMENSION(2)                              :: coord, mycoord, npdims
-
-      CALL mp_environ(numnodes, npdims, mycoord, mp_comm)
-      CALL mp_environ(numnodes, mynode, mp_comm)
-      ALLOCATE (pgrid(0:npdims(1) - 1, 0:npdims(2) - 1))
-      DO prow = 0, npdims(1) - 1
-         DO pcol = 0, npdims(2) - 1
-            coord = (/prow, pcol/)
-            CALL mp_cart_rank(mp_comm, coord, pgrid(prow, pcol))
-         ENDDO
-      ENDDO
-
-      CPASSERT(mynode == pgrid(mycoord(1), mycoord(2)))
-
-      CALL block_mp_new(block_mp_environ, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
-   END FUNCTION
 
    SUBROUTINE swap_i8(arr)
       INTEGER(KIND=int_8), DIMENSION(2), INTENT(INOUT)   :: arr

@@ -1,4 +1,4 @@
 {
 "description": "block-sparse matrix framework",
-"requires": ["../../base"]
+"requires": ["../../base", "../../mpiwrap"]
 }

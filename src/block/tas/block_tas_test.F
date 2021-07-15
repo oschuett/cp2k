@@ -13,9 +13,9 @@ MODULE block_tas_test
    USE block_matrix_api, ONLY: &
       block_matrix_release, block_matrix_nblkcols_total, block_matrix_nblkrows_total, &
       block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
-      block_mp_release, block_matrix_distribution_release, &
+      block_matrix_distribution_release, &
       block_matrix_multiply, &
-      block_matrix_type, block_matrix_distribution_obj, block_mp_obj, &
+      block_matrix_type, block_matrix_distribution_obj, &
       block_matrix_no_transpose, block_matrix_transpose, &
       block_matrix_distribution_new, &
       block_matrix_create, &
@@ -39,8 +39,7 @@ MODULE block_tas_test
    USE block_tas_mm, ONLY: block_tas_multiply
    USE block_tas_split, ONLY: block_tas_mp_comm, &
                               block_tas_get_split_info
-   USE block_tas_util, ONLY: block_mp_environ, &
-                             invert_transpose_flag
+   USE block_tas_util, ONLY: invert_transpose_flag
    USE kinds, ONLY: int_8, real_8, dp
    USE message_passing, ONLY: mp_environ, &
                             mp_cart_create, &
@@ -183,7 +182,6 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: npdims, myploc
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: cd_a, cd_b, cd_c, &
                                                             rd_a, rd_b, rd_c
-      TYPE(block_mp_obj)                                 :: mp_environ_tmp
 
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: row_blk_size, col_blk_size
 
@@ -228,11 +226,9 @@ CONTAINS
          CALL block_tas_default_distvec(INT(block_matrix_nblkcols_total(block_matrix_c)), &
                                         npdims(2), block_matrix_col_block_sizes(block_matrix_c), cd_c)
 
-         mp_environ_tmp = block_mp_environ(comm_dbcsr)
-         CALL block_matrix_distribution_new(dist_a, mp_environ_tmp, rd_a, cd_a, reuse_arrays=.TRUE.)
-         CALL block_matrix_distribution_new(dist_b, mp_environ_tmp, rd_b, cd_b, reuse_arrays=.TRUE.)
-         CALL block_matrix_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
-         CALL block_mp_release(mp_environ_tmp)
+         CALL block_matrix_distribution_new(dist_a, comm_dbcsr, rd_a, cd_a, reuse_arrays=.TRUE.)
+         CALL block_matrix_distribution_new(dist_b, comm_dbcsr, rd_b, cd_b, reuse_arrays=.TRUE.)
+         CALL block_matrix_distribution_new(dist_c, comm_dbcsr, rd_c, cd_c, reuse_arrays=.TRUE.)
 
          row_blk_size => block_matrix_row_block_sizes(block_matrix_a)
          col_blk_size => block_matrix_col_block_sizes(block_matrix_a)
@@ -305,7 +301,6 @@ CONTAINS
                                                             rd_a, rd_b, rd_c
       REAL(KIND=real_8)                                  :: norm, rc_cs, sq_cs
       TYPE(block_matrix_distribution_obj)                       :: dist_a, dist_b, dist_c
-      TYPE(block_mp_obj)                                 :: mp_environ_tmp
       TYPE(block_matrix_type)                                   :: block_matrix_a, block_matrix_a_mm, block_matrix_b, &
                                                             block_matrix_b_mm, block_matrix_c, block_matrix_c_mm, &
                                                             block_matrix_c_mm_check
@@ -343,11 +338,9 @@ CONTAINS
       CALL block_tas_default_distvec(INT(block_matrix_nblkcols_total(block_matrix_c)), &
                                      npdims(2), block_matrix_col_block_sizes(block_matrix_c), cd_c)
 
-      mp_environ_tmp = block_mp_environ(comm_dbcsr)
-      CALL block_matrix_distribution_new(dist_a, mp_environ_tmp, rd_a, cd_a, reuse_arrays=.TRUE.)
-      CALL block_matrix_distribution_new(dist_b, mp_environ_tmp, rd_b, cd_b, reuse_arrays=.TRUE.)
-      CALL block_matrix_distribution_new(dist_c, mp_environ_tmp, rd_c, cd_c, reuse_arrays=.TRUE.)
-      CALL block_mp_release(mp_environ_tmp)
+      CALL block_matrix_distribution_new(dist_a, comm_dbcsr, rd_a, cd_a, reuse_arrays=.TRUE.)
+      CALL block_matrix_distribution_new(dist_b, comm_dbcsr, rd_b, cd_b, reuse_arrays=.TRUE.)
+      CALL block_matrix_distribution_new(dist_c, comm_dbcsr, rd_c, cd_c, reuse_arrays=.TRUE.)
 
       CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, &
                         row_blk_size_obj=block_matrix_row_blk_size_obj(block_matrix_a), &

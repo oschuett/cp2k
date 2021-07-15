@@ -17,11 +17,11 @@ MODULE block_tas_base
       block_matrix_distribution_row_dist, block_matrix_distribution_hold, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
       block_matrix_iterator_start, block_matrix_iterator_stop, &
-      block_matrix_distribution_release, block_mp_release, block_matrix_nblkcols_total, &
+      block_matrix_distribution_release, block_matrix_nblkcols_total, &
       block_matrix_nblkrows_total, block_matrix_release, &
       block_matrix_get_data_size, block_matrix_get_num_blocks, block_matrix_get_nze, &
       block_matrix_get_info, block_matrix_set, block_matrix_filter, block_matrix_clear, &
-      block_matrix_distribution_obj, block_matrix_iterator, block_mp_obj, block_matrix_type, &
+      block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
       block_matrix_create, block_matrix_finalize, block_matrix_get_name
    USE block_tas_types, ONLY: &
       block_tas_distribution_type, block_tas_iterator, block_tas_split_info, block_tas_type
@@ -31,8 +31,7 @@ MODULE block_tas_base
       block_index_global_to_local, block_index_local_to_global, colsplit, &
       block_tas_info_hold, block_tas_release_info, block_tas_create_split, &
       group_to_mrowcol, rowsplit, block_tas_get_split_info
-   USE block_tas_util, ONLY: &
-      block_mp_environ, index_unique
+   USE block_tas_util, ONLY: index_unique
    USE kinds, ONLY: &
       default_string_length, int_8, real_8, real_4, dp
    USE message_passing, ONLY: &
@@ -298,7 +297,6 @@ CONTAINS
 
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS       :: row_dist_vec
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS       :: col_dist_vec
-      TYPE(block_mp_obj)                               :: mp_environ_tmp
       INTEGER                                          :: nrows, ncols, irow, col, icol, row, &
                                                           split_rowcol, nsplit, handle
       LOGICAL                                          :: opt_nsplit
@@ -354,14 +352,12 @@ CONTAINS
          ENDDO
       END SELECT
 
-      mp_environ_tmp = block_mp_environ(split_info_prv%mp_comm_group)
-
       dist%info = split_info_prv
 
-      CALL block_matrix_distribution_new(dist%block_matrix_dist, mp_environ_tmp, row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
+      CALL block_matrix_distribution_new(dist%block_matrix_dist, split_info_prv%mp_comm_group, &
+                                         row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
       ALLOCATE (dist%row_dist, source=row_dist)
       ALLOCATE (dist%col_dist, source=col_dist)
-      CALL block_mp_release(mp_environ_tmp)
 
       !IF(PRESENT(strict_split)) dist%strict_split = strict_split
 
@@ -462,7 +458,6 @@ CONTAINS
       LOGICAL                                            :: tr
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
       TYPE(block_matrix_distribution_obj)                       :: dist
-      TYPE(block_mp_obj)                                 :: mp_environ_tmp
       TYPE(block_tas_iterator)                           :: iter
       TYPE(block_tas_split_info)                         :: info
       INTEGER                                            :: block_number, rb_count, nblks_local
@@ -487,9 +482,7 @@ CONTAINS
          col_size_vec(col) = matrix_rect%col_blk_size%data(col)
       ENDDO
 
-      mp_environ_tmp = block_mp_environ(info%mp_comm)
-      CALL block_matrix_distribution_new(dist, mp_environ_tmp, row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
-      CALL block_mp_release(mp_environ_tmp)
+      CALL block_matrix_distribution_new(dist, info%mp_comm, row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
 
       CALL block_matrix_create(matrix=matrix_dbcsr, &
                         name=TRIM(block_matrix_get_name(matrix_rect%matrix)), &

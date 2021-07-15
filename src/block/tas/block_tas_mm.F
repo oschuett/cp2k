@@ -20,11 +20,11 @@ MODULE block_tas_mm
       block_matrix_scale, &
       block_matrix_multiply, &
       block_matrix_no_transpose, block_matrix_transpose, block_matrix_type, &
-      block_matrix_distribution_obj, block_mp_obj, &
+      block_matrix_distribution_obj, &
       block_matrix_create, block_matrix_finalize, &
       block_matrix_redistribute, &
       block_matrix_distribution_new, &
-      block_mp_release, block_matrix_release, block_matrix_distribution_release, &
+      block_matrix_release, block_matrix_distribution_release, &
       block_matrix_get_nze, &
       block_matrix_cfg, &
       block_matrix_get_info, block_matrix_copy, &
@@ -47,7 +47,7 @@ MODULE block_tas_mm
       rowsplit, colsplit, block_tas_get_split_info, block_tas_create_split, block_tas_mp_comm, &
       block_tas_release_info, accept_pgrid_dims, block_tas_info_hold, default_nsplit_accept_ratio
    USE block_tas_util, ONLY: &
-      swap, invert_transpose_flag, array_eq, block_mp_environ
+      swap, invert_transpose_flag, array_eq
    USE kinds, ONLY: &
       int_8, real_8, real_4, default_string_length, dp
    USE message_passing, ONLY: &
@@ -1518,7 +1518,6 @@ CONTAINS
       INTEGER, DIMENSION(2)                      :: pdims, pcoord
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS :: row_dist, col_dist, rbsize, rcsize
       TYPE(block_matrix_distribution_obj)               :: dist, dist_old
-      TYPE(block_mp_obj)                         :: mp_obj
       CHARACTER(len=default_string_length)       :: name
       LOGICAL                                    :: nodata_prv, optimize_pgrid_prv
       CHARACTER(LEN=*), PARAMETER                :: routineN = 'convert_to_new_pgrid'
@@ -1555,9 +1554,7 @@ CONTAINS
       CALL block_tas_default_distvec(nbrows, pdims(1), rbsize, row_dist)
       CALL block_tas_default_distvec(nbcols, pdims(2), rcsize, col_dist)
 
-      mp_obj = block_mp_environ(mp_comm_cart)
-      CALL block_matrix_distribution_new(dist, mp_obj, row_dist, col_dist, reuse_arrays=.TRUE.)
-      CALL block_mp_release(mp_obj)
+      CALL block_matrix_distribution_new(dist, mp_comm_cart, row_dist, col_dist, reuse_arrays=.TRUE.)
 
       CALL block_matrix_create(matrix_out, name, dist, rbsize, rcsize)
       CALL block_matrix_distribution_release(dist)
