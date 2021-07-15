@@ -16,7 +16,7 @@ MODULE block_tas_reshape_ops
       block_matrix_get_stored_coordinates, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
       block_matrix_iterator_start, block_matrix_iterator_stop, &
-      block_matrix_blk_column_size, block_matrix_blk_row_size, &
+      block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
       block_matrix_get_info, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
       block_matrix_finalize, block_matrix_get_name
@@ -449,6 +449,7 @@ CONTAINS
       REAL(dp), DIMENSION(:, :), POINTER                 :: block
       TYPE(block_matrix_iterator)                               :: iter
       TYPE(block_tas_split_info)                         :: info
+      INTEGER, DIMENSION(:), POINTER                     :: row_block_sizes, col_block_sizes
 
       CALL timeset(routineN, handle)
 
@@ -548,8 +549,10 @@ CONTAINS
          ! First, we need to get the index to create block
          DO WHILE (block_buffer_blocks_left(buffer_recv(iproc)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8)
-            blk_size(1) = block_matrix_blk_row_size(matrix_out, INT(blk_index_i8(1)))
-            blk_size(2) = block_matrix_blk_column_size(matrix_out, INT(blk_index_i8(2)))
+            row_block_sizes => block_matrix_row_block_sizes(matrix_out)
+            col_block_sizes => block_matrix_col_block_sizes(matrix_out)
+            blk_size(1) = row_block_sizes(INT(blk_index_i8(1)))
+            blk_size(2) = col_block_sizes(INT(blk_index_i8(2)))
             ALLOCATE(block(blk_size(1), blk_size(2)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8, block)
             CALL block_matrix_put_block(matrix_out, INT(blk_index_i8(1)), INT(blk_index_i8(2)), block, summation=.TRUE.)

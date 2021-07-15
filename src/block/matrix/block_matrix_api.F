@@ -39,8 +39,6 @@ MODULE block_matrix_api
       dbcsr_mp_release, &
       dbcsr_get_num_blocks, &
       dbcsr_get_nze, &
-      dbcsr_blk_column_size, &
-      dbcsr_blk_row_size, &
       dbcsr_row_block_sizes, &
       dbcsr_col_block_sizes, &
       dbcsr_release
@@ -151,9 +149,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_col_block_sizes
 
    ! TODO: remove these
-   PUBLIC :: block_matrix_blk_column_size
-   PUBLIC :: block_matrix_blk_row_size
-
    PUBLIC :: checker_tr
    PUBLIC :: swap
    PUBLIC :: block_matrix_complete_redistribute
@@ -460,26 +455,6 @@ MODULE block_matrix_api
 
       res => dbcsr_col_block_sizes(matrix%dbcsr)
    END FUNCTION block_matrix_col_block_sizes
-
-   !================================================================================================
-   !================================================================================================
-   PURE FUNCTION block_matrix_blk_row_size(matrix, row) RESULT(res)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      INTEGER, INTENT(IN)                                :: row
-      INTEGER                                            :: res
-
-      res = dbcsr_blk_row_size(matrix%dbcsr, row)
-   END FUNCTION block_matrix_blk_row_size
-
-   !================================================================================================
-   !================================================================================================
-   PURE FUNCTION block_matrix_blk_column_size(matrix, column) RESULT(res)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      INTEGER, INTENT(IN)                                :: column
-      INTEGER                                            :: res
-
-      res = dbcsr_blk_column_size(matrix%dbcsr, column)
-   END FUNCTION block_matrix_blk_column_size
 
    !================================================================================================
    !================================================================================================
