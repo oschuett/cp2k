@@ -24,8 +24,7 @@ MODULE block_tas_test
       block_matrix_maxabs, &
       block_matrix_add, &
       block_matrix_complete_redistribute, &
-      block_matrix_lapack_larnv, block_matrix_set_larnv_seed, block_matrix_get_name, &
-      block_matrix_set_larnv_seed
+      generate_larnv_seed, block_matrix_get_name
    USE block_tas_base, ONLY: &
       block_tas_convert_to_dbcsr, block_tas_create, block_tas_distribution_new, &
       block_tas_finalize, block_tas_get_stored_coordinates, block_tas_nblkcols_total, &
@@ -134,7 +133,7 @@ CONTAINS
 
       ALLOCATE (values(max_row_size, max_col_size))
 
-      CALL block_matrix_set_larnv_seed(7, 42, 3, 42, randmat_counter, jseed)
+      jseed = generate_larnv_seed(7, 42, 3, 42, randmat_counter)
 
       DO row = 1, block_tas_nblkrows_total(matrix)
          DO col = 1, block_tas_nblkcols_total(matrix)
@@ -148,7 +147,7 @@ CONTAINS
                   row_size = rbsize_obj%data(row_s)
                   col_size = cbsize_obj%data(col_s)
                   nze = row_size*col_size
-                  CALL block_matrix_set_larnv_seed(INT(row_s), INT(nrow), INT(col_s), INT(ncol), randmat_counter, iseed)
+                  iseed = generate_larnv_seed(INT(row_s), INT(nrow), INT(col_s), INT(ncol), randmat_counter)
                   CALL dlarnv(1, iseed, max_nze, values)
                   CALL block_tas_put_block(matrix, row_s, col_s, values(1:row_size, 1:col_size))
                ENDIF

@@ -13,7 +13,7 @@ PROGRAM block_tas_unittest
    USE dbcsr_api, ONLY: dbcsr_finalize_lib, &
                         dbcsr_init_lib, &
                         dbcsr_print_statistics
-   USE block_matrix_api, ONLY: block_matrix_get_name, block_matrix_set_larnv_seed
+   USE block_matrix_api, ONLY: block_matrix_get_name
    USE block_tas_base, ONLY: block_tas_destroy, &
                              block_tas_info, &
                              block_tas_nblkcols_total, &

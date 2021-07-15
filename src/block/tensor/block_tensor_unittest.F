@@ -28,7 +28,6 @@ PROGRAM block_tensor_unittest
       block_tensor_pgrid_create, block_tensor_get_info, block_tensor_pgrid_destroy, &
       ndims_tensor, block_tensor_default_distvec
 
-   USE block_matrix_api, ONLY: block_matrix_set_larnv_seed
    USE kinds, ONLY: real_8,dp
 
 #include "../../base/base_uses.f90"

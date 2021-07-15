@@ -88,10 +88,6 @@ MODULE block_matrix_api
  USE dbcsr_dist_util, ONLY: &
       dbcsr_checksum
 
- USE dbcsr_blas_operations, ONLY: &
-     block_matrix_lapack_larnv => dbcsr_lapack_larnv, &
-     block_matrix_set_larnv_seed => set_larnv_seed
-
  USE message_passing, ONLY: mp_cart_rank, mp_environ
 
 
@@ -148,12 +144,12 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_row_block_sizes
    PUBLIC :: block_matrix_col_block_sizes
 
+   PUBLIC :: generate_larnv_seed
+
    ! TODO: remove these
    PUBLIC :: checker_tr
    PUBLIC :: swap
    PUBLIC :: block_matrix_complete_redistribute
-   PUBLIC :: block_matrix_lapack_larnv
-   PUBLIC :: block_matrix_set_larnv_seed
 
    TYPE block_matrix_distribution_obj
       TYPE(dbcsr_distribution_obj), PRIVATE        :: dbcsr
@@ -674,6 +670,34 @@ MODULE block_matrix_api
 
       norm = dbcsr_maxabs(matrix%dbcsr)
    END FUNCTION block_matrix_maxabs
+
+   !================================================================================================
+   !TODO: Move to some utility module.
+   !================================================================================================
+   FUNCTION generate_larnv_seed(irow, nrow, icol, ncol, ival) RESULT(iseed)
+      !! generate a seed respecting the lapack constraints,
+      !! - values between 0..4095 (2**12-1)
+      !! - iseed(4) odd
+      !! also try to avoid iseed that are zero.
+      !! Have but with a unique 2D mapping (irow,icol), and a 'mini-seed' ival
+
+      INTEGER, INTENT(IN)                                :: irow, nrow, icol, ncol, ival
+         !! 1..nrow
+         !! nrow
+         !! 1..ncol
+         !! ncol
+         !! mini-seed
+      INTEGER                                            :: iseed(4)
+         !! a lapack compatible seed
+
+      INTEGER(KIND=int_8)                                :: map
+
+      map = ((irow - 1 + icol*INT(nrow, int_8))*(1 + MODULO(ival, 2**16)))*2 + 1 + 0*ncol ! ncol used
+      iseed(4) = INT(MODULO(map, 2_int_8**12)); map = map/2_int_8**12; ! keep odd
+      iseed(3) = INT(MODULO(IEOR(map, 3541_int_8), 2_int_8**12)); map = map/2_int_8**12
+      iseed(2) = INT(MODULO(IEOR(map, 1153_int_8), 2_int_8**12)); map = map/2_int_8**12
+      iseed(1) = INT(MODULO(IEOR(map, 2029_int_8), 2_int_8**12)); map = map/2_int_8**12
+   END FUNCTION generate_larnv_seed
 
 
 END MODULE block_matrix_api
