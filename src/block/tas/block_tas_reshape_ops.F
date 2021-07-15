@@ -12,7 +12,6 @@ MODULE block_tas_reshape_ops
 
    USE block_matrix_api, ONLY: &
       block_matrix_put_block, block_matrix_reserve_blocks, &
-      internal_data_allocate, internal_data_deallocate, &
       block_matrix_distribution_col_dist, block_matrix_distribution_row_dist, &
       block_matrix_get_stored_coordinates, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &

@@ -61,10 +61,6 @@ MODULE block_matrix_api
       dbcsr_get_stored_coordinates, &
       checker_tr
 
- USE dbcsr_data_methods_low, ONLY: &
-      internal_data_allocate, &
-      internal_data_deallocate
-
  USE dbcsr_types, ONLY: &
       block_matrix_transpose => dbcsr_transpose, &
       block_matrix_no_transpose => dbcsr_no_transpose, &
@@ -170,8 +166,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_complete_redistribute
    PUBLIC :: block_matrix_lapack_larnv
    PUBLIC :: block_matrix_set_larnv_seed
-   PUBLIC :: internal_data_allocate
-   PUBLIC :: internal_data_deallocate
 
    TYPE block_matrix_distribution_obj
       TYPE(dbcsr_distribution_obj), PRIVATE        :: dbcsr
