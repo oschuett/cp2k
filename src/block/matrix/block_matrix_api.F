@@ -37,8 +37,6 @@ MODULE block_matrix_api
 
  USE dbcsr_methods, ONLY: &
       dbcsr_mp_release, &
-      dbcsr_nblkcols_total, &
-      dbcsr_nblkrows_total, &
       dbcsr_get_num_blocks, &
       dbcsr_get_nze, &
       dbcsr_blk_column_size, &
@@ -153,8 +151,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_col_block_sizes
 
    ! TODO: remove these
-   PUBLIC :: block_matrix_nblkcols_total
-   PUBLIC :: block_matrix_nblkrows_total
    PUBLIC :: block_matrix_blk_column_size
    PUBLIC :: block_matrix_blk_row_size
 
@@ -446,24 +442,6 @@ MODULE block_matrix_api
 
       num_blocks = dbcsr_get_num_blocks(matrix%dbcsr)
    END FUNCTION block_matrix_get_num_blocks
-
-   !================================================================================================
-   !================================================================================================
-   FUNCTION block_matrix_nblkrows_total(matrix) RESULT(res)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      INTEGER                                            :: res
-
-      res = dbcsr_nblkrows_total(matrix%dbcsr)
-   END FUNCTION block_matrix_nblkrows_total
-
-   !================================================================================================
-   !================================================================================================
-   FUNCTION block_matrix_nblkcols_total(matrix) RESULT(res)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      INTEGER                                            :: res
-
-      res = dbcsr_nblkcols_total(matrix%dbcsr)
-   END FUNCTION block_matrix_nblkcols_total
 
    !================================================================================================
    !================================================================================================
