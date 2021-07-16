@@ -1467,7 +1467,7 @@ CONTAINS
 
       REAL(dp), DIMENSION(:, :), POINTER        :: block_get
       REAL(dp), DIMENSION(:, :), POINTER        :: block_put
-      LOGICAL                                   :: tr, nodata_prv, found
+      LOGICAL                                   :: nodata_prv, found
 
       CPASSERT(matrix_in%valid)
 
@@ -1492,7 +1492,7 @@ CONTAINS
 
          DO WHILE (block_tas_iterator_blocks_left(iter))
             CALL block_tas_iterator_next_block(iter, row, column, block_get)
-            CALL block_tas_get_block_p(matrix_out, row, column, block_put, tr, found)
+            CALL block_tas_get_block_p(matrix_out, row, column, block_put, found)
             CPASSERT(found)
             block_put(1, 1) = NORM2(block_get)
          ENDDO

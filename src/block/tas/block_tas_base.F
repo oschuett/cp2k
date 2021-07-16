@@ -873,30 +873,26 @@ CONTAINS
    END SUBROUTINE
 
    !! As block_matrix_put_block
-   SUBROUTINE block_tas_put_block(matrix, row, col, block, transposed, summation, &
-                                               scale)
+   SUBROUTINE block_tas_put_block(matrix, row, col, block, summation)
       TYPE(block_tas_type), INTENT(INOUT)     :: matrix
-      REAL(dp), DIMENSION(:, :), INTENT(IN) :: block
-      LOGICAL, INTENT(IN), OPTIONAL         :: transposed, summation
       INTEGER(KIND=int_8), INTENT(IN)       :: row, col
-      REAL(dp), INTENT(IN), OPTIONAL       :: scale
+      REAL(dp), DIMENSION(:, :), INTENT(IN) :: block
+      LOGICAL, INTENT(IN), OPTIONAL         :: summation
 
       INTEGER                     :: col_group, row_group
 
       CALL block_index_global_to_local(matrix%dist%info, matrix%dist, row=row, column=col, &
                                        row_group=row_group, column_group=col_group)
 
-      CALL block_matrix_put_block(matrix%matrix, row_group, col_group, block, &
-                                  transposed=transposed, summation=summation, scale=scale)
+      CALL block_matrix_put_block(matrix%matrix, row_group, col_group, block, summation=summation)
 
    END SUBROUTINE
 
-   SUBROUTINE block_tas_get_block_p(matrix, row, col, block, transposed, found, row_size, col_size)
+   SUBROUTINE block_tas_get_block_p(matrix, row, col, block, found, row_size, col_size)
       !! As block_matrix_get_block_p
       TYPE(block_tas_type), INTENT(INOUT)  :: matrix
       INTEGER(KIND=int_8), INTENT(IN)    :: row, col
       REAL(dp), DIMENSION(:, :), POINTER :: block
-      LOGICAL, INTENT(OUT)               :: transposed
       LOGICAL, INTENT(OUT)               :: found
       INTEGER, INTENT(OUT), OPTIONAL     :: row_size, col_size
 
@@ -905,7 +901,7 @@ CONTAINS
       CALL block_index_global_to_local(matrix%dist%info, matrix%dist, row=row, column=col, &
                                        row_group=row_group, column_group=col_group)
 
-      CALL block_matrix_get_block_p(matrix%matrix, row_group, col_group, block, transposed, &
+      CALL block_matrix_get_block_p(matrix%matrix, row_group, col_group, block, &
                                     found, row_size=row_size, col_size=col_size)
 
    END SUBROUTINE

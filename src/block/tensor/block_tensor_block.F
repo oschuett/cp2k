@@ -402,7 +402,7 @@ CONTAINS
 
    END FUNCTION checker_tr
 
-   SUBROUTINE block_tensor_put_anyd_block (tensor, ind, block, summation, scale)
+   SUBROUTINE block_tensor_put_anyd_block (tensor, ind, block, summation)
       !! Generic implementation of block_tensor_put_block, template for datatype
 
       TYPE(block_nd), INTENT(IN)       :: block
@@ -410,8 +410,6 @@ CONTAINS
       TYPE(block_tensor_type), INTENT(INOUT)            :: tensor
       LOGICAL, INTENT(IN), OPTIONAL                :: summation
          !! whether block should be summed to existing block
-      REAL(dp), INTENT(IN), OPTIONAL :: scale
-         !! scaling factor
       INTEGER, DIMENSION(ndims_tensor(tensor)), &
          INTENT(IN)                                :: ind
          !! block index
@@ -419,7 +417,7 @@ CONTAINS
       SELECT CASE (ndims_tensor(tensor))
 #:for ndim in ndims
       CASE (${ndim}$)
-         CALL block_tensor_put_${ndim}$d_block(tensor, ind, block%sizes, block%blk, summation=summation, scale=scale)
+         CALL block_tensor_put_${ndim}$d_block(tensor, ind, block%sizes, block%blk, summation=summation)
 #:endfor
       END SELECT
    END SUBROUTINE
@@ -451,7 +449,7 @@ CONTAINS
    END SUBROUTINE
 
 #:for ndim in ndims
-   SUBROUTINE block_tensor_put_${ndim}$d_block (tensor, ind, sizes, block, summation, scale)
+   SUBROUTINE block_tensor_put_${ndim}$d_block (tensor, ind, sizes, block, summation)
       !! Template for block_tensor_put_block.
 
       TYPE(block_tensor_type), INTENT(INOUT)                     :: tensor
@@ -464,8 +462,6 @@ CONTAINS
          !! block to put
       LOGICAL, INTENT(IN), OPTIONAL                         :: summation
          !! whether block should be summed to existing block
-      REAL(dp), INTENT(IN), OPTIONAL                       :: scale
-         !! scaling factor
       INTEGER(KIND=int_8), DIMENSION(2)                     :: ind_2d
       INTEGER, DIMENSION(2)                                 :: shape_2d
       REAL(dp), POINTER, DIMENSION(:, :)                   :: block_2d
@@ -504,8 +500,7 @@ CONTAINS
 
       END ASSOCIATE
 
-      CALL block_tas_put_block(tensor%matrix_rep, ind_2d(1), ind_2d(2), block_2d, summation=summation, &
-                               scale=scale)
+      CALL block_tas_put_block(tensor%matrix_rep, ind_2d(1), ind_2d(2), block_2d, summation=summation)
 
       IF (new_block) DEALLOCATE (block_2d)
 
@@ -550,7 +545,6 @@ CONTAINS
 
       INTEGER(KIND=int_8), DIMENSION(2)                     :: ind_2d
       REAL(dp), DIMENSION(:, :), POINTER, CONTIGUOUS       :: block_2d_ptr
-      LOGICAL                                               :: tr
       INTEGER                                               :: i
       REAL(dp), DIMENSION(${shape_colon(ndim)}$), POINTER  :: block_ptr
 
@@ -561,8 +555,7 @@ CONTAINS
       ASSOCIATE (map1_2d => tensor%nd_index_blk%map1_2d, &
                  map2_2d => tensor%nd_index_blk%map2_2d)
 
-         CALL block_tas_get_block_p(tensor%matrix_rep, ind_2d(1), ind_2d(2), block_2d_ptr, tr, found)
-         CPASSERT(.NOT. tr)
+         CALL block_tas_get_block_p(tensor%matrix_rep, ind_2d(1), ind_2d(2), block_2d_ptr, found)
 
          IF (found) THEN
             IF (ALL([map1_2d, map2_2d] == (/(i, i=1, ${ndim}$)/))) THEN

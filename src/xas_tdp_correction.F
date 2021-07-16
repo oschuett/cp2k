@@ -958,7 +958,6 @@ CONTAINS
                                                             proc_dist_3
       INTEGER, DIMENSION(3)                              :: pdims
       LOGICAL                                            :: found
-      REAL(dp)                                           :: factor
       REAL(dp), ALLOCATABLE, DIMENSION(:, :, :)          :: pblock
       TYPE(cp_para_env_type), POINTER                    :: para_env
       TYPE(block_tensor_distribution_type)                    :: t_dist
@@ -991,13 +990,11 @@ CONTAINS
          CALL block_tensor_iterator_next_block(iter, ind, blk)
          CALL block_tensor_get_block(xas_tdp_env%ri_3c_ex, ind, pblock, found)
 
-         factor = 1.0_dp
-         IF (ind(1) == ind(2)) factor = 0.5_dp
+         IF (ind(1) == ind(2)) pblock = 0.5_dp * pblock
          IF (ind(3) /= exat) CYCLE
 
          CALL block_tensor_put_block(work, [ind(1), ind(2), 1], &
-                                [orb_blk_size(ind(1)), orb_blk_size(ind(2)), nsgf_x], &
-                                pblock, scale=factor)
+                                [orb_blk_size(ind(1)), orb_blk_size(ind(2)), nsgf_x], pblock)
 
          DEALLOCATE (pblock)
       END DO

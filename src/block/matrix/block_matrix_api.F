@@ -221,6 +221,7 @@ MODULE block_matrix_api
    END SUBROUTINE block_matrix_iterator_start
 
    !================================================================================================
+   ! TODO: unify with block_matrix_iterator_next_block_index
    !================================================================================================
    SUBROUTINE block_matrix_iterator_next_block_d(iterator, row, column, block, row_size, col_size)
       TYPE(block_matrix_iterator), INTENT(INOUT) :: iterator
@@ -270,28 +271,28 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_get_block_p(matrix, row, col, block, tr, found, row_size, col_size)
+   SUBROUTINE block_matrix_get_block_p(matrix, row, col, block, found, row_size, col_size)
       TYPE(block_matrix_type), INTENT(INOUT)   :: matrix
       INTEGER, INTENT(IN)                      :: row, col
       REAL(dp), DIMENSION(:, :), POINTER       :: block
-      LOGICAL, INTENT(OUT)                     :: tr
       LOGICAL, INTENT(OUT)                     :: found
       INTEGER, INTENT(OUT), OPTIONAL           :: row_size, col_size
 
-      CALL dbcsr_get_block_p(matrix%dbcsr, row, col, block, tr, found, row_size, col_size)
+      LOGICAL :: transposed
+
+      CALL dbcsr_get_block_p(matrix%dbcsr, row, col, block, transposed, found, row_size, col_size)
+      CPASSERT(.NOT.transposed)
    END SUBROUTINE block_matrix_get_block_p
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_put_block(matrix, row, col, block, transposed, summation, scale)
+   SUBROUTINE block_matrix_put_block(matrix, row, col, block, summation)
       TYPE(block_matrix_type), INTENT(INOUT)   :: matrix
       INTEGER, INTENT(IN)                      :: row, col
       REAL(dp), DIMENSION(:, :), INTENT(IN)    :: block
-      LOGICAL, INTENT(IN), OPTIONAL            :: transposed, summation
-      REAL(dp), INTENT(IN), OPTIONAL           :: scale
+      LOGICAL, INTENT(IN), OPTIONAL            :: summation
 
-      CALL dbcsr_put_block(matrix%dbcsr, row, col, block, &
-                           transposed=transposed, summation=summation, scale=scale)
+      CALL dbcsr_put_block(matrix%dbcsr, row, col, block, summation=summation)
    END SUBROUTINE block_matrix_put_block
 
    !================================================================================================
