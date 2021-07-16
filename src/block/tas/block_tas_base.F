@@ -222,7 +222,6 @@ CONTAINS
       INTEGER                                            :: handle
       TYPE(block_tas_iterator)                             :: iter
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
-      LOGICAL :: transposed
       INTEGER(KIND=int_8)                                :: row, column
 
       CALL timeset(routineN, handle)
@@ -238,8 +237,8 @@ CONTAINS
 
       CALL block_tas_iterator_start(iter, matrix_a)
       DO WHILE (block_tas_iterator_blocks_left(iter))
-         CALL block_tas_iterator_next_block(iter, row, column, block, transposed)
-         CALL block_tas_put_block(matrix_b, row, column, block, transposed, summation=summation)
+         CALL block_tas_iterator_next_block(iter, row, column, block)
+         CALL block_tas_put_block(matrix_b, row, column, block, summation=summation)
       ENDDO
       CALL block_tas_iterator_stop(iter)
       CALL timestop(handle)
@@ -254,14 +253,13 @@ CONTAINS
       TYPE(block_tas_iterator)                        :: iter
       INTEGER :: iblk, nblk
       INTEGER(KIND=int_8)                  :: row, column
-      INTEGER :: blk
       INTEGER(KIND=int_8), DIMENSION(:), ALLOCATABLE :: row_res, col_res
 
       nblk = block_tas_get_num_blocks(matrix_in)
       ALLOCATE (row_res(nblk), col_res(nblk))
       CALL block_tas_iterator_start(iter, matrix_in)
       DO iblk = 1, nblk
-         CALL block_tas_iterator_next_block(iter, row, column, blk)
+         CALL block_tas_iterator_next_block(iter, row, column)
          row_res(iblk) = row
          col_res(iblk) = column
       ENDDO
@@ -455,12 +453,11 @@ CONTAINS
       INTEGER(KIND=int_8)                                :: col, row
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: col_dist_vec, col_size_vec, &
                                                             row_dist_vec, row_size_vec
-      LOGICAL                                            :: tr
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
       TYPE(block_matrix_distribution_obj)                       :: dist
       TYPE(block_tas_iterator)                           :: iter
       TYPE(block_tas_split_info)                         :: info
-      INTEGER                                            :: block_number, rb_count, nblks_local
+      INTEGER                                            :: rb_count, nblks_local
       INTEGER, DIMENSION(:), ALLOCATABLE                 :: nz_rows, nz_cols
 
       CALL timeset(routineN, handle)
@@ -499,7 +496,7 @@ CONTAINS
       ALLOCATE (nz_rows(nblks_local), nz_cols(nblks_local))
       rb_count = 0
       DO WHILE (block_tas_iterator_blocks_left(iter))
-         CALL block_tas_iterator_next_block(iter, row, col, block_number)
+         CALL block_tas_iterator_next_block(iter, row, col)
          rb_count = rb_count + 1
          nz_rows(rb_count) = INT(row)
          nz_cols(rb_count) = INT(col)
@@ -510,7 +507,7 @@ CONTAINS
       CALL block_tas_iterator_stop(iter)
       CALL block_tas_iterator_start(iter, matrix_rect)
       DO WHILE (block_tas_iterator_blocks_left(iter))
-         CALL block_tas_iterator_next_block(iter, row, col, block, tr)
+         CALL block_tas_iterator_next_block(iter, row, col, block)
          CALL block_matrix_put_block(matrix_dbcsr, INT(row), INT(col), block)
       ENDDO
 
@@ -536,7 +533,6 @@ CONTAINS
       INTEGER(KIND=int_8)                                :: nbcols, nbrows
       INTEGER, DIMENSION(2)                              :: pcoord, pdims
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: col_blk_size, row_blk_size
-      LOGICAL                                            :: tr
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
       TYPE(block_matrix_distribution_obj)                       :: block_matrix_dist
       TYPE(block_matrix_iterator)                               :: iter
@@ -566,7 +562,7 @@ CONTAINS
 
       CALL block_matrix_iterator_start(iter, matrix_dbcsr)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
-         CALL block_matrix_iterator_next_block(iter, row, col, block, tr)
+         CALL block_matrix_iterator_next_block(iter, row, col, block)
          CALL block_tas_put_block(matrix_rect, INT(row, KIND=int_8), INT(col, KIND=int_8), block)
       ENDDO
       CALL block_matrix_iterator_stop(iter)
@@ -601,22 +597,19 @@ CONTAINS
       CALL block_matrix_iterator_stop(iter%iter)
    END SUBROUTINE
 
-   SUBROUTINE block_tas_iterator_next_block_index(iterator, row, column, block_number, &
-                                                  transposed, blk_p, row_size, col_size)
+   SUBROUTINE block_tas_iterator_next_block_index(iterator, row, column, &
+                                                  blk_p, row_size, col_size)
       !! As block_matrix_iterator_next_block
 
       TYPE(block_tas_iterator), INTENT(INOUT)              :: iterator
       INTEGER(KIND=int_8), INTENT(OUT)                   :: row, column
          !! global block row
          !! global block column
-      INTEGER, INTENT(OUT)                               :: block_number
-      LOGICAL, INTENT(OUT), OPTIONAL                     :: transposed
       INTEGER, INTENT(OUT), OPTIONAL                     :: blk_p, row_size, col_size
 
       INTEGER                                            :: column_group, row_group
 
-      CALL block_matrix_iterator_next_block(iterator%iter, row_group, column_group, block_number, transposed, blk_p, &
-                                     row_size, col_size)
+      CALL block_matrix_iterator_next_block(iterator%iter, row_group, column_group, blk_p, row_size, col_size)
 
       CALL block_index_local_to_global(iterator%dist%info, iterator%dist, row_group=row_group, column_group=column_group, &
                                        row=row, column=column)
@@ -861,20 +854,18 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE block_tas_iterator_next_block_d (iterator, row, column, block, transposed, block_number, &
+   SUBROUTINE block_tas_iterator_next_block_d (iterator, row, column, block, &
       !! As block_matrix_iterator_next_block
                                                          row_size, col_size)
       TYPE(block_tas_iterator), INTENT(INOUT) :: iterator
       INTEGER(KIND=int_8), INTENT(OUT)      :: row, column
       REAL(dp), DIMENSION(:, :), POINTER   :: block
-      LOGICAL, INTENT(OUT)                  :: transposed
-      INTEGER, INTENT(OUT), OPTIONAL        :: block_number
       INTEGER, INTENT(OUT), OPTIONAL        :: row_size, col_size
 
       INTEGER                               :: row_group, column_group
 
-      CALL block_matrix_iterator_next_block(iterator%iter, row_group, column_group, block, transposed, block_number, &
-                                     row_size, col_size)
+      CALL block_matrix_iterator_next_block(iterator%iter, row_group, column_group, block, &
+                                     row_size=row_size, col_size=col_size)
 
       CALL block_index_local_to_global(iterator%dist%info, iterator%dist, row_group=row_group, column_group=column_group, &
                                        row=row, column=column)

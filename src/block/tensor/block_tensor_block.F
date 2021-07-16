@@ -148,7 +148,7 @@ CONTAINS
       ndims_iterator = iterator%nd_index%ndim_nd
    END FUNCTION
 
-   SUBROUTINE block_tensor_iterator_next_block(iterator, ind_nd, blk, blk_p, blk_size, blk_offset)
+   SUBROUTINE block_tensor_iterator_next_block(iterator, ind_nd, blk_p, blk_size, blk_offset)
       !! iterate over nd blocks of an nd rank tensor, index only (blocks must be retrieved by calling
       !! block_tensor_get_block on tensor).
 
@@ -156,8 +156,6 @@ CONTAINS
       INTEGER, DIMENSION(ndims_iterator(iterator)), &
          INTENT(OUT)                                 :: ind_nd
          !! nd index of block
-      INTEGER, INTENT(OUT)                           :: blk
-         !! is this needed?
       INTEGER, INTENT(OUT), OPTIONAL                 :: blk_p
          !! is this needed?
       INTEGER, DIMENSION(ndims_iterator(iterator)), &
@@ -167,7 +165,7 @@ CONTAINS
 
       INTEGER(KIND=int_8), DIMENSION(2)              :: ind_2d
 
-      CALL block_tas_iterator_next_block(iterator%iter, ind_2d(1), ind_2d(2), blk, blk_p=blk_p)
+      CALL block_tas_iterator_next_block(iterator%iter, ind_2d(1), ind_2d(2), blk_p=blk_p)
 
       ind_nd(:) = get_nd_indices_tensor(iterator%nd_index_blk, ind_2d)
       IF (PRESENT(blk_size)) blk_size(:) = get_array_elements(iterator%blk_sizes, ind_nd)

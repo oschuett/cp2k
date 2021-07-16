@@ -1358,7 +1358,7 @@ CONTAINS
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_result_index'
       LOGICAL :: retain_sparsity_prv
-      INTEGER :: bn, row_size, col_size, handle, iblk, mp_comm, nblk
+      INTEGER :: row_size, col_size, handle, iblk, mp_comm, nblk
       INTEGER(int_8) :: row, col
       TYPE(block_tas_iterator) :: iter
 
@@ -1394,7 +1394,7 @@ CONTAINS
       CALL block_tas_iterator_start(iter, matrix_c_bnorm)
       IF (PRESENT(nze)) nze = 0
       DO iblk = 1, nblk
-         CALL block_tas_iterator_next_block(iter, row, col, bn)
+         CALL block_tas_iterator_next_block(iter, row, col)
          row_size = matrix_c%row_blk_size%data(row)
          col_size = matrix_c%col_blk_size%data(col)
          IF (PRESENT(nze)) nze = nze + row_size*col_size
@@ -1467,7 +1467,7 @@ CONTAINS
 
       REAL(dp), DIMENSION(:, :), POINTER        :: block_get
       REAL(dp), DIMENSION(:, :), POINTER        :: block_put
-      LOGICAL                                    :: tr, nodata_prv, found
+      LOGICAL                                   :: tr, nodata_prv, found
 
       CPASSERT(matrix_in%valid)
 
@@ -1491,7 +1491,7 @@ CONTAINS
          CALL block_tas_iterator_start(iter, matrix_in)
 
          DO WHILE (block_tas_iterator_blocks_left(iter))
-            CALL block_tas_iterator_next_block(iter, row, column, block_get, tr)
+            CALL block_tas_iterator_next_block(iter, row, column, block_get)
             CALL block_tas_get_block_p(matrix_out, row, column, block_put, tr, found)
             CPASSERT(found)
             block_put(1, 1) = NORM2(block_get)

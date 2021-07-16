@@ -72,7 +72,7 @@ CONTAINS
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_reshape'
 
-      INTEGER                                            :: handle, handle2, iproc, mp_comm, mynode, nblock, &
+      INTEGER                                            :: handle, handle2, iproc, mp_comm, mynode, &
                                                             ndata, numnodes, bcount, nblk
       INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:, :)  :: index_recv, blks_to_allocate
       INTEGER(KIND=int_8), DIMENSION(2)                  :: blk_index
@@ -81,7 +81,7 @@ CONTAINS
                                                             num_rec, num_send
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: req_array
       INTEGER, DIMENSION(2)                              :: blk_size
-      LOGICAL                                            :: tr, tr_in, move_prv
+      LOGICAL                                            :: tr_in, move_prv
       TYPE(block_buffer_type), ALLOCATABLE, DIMENSION(:) :: buffer_recv, buffer_send
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: block
       TYPE(block_tas_iterator)                           :: iter
@@ -128,7 +128,7 @@ CONTAINS
 
       CALL timeset(routineN//"_get_coord", handle2)
       DO WHILE (block_tas_iterator_blocks_left(iter))
-         CALL block_tas_iterator_next_block(iter, blk_index(1), blk_index(2), nblock, transposed=tr, &
+         CALL block_tas_iterator_next_block(iter, blk_index(1), blk_index(2), &
                                             row_size=blk_size(1), col_size=blk_size(2))
 
          IF (tr_in) THEN
@@ -162,11 +162,8 @@ CONTAINS
 
       CALL block_tas_iterator_start(iter, matrix_in)
       DO WHILE (block_tas_iterator_blocks_left(iter))
-         CALL block_tas_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
+         CALL block_tas_iterator_next_block(iter, blk_index(1), blk_index(2), block, &
                                             row_size=blk_size(1), col_size=blk_size(2))
-
-         CPASSERT(tr .EQV. .FALSE.)
-
          IF (tr_in) THEN
             CALL block_tas_get_stored_coordinates(matrix_out, blk_index(2), blk_index(1), iproc)
          ELSE
@@ -259,9 +256,9 @@ CONTAINS
       INTEGER, DIMENSION(2) :: blk_index
       INTEGER(KIND=int_8), DIMENSION(2) :: blk_index_i8
       TYPE(block_matrix_iterator) :: iter
-      INTEGER :: nblock, i, iproc, bcount, nblk
+      INTEGER :: i, iproc, bcount, nblk
       INTEGER, DIMENSION(:), ALLOCATABLE :: iprocs
-      LOGICAL :: tr, nodata_prv, move_prv
+      LOGICAL :: nodata_prv, move_prv
       INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:, :) :: index_recv
       INTEGER :: ndata
 
@@ -343,7 +340,7 @@ CONTAINS
       ALLOCATE (iprocs(info%ngroup))
       CALL block_matrix_iterator_start(iter, matrix_in)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
-         CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), nblock, transposed=tr, &
+         CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), &
                                         row_size=blk_size(1), col_size=blk_size(2))
          CALL block_repl_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iprocs)
          DO i = 1, SIZE(iprocs)
@@ -371,7 +368,7 @@ CONTAINS
 
       CALL block_matrix_iterator_start(iter, matrix_in)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
-         CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
+         CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), block, &
                                         row_size=blk_size(1), col_size=blk_size(2))
          CALL block_repl_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iprocs)
          DO i = 1, SIZE(iprocs)
@@ -436,7 +433,7 @@ CONTAINS
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tas_merge'
       INTEGER                                            :: handle, handle2, iproc, mp_comm, &
-                                                            mynode, nblock, ndata, numnodes, nblk, bcount
+                                                            mynode, ndata, numnodes, nblk, bcount
       INTEGER(KIND=int_8), ALLOCATABLE, DIMENSION(:, :)  :: index_recv
       INTEGER(KIND=int_8), DIMENSION(2)                  :: blk_index_i8
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: iprocs, num_blocks_recv, &
@@ -444,7 +441,7 @@ CONTAINS
                                                             num_entries_send, num_rec, num_send
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: req_array, blks_to_allocate, blks_to_allocate_u
       INTEGER, DIMENSION(2)                              :: blk_index, blk_size
-      LOGICAL                                            :: tr, move_prv
+      LOGICAL                                            :: move_prv
       TYPE(block_buffer_type), ALLOCATABLE, DIMENSION(:) :: buffer_recv, buffer_send
       REAL(dp), DIMENSION(:, :), POINTER                 :: block
       TYPE(block_matrix_iterator)                               :: iter
@@ -484,7 +481,7 @@ CONTAINS
 
       CALL block_matrix_iterator_start(iter, matrix_in%matrix)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
-         CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), nblock, transposed=tr, &
+         CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), &
                                         row_size=blk_size(1), col_size=blk_size(2))
          CALL block_matrix_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iproc)
          num_send(2*iproc) = num_send(2*iproc) + PRODUCT(blk_size)
@@ -510,7 +507,7 @@ CONTAINS
 
       CALL block_matrix_iterator_start(iter, matrix_in%matrix)
       DO WHILE (block_matrix_iterator_blocks_left(iter))
-         CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), block, tr, &
+         CALL block_matrix_iterator_next_block(iter, blk_index(1), blk_index(2), block, &
                                                row_size=blk_size(1), col_size=blk_size(2))
          CALL block_matrix_get_stored_coordinates(matrix_out, blk_index(1), blk_index(2), iproc)
          CALL block_buffer_add_block(buffer_send(iproc), INT(blk_index, KIND=int_8), block)
