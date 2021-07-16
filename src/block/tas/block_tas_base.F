@@ -12,7 +12,7 @@ MODULE block_tas_base
    !! DBCSR routines.
 
    USE block_matrix_api, ONLY: &
-      block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
+      block_matrix_get_row_block_sizes, block_matrix_get_col_block_sizes, &
       block_matrix_get_block_p, block_matrix_put_block, block_matrix_reserve_blocks, &
       block_matrix_distribution_col_dist, block_matrix_distribution_new, &
       block_matrix_distribution_row_dist, block_matrix_distribution_hold, &
@@ -546,8 +546,8 @@ CONTAINS
       CALL block_matrix_get_info(matrix_dbcsr, distribution=block_matrix_dist, name=name, &
                           row_blk_size=row_blk_size, col_blk_size=col_blk_size)
 
-      nbrows = SIZE(block_matrix_row_block_sizes(matrix_dbcsr))
-      nbcols = SIZE(block_matrix_col_block_sizes(matrix_dbcsr))
+      nbrows = SIZE(block_matrix_get_row_block_sizes(matrix_dbcsr))
+      nbcols = SIZE(block_matrix_get_col_block_sizes(matrix_dbcsr))
 
       row_dist_obj = block_tas_dist_arb(block_matrix_distribution_row_dist(block_matrix_dist), pdims(1), nbrows)
       col_dist_obj = block_tas_dist_arb(block_matrix_distribution_col_dist(block_matrix_dist), pdims(2), nbcols)
@@ -728,14 +728,14 @@ CONTAINS
       TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER                                            :: nblkcols_local
 
-      nblkcols_local = SIZE(block_matrix_col_block_sizes(matrix%matrix))
+      nblkcols_local = SIZE(block_matrix_get_col_block_sizes(matrix%matrix))
    END FUNCTION
 
    FUNCTION block_tas_nblkrows_local(matrix) RESULT(nblkrows_local)
       TYPE(block_tas_type), INTENT(IN)                     :: matrix
       INTEGER                                            :: nblkrows_local
 
-      nblkrows_local = SIZE(block_matrix_row_block_sizes(matrix%matrix))
+      nblkrows_local = SIZE(block_matrix_get_row_block_sizes(matrix%matrix))
    END FUNCTION
 
    PURE FUNCTION block_tas_get_num_blocks(matrix) RESULT(num_blocks)

@@ -16,7 +16,7 @@ MODULE block_tas_reshape_ops
       block_matrix_get_stored_coordinates, &
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
       block_matrix_iterator_start, block_matrix_iterator_stop, &
-      block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
+      block_matrix_get_row_block_sizes, block_matrix_get_col_block_sizes, &
       block_matrix_get_info, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
       block_matrix_finalize, block_matrix_get_name
@@ -546,8 +546,8 @@ CONTAINS
          ! First, we need to get the index to create block
          DO WHILE (block_buffer_blocks_left(buffer_recv(iproc)))
             CALL block_buffer_get_next_block(buffer_recv(iproc), ndata, blk_index_i8)
-            row_block_sizes => block_matrix_row_block_sizes(matrix_out)
-            col_block_sizes => block_matrix_col_block_sizes(matrix_out)
+            row_block_sizes => block_matrix_get_row_block_sizes(matrix_out)
+            col_block_sizes => block_matrix_get_col_block_sizes(matrix_out)
             blk_size(1) = row_block_sizes(INT(blk_index_i8(1)))
             blk_size(2) = col_block_sizes(INT(blk_index_i8(2)))
             ALLOCATE(block(blk_size(1), blk_size(2)))

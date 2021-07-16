@@ -12,7 +12,7 @@ MODULE block_tas_test
    !! testing infrastructure for tall-and-skinny matrices
    USE block_matrix_api, ONLY: &
       block_matrix_release, &
-      block_matrix_row_block_sizes, block_matrix_col_block_sizes, &
+      block_matrix_get_row_block_sizes, block_matrix_get_col_block_sizes, &
       block_matrix_distribution_release, &
       block_matrix_multiply, &
       block_matrix_type, block_matrix_distribution_obj, &
@@ -208,45 +208,45 @@ CONTAINS
          npdims(:) = 0
          CALL mp_cart_create(mp_comm, 2, npdims, myploc, comm_dbcsr)
 
-         ALLOCATE (rd_a(SIZE(block_matrix_row_block_sizes(block_matrix_a))))
-         ALLOCATE (rd_b(SIZE(block_matrix_row_block_sizes(block_matrix_b))))
-         ALLOCATE (rd_c(SIZE(block_matrix_row_block_sizes(block_matrix_c))))
-         ALLOCATE (cd_a(SIZE(block_matrix_col_block_sizes(block_matrix_a))))
-         ALLOCATE (cd_b(SIZE(block_matrix_col_block_sizes(block_matrix_b))))
-         ALLOCATE (cd_c(SIZE(block_matrix_col_block_sizes(block_matrix_c))))
+         ALLOCATE (rd_a(SIZE(block_matrix_get_row_block_sizes(block_matrix_a))))
+         ALLOCATE (rd_b(SIZE(block_matrix_get_row_block_sizes(block_matrix_b))))
+         ALLOCATE (rd_c(SIZE(block_matrix_get_row_block_sizes(block_matrix_c))))
+         ALLOCATE (cd_a(SIZE(block_matrix_get_col_block_sizes(block_matrix_a))))
+         ALLOCATE (cd_b(SIZE(block_matrix_get_col_block_sizes(block_matrix_b))))
+         ALLOCATE (cd_c(SIZE(block_matrix_get_col_block_sizes(block_matrix_c))))
 
-         CALL block_tas_default_distvec(INT(SIZE(block_matrix_row_block_sizes(block_matrix_a))), &
-                                        npdims(1), block_matrix_row_block_sizes(block_matrix_a), rd_a)
-         CALL block_tas_default_distvec(INT(SIZE(block_matrix_col_block_sizes(block_matrix_a))), &
-                                        npdims(2), block_matrix_col_block_sizes(block_matrix_a), cd_a)
-         CALL block_tas_default_distvec(INT(SIZE(block_matrix_row_block_sizes(block_matrix_b))), &
-                                        npdims(1), block_matrix_row_block_sizes(block_matrix_b), rd_b)
-         CALL block_tas_default_distvec(INT(SIZE(block_matrix_col_block_sizes(block_matrix_b))), &
-                                        npdims(2), block_matrix_col_block_sizes(block_matrix_b), cd_b)
-         CALL block_tas_default_distvec(INT(SIZE(block_matrix_row_block_sizes(block_matrix_c))), &
-                                        npdims(1), block_matrix_row_block_sizes(block_matrix_c), rd_c)
-         CALL block_tas_default_distvec(INT(SIZE(block_matrix_col_block_sizes(block_matrix_c))), &
-                                        npdims(2), block_matrix_col_block_sizes(block_matrix_c), cd_c)
+         CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_row_block_sizes(block_matrix_a))), &
+                                        npdims(1), block_matrix_get_row_block_sizes(block_matrix_a), rd_a)
+         CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_col_block_sizes(block_matrix_a))), &
+                                        npdims(2), block_matrix_get_col_block_sizes(block_matrix_a), cd_a)
+         CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_row_block_sizes(block_matrix_b))), &
+                                        npdims(1), block_matrix_get_row_block_sizes(block_matrix_b), rd_b)
+         CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_col_block_sizes(block_matrix_b))), &
+                                        npdims(2), block_matrix_get_col_block_sizes(block_matrix_b), cd_b)
+         CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_row_block_sizes(block_matrix_c))), &
+                                        npdims(1), block_matrix_get_row_block_sizes(block_matrix_c), rd_c)
+         CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_col_block_sizes(block_matrix_c))), &
+                                        npdims(2), block_matrix_get_col_block_sizes(block_matrix_c), cd_c)
 
          CALL block_matrix_distribution_new(dist_a, comm_dbcsr, rd_a, cd_a)
          CALL block_matrix_distribution_new(dist_b, comm_dbcsr, rd_b, cd_b)
          CALL block_matrix_distribution_new(dist_c, comm_dbcsr, rd_c, cd_c)
          DEALLOCATE(rd_a, rd_b, rd_c, cd_a, cd_b, cd_c)
 
-         row_blk_size => block_matrix_row_block_sizes(block_matrix_a)
-         col_blk_size => block_matrix_col_block_sizes(block_matrix_a)
+         row_blk_size => block_matrix_get_row_block_sizes(block_matrix_a)
+         col_blk_size => block_matrix_get_col_block_sizes(block_matrix_a)
          CALL block_matrix_create(matrix=block_matrix_a_mm, &
                            name=block_matrix_get_name(block_matrix_a), &
                            dist=dist_a, &
                            row_blk_size=row_blk_size, col_blk_size=col_blk_size)
-         row_blk_size => block_matrix_row_block_sizes(block_matrix_b)
-         col_blk_size => block_matrix_col_block_sizes(block_matrix_b)
+         row_blk_size => block_matrix_get_row_block_sizes(block_matrix_b)
+         col_blk_size => block_matrix_get_col_block_sizes(block_matrix_b)
          CALL block_matrix_create(matrix=block_matrix_b_mm, &
                            name=block_matrix_get_name(block_matrix_b), &
                            dist=dist_b, &
                            row_blk_size=row_blk_size, col_blk_size=col_blk_size)
-         row_blk_size => block_matrix_row_block_sizes(block_matrix_c)
-         col_blk_size => block_matrix_col_block_sizes(block_matrix_c)
+         row_blk_size => block_matrix_get_row_block_sizes(block_matrix_c)
+         col_blk_size => block_matrix_get_col_block_sizes(block_matrix_c)
          CALL block_matrix_create(matrix=block_matrix_c_mm, &
                            name=block_matrix_get_name(block_matrix_c), &
                            dist=dist_c, &
@@ -329,25 +329,25 @@ CONTAINS
       npdims(:) = 0
       CALL mp_cart_create(mp_comm, 2, npdims, myploc, comm_dbcsr)
 
-      ALLOCATE (rd_a(SIZE(block_matrix_row_block_sizes(block_matrix_a))))
-      ALLOCATE (rd_b(SIZE(block_matrix_row_block_sizes(block_matrix_b))))
-      ALLOCATE (rd_c(SIZE(block_matrix_row_block_sizes(block_matrix_c))))
-      ALLOCATE (cd_a(SIZE(block_matrix_col_block_sizes(block_matrix_a))))
-      ALLOCATE (cd_b(SIZE(block_matrix_col_block_sizes(block_matrix_b))))
-      ALLOCATE (cd_c(SIZE(block_matrix_col_block_sizes(block_matrix_c))))
+      ALLOCATE (rd_a(SIZE(block_matrix_get_row_block_sizes(block_matrix_a))))
+      ALLOCATE (rd_b(SIZE(block_matrix_get_row_block_sizes(block_matrix_b))))
+      ALLOCATE (rd_c(SIZE(block_matrix_get_row_block_sizes(block_matrix_c))))
+      ALLOCATE (cd_a(SIZE(block_matrix_get_col_block_sizes(block_matrix_a))))
+      ALLOCATE (cd_b(SIZE(block_matrix_get_col_block_sizes(block_matrix_b))))
+      ALLOCATE (cd_c(SIZE(block_matrix_get_col_block_sizes(block_matrix_c))))
 
-      CALL block_tas_default_distvec(INT(SIZE(block_matrix_row_block_sizes(block_matrix_a))), &
-                                     npdims(1), block_matrix_row_block_sizes(block_matrix_a), rd_a)
-      CALL block_tas_default_distvec(INT(SIZE(block_matrix_col_block_sizes(block_matrix_a))), &
-                                     npdims(2), block_matrix_col_block_sizes(block_matrix_a), cd_a)
-      CALL block_tas_default_distvec(INT(SIZE(block_matrix_row_block_sizes(block_matrix_b))), &
-                                     npdims(1), block_matrix_row_block_sizes(block_matrix_b), rd_b)
-      CALL block_tas_default_distvec(INT(SIZE(block_matrix_col_block_sizes(block_matrix_b))), &
-                                     npdims(2), block_matrix_col_block_sizes(block_matrix_b), cd_b)
-      CALL block_tas_default_distvec(INT(SIZE(block_matrix_row_block_sizes(block_matrix_c))), &
-                                     npdims(1), block_matrix_row_block_sizes(block_matrix_c), rd_c)
-      CALL block_tas_default_distvec(INT(SIZE(block_matrix_col_block_sizes(block_matrix_c))), &
-                                     npdims(2), block_matrix_col_block_sizes(block_matrix_c), cd_c)
+      CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_row_block_sizes(block_matrix_a))), &
+                                     npdims(1), block_matrix_get_row_block_sizes(block_matrix_a), rd_a)
+      CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_col_block_sizes(block_matrix_a))), &
+                                     npdims(2), block_matrix_get_col_block_sizes(block_matrix_a), cd_a)
+      CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_row_block_sizes(block_matrix_b))), &
+                                     npdims(1), block_matrix_get_row_block_sizes(block_matrix_b), rd_b)
+      CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_col_block_sizes(block_matrix_b))), &
+                                     npdims(2), block_matrix_get_col_block_sizes(block_matrix_b), cd_b)
+      CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_row_block_sizes(block_matrix_c))), &
+                                     npdims(1), block_matrix_get_row_block_sizes(block_matrix_c), rd_c)
+      CALL block_tas_default_distvec(INT(SIZE(block_matrix_get_col_block_sizes(block_matrix_c))), &
+                                     npdims(2), block_matrix_get_col_block_sizes(block_matrix_c), cd_c)
 
       CALL block_matrix_distribution_new(dist_a, comm_dbcsr, rd_a, cd_a)
       CALL block_matrix_distribution_new(dist_b, comm_dbcsr, rd_b, cd_b)
@@ -355,21 +355,21 @@ CONTAINS
       DEALLOCATE(rd_a, rd_b, rd_c, cd_a, cd_b, cd_c)
 
       CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, &
-                        row_blk_size=block_matrix_row_block_sizes(block_matrix_a), &
-                        col_blk_size=block_matrix_col_block_sizes(block_matrix_a))
+                        row_blk_size=block_matrix_get_row_block_sizes(block_matrix_a), &
+                        col_blk_size=block_matrix_get_col_block_sizes(block_matrix_a))
 
       CALL block_matrix_create(matrix=block_matrix_b_mm, name="matrix b", dist=dist_b, &
-                        row_blk_size=block_matrix_row_block_sizes(block_matrix_b), &
-                        col_blk_size=block_matrix_col_block_sizes(block_matrix_b))
+                        row_blk_size=block_matrix_get_row_block_sizes(block_matrix_b), &
+                        col_blk_size=block_matrix_get_col_block_sizes(block_matrix_b))
 
       CALL block_matrix_create(matrix=block_matrix_c_mm, name="matrix c", dist=dist_c, &
-                        row_blk_size=block_matrix_row_block_sizes(block_matrix_c), &
-                        col_blk_size=block_matrix_col_block_sizes(block_matrix_c))
+                        row_blk_size=block_matrix_get_row_block_sizes(block_matrix_c), &
+                        col_blk_size=block_matrix_get_col_block_sizes(block_matrix_c))
 
       CALL block_matrix_create(matrix=block_matrix_c_mm_check, name="matrix c check", &
                         dist=dist_c, &
-                        row_blk_size=block_matrix_row_block_sizes(block_matrix_c), &
-                        col_blk_size=block_matrix_col_block_sizes(block_matrix_c))
+                        row_blk_size=block_matrix_get_row_block_sizes(block_matrix_c), &
+                        col_blk_size=block_matrix_get_col_block_sizes(block_matrix_c))
 
       CALL block_matrix_finalize(block_matrix_a_mm)
       CALL block_matrix_finalize(block_matrix_b_mm)

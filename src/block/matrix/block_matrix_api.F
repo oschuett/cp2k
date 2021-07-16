@@ -131,8 +131,8 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_get_num_blocks
    PUBLIC :: block_matrix_get_nze
    PUBLIC :: block_matrix_get_stored_coordinates
-   PUBLIC :: block_matrix_row_block_sizes
-   PUBLIC :: block_matrix_col_block_sizes
+   PUBLIC :: block_matrix_get_row_block_sizes
+   PUBLIC :: block_matrix_get_col_block_sizes
 
    PUBLIC :: generate_larnv_seed
 
@@ -387,21 +387,21 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   FUNCTION block_matrix_row_block_sizes(matrix) RESULT(res)
+   FUNCTION block_matrix_get_row_block_sizes(matrix) RESULT(res)
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: res
 
       res => dbcsr_row_block_sizes(matrix%dbcsr)
-   END FUNCTION block_matrix_row_block_sizes
+   END FUNCTION block_matrix_get_row_block_sizes
 
    !================================================================================================
    !================================================================================================
-   FUNCTION block_matrix_col_block_sizes(matrix) RESULT(res)
+   FUNCTION block_matrix_get_col_block_sizes(matrix) RESULT(res)
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
       INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: res
 
       res => dbcsr_col_block_sizes(matrix%dbcsr)
-   END FUNCTION block_matrix_col_block_sizes
+   END FUNCTION block_matrix_get_col_block_sizes
 
    !================================================================================================
    !================================================================================================
