@@ -20,7 +20,7 @@ MODULE block_tensor_types
       array_list, array_offsets, create_array_list, destroy_array_list, get_array_elements, &
       sizes_of_arrays, sum_of_arrays, array_sublist, get_arrays, get_ith_array, array_eq_i
    USE block_matrix_api, ONLY: &
-       block_matrix_distribution_obj, block_matrix_get_info, block_matrix_type
+       block_matrix_distribution_obj, block_matrix_type
    USE kinds, ONLY: real_8, dp, default_string_length
    USE block_tas_base, ONLY: &
       block_tas_create, block_tas_distribution_new, &

@@ -25,7 +25,9 @@ MODULE block_tas_io
       mp_environ, mp_sum, mp_max
    USE block_matrix_api, ONLY: &
       block_matrix_distribution_row_dist, block_matrix_distribution_col_dist, &
-      block_matrix_distribution_obj, block_matrix_get_info
+      block_matrix_distribution_obj, block_matrix_get_distribution
+
+#include "../../base/base_uses.f90"
 
    IMPLICIT NONE
    PRIVATE
@@ -48,56 +50,61 @@ CONTAINS
       LOGICAL, OPTIONAL, INTENT(IN)  :: full_info
          !! Whether to print distribution and block size vectors
 
-      INTEGER(KIND=int_8)                      :: nblkrows_total, nblkcols_total, nfullrows_total, &
-                                                  nfullcols_total
-      INTEGER                                  :: nprow, npcol, unit_nr_prv
-      CLASS(block_tas_distribution), ALLOCATABLE :: proc_row_dist, proc_col_dist
-      CLASS(block_tas_rowcol_data), ALLOCATABLE  :: row_blk_size, col_blk_size
-      INTEGER(KIND=int_8)                      :: iblk
-      CHARACTER(default_string_length)         :: name
+      !TODO: re-enable
+      MARK_USED(matrix)
+      MARK_USED(unit_nr)
+      MARK_USED(full_info)
 
-      unit_nr_prv = prep_output_unit(unit_nr)
-      IF (unit_nr_prv == 0) RETURN
-
-      CALL block_tas_get_info(matrix, nblkrows_total=nblkrows_total, nblkcols_total=nblkcols_total, &
-                              nfullrows_total=nfullrows_total, nfullcols_total=nfullcols_total, &
-                              nprow=nprow, npcol=npcol, proc_row_dist=proc_row_dist, proc_col_dist=proc_col_dist, &
-                              row_blk_size=row_blk_size, col_blk_size=col_blk_size, name=name)
-
-      IF (unit_nr_prv > 0) THEN
-         WRITE (unit_nr_prv, "(T2,A)") &
-            "GLOBAL INFO OF "//TRIM(name)
-         WRITE (unit_nr_prv, "(T4,A,1X)", advance="no") "block dimensions:"
-         WRITE (unit_nr_prv, "(I12,I12)", advance="no") nblkrows_total, nblkcols_total
-         WRITE (unit_nr_prv, "(/T4,A,1X)", advance="no") "full dimensions:"
-         WRITE (unit_nr_prv, "(I14,I14)", advance="no") nfullrows_total, nfullcols_total
-         WRITE (unit_nr_prv, "(/T4,A,1X)", advance="no") "process grid dimensions:"
-         WRITE (unit_nr_prv, "(I10,I10)", advance="no") nprow, npcol
-         IF (PRESENT(full_info)) THEN
-            IF (full_info) THEN
-               WRITE (unit_nr_prv, '(/T4,A)', advance='no') "Block sizes:"
-               WRITE (unit_nr_prv, '(/T8,A)', advance='no') 'Row:'
-               DO iblk = 1, row_blk_size%nmrowcol
-                  WRITE (unit_nr_prv, '(I4,1X)', advance='no') row_blk_size%data(iblk)
-               ENDDO
-               WRITE (unit_nr_prv, '(/T8,A)', advance='no') 'Column:'
-               DO iblk = 1, col_blk_size%nmrowcol
-                  WRITE (unit_nr_prv, '(I4,1X)', advance='no') col_blk_size%data(iblk)
-               ENDDO
-               WRITE (unit_nr_prv, '(/T4,A)', advance='no') "Block distribution:"
-               WRITE (unit_nr_prv, '(/T8,A)', advance='no') 'Row:'
-               DO iblk = 1, proc_row_dist%nmrowcol
-                  WRITE (unit_nr_prv, '(I4,1X)', advance='no') proc_row_dist%dist(iblk)
-               ENDDO
-               WRITE (unit_nr_prv, '(/T8,A)', advance='no') 'Column:'
-               DO iblk = 1, proc_col_dist%nmrowcol
-                  WRITE (unit_nr_prv, '(I4,1X)', advance='no') proc_col_dist%dist(iblk)
-               ENDDO
-
-            ENDIF
-         ENDIF
-         WRITE (unit_nr_prv, *)
-      ENDIF
+      !INTEGER(KIND=int_8)                      :: nblkrows_total, nblkcols_total, nfullrows_total, &
+      !                                            nfullcols_total
+      !INTEGER                                  :: nprow, npcol, unit_nr_prv
+      !CLASS(block_tas_distribution), ALLOCATABLE :: proc_row_dist, proc_col_dist
+      !CLASS(block_tas_rowcol_data), ALLOCATABLE  :: row_blk_size, col_blk_size
+      !INTEGER(KIND=int_8)                      :: iblk
+      !CHARACTER(default_string_length)         :: name
+      !
+      !unit_nr_prv = prep_output_unit(unit_nr)
+      !IF (unit_nr_prv == 0) RETURN
+      !
+      !CALL block_tas_get_info(matrix, nblkrows_total=nblkrows_total, nblkcols_total=nblkcols_total, &
+      !                        nfullrows_total=nfullrows_total, nfullcols_total=nfullcols_total, &
+      !                        nprow=nprow, npcol=npcol, proc_row_dist=proc_row_dist, proc_col_dist=proc_col_dist, &
+      !                        row_blk_size=row_blk_size, col_blk_size=col_blk_size, name=name)
+      !
+      !IF (unit_nr_prv > 0) THEN
+      !   WRITE (unit_nr_prv, "(T2,A)") &
+      !      "GLOBAL INFO OF "//TRIM(name)
+      !   WRITE (unit_nr_prv, "(T4,A,1X)", advance="no") "block dimensions:"
+      !   WRITE (unit_nr_prv, "(I12,I12)", advance="no") nblkrows_total, nblkcols_total
+      !   WRITE (unit_nr_prv, "(/T4,A,1X)", advance="no") "full dimensions:"
+      !   WRITE (unit_nr_prv, "(I14,I14)", advance="no") nfullrows_total, nfullcols_total
+      !   WRITE (unit_nr_prv, "(/T4,A,1X)", advance="no") "process grid dimensions:"
+      !   WRITE (unit_nr_prv, "(I10,I10)", advance="no") nprow, npcol
+      !   IF (PRESENT(full_info)) THEN
+      !      IF (full_info) THEN
+      !         WRITE (unit_nr_prv, '(/T4,A)', advance='no') "Block sizes:"
+      !         WRITE (unit_nr_prv, '(/T8,A)', advance='no') 'Row:'
+      !         DO iblk = 1, row_blk_size%nmrowcol
+      !            WRITE (unit_nr_prv, '(I4,1X)', advance='no') row_blk_size%data(iblk)
+      !         ENDDO
+      !         WRITE (unit_nr_prv, '(/T8,A)', advance='no') 'Column:'
+      !         DO iblk = 1, col_blk_size%nmrowcol
+      !            WRITE (unit_nr_prv, '(I4,1X)', advance='no') col_blk_size%data(iblk)
+      !         ENDDO
+      !         WRITE (unit_nr_prv, '(/T4,A)', advance='no') "Block distribution:"
+      !         WRITE (unit_nr_prv, '(/T8,A)', advance='no') 'Row:'
+      !         DO iblk = 1, proc_row_dist%nmrowcol
+      !            WRITE (unit_nr_prv, '(I4,1X)', advance='no') proc_row_dist%dist(iblk)
+      !         ENDDO
+      !         WRITE (unit_nr_prv, '(/T8,A)', advance='no') 'Column:'
+      !         DO iblk = 1, proc_col_dist%nmrowcol
+      !            WRITE (unit_nr_prv, '(I4,1X)', advance='no') proc_col_dist%dist(iblk)
+      !         ENDDO
+      !
+      !      ENDIF
+      !   ENDIF
+      !   WRITE (unit_nr_prv, *)
+      !ENDIF
 
    END SUBROUTINE
 
@@ -153,7 +160,7 @@ CONTAINS
       occupation = -1.0_real_8
       IF (nblock_tot .NE. 0) occupation = 100.0_real_8*REAL(nblock_p_sum, real_8)/REAL(nblock_tot, real_8)
 
-      CALL block_matrix_get_info(matrix%matrix, distribution=dist)
+      dist = block_matrix_get_distribution(matrix%matrix)
       rowdist => block_matrix_distribution_row_dist(dist)
       coldist => block_matrix_distribution_col_dist(dist)
 

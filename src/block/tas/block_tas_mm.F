@@ -26,16 +26,15 @@ MODULE block_tas_mm
       block_matrix_distribution_new, &
       block_matrix_release, block_matrix_distribution_release, &
       block_matrix_get_nze, &
-      block_matrix_cfg, &
-      block_matrix_get_info, block_matrix_copy, &
+      block_matrix_cfg, block_matrix_get_distribution, &
+      block_matrix_copy, block_matrix_get_row_block_sizes, block_matrix_get_col_block_sizes, &
       block_matrix_clear, block_matrix_add, block_matrix_zero, block_matrix_get_name
    USE block_tas_base, ONLY: &
       block_tas_create, block_tas_destroy, block_tas_distribution_destroy, block_tas_distribution_new, &
       block_tas_info, block_tas_nblkcols_total, &
       block_tas_nblkrows_total, block_tas_filter, block_tas_get_info, block_tas_iterator_blocks_left, &
       block_tas_get_nze_total, block_tas_reserve_blocks, block_tas_iterator_start, block_tas_iterator_next_block, &
-      block_tas_iterator_stop, block_tas_copy, block_tas_get_block_p, block_tas_clear, block_tas_get_num_blocks, &
-      block_tas_nfullrows_total, block_tas_nfullcols_total
+      block_tas_iterator_stop, block_tas_copy, block_tas_get_block_p, block_tas_clear, block_tas_get_num_blocks
    USE block_tas_types, ONLY: &
       block_tas_distribution_type, block_tas_split_info, block_tas_type, block_tas_iterator
    USE block_tas_global, ONLY: &
@@ -1478,7 +1477,6 @@ CONTAINS
       ENDIF
 
       CALL block_tas_get_info(matrix_in, name=name, nblkrows_total=nblkrows, nblkcols_total=nblkcols)
-
       row_blk_size = block_tas_blk_size_one(nblkrows)
       col_blk_size = block_tas_blk_size_one(nblkcols)
 
@@ -1545,9 +1543,12 @@ CONTAINS
          RETURN
       ENDIF
 
-      CALL block_matrix_get_info(matrix_in, nblkrows_total=nbrows, nblkcols_total=nbcols, &
-                          row_blk_size=rbsize, col_blk_size=rcsize, &
-                          distribution=dist_old, name=name)
+      rbsize => block_matrix_get_row_block_sizes(matrix_in)
+      rcsize => block_matrix_get_col_block_sizes(matrix_in)
+      nbrows = SIZE(rbsize)
+      nbcols = SIZE(rcsize)
+      name = block_matrix_get_name(matrix_in)
+      dist_old = block_matrix_get_distribution(matrix_in)
       CALL mp_environ(nproc, pdims, pcoord, mp_comm_cart)
 
       ALLOCATE (row_dist(nbrows), col_dist(nbcols))

@@ -17,7 +17,7 @@ MODULE block_tas_reshape_ops
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
       block_matrix_iterator_start, block_matrix_iterator_stop, &
       block_matrix_get_row_block_sizes, block_matrix_get_col_block_sizes, &
-      block_matrix_get_info, block_matrix_clear, &
+      block_matrix_clear, block_matrix_get_distribution, &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
       block_matrix_finalize, block_matrix_get_name
    USE block_tas_base, ONLY: &
@@ -284,9 +284,11 @@ CONTAINS
          move_prv = .FALSE.
       ENDIF
 
-      CALL block_matrix_get_info(matrix_in, distribution=block_matrix_dist,  &
-                          nblkrows_total=nblkrows, nblkcols_total=nblkcols, &
-                          row_blk_size=row_blk_size, col_blk_size=col_blk_size)
+      row_blk_size => block_matrix_get_row_block_sizes(matrix_in)
+      col_blk_size => block_matrix_get_col_block_sizes(matrix_in)
+      nblkrows = SIZE(row_blk_size)
+      nblkcols = SIZE(col_blk_size)
+      block_matrix_dist = block_matrix_get_distribution(matrix_in)
       row_dist => block_matrix_distribution_row_dist(block_matrix_dist)
       col_dist => block_matrix_distribution_col_dist(block_matrix_dist)
 

@@ -128,17 +128,19 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_distribution_release
 
    PUBLIC :: block_matrix_get_name
+   PUBLIC :: block_matrix_get_distribution
    PUBLIC :: block_matrix_get_num_blocks
    PUBLIC :: block_matrix_get_nze
    PUBLIC :: block_matrix_get_stored_coordinates
    PUBLIC :: block_matrix_get_row_block_sizes
    PUBLIC :: block_matrix_get_col_block_sizes
+   PUBLIC :: block_matrix_get_local_rows
+   PUBLIC :: block_matrix_get_local_cols
 
    PUBLIC :: generate_larnv_seed
 
    ! TODO: remove these
    PUBLIC :: block_matrix_complete_redistribute
-   PUBLIC :: block_matrix_get_info
    PUBLIC :: block_matrix_cfg
 
    TYPE block_matrix_distribution_obj
@@ -297,61 +299,6 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_get_info(matrix, nblkrows_total, nblkcols_total, &
-                                    nfullrows_total, nfullcols_total, &
-                                    nblkrows_local, nblkcols_local, &
-                                    nfullrows_local, nfullcols_local, &
-                                    my_prow, my_pcol, &
-                                    local_rows, local_cols, proc_row_dist, proc_col_dist, &
-                                    row_blk_size, col_blk_size, row_blk_offset, col_blk_offset, &
-                                    distribution, name, &
-                                    group)
-      TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      INTEGER, INTENT(OUT), OPTIONAL :: nblkrows_total, nblkcols_total, nfullrows_total, &
-                                        nfullcols_total, nblkrows_local, nblkcols_local, nfullrows_local, nfullcols_local, &
-                                        my_prow, my_pcol
-      INTEGER, DIMENSION(:), OPTIONAL, POINTER           :: local_rows, local_cols, proc_row_dist, &
-                                                            proc_col_dist, &
-                                                            row_blk_size, col_blk_size, &
-                                                            row_blk_offset, col_blk_offset
-      TYPE(block_matrix_distribution_obj), INTENT(OUT), &
-         OPTIONAL                                        :: distribution
-      CHARACTER(len=*), INTENT(OUT), OPTIONAL            :: name
-      INTEGER, INTENT(OUT), OPTIONAL                     :: group
-
-      TYPE(dbcsr_distribution_obj)                       :: dist
-
-      CALL dbcsr_get_info(matrix=matrix%dbcsr, &
-                          nblkrows_total=nblkrows_total, &
-                          nblkcols_total=nblkcols_total, &
-                          nfullrows_total=nfullrows_total, &
-                          nfullcols_total=nfullcols_total, &
-                          nblkrows_local=nblkrows_local, &
-                          nblkcols_local=nblkcols_local, &
-                          nfullrows_local=nfullrows_local, &
-                          nfullcols_local=nfullcols_local, &
-                          my_prow=my_prow, &
-                          my_pcol=my_pcol, &
-                          local_rows=local_rows, &
-                          local_cols=local_cols, &
-                          proc_row_dist=proc_row_dist, &
-                          proc_col_dist=proc_col_dist, &
-                          row_blk_size=row_blk_size, &
-                          col_blk_size=col_blk_size, &
-                          row_blk_offset=row_blk_offset, &
-                          col_blk_offset=col_blk_offset, &
-                          distribution=dist, &
-                          name=name, &
-                          group=group)
-
-      IF (PRESENT(distribution)) THEN
-         distribution%dbcsr = dist
-      ENDIF
-
-   END SUBROUTINE block_matrix_get_info
-
-   !================================================================================================
-   !================================================================================================
    SUBROUTINE block_matrix_clear(matrix)
       TYPE(block_matrix_type), INTENT(INOUT) :: matrix
 
@@ -366,6 +313,17 @@ MODULE block_matrix_api
 
       CALL dbcsr_get_info(matrix%dbcsr, name=res)
    END FUNCTION block_matrix_get_name
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_get_distribution(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      TYPE(block_matrix_distribution_obj)                :: res
+      TYPE(dbcsr_distribution_obj)                       :: dist
+
+      CALL dbcsr_get_info(matrix%dbcsr, distribution=dist)
+      res%dbcsr = dist
+   END FUNCTION block_matrix_get_distribution
 
    !================================================================================================
    !================================================================================================
@@ -402,6 +360,24 @@ MODULE block_matrix_api
 
       res => dbcsr_col_block_sizes(matrix%dbcsr)
    END FUNCTION block_matrix_get_col_block_sizes
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_get_local_rows(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: res
+
+      CALL dbcsr_get_info(matrix%dbcsr, local_rows=res)
+   END FUNCTION block_matrix_get_local_rows
+
+   !================================================================================================
+   !================================================================================================
+   FUNCTION block_matrix_get_local_cols(matrix) RESULT(res)
+      TYPE(block_matrix_type), INTENT(IN)                :: matrix
+      INTEGER, DIMENSION(:), POINTER, CONTIGUOUS         :: res
+
+      CALL dbcsr_get_info(matrix%dbcsr, local_cols=res)
+   END FUNCTION block_matrix_get_local_cols
 
    !================================================================================================
    !================================================================================================

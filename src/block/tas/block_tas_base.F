@@ -19,10 +19,11 @@ MODULE block_tas_base
       block_matrix_iterator_blocks_left, block_matrix_iterator_next_block, &
       block_matrix_iterator_start, block_matrix_iterator_stop, &
       block_matrix_distribution_release, block_matrix_release, &
-      block_matrix_get_num_blocks, block_matrix_get_nze, &
-      block_matrix_get_info, block_matrix_set, block_matrix_filter, block_matrix_clear, &
+      block_matrix_get_num_blocks, block_matrix_get_nze, block_matrix_get_distribution, &
+      block_matrix_set, block_matrix_filter, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
-      block_matrix_create, block_matrix_finalize, block_matrix_get_name
+      block_matrix_create, block_matrix_finalize, block_matrix_get_name, &
+      block_matrix_get_local_rows, block_matrix_get_local_cols
    USE block_tas_types, ONLY: &
       block_tas_distribution_type, block_tas_iterator, block_tas_split_info, block_tas_type
    USE block_tas_global, ONLY: &
@@ -543,12 +544,15 @@ CONTAINS
       NULLIFY (col_blk_size, row_blk_size)
       CALL timeset(routineN, handle)
       CALL mp_environ(numnodes, pdims, pcoord, info%mp_comm)
-      CALL block_matrix_get_info(matrix_dbcsr, distribution=block_matrix_dist, name=name, &
-                          row_blk_size=row_blk_size, col_blk_size=col_blk_size)
 
-      nbrows = SIZE(block_matrix_get_row_block_sizes(matrix_dbcsr))
-      nbcols = SIZE(block_matrix_get_col_block_sizes(matrix_dbcsr))
+      name = block_matrix_get_name(matrix_dbcsr)
+      row_blk_size = block_matrix_get_row_block_sizes(matrix_dbcsr)
+      col_blk_size = block_matrix_get_col_block_sizes(matrix_dbcsr)
 
+      nbrows = SIZE(row_blk_size)
+      nbcols = SIZE(col_blk_size)
+
+      block_matrix_dist = block_matrix_get_distribution(matrix_dbcsr)
       row_dist_obj = block_tas_dist_arb(block_matrix_distribution_row_dist(block_matrix_dist), pdims(1), nbrows)
       col_dist_obj = block_tas_dist_arb(block_matrix_distribution_col_dist(block_matrix_dist), pdims(2), nbcols)
 
@@ -785,19 +789,14 @@ CONTAINS
       CALL block_matrix_clear(matrix%matrix)
    END SUBROUTINE
 
-   SUBROUTINE block_tas_get_info(matrix, nblkrows_total, nblkcols_total, &
-                                 nfullrows_total, nfullcols_total, &
-                                 nblkrows_local, nblkcols_local, &
-                                 nfullrows_local, nfullcols_local, &
-                                 nprow, npcol, my_prow, my_pcol, &
-                                 local_rows, local_cols, proc_row_dist, proc_col_dist, &
+   SUBROUTINE block_tas_get_info(matrix, &
+                                 nblkrows_total, nblkcols_total, &
+                                 local_rows, local_cols, &
+                                 proc_row_dist, proc_col_dist, &
                                  row_blk_size, col_blk_size, distribution, name)
 
       TYPE(block_tas_type), INTENT(IN)                                :: matrix
-      INTEGER(KIND=int_8), INTENT(OUT), OPTIONAL                      :: nblkrows_total, nblkcols_total, nfullrows_total, &
-                                                                         nfullcols_total
-      INTEGER, INTENT(OUT), OPTIONAL                                  :: nblkrows_local, nblkcols_local, nfullrows_local, &
-                                                                         nfullcols_local, nprow, npcol, my_prow, my_pcol
+      INTEGER(KIND=int_8), INTENT(OUT), OPTIONAL                      :: nblkrows_total, nblkcols_total
       INTEGER(KIND=int_8), DIMENSION(:), OPTIONAL, ALLOCATABLE        :: local_rows, local_cols
       CLASS(block_tas_distribution), ALLOCATABLE, OPTIONAL, &
          INTENT(OUT)                                                  :: proc_row_dist, proc_col_dist
@@ -807,31 +806,13 @@ CONTAINS
       CHARACTER(len=*), INTENT(OUT), OPTIONAL                         :: name
 
       TYPE(block_tas_split_info)                                      :: info
-      INTEGER                                                         :: numnodes, irow, icol
-      INTEGER, DIMENSION(2)                                           :: pdims, pcoord
+      INTEGER                                                         :: irow, icol
       INTEGER, DIMENSION(:), POINTER                                  :: local_rows_local, local_cols_local
-
-      NULLIFY (local_rows_local, local_cols_local)
-      CALL block_matrix_get_info(matrix%matrix, nblkrows_local=nblkrows_local, nblkcols_local=nblkcols_local, &
-                          nfullrows_local=nfullrows_local, nfullcols_local=nfullcols_local, &
-                          local_rows=local_rows_local, local_cols=local_cols_local, &
-                          name=name)
-
-      IF (PRESENT(nblkrows_total)) nblkrows_total = block_tas_nblkrows_total(matrix)
-      IF (PRESENT(nblkcols_total)) nblkcols_total = block_tas_nblkcols_total(matrix)
-
-      IF (PRESENT(nfullrows_total)) nfullrows_total = block_tas_nfullrows_total(matrix)
-      IF (PRESENT(nfullcols_total)) nfullcols_total = block_tas_nfullcols_total(matrix)
 
       info = block_tas_info(matrix)
 
-      CALL mp_environ(numnodes, pdims, pcoord, info%mp_comm)
-      IF (PRESENT(my_prow)) my_prow = pcoord(1)
-      IF (PRESENT(my_pcol)) my_pcol = pcoord(2)
-      IF (PRESENT(nprow)) nprow = pdims(1)
-      IF (PRESENT(npcol)) npcol = pdims(2)
-
       IF (PRESENT(local_rows)) THEN
+         local_rows_local => block_matrix_get_local_rows(matrix%matrix)
          ALLOCATE (local_rows(SIZE(local_rows_local)))
          DO irow = 1, SIZE(local_rows_local)
             CALL block_index_local_to_global(info, matrix%dist, row_group=local_rows_local(irow), row=local_rows(irow))
@@ -839,15 +820,18 @@ CONTAINS
       ENDIF
 
       IF (PRESENT(local_cols)) THEN
+         local_cols_local => block_matrix_get_local_cols(matrix%matrix)
          ALLOCATE (local_cols(SIZE(local_cols_local)))
          DO icol = 1, SIZE(local_cols_local)
             CALL block_index_local_to_global(info, matrix%dist, column_group=local_cols_local(icol), column=local_cols(icol))
          ENDDO
       ENDIF
 
+      IF (PRESENT(name)) name = block_matrix_get_name(matrix%matrix)
+      IF (PRESENT(nblkrows_total)) nblkrows_total = block_tas_nblkrows_total(matrix)
+      IF (PRESENT(nblkcols_total)) nblkcols_total = block_tas_nblkcols_total(matrix)
       IF (PRESENT(proc_row_dist)) ALLOCATE (proc_row_dist, SOURCE=matrix%dist%row_dist)
       IF (PRESENT(proc_col_dist)) ALLOCATE (proc_col_dist, SOURCE=matrix%dist%col_dist)
-
       IF (PRESENT(row_blk_size)) ALLOCATE (row_blk_size, SOURCE=matrix%row_blk_size)
       IF (PRESENT(col_blk_size)) ALLOCATE (col_blk_size, SOURCE=matrix%col_blk_size)
       IF (PRESENT(distribution)) distribution = matrix%dist
