@@ -228,9 +228,10 @@ CONTAINS
          CALL block_tas_default_distvec(INT(SIZE(block_matrix_col_block_sizes(block_matrix_c))), &
                                         npdims(2), block_matrix_col_block_sizes(block_matrix_c), cd_c)
 
-         CALL block_matrix_distribution_new(dist_a, comm_dbcsr, rd_a, cd_a, reuse_arrays=.TRUE.)
-         CALL block_matrix_distribution_new(dist_b, comm_dbcsr, rd_b, cd_b, reuse_arrays=.TRUE.)
-         CALL block_matrix_distribution_new(dist_c, comm_dbcsr, rd_c, cd_c, reuse_arrays=.TRUE.)
+         CALL block_matrix_distribution_new(dist_a, comm_dbcsr, rd_a, cd_a)
+         CALL block_matrix_distribution_new(dist_b, comm_dbcsr, rd_b, cd_b)
+         CALL block_matrix_distribution_new(dist_c, comm_dbcsr, rd_c, cd_c)
+         DEALLOCATE(rd_a, rd_b, rd_c, cd_a, cd_b, cd_c)
 
          row_blk_size => block_matrix_row_block_sizes(block_matrix_a)
          col_blk_size => block_matrix_col_block_sizes(block_matrix_a)
@@ -348,9 +349,10 @@ CONTAINS
       CALL block_tas_default_distvec(INT(SIZE(block_matrix_col_block_sizes(block_matrix_c))), &
                                      npdims(2), block_matrix_col_block_sizes(block_matrix_c), cd_c)
 
-      CALL block_matrix_distribution_new(dist_a, comm_dbcsr, rd_a, cd_a, reuse_arrays=.TRUE.)
-      CALL block_matrix_distribution_new(dist_b, comm_dbcsr, rd_b, cd_b, reuse_arrays=.TRUE.)
-      CALL block_matrix_distribution_new(dist_c, comm_dbcsr, rd_c, cd_c, reuse_arrays=.TRUE.)
+      CALL block_matrix_distribution_new(dist_a, comm_dbcsr, rd_a, cd_a)
+      CALL block_matrix_distribution_new(dist_b, comm_dbcsr, rd_b, cd_b)
+      CALL block_matrix_distribution_new(dist_c, comm_dbcsr, rd_c, cd_c)
+      DEALLOCATE(rd_a, rd_b, rd_c, cd_a, cd_b, cd_c)
 
       CALL block_matrix_create(matrix=block_matrix_a_mm, name="matrix a", dist=dist_a, &
                         row_blk_size=block_matrix_row_block_sizes(block_matrix_a), &

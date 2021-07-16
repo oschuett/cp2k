@@ -1306,15 +1306,13 @@ CONTAINS
       CALL block_tas_set(tensor%matrix_rep, alpha)
    END SUBROUTINE
 
-   SUBROUTINE block_tensor_filter (tensor, eps, method, use_absolute)
+   SUBROUTINE block_tensor_filter (tensor, eps)
       !! As block_filter
 
       TYPE(block_tensor_type), INTENT(INOUT)    :: tensor
       REAL(dp), INTENT(IN)                :: eps
-      INTEGER, INTENT(IN), OPTIONAL        :: method
-      LOGICAL, INTENT(IN), OPTIONAL        :: use_absolute
 
-      CALL block_tas_filter(tensor%matrix_rep, eps, method, use_absolute)
+      CALL block_tas_filter(tensor%matrix_rep, eps)
 
    END SUBROUTINE
 

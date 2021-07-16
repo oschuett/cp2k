@@ -1554,7 +1554,8 @@ CONTAINS
       CALL block_tas_default_distvec(nbrows, pdims(1), rbsize, row_dist)
       CALL block_tas_default_distvec(nbcols, pdims(2), rcsize, col_dist)
 
-      CALL block_matrix_distribution_new(dist, mp_comm_cart, row_dist, col_dist, reuse_arrays=.TRUE.)
+      CALL block_matrix_distribution_new(dist, mp_comm_cart, row_dist, col_dist)
+      DEALLOCATE(row_dist, col_dist)
 
       CALL block_matrix_create(matrix_out, name, dist, rbsize, rcsize)
       CALL block_matrix_distribution_release(dist)

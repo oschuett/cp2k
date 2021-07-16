@@ -171,9 +171,9 @@ CONTAINS
                         name=name, &
                         dist=dist%block_matrix_dist, &
                         row_blk_size=row_blk_size_vec, &
-                        col_blk_size=col_blk_size_vec, &
-                        reuse_arrays=.TRUE.)
+                        col_blk_size=col_blk_size_vec)
 
+      DEALLOCATE(row_blk_size_vec, col_blk_size_vec)
       matrix%valid = .TRUE.
       CALL timestop(handle)
 
@@ -354,7 +354,8 @@ CONTAINS
       dist%info = split_info_prv
 
       CALL block_matrix_distribution_new(dist%block_matrix_dist, split_info_prv%mp_comm_group, &
-                                         row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
+                                         row_dist_vec, col_dist_vec)
+      DEALLOCATE(row_dist_vec, col_dist_vec)
       ALLOCATE (dist%row_dist, source=row_dist)
       ALLOCATE (dist%col_dist, source=col_dist)
 
@@ -481,17 +482,18 @@ CONTAINS
          col_size_vec(col) = matrix_rect%col_blk_size%data(col)
       ENDDO
 
-      CALL block_matrix_distribution_new(dist, info%mp_comm, row_dist_vec, col_dist_vec, reuse_arrays=.TRUE.)
+      CALL block_matrix_distribution_new(dist, info%mp_comm, row_dist_vec, col_dist_vec)
+      DEALLOCATE(row_dist_vec, col_dist_vec)
 
       CALL block_matrix_create(matrix=matrix_dbcsr, &
                         name=TRIM(block_matrix_get_name(matrix_rect%matrix)), &
                         dist=dist, &
                         row_blk_size=row_size_vec, &
-                        col_blk_size=col_size_vec, &
-                        reuse_arrays=.TRUE.)
+                        col_blk_size=col_size_vec)
 
       CALL block_matrix_distribution_release(dist)
 
+      DEALLOCATE(row_size_vec, col_size_vec)
       nblks_local = block_tas_get_num_blocks(matrix_rect)
       CALL block_tas_iterator_start(iter, matrix_rect)
       ALLOCATE (nz_rows(nblks_local), nz_cols(nblks_local))
@@ -924,14 +926,12 @@ CONTAINS
       CALL block_matrix_set(matrix%matrix, alpha)
    END SUBROUTINE
 
-   SUBROUTINE block_tas_filter (matrix, eps, method, use_absolute)
+   SUBROUTINE block_tas_filter (matrix, eps)
       !! As block_matrix_filter
       TYPE(block_tas_type), INTENT(INOUT)    :: matrix
       REAL(dp), INTENT(IN)                :: eps
-      INTEGER, INTENT(IN), OPTIONAL        :: method
-      LOGICAL, INTENT(IN), OPTIONAL        :: use_absolute
 
-      CALL block_matrix_filter(matrix%matrix, eps, method, use_absolute)
+      CALL block_matrix_filter(matrix%matrix, eps)
 
    END SUBROUTINE
 

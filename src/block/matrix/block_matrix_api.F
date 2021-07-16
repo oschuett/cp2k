@@ -112,7 +112,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_finalize
    PUBLIC :: block_matrix_multiply
    PUBLIC :: block_matrix_redistribute
-   PUBLIC :: block_matrix_cfg
    PUBLIC :: block_matrix_copy
    PUBLIC :: block_matrix_add
    PUBLIC :: block_matrix_maxabs
@@ -140,6 +139,7 @@ MODULE block_matrix_api
    ! TODO: remove these
    PUBLIC :: block_matrix_complete_redistribute
    PUBLIC :: block_matrix_get_info
+   PUBLIC :: block_matrix_cfg
 
    TYPE block_matrix_distribution_obj
       TYPE(dbcsr_distribution_obj), PRIVATE        :: dbcsr
@@ -168,61 +168,30 @@ MODULE block_matrix_api
    !================================================================================================
    !================================================================================================
    SUBROUTINE block_matrix_create_new(matrix, name, dist, &
-                                      row_blk_size, col_blk_size, &
-                                      nze, &
-                                      max_rbs, max_cbs, &
-                                      thread_dist, &
-                                      reuse, reuse_arrays, mutable_work, make_index, replication_type)
+                                      row_blk_size, col_blk_size)
 
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
       CHARACTER(len=*), INTENT(IN)                       :: name
       TYPE(block_matrix_distribution_obj), INTENT(IN)    :: dist
-      INTEGER, DIMENSION(:), INTENT(IN), POINTER, &
-         CONTIGUOUS, OPTIONAL                            :: row_blk_size, col_blk_size
-      INTEGER, INTENT(IN), OPTIONAL                      :: nze
-      INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
-      TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: thread_dist
-      LOGICAL, INTENT(IN), OPTIONAL                      :: reuse, reuse_arrays, mutable_work, &
-                                                            make_index
-      CHARACTER, INTENT(IN), OPTIONAL                    :: replication_type
+      INTEGER, DIMENSION(:), INTENT(IN), POINTER, CONTIGUOUS :: row_blk_size, col_blk_size
 
       CALL dbcsr_create(matrix%dbcsr, name=name, dist=dist%dbcsr, &
                         matrix_type=dbcsr_type_no_symmetry, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                        nze=nze, data_type=dbcsr_type_real_8, &
-                        max_rbs=max_rbs, max_cbs=max_cbs, &
-                        thread_dist=thread_dist%dbcsr, &
-                        reuse=reuse, reuse_arrays=reuse_arrays, &
-                        mutable_work=mutable_work, make_index=make_index, &
-                        replication_type=replication_type)
+                        data_type=dbcsr_type_real_8)
    END SUBROUTINE block_matrix_create_new
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_create_template(matrix, template, name, dist, &
-                                           row_blk_size, col_blk_size, &
-                                           nze, &
-                                           max_rbs, max_cbs, &
-                                           reuse_arrays, mutable_work, make_index, replication_type)
+   SUBROUTINE block_matrix_create_template(matrix, template, name)
 
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
       TYPE(block_matrix_type), INTENT(IN)                :: template
       CHARACTER(len=*), INTENT(IN), OPTIONAL             :: name
-      TYPE(block_matrix_distribution_obj), INTENT(IN), OPTIONAL :: dist
-      INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL, &
-         POINTER, CONTIGUOUS                             :: row_blk_size, col_blk_size
-      INTEGER, INTENT(IN), OPTIONAL                      :: nze
-      INTEGER, INTENT(IN), OPTIONAL                      :: max_rbs, max_cbs
-      LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays, mutable_work, make_index
-      CHARACTER, INTENT(IN), OPTIONAL                    :: replication_type
 
-      CALL dbcsr_create(matrix%dbcsr, template=template%dbcsr, name=name, dist=dist%dbcsr, &
+      CALL dbcsr_create(matrix%dbcsr, template=template%dbcsr, name=name, &
                         matrix_type=dbcsr_type_no_symmetry, &
-                        row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
-                        nze=nze, data_type=dbcsr_type_real_8, &
-                        max_rbs=max_rbs, max_cbs=max_cbs, &
-                        reuse_arrays=reuse_arrays, mutable_work=mutable_work, &
-                        make_index=make_index, replication_type=replication_type)
+                        data_type=dbcsr_type_real_8)
    END SUBROUTINE block_matrix_create_template
 
    !================================================================================================
@@ -244,15 +213,11 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_iterator_start(iterator, matrix, shared, dynamic, &
-                                   dynamic_byrows, contiguous_pointers, read_only)
+   SUBROUTINE block_matrix_iterator_start(iterator, matrix)
       TYPE(block_matrix_iterator), INTENT(OUT)           :: iterator
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      LOGICAL, INTENT(IN), OPTIONAL                      :: shared, dynamic, dynamic_byrows, &
-                                                            contiguous_pointers, read_only
 
-      CALL dbcsr_iterator_start(iterator%dbcsr, matrix%dbcsr, shared, dynamic, &
-                                dynamic_byrows, contiguous_pointers, read_only)
+      CALL dbcsr_iterator_start(iterator%dbcsr, matrix%dbcsr)
    END SUBROUTINE block_matrix_iterator_start
 
    !================================================================================================
@@ -290,13 +255,11 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_filter(matrix, eps, method, use_absolute, filter_diag)
+   SUBROUTINE block_matrix_filter(matrix, eps)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
       REAL(dp), INTENT(IN)                               :: eps
-      INTEGER, INTENT(IN), OPTIONAL                      :: method
-      LOGICAL, INTENT(in), OPTIONAL                      :: use_absolute, filter_diag
 
-      CALL dbcsr_filter(matrix%dbcsr, eps, method, use_absolute, filter_diag)
+      CALL dbcsr_filter(matrix%dbcsr, eps)
    END SUBROUTINE block_matrix_filter
 
    !================================================================================================
@@ -452,12 +415,11 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_reserve_blocks(matrix, rows, cols, blk_pointers)
+   SUBROUTINE block_matrix_reserve_blocks(matrix, rows, cols)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
       INTEGER, DIMENSION(:), INTENT(IN)                  :: rows, cols
-      INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL        :: blk_pointers
 
-      CALL dbcsr_reserve_blocks(matrix%dbcsr, rows, cols, blk_pointers)
+      CALL dbcsr_reserve_blocks(matrix%dbcsr, rows, cols)
    END SUBROUTINE block_matrix_reserve_blocks
 
    !================================================================================================
@@ -480,14 +442,10 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_distribution_new(dist, mp_comm, row_dist_block, col_dist_block, &
-                                            local_rows, local_cols, reuse_arrays)
+   SUBROUTINE block_matrix_distribution_new(dist, mp_comm, row_dist_block, col_dist_block)
       TYPE(block_matrix_distribution_obj), INTENT(OUT)       :: dist
       INTEGER, INTENT(IN)                                    :: mp_comm
       INTEGER, DIMENSION(:), INTENT(IN), POINTER, CONTIGUOUS :: row_dist_block, col_dist_block
-      INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL, &
-         POINTER, CONTIGUOUS                                 :: local_rows, local_cols
-      LOGICAL, OPTIONAL                                      :: reuse_arrays
 
       TYPE(dbcsr_mp_obj)                                 :: mp_env
       INTEGER                                            :: mynode, numnodes, pcol, prow
@@ -508,19 +466,16 @@ MODULE block_matrix_api
 
       CALL dbcsr_mp_new(mp_env, mp_comm, pgrid, mynode, numnodes, mycoord(1), mycoord(2))
       CALL dbcsr_distribution_new(dist=dist%dbcsr, mp_env=mp_env, &
-                                 row_dist_block=row_dist_block, col_dist_block=col_dist_block, &
-                                 local_rows=local_rows, local_cols=local_cols, &
-                                 reuse_arrays=reuse_arrays)
+                                  row_dist_block=row_dist_block, col_dist_block=col_dist_block)
       CALL dbcsr_mp_release(mp_env)
    END SUBROUTINE block_matrix_distribution_new
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_finalize(matrix, reshuffle)
+   SUBROUTINE block_matrix_finalize(matrix)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
-      LOGICAL, INTENT(IN), OPTIONAL                      :: reshuffle
 
-      CALL dbcsr_finalize(matrix%dbcsr, reshuffle)
+      CALL dbcsr_finalize(matrix%dbcsr)
    END SUBROUTINE block_matrix_finalize
 
    !================================================================================================
@@ -551,26 +506,21 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_scale(matrix, alpha, last_column)
+   SUBROUTINE block_matrix_scale(matrix, alpha)
       TYPE(block_matrix_type), INTENT(INOUT)    :: matrix
        REAL(dp), INTENT(IN)                     :: alpha
-      INTEGER, INTENT(IN), OPTIONAL             :: last_column
 
-      CALL dbcsr_scale(matrix%dbcsr, alpha, last_column)
+      CALL dbcsr_scale(matrix%dbcsr, alpha)
    END SUBROUTINE block_matrix_scale
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_copy(matrix_b, matrix_a, name, keep_sparsity, &
-                                shallow_data, keep_imaginary)
+   SUBROUTINE block_matrix_copy(matrix_b, matrix_a, name)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix_b
       TYPE(block_matrix_type), INTENT(IN)                :: matrix_a
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL             :: name
-      LOGICAL, INTENT(IN), OPTIONAL                      :: keep_sparsity, shallow_data, &
-                                                            keep_imaginary
 
-      CALL dbcsr_copy(matrix_b%dbcsr, matrix_a%dbcsr, name, keep_sparsity, &
-                      shallow_data, keep_imaginary, dbcsr_type_no_symmetry)
+      CALL dbcsr_copy(matrix_b%dbcsr, matrix_a%dbcsr, name)
 
    END SUBROUTINE block_matrix_copy
 
@@ -585,14 +535,12 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_complete_redistribute(matrix, redist, keep_sparsity, summation)
+   SUBROUTINE block_matrix_complete_redistribute(matrix, redist)
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
       TYPE(block_matrix_type), INTENT(INOUT)             :: redist
-      LOGICAL, INTENT(IN), OPTIONAL                      :: keep_sparsity, summation
 
       CALL dbcsr_redistribute(matrix%dbcsr, redist%dbcsr)
-      CALL dbcsr_complete_redistribute(matrix%dbcsr, redist%dbcsr, &
-                                       keep_sparsity=keep_sparsity, summation=summation)
+      CALL dbcsr_complete_redistribute(matrix%dbcsr, redist%dbcsr)
    END SUBROUTINE block_matrix_complete_redistribute
 
    !================================================================================================
