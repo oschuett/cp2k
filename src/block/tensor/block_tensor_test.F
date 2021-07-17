@@ -742,12 +742,11 @@ CONTAINS
       sizes_2d(2) = PRODUCT(nd_sizes(map2))
    END FUNCTION
 
-   FUNCTION block_tensor_checksum(tensor, local, pos)
+   FUNCTION block_tensor_checksum(tensor)
       !! checksum of a tensor consistent with block_checksum
       TYPE(block_tensor_type), INTENT(IN) :: tensor
       REAL(KIND=real_8) :: block_tensor_checksum
-      LOGICAL, INTENT(IN), OPTIONAL     :: local, pos
-      block_tensor_checksum = block_tas_checksum(tensor%matrix_rep, local, pos)
+      block_tensor_checksum = block_tas_checksum(tensor%matrix_rep)
    END FUNCTION
 
    SUBROUTINE block_tensor_reset_randmat_seed()

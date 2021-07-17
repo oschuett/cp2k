@@ -434,15 +434,14 @@ CONTAINS
 
    END SUBROUTINE
 
-   FUNCTION block_tas_checksum(matrix, local, pos)
+   FUNCTION block_tas_checksum(matrix)
       !! Calculate checksum of tall-and-skinny matrix consistent with block_matrix_checksum
       TYPE(block_tas_type), INTENT(IN) :: matrix
-      LOGICAL, INTENT(IN), OPTIONAL  :: local, pos
       TYPE(block_matrix_type)               :: block_matrix_m
       REAL(KIND=real_8)              :: block_tas_checksum
 
       CALL block_tas_convert_to_dbcsr(matrix, block_matrix_m)
-      block_tas_checksum = block_matrix_checksum(block_matrix_m, local, pos)
+      block_tas_checksum = block_matrix_checksum(block_matrix_m)
       CALL block_matrix_release(block_matrix_m)
    END FUNCTION
 

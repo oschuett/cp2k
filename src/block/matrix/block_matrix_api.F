@@ -446,7 +446,7 @@ MODULE block_matrix_api
    SUBROUTINE block_matrix_get_stored_coordinates(matrix, row, column, processor)
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
       INTEGER, INTENT(IN)                                :: row, column
-      INTEGER, INTENT(OUT), OPTIONAL                     :: processor
+      INTEGER, INTENT(OUT)                               :: processor
 
       CALL dbcsr_get_stored_coordinates(matrix%dbcsr, row, column, processor)
    END SUBROUTINE block_matrix_get_stored_coordinates
@@ -462,12 +462,11 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_copy(matrix_b, matrix_a, name)
+   SUBROUTINE block_matrix_copy(matrix_b, matrix_a)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix_b
       TYPE(block_matrix_type), INTENT(IN)                :: matrix_a
-      CHARACTER(LEN=*), INTENT(IN), OPTIONAL             :: name
 
-      CALL dbcsr_copy(matrix_b%dbcsr, matrix_a%dbcsr, name)
+      CALL dbcsr_copy(matrix_b%dbcsr, matrix_a%dbcsr)
 
    END SUBROUTINE block_matrix_copy
 
@@ -532,12 +531,11 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   FUNCTION block_matrix_checksum(matrix, local, pos) RESULT(checksum)
+   FUNCTION block_matrix_checksum(matrix) RESULT(checksum)
       TYPE(block_matrix_type), INTENT(IN)                :: matrix
-      LOGICAL, INTENT(IN), OPTIONAL                      :: local, pos
       REAL(KIND=dp)                                      :: checksum
 
-      checksum = dbcsr_checksum(matrix%dbcsr, local=local, pos=pos)
+      checksum = dbcsr_checksum(matrix%dbcsr)
    END FUNCTION block_matrix_checksum
 
    !================================================================================================
