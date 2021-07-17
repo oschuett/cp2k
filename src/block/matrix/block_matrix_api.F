@@ -54,8 +54,8 @@ MODULE block_matrix_api
       dbcsr_get_stored_coordinates
 
  USE dbcsr_types, ONLY: &
-      block_matrix_transpose => dbcsr_transpose, &
-      block_matrix_no_transpose => dbcsr_no_transpose, &
+      dbcsr_transpose, &
+      dbcsr_no_transpose, &
       dbcsr_mp_obj, &
       dbcsr_type_real_8, &
       dbcsr_type_no_symmetry, &
@@ -124,8 +124,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_maxabs
    PUBLIC :: block_matrix_zero
    PUBLIC :: block_matrix_checksum
-   PUBLIC :: block_matrix_transpose
-   PUBLIC :: block_matrix_no_transpose
    PUBLIC :: block_matrix_get_name
    PUBLIC :: block_matrix_get_distribution
    PUBLIC :: block_matrix_get_num_blocks
@@ -502,8 +500,7 @@ MODULE block_matrix_api
    SUBROUTINE block_matrix_multiply(transa, transb, &
                                       alpha, matrix_a, matrix_b, beta, matrix_c, &
                                       retain_sparsity, filter_eps, flop)
-      !TODO use LOGICALs for transpose
-      CHARACTER(LEN=1), INTENT(IN)                   :: transa, transb
+      LOGICAL, INTENT(IN)                            :: transa, transb
       REAL(kind=dp), INTENT(IN)                      :: alpha
       TYPE(block_matrix_type), INTENT(IN)            :: matrix_a, matrix_b
       REAL(kind=dp), INTENT(IN)                      :: beta
@@ -512,7 +509,21 @@ MODULE block_matrix_api
       REAL(kind=dp), INTENT(IN), OPTIONAL            :: filter_eps
       INTEGER(int_8), INTENT(OUT), OPTIONAL          :: flop
 
-      CALL dbcsr_multiply(transa=transa, transb=transb, &
+      CHARACTER(LEN=1)                               :: transa_char, transb_char
+
+      IF(transa) THEN
+         transa_char = dbcsr_transpose
+      ELSE
+         transa_char = dbcsr_no_transpose
+      ENDIF
+
+      IF(transb) THEN
+         transb_char = dbcsr_transpose
+      ELSE
+         transb_char = dbcsr_no_transpose
+      ENDIF
+
+      CALL dbcsr_multiply(transa=transa_char, transb=transb_char, &
                           alpha=alpha, matrix_a=matrix_a%dbcsr, &
                           matrix_b=matrix_b%dbcsr, beta=beta, matrix_c=matrix_c%dbcsr, &
                           retain_sparsity=retain_sparsity, filter_eps=filter_eps, flop=flop)

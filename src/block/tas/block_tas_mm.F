@@ -19,7 +19,7 @@ MODULE block_tas_mm
    USE block_matrix_api, ONLY: &
       block_matrix_scale, &
       block_matrix_multiply, &
-      block_matrix_no_transpose, block_matrix_transpose, block_matrix_type, &
+      block_matrix_type, &
       block_matrix_distribution_obj, &
       block_matrix_create, block_matrix_create_from_template, block_matrix_finalize, &
       block_matrix_redistribute, &
@@ -46,7 +46,7 @@ MODULE block_tas_mm
       rowsplit, colsplit, block_tas_get_split_info, block_tas_create_split, block_tas_mp_comm, &
       block_tas_release_info, accept_pgrid_dims, block_tas_info_hold, default_nsplit_accept_ratio
    USE block_tas_util, ONLY: &
-      swap, invert_transpose_flag, array_eq
+      swap, array_eq
    USE kinds, ONLY: &
       int_8, real_8, real_4, default_string_length, dp
    USE message_passing, ONLY: &
@@ -77,7 +77,7 @@ CONTAINS
       !! tall-and-skinny matrix-matrix multiplication. Undocumented dummy arguments are identical to
       !! arguments of block_matrix_multiply (see block_matrix_mm, block_matrix_multiply_generic).
 
-      CHARACTER(LEN=1), INTENT(IN)               :: transa, transb, transc
+      LOGICAL, INTENT(IN)               :: transa, transb, transc
       REAL(dp), INTENT(IN)        :: alpha, beta
       TYPE(block_tas_type), TARGET, &
          INTENT(INOUT)                           :: matrix_a, matrix_b, matrix_c
@@ -112,7 +112,7 @@ CONTAINS
                                                     unit_nr_prv, nsplit, nsplit_opt, numproc, numproc_sub, iproc, &
                                                     mp_comm_group, mp_comm_mm, split_rc, split_a, split_b, split_c, &
                                                     mp_comm_opt, batched_repl, max_mm_dim_batched, nsplit_batched
-      CHARACTER(LEN=1)                           :: tr_case, transa_prv, transb_prv, transc_prv
+      LOGICAL                                    :: tr_case, transa_prv, transb_prv, transc_prv
       LOGICAL                                    :: new_a, new_b, new_c, simple_split_prv, opt_pgrid, &
                                                     move_a, move_b, do_batched, &
                                                     nodata_3
@@ -215,11 +215,11 @@ CONTAINS
          ENDIF
       ENDIF
 
-      IF (transa_prv .EQ. block_matrix_transpose) THEN
+      IF (transa_prv) THEN
          CALL swap(dims_a)
       ENDIF
 
-      IF (transb_prv .EQ. block_matrix_transpose) THEN
+      IF (transb_prv) THEN
          CALL swap(dims_b)
       ENDIF
 
@@ -230,8 +230,6 @@ CONTAINS
       ENDIF
 
       dims(:) = [dims_a(1), dims_a(2), dims_b(2)]
-
-      tr_case = ''
 
       IF (unit_nr_prv > 0) THEN
          WRITE (unit_nr_prv, "(T2,A, 1X, I12, 1X, I12, 1X, I12)") "mm dims:", dims(1), dims(2), dims(3)
@@ -303,15 +301,15 @@ CONTAINS
          new_b = .FALSE.
          IF (matrix_b%do_batched <= 2) THEN
             ALLOCATE (matrix_b_rs)
-            CALL reshape_mm_small(mp_comm, matrix_b, matrix_b_rs, &
-                                  transb_prv == block_matrix_transpose, transb_prv, move_data=move_b)
+            CALL reshape_mm_small(mp_comm, matrix_b, matrix_b_rs, transb_prv, move_data=move_b)
+            transb_prv = .FALSE.
             new_b = .TRUE.
          ENDIF
 
          tr_case = transa_prv
 
          IF (unit_nr_prv > 0) THEN
-            IF (tr_case == 'N') THEN
+            IF (.NOT.tr_case) THEN
                WRITE (unit_nr_prv, "(T2,A, 1X, A)") "mm case:", "| x + = |"
             ELSE
                WRITE (unit_nr_prv, "(T2,A, 1X, A)") "mm case:", "--T x + = --T"
@@ -340,7 +338,8 @@ CONTAINS
 
          IF (matrix_c%do_batched <= 2) THEN
             ALLOCATE (matrix_c_rs)
-            CALL reshape_mm_small(mp_comm, matrix_c, matrix_c_rs, transc_prv == block_matrix_transpose, transc_prv, nodata=nodata_3)
+            CALL reshape_mm_small(mp_comm, matrix_c, matrix_c_rs, transc_prv, nodata=nodata_3)
+            transc_prv = .FALSE.
 
             ! just leave sparsity structure for retain sparsity but no values
             IF (.NOT. nodata_3) CALL block_matrix_zero(matrix_c_rs%matrix)
@@ -354,7 +353,7 @@ CONTAINS
          tr_case = transa_prv
 
          IF (unit_nr_prv > 0) THEN
-            IF (tr_case == 'N') THEN
+            IF (.NOT.tr_case) THEN
                WRITE (unit_nr_prv, "(T2,A, 1X, A)") "mm case:", "-- x --T = +"
             ELSE
                WRITE (unit_nr_prv, "(T2,A, 1X, A)") "mm case:", "|T x | = +"
@@ -377,15 +376,15 @@ CONTAINS
          new_a = .FALSE.
          IF (matrix_a%do_batched <= 2) THEN
             ALLOCATE (matrix_a_rs)
-            CALL reshape_mm_small(mp_comm, matrix_a, matrix_a_rs, &
-                                  transa_prv == block_matrix_transpose, transa_prv, move_data=move_a)
+            CALL reshape_mm_small(mp_comm, matrix_a, matrix_a_rs, transa_prv, move_data=move_a)
+            transa_prv = .FALSE.
             new_a = .TRUE.
          ENDIF
 
          tr_case = transb_prv
 
          IF (unit_nr_prv > 0) THEN
-            IF (tr_case == 'N') THEN
+            IF (.NOT.tr_case) THEN
                WRITE (unit_nr_prv, "(T2,A, 1X, A)") "mm case:", "+ x -- = --"
             ELSE
                WRITE (unit_nr_prv, "(T2,A, 1X, A)") "mm case:", "+ x |T = |T"
@@ -478,22 +477,21 @@ CONTAINS
 
          CALL mp_sync(matrix_a%dist%info%mp_comm)
          CALL timeset("block_tas_dbcsr", handle4)
-         SELECT CASE (tr_case)
-         CASE (block_matrix_no_transpose)
+         IF (.NOT.tr_case) THEN
             CALL timeset("block_tas_mm_1N", handle3)
 
-            CALL block_matrix_multiply(transa=block_matrix_no_transpose, transb=block_matrix_no_transpose, alpha=alpha, &
+            CALL block_matrix_multiply(transa=.FALSE., transb=.FALSE., alpha=alpha, &
                                 matrix_a=matrix_a_mm, matrix_b=matrix_b_mm, beta=beta, matrix_c=matrix_c_mm, &
                                 filter_eps=filter_eps_prv, retain_sparsity=retain_sparsity, flop=flop)
             CALL timestop(handle3)
-         CASE (block_matrix_transpose)
+         ELSE
             CALL timeset("block_tas_mm_1T", handle3)
-            CALL block_matrix_multiply(transa=block_matrix_transpose, transb=block_matrix_no_transpose, alpha=alpha, &
+            CALL block_matrix_multiply(transa=.TRUE., transb=.FALSE., alpha=alpha, &
                                 matrix_a=matrix_b_mm, matrix_b=matrix_a_mm, beta=beta, matrix_c=matrix_c_mm, &
                                 filter_eps=filter_eps_prv, retain_sparsity=retain_sparsity, flop=flop)
 
             CALL timestop(handle3)
-         END SELECT
+         END IF
          CALL mp_sync(matrix_a%dist%info%mp_comm)
          CALL timestop(handle4)
 
@@ -658,20 +656,19 @@ CONTAINS
 
          CALL mp_sync(matrix_a%dist%info%mp_comm)
          CALL timeset("block_tas_dbcsr", handle4)
-         SELECT CASE (tr_case)
-         CASE (block_matrix_no_transpose)
+         IF (.NOT.tr_case) THEN
             CALL timeset("block_tas_mm_3N", handle3)
-            CALL block_matrix_multiply(transa=block_matrix_no_transpose, transb=block_matrix_no_transpose, alpha=alpha, &
+            CALL block_matrix_multiply(transa=.FALSE., transb=.FALSE., alpha=alpha, &
                                 matrix_a=matrix_a_mm, matrix_b=matrix_b_mm, beta=beta, matrix_c=matrix_c_mm, &
                                 filter_eps=filter_eps_prv, retain_sparsity=retain_sparsity, flop=flop)
             CALL timestop(handle3)
-         CASE (block_matrix_transpose)
+         ELSE
             CALL timeset("block_tas_mm_3T", handle3)
-            CALL block_matrix_multiply(transa=block_matrix_no_transpose, transb=block_matrix_transpose, alpha=alpha, &
+            CALL block_matrix_multiply(transa=.FALSE., transb=.TRUE., alpha=alpha, &
                                 matrix_a=matrix_b_mm, matrix_b=matrix_a_mm, beta=beta, matrix_c=matrix_c_mm, &
                                 filter_eps=filter_eps_prv, retain_sparsity=retain_sparsity, flop=flop)
             CALL timestop(handle3)
-         END SELECT
+         END IF
          CALL mp_sync(matrix_a%dist%info%mp_comm)
          CALL timestop(handle4)
 
@@ -727,14 +724,15 @@ CONTAINS
 
       IF (new_c) THEN
          CALL block_matrix_scale(matrix_c%matrix, beta)
-         CALL block_tas_reshape(matrix_c_rs, matrix_c, summation=.TRUE., transposed=transc_prv /= transc, &
+         CALL block_tas_reshape(matrix_c_rs, matrix_c, summation=.TRUE., &
+                                transposed=(transc_prv .NEQV. transc), &
                                 move_data=.TRUE.)
          CALL block_tas_destroy(matrix_c_rs)
          DEALLOCATE (matrix_c_rs)
          IF (PRESENT(filter_eps)) CALL block_tas_filter(matrix_c, filter_eps)
       ELSEIF (matrix_c%do_batched > 0) THEN
          IF (matrix_c%mm_storage%batched_out) THEN
-            matrix_c%mm_storage%batched_trans = transc_prv /= transc
+            matrix_c%mm_storage%batched_trans = (transc_prv .NEQV. transc)
          ENDIF
       ENDIF
 
@@ -794,7 +792,7 @@ CONTAINS
 
    END SUBROUTINE
 
-   SUBROUTINE reshape_mm_small(mp_comm, matrix_in, matrix_out, transposed, trans, nodata, move_data)
+   SUBROUTINE reshape_mm_small(mp_comm, matrix_in, matrix_out, transposed, nodata, move_data)
       !! Make sure that smallest matrix involved in a multiplication is not split and bring it to
       !! the same process grid as the other 2 matrices.
 
@@ -802,10 +800,8 @@ CONTAINS
          !! communicator that defines Cartesian topology
       TYPE(block_tas_type), INTENT(INOUT) :: matrix_in
       TYPE(block_tas_type), INTENT(OUT)   :: matrix_out
-      LOGICAL, INTENT(IN)               :: transposed
+      LOGICAL, INTENT(IN)              :: transposed
          !! Whether matrix_out should be transposed
-      CHARACTER(LEN=1), INTENT(INOUT)   :: trans
-         !! update transpose flag for DBCSR mm according to 'transposed' argument
       LOGICAL, INTENT(IN), OPTIONAL     :: nodata, move_data
          !! Data of matrix_in should not be copied to matrix_out
          !! memory optimization: move data such that matrix_in is empty on return.
@@ -827,15 +823,6 @@ CONTAINS
          nodata_prv = .FALSE.
       ENDIF
 
-      IF (transposed) THEN
-         SELECT CASE (trans)
-         CASE (block_matrix_transpose)
-            trans = block_matrix_no_transpose
-         CASE (block_matrix_no_transpose)
-            trans = block_matrix_transpose
-         END SELECT
-      ENDIF
-
       CALL mp_environ(numnodes, pdims, pcoord, mp_comm)
 
       dims = [block_tas_nblkrows_total(matrix_in), block_tas_nblkcols_total(matrix_in)]
@@ -854,7 +841,6 @@ CONTAINS
          CALL block_tas_distribution_new(dist, mp_comm, new_row_dist, new_col_dist, nosplit=.TRUE.)
          CALL block_tas_create(matrix_out, block_matrix_get_name(matrix_in%matrix), dist, &
                                matrix_in%col_blk_size, matrix_in%row_blk_size, own_dist=.TRUE.)
-
       ENDIF
       IF (.NOT. nodata_prv) CALL block_tas_reshape(matrix_in, matrix_out, transposed=transposed, move_data=move_data)
 
@@ -874,7 +860,7 @@ CONTAINS
       LOGICAL, INTENT(OUT)                       :: new1, new2
          !! Whether matrix1_out is a new matrix or simply pointing to matrix1_in
          !! Whether matrix2_out is a new matrix or simply pointing to matrix2_in
-      CHARACTER(LEN=1), INTENT(INOUT)            :: trans1, trans2
+      LOGICAL, INTENT(INOUT)                     :: trans1, trans2
          !! transpose flag of matrix1_in for multiplication
          !! transpose flag of matrix2_in for multiplication
       LOGICAL, INTENT(IN), OPTIONAL              :: optimize_dist
@@ -939,9 +925,9 @@ CONTAINS
       nze1 = block_tas_get_nze_total(matrix1_in)
       nze2 = block_tas_get_nze_total(matrix2_in)
 
-      IF (trans1 == block_matrix_transpose) split_rc_1 = MOD(split_rc_1, 2) + 1
+      IF (trans1) split_rc_1 = MOD(split_rc_1, 2) + 1
 
-      IF (trans2 == block_matrix_transpose) split_rc_2 = MOD(split_rc_2, 2) + 1
+      IF (trans2) split_rc_2 = MOD(split_rc_2, 2) + 1
 
       IF (nze1 >= nze2) THEN
          ref = 1
@@ -1002,12 +988,12 @@ CONTAINS
 
             IF (trans1_newdist) THEN
                CALL swap(dims1)
-               CALL invert_transpose_flag(trans1)
+               trans1 = .NOT. trans1
             ENDIF
 
             IF (trans2_newdist) THEN
                CALL swap(dims2)
-               CALL invert_transpose_flag(trans2)
+               trans2 = .NOT. trans2
             ENDIF
 
             IF (nsplit_prv == 0) THEN
@@ -1268,7 +1254,7 @@ CONTAINS
       TYPE(block_tas_type), INTENT(IN)           :: template
       TYPE(block_tas_type), INTENT(INOUT)        :: matrix_in
       TYPE(block_tas_type), INTENT(OUT)          :: matrix_out
-      CHARACTER(LEN=1), INTENT(INOUT)            :: trans
+      LOGICAL, INTENT(INOUT)                     :: trans
       INTEGER, INTENT(IN)                        :: split_rc
       LOGICAL, INTENT(IN), OPTIONAL              :: nodata, move_data
       CLASS(block_tas_distribution), ALLOCATABLE :: row_dist, col_dist
@@ -1296,14 +1282,7 @@ CONTAINS
       dim_split_matrix = split_rc
 
       transposed = dim_split_template .NE. dim_split_matrix
-      IF (transposed) THEN
-         SELECT CASE (trans)
-         CASE (block_matrix_transpose)
-            trans = block_matrix_no_transpose
-         CASE (block_matrix_no_transpose)
-            trans = block_matrix_transpose
-         END SELECT
-      ENDIF
+      IF (transposed) trans = .NOT. trans
 
       CALL mp_environ(numnodes, pdims, pcoord, info_template%mp_comm)
 
@@ -1346,7 +1325,7 @@ CONTAINS
                                      unit_nr, blk_ind, nze, retain_sparsity)
       !! Estimate sparsity pattern of C resulting from A x B = C by multiplying the block norms of A and B
       !! Same dummy arguments as block_tas_multiply
-      CHARACTER(LEN=1), INTENT(IN)               :: transa, transb, transc
+      LOGICAL, INTENT(IN)                                :: transa, transb, transc
       TYPE(block_tas_type), INTENT(INOUT), TARGET        :: matrix_a, matrix_b, matrix_c
       TYPE(block_tas_type), POINTER                      :: matrix_a_bnorm, matrix_b_bnorm, matrix_c_bnorm
       REAL(KIND=real_8), INTENT(IN), OPTIONAL    :: filter_eps

@@ -28,7 +28,6 @@ MODULE block_tensor
       get_arrays, reorder_arrays, get_ith_array, array_list, array_sublist, check_equal, array_eq_i, &
       create_array_list, destroy_array_list, sizes_of_arrays
    USE block_matrix_api, ONLY: &
-      block_matrix_transpose, block_matrix_no_transpose, &
       block_matrix_clear
    USE block_tas_types, ONLY: &
       block_tas_split_info
@@ -593,7 +592,7 @@ CONTAINS
       INTEGER, DIMENSION(SIZE(notcontract_2))        :: notcontract_2_mod
       INTEGER, DIMENSION(SIZE(map_1))                :: map_1_mod
       INTEGER, DIMENSION(SIZE(map_2))                :: map_2_mod
-      CHARACTER(LEN=1)                               :: trans_1, trans_2, trans_3
+      LOGICAL                                        :: trans_1, trans_2, trans_3
       LOGICAL                                        :: new_1, new_2, new_3, move_data_1, move_data_2
       INTEGER                                        :: ndims1, ndims2, ndims3
       INTEGER                                        :: occ_1, occ_2
@@ -823,7 +822,7 @@ CONTAINS
                                     notcontract_1_mod, contract_1_mod, notcontract_2_mod, contract_2_mod, &
                                     trans_1, trans_2, new_1, new_2, ref_tensor, optimize_dist=optimize_dist, &
                                     move_data_1=move_data_1, move_data_2=move_data_2, unit_nr=unit_nr_prv)
-         CALL invert_transpose_flag(trans_1)
+         trans_1 = .NOT. trans_1
 
          CALL reshape_mm_small(tensor_algn_3, map_1_mod, map_2_mod, tensor_contr_3, trans_3, &
                                new_3, nodata=nodata_3, unit_nr=unit_nr_prv)
@@ -857,8 +856,8 @@ CONTAINS
                                     trans_2, trans_3, new_2, new_3, ref_tensor, nodata2=nodata_3, optimize_dist=optimize_dist, &
                                     move_data_1=move_data_2, unit_nr=unit_nr_prv)
 
-         CALL invert_transpose_flag(trans_2)
-         CALL invert_transpose_flag(trans_3)
+         trans_2 = .NOT. trans_2
+         trans_3 = .NOT. trans_3
 
          CALL reshape_mm_small(tensor_algn_1, notcontract_1_mod, contract_1_mod, tensor_contr_1, &
                                trans_1, new_1, move_data=move_data_1, unit_nr=unit_nr_prv)
@@ -1188,7 +1187,7 @@ CONTAINS
       INTEGER, DIMENSION(:), INTENT(IN)           :: ind1_linked, ind2_linked
          !! indices of tensor 1 that are linked to indices of tensor 2
          !! 1:1 correspondence with ind1_linked
-      CHARACTER(LEN=1), INTENT(OUT)               :: trans1, trans2
+      LOGICAL, INTENT(OUT)                        :: trans1, trans2
          !! transpose flag of matrix rep. of tensor 1
          !! transpose flag of matrix rep. tensor 2
       LOGICAL, INTENT(OUT)                        :: new1, new2
@@ -1358,18 +1357,18 @@ CONTAINS
 
       SELECT CASE (compat1)
       CASE (1)
-         trans1 = block_matrix_no_transpose
+         trans1 = .FALSE.
       CASE (2)
-         trans1 = block_matrix_transpose
+         trans1 = .TRUE.
       CASE DEFAULT
          CPABORT("should not happen")
       END SELECT
 
       SELECT CASE (compat2)
       CASE (1)
-         trans2 = block_matrix_no_transpose
+         trans2 = .FALSE.
       CASE (2)
-         trans2 = block_matrix_transpose
+         trans2 = .TRUE.
       CASE DEFAULT
          CPABORT("should not happen")
       END SELECT
@@ -1415,7 +1414,7 @@ CONTAINS
          !! index that should be mapped to second matrix dimension
       TYPE(block_tensor_type), POINTER, INTENT(OUT)    :: tensor_out
          !! tensor out
-      CHARACTER(LEN=1), INTENT(OUT)               :: trans
+      LOGICAL, INTENT(OUT)                        :: trans
          !! transpose flag of matrix rep.
       LOGICAL, INTENT(OUT)                        :: new
          !! whether a new tensor was created for tensor_out
@@ -1466,9 +1465,9 @@ CONTAINS
       ENDIF
 
       IF (compat1 == 1 .AND. compat2 == 2) THEN
-         trans = block_matrix_no_transpose
+         trans = .FALSE.
       ELSEIF (compat1 == 2 .AND. compat2 == 1) THEN
-         trans = block_matrix_transpose
+         trans = .TRUE.
       ELSE
          CPABORT("this should not happen")
       ENDIF
@@ -1552,16 +1551,6 @@ CONTAINS
       ENDIF
 
    END FUNCTION
-
-   SUBROUTINE invert_transpose_flag(trans_flag)
-      CHARACTER(LEN=1), INTENT(INOUT)                    :: trans_flag
-
-      IF (trans_flag == block_matrix_transpose) THEN
-         trans_flag = block_matrix_no_transpose
-      ELSEIF (trans_flag == block_matrix_no_transpose) THEN
-         trans_flag = block_matrix_transpose
-      ENDIF
-   END SUBROUTINE
 
    SUBROUTINE index_linked_sort(ind_ref, ind_dep)
       INTEGER, DIMENSION(:), INTENT(INOUT) :: ind_ref, ind_dep

@@ -11,9 +11,6 @@ MODULE block_tas_util
 
    !! often used utilities for tall-and-skinny matrices
 
-   USE block_matrix_api, ONLY: block_matrix_transpose, &
-                               block_matrix_no_transpose
-
    USE kinds, ONLY: int_4, int_8
    USE util, ONLY: sort
 
@@ -34,7 +31,6 @@ MODULE block_tas_util
    PUBLIC :: &
       array_eq, &
       index_unique, &
-      invert_transpose_flag, &
       swap
 
    INTERFACE swap
@@ -176,16 +172,6 @@ CONTAINS
 
    END SUBROUTINE sort_indices
 
-
-   SUBROUTINE invert_transpose_flag(trans_flag)
-      CHARACTER(LEN=1), INTENT(INOUT)                    :: trans_flag
-
-      IF (trans_flag == block_matrix_transpose) THEN
-         trans_flag = block_matrix_no_transpose
-      ELSEIF (trans_flag == block_matrix_no_transpose) THEN
-         trans_flag = block_matrix_transpose
-      ENDIF
-   END SUBROUTINE
 
    PURE_ARRAY_EQ FUNCTION array_eq_i(arr1, arr2)
       INTEGER, DIMENSION(:), INTENT(IN)                  :: arr1, arr2

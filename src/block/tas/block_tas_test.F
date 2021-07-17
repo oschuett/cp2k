@@ -16,7 +16,6 @@ MODULE block_tas_test
       block_matrix_distribution_release, &
       block_matrix_multiply, &
       block_matrix_type, block_matrix_distribution_obj, &
-      block_matrix_no_transpose, block_matrix_transpose, &
       block_matrix_distribution_new, &
       block_matrix_create, &
       block_matrix_finalize, &
@@ -37,7 +36,6 @@ MODULE block_tas_test
    USE block_tas_mm, ONLY: block_tas_multiply
    USE block_tas_split, ONLY: block_tas_mp_comm, &
                               block_tas_get_split_info
-   USE block_tas_util, ONLY: invert_transpose_flag
    USE kinds, ONLY: int_8, real_8, dp
    USE message_passing, ONLY: mp_environ, &
                             mp_cart_create, &
@@ -165,8 +163,8 @@ CONTAINS
       !! Benchmark routine. Due to random sparsity (as opposed to structured sparsity pattern), this
       !! may not be representative for actual applications.
 
-      CHARACTER(LEN=1), INTENT(IN)                       :: transa, transb, transc
-      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix_a, matrix_b, matrix_c
+      LOGICAL, INTENT(IN)                                :: transa, transb, transc
+      TYPE(block_tas_type), INTENT(INOUT)                :: matrix_a, matrix_b, matrix_c
 
       REAL(KIND=real_8), INTENT(IN), OPTIONAL            :: filter_eps
       INTEGER, INTENT(IN), OPTIONAL                      :: io_unit
@@ -290,13 +288,13 @@ CONTAINS
 
    SUBROUTINE block_tas_test_mm(transa, transb, transc, matrix_a, matrix_b, matrix_c, filter_eps, unit_nr, log_verbose)
       !! Test tall-and-skinny matrix multiplication for accuracy
-      CHARACTER(LEN=1), INTENT(IN)                       :: transa, transb, transc
-      TYPE(block_tas_type), INTENT(INOUT)                  :: matrix_a, matrix_b, matrix_c
+      LOGICAL, INTENT(IN)                                :: transa, transb, transc
+      TYPE(block_tas_type), INTENT(INOUT)                :: matrix_a, matrix_b, matrix_c
       INTEGER, INTENT(IN)                                :: unit_nr
       LOGICAL, INTENT(IN), OPTIONAL                      :: log_verbose
       REAL(KIND=real_8), INTENT(IN), OPTIONAL            :: filter_eps
 
-      CHARACTER(LEN=1)                                   :: transa_prv, transb_prv
+      LOGICAL                                            :: transa_prv, transb_prv
       INTEGER                                            :: comm_dbcsr, io_unit, mp_comm, mynode, &
                                                             numnodes
       INTEGER, DIMENSION(2)                              :: myploc, npdims
@@ -382,13 +380,13 @@ CONTAINS
 
       transa_prv = transa; transb_prv = transb
 
-      IF (transc == block_matrix_no_transpose) THEN
+      IF (.NOT.transc) THEN
          CALL block_matrix_multiply(transa_prv, transb_prv, 1.0_dp, &
                              block_matrix_a_mm, block_matrix_b_mm, &
                              0.0_dp, block_matrix_c_mm, filter_eps=filter_eps)
-      ELSEIF (transc == block_matrix_transpose) THEN
-         CALL invert_transpose_flag(transa_prv)
-         CALL invert_transpose_flag(transb_prv)
+      ELSE
+         transa_prv = .NOT. transa_prv
+         transb_prv = .NOT. transb_prv
          CALL block_matrix_multiply(transb_prv, transa_prv, 1.0_dp, &
                              block_matrix_b_mm, block_matrix_a_mm, &
                              0.0_dp, block_matrix_c_mm, filter_eps=filter_eps)
