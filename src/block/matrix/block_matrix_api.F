@@ -108,6 +108,7 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_type
    PUBLIC :: block_matrix_release
    PUBLIC :: block_matrix_create
+   PUBLIC :: block_matrix_create_from_template
    PUBLIC :: block_matrix_clear
    PUBLIC :: block_matrix_scale
    PUBLIC :: block_matrix_get_block_p
@@ -153,18 +154,11 @@ MODULE block_matrix_api
       TYPE(dbcsr_iterator), PRIVATE        :: dbcsr
    END TYPE block_matrix_iterator
 
-   INTERFACE block_matrix_create
-      MODULE PROCEDURE block_matrix_create_new
-      MODULE PROCEDURE block_matrix_create_template
-   END INTERFACE block_matrix_create
-
    CONTAINS
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_create_new(matrix, name, dist, &
-                                      row_blk_size, col_blk_size)
-
+   SUBROUTINE block_matrix_create(matrix, name, dist, row_blk_size, col_blk_size)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
       CHARACTER(len=*), INTENT(IN)                       :: name
       TYPE(block_matrix_distribution_obj), INTENT(IN)    :: dist
@@ -174,20 +168,19 @@ MODULE block_matrix_api
                         matrix_type=dbcsr_type_no_symmetry, &
                         row_blk_size=row_blk_size, col_blk_size=col_blk_size, &
                         data_type=dbcsr_type_real_8)
-   END SUBROUTINE block_matrix_create_new
+   END SUBROUTINE block_matrix_create
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_create_template(matrix, template, name)
-
+   SUBROUTINE block_matrix_create_from_template(matrix, name, template)
       TYPE(block_matrix_type), INTENT(INOUT)             :: matrix
+      CHARACTER(len=*), INTENT(IN)                       :: name
       TYPE(block_matrix_type), INTENT(IN)                :: template
-      CHARACTER(len=*), INTENT(IN), OPTIONAL             :: name
 
       CALL dbcsr_create(matrix%dbcsr, template=template%dbcsr, name=name, &
                         matrix_type=dbcsr_type_no_symmetry, &
                         data_type=dbcsr_type_real_8)
-   END SUBROUTINE block_matrix_create_template
+   END SUBROUTINE block_matrix_create_from_template
 
    !================================================================================================
    !================================================================================================

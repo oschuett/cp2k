@@ -21,7 +21,7 @@ MODULE block_tas_mm
       block_matrix_multiply, &
       block_matrix_no_transpose, block_matrix_transpose, block_matrix_type, &
       block_matrix_distribution_obj, &
-      block_matrix_create, block_matrix_finalize, &
+      block_matrix_create, block_matrix_create_from_template, block_matrix_finalize, &
       block_matrix_redistribute, &
       block_matrix_distribution_new, &
       block_matrix_release, block_matrix_distribution_release, &
@@ -784,7 +784,7 @@ CONTAINS
       ENDIF
 
       IF (.NOT. local_copy_prv) THEN
-         CALL block_matrix_create(matrix_tmp, template=matrix_out)
+         CALL block_matrix_create_from_template(matrix_tmp, name="tmp", template=matrix_out)
          CALL block_matrix_redistribute(matrix_in, matrix_tmp)
          CALL block_matrix_add(matrix_out, matrix_tmp, alpha=alpha, beta=1.0_dp)
          CALL block_matrix_release(matrix_tmp)
@@ -1536,8 +1536,10 @@ CONTAINS
          nodata_prv = .FALSE.
       ENDIF
 
+      name = block_matrix_get_name(matrix_in)
+
       IF (.NOT. optimize_pgrid_prv) THEN
-         CALL block_matrix_create(matrix_out, template=matrix_in)
+         CALL block_matrix_create_from_template(matrix_out, name=name, template=matrix_in)
          IF (.NOT. nodata_prv) CALL block_matrix_copy(matrix_out, matrix_in)
          CALL timestop(handle)
          RETURN
@@ -1547,7 +1549,6 @@ CONTAINS
       rcsize => block_matrix_get_col_block_sizes(matrix_in)
       nbrows = SIZE(rbsize)
       nbcols = SIZE(rcsize)
-      name = block_matrix_get_name(matrix_in)
       dist_old = block_matrix_get_distribution(matrix_in)
       CALL mp_environ(nproc, pdims, pcoord, mp_comm_cart)
 

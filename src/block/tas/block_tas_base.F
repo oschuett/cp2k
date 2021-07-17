@@ -22,7 +22,8 @@ MODULE block_tas_base
       block_matrix_get_num_blocks, block_matrix_get_nze, block_matrix_get_distribution, &
       block_matrix_set, block_matrix_filter, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
-      block_matrix_create, block_matrix_finalize, block_matrix_get_name, &
+      block_matrix_create, block_matrix_create_from_template, &
+      block_matrix_finalize, block_matrix_get_name, &
       block_matrix_get_local_rows, block_matrix_get_local_cols
    USE block_tas_types, ONLY: &
       block_tas_distribution_type, block_tas_iterator, block_tas_split_info, block_tas_type
@@ -186,7 +187,7 @@ CONTAINS
       TYPE(block_tas_type), INTENT(OUT)                    :: matrix
       CHARACTER(len=*), INTENT(IN), OPTIONAL               :: name
 
-      CALL block_matrix_create(matrix%matrix, template=matrix_in%matrix, name=name)
+      CALL block_matrix_create_from_template(matrix%matrix, name=name, template=matrix_in%matrix)
       CALL block_matrix_finalize(matrix%matrix)
 
       CALL block_tas_copy_distribution(matrix_in%dist, matrix%dist)
