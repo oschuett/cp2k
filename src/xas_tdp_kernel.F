@@ -1105,7 +1105,7 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER :: routineN = 'contract3_RI_to_doMOs'
 
-      INTEGER                                            :: blk, handle, iatom, ik, ind(3), jatom, &
+      INTEGER                                            :: handle, iatom, ik, ind(3), jatom, &
                                                             katom, nk, s1, s2
       LOGICAL                                            :: found, t_found
       REAL(dp)                                           :: prefac
@@ -1122,7 +1122,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iter, ab_Q)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk)
+         CALL block_tensor_iterator_next_block(iter, ind)
 
          iatom = ind(1)
          jatom = ind(2)
@@ -1182,7 +1182,7 @@ CONTAINS
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'contract2_AO_to_doMO_low'
 
-      INTEGER                                            :: blk, handle, i, iatom, ind(3), j, jatom, &
+      INTEGER                                            :: handle, i, iatom, ind(3), j, jatom, &
                                                             katom, n, s1, s2
       INTEGER, DIMENSION(:), POINTER                     :: atom_blk_size
       LOGICAL                                            :: found, t_found
@@ -1198,7 +1198,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iter, ab_Q)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk)
+         CALL block_tensor_iterator_next_block(iter, ind)
 
          iatom = ind(1)
          jatom = ind(2)

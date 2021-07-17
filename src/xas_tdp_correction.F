@@ -953,7 +953,7 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'get_full_pqX_from_3c_ex', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: blk, i, ind(3), natom, nblk_ri, nsgf_x
+      INTEGER                                            :: i, ind(3), natom, nblk_ri, nsgf_x
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: orb_blk_size, proc_dist_1, proc_dist_2, &
                                                             proc_dist_3
       INTEGER, DIMENSION(3)                              :: pdims
@@ -987,7 +987,7 @@ CONTAINS
       !dist of 3c_ex and work match, can simply copy blocks over. Diagonal with factor 0.5
       CALL block_tensor_iterator_start(iter, xas_tdp_env%ri_3c_ex)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk)
+         CALL block_tensor_iterator_next_block(iter, ind)
          CALL block_tensor_get_block(xas_tdp_env%ri_3c_ex, ind, pblock, found)
 
          IF (ind(1) == ind(2)) pblock = 0.5_dp * pblock
@@ -1265,7 +1265,7 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER                        :: routineN = 'get_oIY_tensors'
 
-      INTEGER                                            :: blk, bo(2), handle, i, ido_mo, ind(2), &
+      INTEGER                                            :: bo(2), handle, i, ido_mo, ind(2), &
                                                             natom, nblk_aos, nblk_mos, nblk_ri, &
                                                             ndo_mo, pdims_2d(2), proc_id
       INTEGER, DIMENSION(:), POINTER                     :: ao_row_dist, mo_row_dist, ri_col_dist
@@ -1326,7 +1326,7 @@ CONTAINS
          !copy block by block, dist match
          CALL block_tensor_iterator_start(iter, t_work)
          DO WHILE (block_tensor_iterator_blocks_left(iter))
-            CALL block_tensor_iterator_next_block(iter, ind, blk)
+            CALL block_tensor_iterator_next_block(iter, ind)
             CALL block_tensor_get_block(t_work, ind, pblock, found)
 
             DO i = 1, nblk_ri
@@ -1408,7 +1408,7 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'calc_ss_oov_contrib', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: a, blk, boff(3), bsize(3), handle, idx1, &
+      INTEGER                                            :: a, boff(3), bsize(3), handle, idx1, &
                                                             idx2, idx3, ind(3), j, k, nocc
       LOGICAL                                            :: found
       REAL(dp)                                           :: denom, tmp
@@ -1425,7 +1425,7 @@ CONTAINS
       !Iterate over the tensors and sum. Both tensors have same dist
       CALL block_tensor_iterator_start(iter, ja_Ik_diff)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk, blk_offset=boff, blk_size=bsize)
+         CALL block_tensor_iterator_next_block(iter, ind, blk_offset=boff, blk_size=bsize)
          CALL block_tensor_get_block(ja_Ik_diff, ind, tensor_blk, found)
 
          IF (found) THEN
@@ -1486,7 +1486,7 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'calc_os_oov_contrib', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: a, blk, boff(3), bsize(3), handle, idx1, &
+      INTEGER                                            :: a, boff(3), bsize(3), handle, idx1, &
                                                             idx2, idx3, ind(3), j, k
       LOGICAL                                            :: found
       REAL(dp)                                           :: denom, tmp
@@ -1504,7 +1504,7 @@ CONTAINS
       !Iterate over the tensor and sum
       CALL block_tensor_iterator_start(iter, ja_Ik)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk, blk_offset=boff, blk_size=bsize)
+         CALL block_tensor_iterator_next_block(iter, ind, blk_offset=boff, blk_size=bsize)
          CALL block_tensor_get_block(ja_Ik, ind, ja_Ik_blk, found)
 
          IF (found) THEN
@@ -1563,7 +1563,7 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'calc_ss_ovv_contrib', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: a, b, blk, boff(3), bsize(3), handle, &
+      INTEGER                                            :: a, b, boff(3), bsize(3), handle, &
                                                             idx1, idx2, idx3, ind(3), j, nocc
       LOGICAL                                            :: found
       REAL(dp)                                           :: denom, tmp
@@ -1580,7 +1580,7 @@ CONTAINS
       !tensors have matching distributions, can do that safely
       CALL block_tensor_iterator_start(iter, aj_Ib_diff)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk, blk_offset=boff, blk_size=bsize)
+         CALL block_tensor_iterator_next_block(iter, ind, blk_offset=boff, blk_size=bsize)
          CALL block_tensor_get_block(aj_Ib_diff, ind, tensor_blk, found)
 
          IF (found) THEN
@@ -1643,7 +1643,7 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'calc_os_ovv_contrib', &
          routineP = moduleN//':'//routineN
 
-      INTEGER                                            :: a, b, blk, boff(3), bsize(3), handle, &
+      INTEGER                                            :: a, b, boff(3), bsize(3), handle, &
                                                             idx1, idx2, idx3, ind(3), j
       LOGICAL                                            :: found
       REAL(dp)                                           :: denom, tmp
@@ -1659,7 +1659,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iter, aj_Ib)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk, blk_offset=boff, blk_size=bsize)
+         CALL block_tensor_iterator_next_block(iter, ind, blk_offset=boff, blk_size=bsize)
          CALL block_tensor_get_block(aj_Ib, ind, aj_Ib_blk, found)
 
          IF (found) THEN

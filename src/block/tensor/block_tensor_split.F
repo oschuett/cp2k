@@ -77,7 +77,7 @@ CONTAINS
       INTEGER, DIMENSION(:), ALLOCATABLE              :: ${varlist("inblock_offset")}$
       INTEGER, DIMENSION(:), ALLOCATABLE              :: ${varlist("blk_nsplit")}$
       INTEGER                                         :: ${varlist("split_blk")}$
-      INTEGER :: idim, i, isplit_sum, blk, nsplit, handle, splitsum, bcount
+      INTEGER :: idim, i, isplit_sum, nsplit, handle, splitsum, bcount
       INTEGER, DIMENSION(:, :), ALLOCATABLE           :: blks_to_allocate
       INTEGER, DIMENSION(:), ALLOCATABLE :: dist_d, blk_size_d, blk_size_split_d, dist_split_d
       INTEGER, DIMENSION(ndims_matrix_row(tensor_in)) :: map1_2d
@@ -172,7 +172,7 @@ CONTAINS
 
       bcount = 0
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size)
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk_size=blk_size)
 #:for ndim in ndims
          IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
 #:for idim in range(1,ndim+1)
@@ -193,7 +193,7 @@ CONTAINS
 
       bcount = 0
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk_size=blk_size, blk_offset=blk_offset)
 
 #:for ndim in ndims
          IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
@@ -217,7 +217,7 @@ CONTAINS
       CALL block_tensor_iterator_start(iter, tensor_in)
 
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk_size=blk_size, blk_offset=blk_offset)
 #:for ndim in ndims
          IF (ndims_tensor(tensor_in) == ${ndim}$) THEN
             CALL block_tensor_get_block(tensor_in, blk_index, block_${ndim}$d, found)
@@ -331,7 +331,7 @@ CONTAINS
                                                          ${varlist("split")}$
       INTEGER, DIMENSION(:), ALLOCATABLE              :: ${varlist("inblock_offset")}$, ${varlist("blk_size_split")}$
       INTEGER, DIMENSION(:, :), ALLOCATABLE            :: blks_to_allocate
-      INTEGER                                         :: idim, iblk, blk, bcount
+      INTEGER                                         :: idim, iblk, bcount
       INTEGER                                         :: ${varlist("iblk")}$, isplit_sum, splitsum, nblk
       TYPE(block_tensor_iterator_type)                     :: iter
       INTEGER, DIMENSION(ndims_tensor(tensor_out)) :: blk_index, blk_size, blk_offset, blk_shape, blk_index_n
@@ -402,7 +402,7 @@ CONTAINS
       CALL block_tensor_iterator_start(iter, tensor_split_in)
       bcount = 0
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size)
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk_size=blk_size)
 #:for ndim in ndims
          IF (ndims_tensor(tensor_out) == ${ndim}$) THEN
 #:for idim in range(1,ndim+1)
@@ -418,7 +418,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iter, tensor_out)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk_size=blk_size, blk_offset=blk_offset)
 
 #:for ndim in ndims
          IF (ndims_tensor(tensor_out) == ${ndim}$) THEN
@@ -588,7 +588,7 @@ CONTAINS
       TYPE(block_tensor_iterator_type)                     :: iter
       INTEGER, DIMENSION(ndims_tensor(tensor_in)) :: blk_index, blk_size, blk_offset
       LOGICAL :: found, move_data_prv
-      INTEGER :: idim, blk, iblk, iblk_all, nblk
+      INTEGER :: idim, iblk, iblk_all, nblk
       INTEGER, DIMENSION(:, :), ALLOCATABLE :: blk_ind, blk_ind_tmp
 #:for ndim in ndims
       REAL(dp), DIMENSION(${shape_colon(n=ndim)}$), ALLOCATABLE :: block_${ndim}$d, block_put_${ndim}$d
@@ -629,7 +629,7 @@ CONTAINS
       ! copy blocks
       CALL block_tensor_iterator_start(iter, tensor_out)
       iter_loop: DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+         CALL block_tensor_iterator_next_block(iter, blk_index, blk_size=blk_size, blk_offset=blk_offset)
 
          DO idim = 1, ndims_tensor(tensor_in)
             blk_bounds(1, idim) = MAX(bounds(1, idim) - blk_offset(idim) + 1, 1)

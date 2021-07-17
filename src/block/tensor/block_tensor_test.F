@@ -71,7 +71,6 @@ CONTAINS
       TYPE(block_tensor_type), INTENT(INOUT)          :: tensor1, tensor2
       LOGICAL                                    :: block_tensor_equal
 
-      INTEGER                                    :: blk
       TYPE(block_tensor_type)                         :: tensor2_tmp
       TYPE(block_tensor_iterator_type)                :: iter
       TYPE(block_nd)                             :: blk_data1, blk_data2
@@ -89,7 +88,7 @@ CONTAINS
       CALL block_tensor_iterator_start(iter, tensor1)
 
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
+         CALL block_tensor_iterator_next_block(iter, ind_nd, blk_size=blk_size)
          CALL block_tensor_get_block(tensor1, ind_nd, blk_data1, found)
          CPASSERT(found)
          CALL block_tensor_get_block(tensor2_tmp, ind_nd, blk_data2, found)
@@ -354,7 +353,7 @@ CONTAINS
       LOGICAL, INTENT(IN)                                :: enumerate
       INTEGER, DIMENSION(:), INTENT(IN), OPTIONAL        :: ${varlist("blk_ind")}$
          !! index along respective dimension of non-zero blocks
-      INTEGER                                            :: blk, numnodes, mynode
+      INTEGER                                            :: numnodes, mynode
 
       INTEGER                                            :: i, ib, my_nblks_alloc, nblks_alloc, proc, nze
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: ${varlist("my_blk_ind")}$
@@ -419,7 +418,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iterator, tensor)
       DO WHILE (block_tensor_iterator_blocks_left(iterator))
-         CALL block_tensor_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size, blk_offset=blk_offset)
+         CALL block_tensor_iterator_next_block(iterator, blk_index, blk_size=blk_size, blk_offset=blk_offset)
 
          IF (.NOT. enumerate) THEN
             blk_index_2d = INT(get_2d_indices_tensor(tensor%nd_index_blk, blk_index))
@@ -492,7 +491,7 @@ CONTAINS
       REAL(dp), ALLOCATABLE, DIMENSION(${shape_colon(ndim)}$)   :: block
       INTEGER, DIMENSION(ndims_tensor(tensor))                  :: dims_nd, ind_nd, blk_size, blk_offset
       TYPE(block_tensor_iterator_type)                                     :: iterator
-      INTEGER                                                    :: blk, idim
+      INTEGER                                                    :: idim
       INTEGER, DIMENSION(ndims_tensor(tensor))                   :: blk_start, blk_end
       LOGICAL                                                    :: found
 
@@ -503,7 +502,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iterator, tensor)
       DO WHILE (block_tensor_iterator_blocks_left(iterator))
-         CALL block_tensor_iterator_next_block(iterator, ind_nd, blk, blk_size=blk_size, blk_offset=blk_offset)
+         CALL block_tensor_iterator_next_block(iterator, ind_nd, blk_size=blk_size, blk_offset=blk_offset)
          CALL block_tensor_get_block(tensor, ind_nd, block, found)
          CPASSERT(found)
 

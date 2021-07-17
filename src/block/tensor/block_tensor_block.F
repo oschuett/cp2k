@@ -148,7 +148,7 @@ CONTAINS
       ndims_iterator = iterator%nd_index%ndim_nd
    END FUNCTION
 
-   SUBROUTINE block_tensor_iterator_next_block(iterator, ind_nd, blk_p, blk_size, blk_offset)
+   SUBROUTINE block_tensor_iterator_next_block(iterator, ind_nd, blk_size, blk_offset)
       !! iterate over nd blocks of an nd rank tensor, index only (blocks must be retrieved by calling
       !! block_tensor_get_block on tensor).
 
@@ -156,8 +156,6 @@ CONTAINS
       INTEGER, DIMENSION(ndims_iterator(iterator)), &
          INTENT(OUT)                                 :: ind_nd
          !! nd index of block
-      INTEGER, INTENT(OUT), OPTIONAL                 :: blk_p
-         !! is this needed?
       INTEGER, DIMENSION(ndims_iterator(iterator)), &
          INTENT(OUT), OPTIONAL                       :: blk_size, blk_offset
          !! blk size in each dimension
@@ -165,7 +163,7 @@ CONTAINS
 
       INTEGER(KIND=int_8), DIMENSION(2)              :: ind_2d
 
-      CALL block_tas_iterator_next_block(iterator%iter, ind_2d(1), ind_2d(2), blk_p=blk_p)
+      CALL block_tas_iterator_next_block(iterator%iter, ind_2d(1), ind_2d(2))
 
       ind_nd(:) = get_nd_indices_tensor(iterator%nd_index_blk, ind_2d)
       IF (PRESENT(blk_size)) blk_size(:) = get_array_elements(iterator%blk_sizes, ind_nd)
@@ -303,7 +301,7 @@ CONTAINS
       INTEGER, ALLOCATABLE, DIMENSION(:) :: blk_ind_1, blk_ind_2
 
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_reserve_blocks_tensor_to_matrix'
-      INTEGER :: handle, blk, iblk, nblk
+      INTEGER :: handle, iblk, nblk
       INTEGER, DIMENSION(2)              :: ind_2d
 
       CALL timeset(routineN, handle)
@@ -314,7 +312,7 @@ CONTAINS
 
       iblk = 0
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind_2d, blk)
+         CALL block_tensor_iterator_next_block(iter, ind_2d)
          IF (dbcsr_has_symmetry(matrix_out)) THEN
             IF (checker_tr(ind_2d(1), ind_2d(2))) CYCLE
             IF (ind_2d(1) > ind_2d(2)) CALL swap(ind_2d(1), ind_2d(2))
@@ -348,7 +346,7 @@ CONTAINS
    SUBROUTINE block_tensor_reserved_block_indices(tensor, blk_ind)
       !! indices of non-zero blocks
       TYPE(block_tensor_type), INTENT(IN)            :: tensor
-      INTEGER                                   :: blk, iblk, nblk
+      INTEGER                                   :: iblk, nblk
       TYPE(block_tensor_iterator_type)               :: iterator
       INTEGER, DIMENSION(ndims_tensor(tensor))  :: ind_nd
       INTEGER, DIMENSION(block_tensor_get_num_blocks(tensor), ndims_tensor(tensor)), INTENT(OUT) :: blk_ind
@@ -359,7 +357,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iterator, tensor)
       DO iblk = 1, nblk
-         CALL block_tensor_iterator_next_block(iterator, ind_nd, blk)
+         CALL block_tensor_iterator_next_block(iterator, ind_nd)
          blk_ind(iblk, :) = ind_nd(:)
       ENDDO
       CALL block_tensor_iterator_stop(iterator)

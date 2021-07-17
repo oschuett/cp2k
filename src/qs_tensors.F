@@ -1571,7 +1571,7 @@ CONTAINS
       REAL(dp), INTENT(IN)                               :: eps
       REAL(dp), INTENT(INOUT)                            :: memory
 
-      INTEGER                                            :: blk, buffer_left, buffer_size, &
+      INTEGER                                            :: buffer_left, buffer_size, &
                                                             buffer_start, i, memory_usage, nbits, &
                                                             nints
       INTEGER(int_8)                                     :: estimate_to_store_int, &
@@ -1603,7 +1603,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iter, tensor)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk)
+         CALL block_tensor_iterator_next_block(iter, ind)
          CALL block_tensor_get_block(tensor, ind, blk_data, found)
          CPASSERT(found)
          nints = SIZE(blk_data)
@@ -1681,7 +1681,7 @@ CONTAINS
       TYPE(hfx_compression_type), INTENT(INOUT)          :: compressed
       REAL(dp), INTENT(IN)                               :: eps
 
-      INTEGER                                            :: blk, buffer_left, buffer_size, &
+      INTEGER                                            :: buffer_left, buffer_size, &
                                                             buffer_start, i, memory_usage, nbits, &
                                                             nints
       INTEGER(int_8)                                     :: estimate_to_store_int
@@ -1712,7 +1712,7 @@ CONTAINS
       CALL block_tensor_reserve_blocks(tensor, blk_indices)
       CALL block_tensor_iterator_start(iter, tensor)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk, blk_size=blk_size)
+         CALL block_tensor_iterator_next_block(iter, ind, blk_size=blk_size)
          nints = PRODUCT(blk_size)
          CALL hfx_get_single_cache_element( &
             estimate_to_store_int, 6, &

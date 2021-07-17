@@ -601,19 +601,18 @@ CONTAINS
       CALL block_matrix_iterator_stop(iter%iter)
    END SUBROUTINE
 
-   SUBROUTINE block_tas_iterator_next_block_index(iterator, row, column, &
-                                                  blk_p, row_size, col_size)
+   SUBROUTINE block_tas_iterator_next_block_index(iterator, row, column, row_size, col_size)
       !! As block_matrix_iterator_next_block
 
       TYPE(block_tas_iterator), INTENT(INOUT)              :: iterator
       INTEGER(KIND=int_8), INTENT(OUT)                   :: row, column
          !! global block row
          !! global block column
-      INTEGER, INTENT(OUT), OPTIONAL                     :: blk_p, row_size, col_size
+      INTEGER, INTENT(OUT), OPTIONAL                     :: row_size, col_size
 
       INTEGER                                            :: column_group, row_group
 
-      CALL block_matrix_iterator_next_block(iterator%iter, row_group, column_group, blk_p, row_size, col_size)
+      CALL block_matrix_iterator_next_block(iterator%iter, row_group, column_group, row_size, col_size)
 
       CALL block_index_local_to_global(iterator%dist%info, iterator%dist, row_group=row_group, column_group=column_group, &
                                        row=row, column=column)

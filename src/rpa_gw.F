@@ -5129,7 +5129,7 @@ CONTAINS
 
       CHARACTER(LEN=*), PARAMETER                        :: routineN = 'trace_sigma_gw'
 
-      INTEGER                                            :: blk, handle, n, n_end, n_end_block, &
+      INTEGER                                            :: handle, n, n_end, n_end_block, &
                                                             n_start, n_start_block
       INTEGER, DIMENSION(1)                              :: trace_shape
       INTEGER, DIMENSION(2)                              :: mo_bounds_off
@@ -5150,7 +5150,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iter, t3c_1_redist)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind, blk, blk_size=bsize, blk_offset=boff)
+         CALL block_tensor_iterator_next_block(iter, ind, blk_size=bsize, blk_offset=boff)
          CALL block_tensor_get_block(t3c_1_redist, ind, block_1, found)
          CPASSERT(found)
          CALL block_tensor_get_block(t3c_2, ind, block_2, found)

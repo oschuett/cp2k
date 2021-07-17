@@ -278,7 +278,6 @@ CONTAINS
          !! Whether to sum matrices b = a + b
       TYPE(block_tensor_iterator_type) :: iter
       INTEGER, DIMENSION(ndims_tensor(tensor_in))  :: ind_nd
-      INTEGER :: blk
       TYPE(block_nd) :: blk_data
       LOGICAL :: found
 
@@ -298,7 +297,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iter, tensor_in)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind_nd, blk)
+         CALL block_tensor_iterator_next_block(iter, ind_nd)
          CALL block_tensor_get_block(tensor_in, ind_nd, blk_data, found)
          CPASSERT(found)
          CALL block_tensor_put_block(tensor_out, ind_nd, blk_data, summation=summation)
@@ -373,7 +372,7 @@ CONTAINS
       LOGICAL, INTENT(IN), OPTIONAL          :: summation
          !! matrix_out = matrix_out + tensor_in
       TYPE(block_tensor_iterator_type)            :: iter
-      INTEGER                                :: blk, handle
+      INTEGER                                :: handle
       INTEGER, DIMENSION(2)                  :: ind_2d
       REAL(KIND=real_8), DIMENSION(:, :), ALLOCATABLE :: block
       CHARACTER(LEN=*), PARAMETER :: routineN = 'block_tensor_copy_tensor_to_matrix'
@@ -391,7 +390,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iter, tensor_in)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind_2d, blk)
+         CALL block_tensor_iterator_next_block(iter, ind_2d)
          IF (dbcsr_has_symmetry(matrix_out) .AND. checker_tr(ind_2d(1), ind_2d(2))) CYCLE
 
          CALL block_tensor_get_block(tensor_in, ind_2d, block, found)

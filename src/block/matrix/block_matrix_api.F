@@ -237,16 +237,16 @@ MODULE block_matrix_api
 
    !================================================================================================
    !================================================================================================
-   SUBROUTINE block_matrix_iterator_next_block_index(iterator, row, column, blk_p, row_size, col_size)
+   SUBROUTINE block_matrix_iterator_next_block_index(iterator, row, column, row_size, col_size)
       TYPE(block_matrix_iterator), INTENT(INOUT)         :: iterator
       INTEGER, INTENT(OUT)                               :: row, column
-      INTEGER, INTENT(OUT), OPTIONAL                     :: blk_p, row_size, col_size
+      INTEGER, INTENT(OUT), OPTIONAL                     :: row_size, col_size
 
       INTEGER :: blk ! only needed to select right procedure from interface
       LOGICAL :: transposed
 
       CALL dbcsr_iterator_next_block(iterator%dbcsr, row=row, column=column, blk=blk,&
-                                     transposed=transposed, blk_p=blk_p, &
+                                     transposed=transposed, &
                                      row_size=row_size, col_size=col_size)
       CPASSERT(.NOT.transposed)
    END SUBROUTINE block_matrix_iterator_next_block_index
@@ -527,17 +527,13 @@ MODULE block_matrix_api
    !================================================================================================
    SUBROUTINE block_matrix_multiply(transa, transb, &
                                       alpha, matrix_a, matrix_b, beta, matrix_c, &
-                                      first_row, last_row, &
-                                      first_column, last_column, first_k, last_k, &
                                       retain_sparsity, filter_eps, flop)
+      !TODO use LOGICALs for transpose
       CHARACTER(LEN=1), INTENT(IN)                   :: transa, transb
       REAL(kind=dp), INTENT(IN)                      :: alpha
       TYPE(block_matrix_type), INTENT(IN)            :: matrix_a, matrix_b
       REAL(kind=dp), INTENT(IN)                      :: beta
       TYPE(block_matrix_type), INTENT(INOUT)         :: matrix_c
-      INTEGER, INTENT(IN), OPTIONAL                  :: first_row, last_row, &
-                                                        first_column, last_column, &
-                                                        first_k, last_k
       LOGICAL, INTENT(IN), OPTIONAL                  :: retain_sparsity
       REAL(kind=dp), INTENT(IN), OPTIONAL            :: filter_eps
       INTEGER(int_8), INTENT(OUT), OPTIONAL          :: flop
@@ -545,9 +541,6 @@ MODULE block_matrix_api
       CALL dbcsr_multiply(transa=transa, transb=transb, &
                           alpha=alpha, matrix_a=matrix_a%dbcsr, &
                           matrix_b=matrix_b%dbcsr, beta=beta, matrix_c=matrix_c%dbcsr, &
-                          first_row=first_row, last_row=last_row, &
-                          first_column=first_column, last_column=last_column, &
-                          first_k=first_k, last_k=last_k, &
                           retain_sparsity=retain_sparsity, filter_eps=filter_eps, flop=flop)
    END SUBROUTINE block_matrix_multiply
 

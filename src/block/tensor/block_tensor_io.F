@@ -168,7 +168,6 @@ CONTAINS
          !! for local output
       LOGICAL, INTENT(IN), OPTIONAL                      :: write_int
          !! convert to integers (useful for testing with integer tensors)
-      INTEGER                                            :: blk
       INTEGER, DIMENSION(ndims_tensor(tensor))          :: blk_index, blk_size
 #:for ndim in ndims
       REAL(KIND=real_8), ALLOCATABLE, &
@@ -183,7 +182,7 @@ CONTAINS
       ENDIF
       CALL block_tensor_iterator_start(iterator, tensor)
       DO WHILE (block_tensor_iterator_blocks_left(iterator))
-         CALL block_tensor_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size)
+         CALL block_tensor_iterator_next_block(iterator, blk_index, blk_size=blk_size)
          CALL block_tensor_get_stored_coordinates(tensor, blk_index, proc)
          CALL mp_environ(numnodes, mynode, tensor%pgrid%mp_comm_2d)
          CPASSERT(proc .EQ. mynode)
@@ -263,7 +262,7 @@ CONTAINS
       INTEGER, INTENT(IN)                                :: io_unit_master, io_unit_all
       TYPE(block_tensor_iterator_type)                        :: iterator
       INTEGER, DIMENSION(ndims_tensor(tensor))          :: blk_index, blk_size
-      INTEGER                                            :: blk, mynode, numnodes, proc
+      INTEGER                                            :: mynode, numnodes, proc
 
       IF (io_unit_master > 0) THEN
          WRITE (io_unit_master, '(T7,A)') "(block index) @ process: size"
@@ -271,7 +270,7 @@ CONTAINS
 
       CALL block_tensor_iterator_start(iterator, tensor)
       DO WHILE (block_tensor_iterator_blocks_left(iterator))
-         CALL block_tensor_iterator_next_block(iterator, blk_index, blk, blk_size=blk_size)
+         CALL block_tensor_iterator_next_block(iterator, blk_index, blk_size=blk_size)
          CALL block_tensor_get_stored_coordinates(tensor, blk_index, proc)
          CALL mp_environ(numnodes, mynode, tensor%pgrid%mp_comm_2d)
          CPASSERT(proc .EQ. mynode)

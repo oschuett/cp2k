@@ -848,7 +848,7 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER :: routineN = 'calculate_density_coeffs'
 
-      INTEGER                                            :: blk, exat, handle, i, iat, iatom, iex, &
+      INTEGER                                            :: exat, handle, i, iat, iatom, iex, &
                                                             inb, ind(3), ispin, jatom, jnb, katom, &
                                                             natom, nex, nkind, nnb, nspins, &
                                                             output_unit, ri_at
@@ -994,7 +994,7 @@ CONTAINS
 
          CALL block_tensor_iterator_start(iter, pqX)
          DO WHILE (block_tensor_iterator_blocks_left(iter))
-            CALL block_tensor_iterator_next_block(iter, ind, blk)
+            CALL block_tensor_iterator_next_block(iter, ind)
             CALL block_tensor_get_block(pqX, ind, t_block, tensor_found)
 
             iatom = ind(1)

@@ -61,7 +61,7 @@ CONTAINS
          !! tensor_in is empty on return
       LOGICAL, INTENT(IN), OPTIONAL                    :: move_data
 
-      INTEGER                                            :: blk, iproc, mp_comm, mynode, ndata, &
+      INTEGER                                            :: iproc, mp_comm, mynode, ndata, &
                                                             numnodes, bcount, nblk
       INTEGER, ALLOCATABLE, DIMENSION(:)                 :: num_blocks_recv, num_blocks_send, &
                                                             num_entries_recv, num_entries_send, &
@@ -103,7 +103,7 @@ CONTAINS
       ALLOCATE (req_array(1:numnodes, 4))
       CALL block_tensor_iterator_start(iter, tensor_in)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
+         CALL block_tensor_iterator_next_block(iter, ind_nd, blk_size=blk_size)
          CALL block_tensor_get_stored_coordinates(tensor_out, ind_nd, iproc)
          num_send(2*iproc) = num_send(2*iproc) + PRODUCT(blk_size)
          num_send(2*iproc + 1) = num_send(2*iproc + 1) + 1
@@ -123,7 +123,7 @@ CONTAINS
       ENDDO
       CALL block_tensor_iterator_start(iter, tensor_in)
       DO WHILE (block_tensor_iterator_blocks_left(iter))
-         CALL block_tensor_iterator_next_block(iter, ind_nd, blk, blk_size=blk_size)
+         CALL block_tensor_iterator_next_block(iter, ind_nd, blk_size=blk_size)
          CALL block_tensor_get_block(tensor_in, ind_nd, blk_data, found)
          CPASSERT(found)
          CALL block_tensor_get_stored_coordinates(tensor_out, ind_nd, iproc)
