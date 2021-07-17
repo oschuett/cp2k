@@ -612,7 +612,8 @@ CONTAINS
 
       INTEGER                                            :: column_group, row_group
 
-      CALL block_matrix_iterator_next_block(iterator%iter, row_group, column_group, row_size, col_size)
+      CALL block_matrix_iterator_next_block(iterator%iter, row=row_group, column=column_group, &
+                                            row_size=row_size, col_size=col_size)
 
       CALL block_index_local_to_global(iterator%dist%info, iterator%dist, row_group=row_group, column_group=column_group, &
                                        row=row, column=column)

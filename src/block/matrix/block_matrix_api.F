@@ -158,11 +158,6 @@ MODULE block_matrix_api
       MODULE PROCEDURE block_matrix_create_template
    END INTERFACE block_matrix_create
 
-   INTERFACE block_matrix_iterator_next_block
-      MODULE PROCEDURE block_matrix_iterator_next_block_d
-      MODULE PROCEDURE block_matrix_iterator_next_block_index
-   END INTERFACE block_matrix_iterator_next_block
-
    CONTAINS
 
    !================================================================================================
@@ -221,36 +216,23 @@ MODULE block_matrix_api
    END SUBROUTINE block_matrix_iterator_start
 
    !================================================================================================
-   ! TODO: unify with block_matrix_iterator_next_block_index
    !================================================================================================
-   SUBROUTINE block_matrix_iterator_next_block_d(iterator, row, column, block, row_size, col_size)
-      TYPE(block_matrix_iterator), INTENT(INOUT) :: iterator
-      INTEGER, INTENT(OUT)                       :: row, column
-      REAL(dp), DIMENSION(:, :), POINTER         :: block
-      INTEGER, INTENT(OUT), OPTIONAL             :: row_size, col_size
+   SUBROUTINE block_matrix_iterator_next_block(iterator, row, column, block, row_size, col_size)
+      TYPE(block_matrix_iterator), INTENT(INOUT)   :: iterator
+      INTEGER, INTENT(OUT)                         :: row, column
+      REAL(dp), DIMENSION(:, :), POINTER, OPTIONAL :: block
+      INTEGER, INTENT(OUT), OPTIONAL               :: row_size, col_size
 
       LOGICAL :: transposed
-      CALL dbcsr_iterator_next_block(iterator%dbcsr, row, column, block, transposed, &
-                                     row_size=row_size, col_size=col_size)
-      CPASSERT(.NOT.transposed)
-   END SUBROUTINE block_matrix_iterator_next_block_d
+      REAL(dp), DIMENSION(:, :), POINTER :: block_prv ! block arg is non-optional in dbcsr routine
 
-   !================================================================================================
-   !================================================================================================
-   SUBROUTINE block_matrix_iterator_next_block_index(iterator, row, column, row_size, col_size)
-      TYPE(block_matrix_iterator), INTENT(INOUT)         :: iterator
-      INTEGER, INTENT(OUT)                               :: row, column
-      INTEGER, INTENT(OUT), OPTIONAL                     :: row_size, col_size
-
-      INTEGER :: blk ! only needed to select right procedure from interface
-      LOGICAL :: transposed
-
-      CALL dbcsr_iterator_next_block(iterator%dbcsr, row=row, column=column, blk=blk,&
+      CALL dbcsr_iterator_next_block(iterator%dbcsr, row=row, column=column, block=block_prv, &
                                      transposed=transposed, &
                                      row_size=row_size, col_size=col_size)
       CPASSERT(.NOT.transposed)
-   END SUBROUTINE block_matrix_iterator_next_block_index
-
+      IF (PRESENT(block)) block => block_prv
+   END SUBROUTINE block_matrix_iterator_next_block
+!
    !================================================================================================
    !================================================================================================
    SUBROUTINE block_matrix_filter(matrix, eps)
