@@ -20,7 +20,7 @@ MODULE block_tas_base
       block_matrix_iterator_start, block_matrix_iterator_stop, &
       block_matrix_distribution_release, block_matrix_release, &
       block_matrix_get_num_blocks, block_matrix_get_nze, block_matrix_get_distribution, &
-      block_matrix_set, block_matrix_filter, block_matrix_clear, &
+      block_matrix_filter, block_matrix_clear, &
       block_matrix_distribution_obj, block_matrix_iterator, block_matrix_type, &
       block_matrix_create, block_matrix_create_from_template, &
       block_matrix_finalize, block_matrix_get_name, &
@@ -76,7 +76,6 @@ MODULE block_tas_base
       block_tas_nfullcols_total, &
       block_tas_put_block, &
       block_tas_reserve_blocks, &
-      block_tas_set, &
       block_repl_get_stored_coordinates
    PUBLIC :: &
       ! conversion routines
@@ -889,13 +888,6 @@ CONTAINS
       CALL block_matrix_get_block_p(matrix%matrix, row_group, col_group, block, &
                                     found, row_size=row_size, col_size=col_size)
 
-   END SUBROUTINE
-
-   SUBROUTINE block_tas_set(matrix, alpha)
-      !! As block_matrix_set
-      TYPE(block_tas_type), INTENT(INOUT)    :: matrix
-      REAL(dp), INTENT(IN)                :: alpha
-      CALL block_matrix_set(matrix%matrix, alpha)
    END SUBROUTINE
 
    SUBROUTINE block_tas_filter (matrix, eps)

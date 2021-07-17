@@ -28,7 +28,7 @@ MODULE block_tensor_api
       block_tensor_create, block_tensor_destroy, block_tensor_distribution_destroy, block_tensor_distribution_new, &
       block_tensor_distribution_type, block_tensor_nd_mp_comm, block_tensor_nd_mp_free, block_tensor_type, &
       block_tensor_pgrid_type, block_tensor_pgrid_create, block_tensor_pgrid_create_expert, block_tensor_pgrid_destroy, &
-      block_tensor_set, block_tensor_filter, &
+      block_tensor_filter, &
       block_tensor_mp_environ_pgrid => mp_environ_pgrid, block_tensor_blk_sizes, block_tensor_get_info, &
       block_tensor_finalize, block_tensor_scale, block_tensor_get_nze, block_tensor_get_nze_total, &
       block_tensor_get_num_blocks, block_tensor_get_num_blocks_total, block_tensor_clear, &
@@ -74,7 +74,6 @@ MODULE block_tensor_api
    PUBLIC :: block_tensor_pgrid_create
    PUBLIC :: block_tensor_pgrid_create_expert
    PUBLIC :: block_tensor_pgrid_destroy
-   PUBLIC :: block_tensor_set
    PUBLIC :: block_tensor_filter
    PUBLIC :: block_tensor_mp_environ_pgrid
    PUBLIC :: block_tensor_copy_matrix_to_tensor

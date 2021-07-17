@@ -25,7 +25,7 @@ MODULE block_tensor_types
    USE block_tas_base, ONLY: &
       block_tas_create, block_tas_distribution_new, &
       block_tas_distribution_destroy, block_tas_finalize, block_tas_get_info, &
-      block_tas_destroy, block_tas_get_stored_coordinates, block_tas_set, block_tas_filter, &
+      block_tas_destroy, block_tas_get_stored_coordinates, block_tas_filter, &
       block_tas_get_num_blocks, block_tas_get_num_blocks_total, block_tas_get_nze, &
       block_tas_get_nze_total, block_tas_clear
    USE block_tas_types, ONLY: &
@@ -82,7 +82,6 @@ MODULE block_tensor_types
       block_tensor_pgrid_type, &
       block_tensor_pgrid_set_strict_split, &
       block_tensor_scale, &
-      block_tensor_set, &
       block_tensor_type, &
       dims_tensor, &
       mp_environ_pgrid, &
@@ -1297,13 +1296,6 @@ CONTAINS
       CALL mp_environ(nproc, dims_2d, task_coor_2d, pgrid%mp_comm_2d)
       CALL block_tensor_get_mapping_info(pgrid%nd_index_grid, dims_nd=dims)
       task_coor = get_nd_indices_pgrid(pgrid%nd_index_grid, task_coor_2d)
-   END SUBROUTINE
-
-   SUBROUTINE block_tensor_set (tensor, alpha)
-      !! As block_set
-      TYPE(block_tensor_type), INTENT(INOUT)                   :: tensor
-      REAL(dp), INTENT(IN)                               :: alpha
-      CALL block_tas_set(tensor%matrix_rep, alpha)
    END SUBROUTINE
 
    SUBROUTINE block_tensor_filter (tensor, eps)

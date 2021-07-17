@@ -20,7 +20,6 @@ MODULE block_matrix_api
     dbcsr_complete_redistribute
 
  USE dbcsr_operations, ONLY: &
-      dbcsr_set, &
       dbcsr_filter, &
       dbcsr_scale, &
       dbcsr_get_info, &
@@ -114,7 +113,6 @@ MODULE block_matrix_api
    PUBLIC :: block_matrix_get_block_p
    PUBLIC :: block_matrix_put_block
    PUBLIC :: block_matrix_reserve_blocks
-   PUBLIC :: block_matrix_set
    PUBLIC :: block_matrix_filter
    PUBLIC :: block_matrix_finalize
    PUBLIC :: block_matrix_multiply
@@ -232,15 +230,6 @@ MODULE block_matrix_api
 
       CALL dbcsr_filter(matrix%dbcsr, eps)
    END SUBROUTINE block_matrix_filter
-
-   !================================================================================================
-   !================================================================================================
-   SUBROUTINE block_matrix_set(matrix, alpha)
-      TYPE(block_matrix_type), INTENT(INOUT)     :: matrix
-      REAL(dp), INTENT(IN)                       :: alpha
-
-      CALL dbcsr_set(matrix%dbcsr, alpha)
-   END SUBROUTINE block_matrix_set
 
    !================================================================================================
    !================================================================================================
