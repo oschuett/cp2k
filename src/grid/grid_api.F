@@ -18,6 +18,7 @@ MODULE grid_api
    USE kinds,                           ONLY: dp
    USE message_passing,                 ONLY: mp_sum
    USE offload_api,                     ONLY: offload_buffer_type
+   USE pw_types,                        ONLY: pw_type
    USE realspace_grid_types,            ONLY: realspace_grid_p_type,&
                                               realspace_grid_type
    USE string_utilities,                ONLY: strlcpy_c2f
@@ -101,6 +102,7 @@ CONTAINS
 !> \param radius ...
 !> \param use_subpatch ...
 !> \param subpatch_pattern ...
+!> \param pwgrid ...
 !> \author Ole Schuett
 ! **************************************************************************************************
    SUBROUTINE collocate_pgf_product(la_max, zeta, la_min, &
@@ -108,7 +110,7 @@ CONTAINS
                                     ra, rab, scale, pab, o1, o2, &
                                     rsgrid, cell, cube_info, &
                                     ga_gb_function, radius, &
-                                    use_subpatch, subpatch_pattern)
+                                    use_subpatch, subpatch_pattern, pwgrid)
 
       INTEGER, INTENT(IN)                                :: la_max
       REAL(KIND=dp), INTENT(IN)                          :: zeta
@@ -119,18 +121,22 @@ CONTAINS
       REAL(KIND=dp), INTENT(IN)                          :: scale
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
       INTEGER, INTENT(IN)                                :: o1, o2
-      TYPE(realspace_grid_type)                          :: rsgrid
+      TYPE(realspace_grid_type), OPTIONAL                :: rsgrid
       TYPE(cell_type), POINTER                           :: cell
       TYPE(cube_info_type), INTENT(IN)                   :: cube_info
       INTEGER, INTENT(IN)                                :: ga_gb_function
       REAL(KIND=dp), INTENT(IN)                          :: radius
       LOGICAL, OPTIONAL                                  :: use_subpatch
       INTEGER, INTENT(IN), OPTIONAL                      :: subpatch_pattern
+      TYPE(pw_type), OPTIONAL                            :: pwgrid
 
-      INTEGER                                            :: border_mask
+      CHARACTER(LEN=*), PARAMETER :: routineN = 'collocate_pgf_product'
+
+      INTEGER                                            :: border_mask, handle
       INTEGER, DIMENSION(3), TARGET                      :: border_width, npts_global, npts_local, &
                                                             shift_local
       LOGICAL(KIND=C_BOOL)                               :: orthorhombic
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dh, dh_inv
       REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid
       INTERFACE
          SUBROUTINE grid_ref_collocate_pgf_product_c(orthorhombic, &
@@ -170,6 +176,8 @@ CONTAINS
          END SUBROUTINE grid_ref_collocate_pgf_product_c
       END INTERFACE
 
+      CALL timeset(routineN, handle)
+
       !TODO remove unused dummy arguments
       MARK_USED(cell)
       MARK_USED(cube_info)
@@ -182,21 +190,34 @@ CONTAINS
          END IF
       END IF
 
-      orthorhombic = LOGICAL(rsgrid%desc%orthorhombic, C_BOOL)
-
       CPASSERT(LBOUND(pab, 1) == 1)
       CPASSERT(LBOUND(pab, 2) == 1)
 
-      CALL get_rsgrid_properties(rsgrid, npts_global=npts_global, &
-                                 npts_local=npts_local, &
-                                 shift_local=shift_local, &
-                                 border_width=border_width)
-
-      grid(1:, 1:, 1:) => rsgrid%r(:, :, :)  ! pointer assignment
+      IF (PRESENT(rsgrid)) THEN
+         CPASSERT(.NOT. PRESENT(pwgrid))
+         CALL get_rsgrid_properties(rsgrid, npts_global=npts_global, &
+                                    npts_local=npts_local, &
+                                    shift_local=shift_local, &
+                                    border_width=border_width)
+         grid(1:, 1:, 1:) => rsgrid%r(:, :, :)
+         dh(1:, 1:) => rsgrid%desc%dh(:, :)
+         dh_inv(1:, 1:) => rsgrid%desc%dh_inv(:, :)
+         orthorhombic = LOGICAL(rsgrid%desc%orthorhombic, C_BOOL)
+      ELSE
+         CPASSERT(PRESENT(pwgrid))
+         CALL get_pwgrid_properties(pwgrid, npts_global=npts_global, &
+                                    npts_local=npts_local, &
+                                    shift_local=shift_local, &
+                                    border_width=border_width)
+         grid(1:, 1:, 1:) => pwgrid%cr3d(:, :, :)
+         dh(1:, 1:) => pwgrid%pw_grid%dh(:, :)
+         dh_inv(1:, 1:) => pwgrid%pw_grid%dh_inv(:, :)
+         orthorhombic = LOGICAL(pwgrid%pw_grid%orthorhombic, C_BOOL)
+      ENDIF
 
 #if __GNUC__ >= 9
-      CPASSERT(IS_CONTIGUOUS(rsgrid%desc%dh))
-      CPASSERT(IS_CONTIGUOUS(rsgrid%desc%dh_inv))
+      CPASSERT(IS_CONTIGUOUS(dh))
+      CPASSERT(IS_CONTIGUOUS(dh_inv))
       CPASSERT(IS_CONTIGUOUS(ra))
       CPASSERT(IS_CONTIGUOUS(rab))
       CPASSERT(IS_CONTIGUOUS(npts_global))
@@ -219,8 +240,8 @@ CONTAINS
                                             zeta=zeta, &
                                             zetb=zetb, &
                                             rscale=scale, &
-                                            dh=C_LOC(rsgrid%desc%dh(1, 1)), &
-                                            dh_inv=C_LOC(rsgrid%desc%dh_inv(1, 1)), &
+                                            dh=C_LOC(dh(1, 1)), &
+                                            dh_inv=C_LOC(dh_inv(1, 1)), &
                                             ra=C_LOC(ra(1)), &
                                             rab=C_LOC(rab(1)), &
                                             npts_global=C_LOC(npts_global(1)), &
@@ -234,6 +255,7 @@ CONTAINS
                                             n2=SIZE(pab, 2), &
                                             pab=C_LOC(pab(1, 1)), &
                                             grid=C_LOC(grid(1, 1, 1)))
+      CALL timestop(handle)
 
    END SUBROUTINE collocate_pgf_product
 
@@ -503,12 +525,8 @@ CONTAINS
       INTEGER                                            :: i
 
       ! See rs_grid_create() in ./src/pw/realspace_grid_types.F.
-      CPASSERT(LBOUND(rsgrid%r, 1) == rsgrid%lb_local(1))
-      CPASSERT(UBOUND(rsgrid%r, 1) == rsgrid%ub_local(1))
-      CPASSERT(LBOUND(rsgrid%r, 2) == rsgrid%lb_local(2))
-      CPASSERT(UBOUND(rsgrid%r, 2) == rsgrid%ub_local(2))
-      CPASSERT(LBOUND(rsgrid%r, 3) == rsgrid%lb_local(3))
-      CPASSERT(UBOUND(rsgrid%r, 3) == rsgrid%ub_local(3))
+      CPASSERT(ALL(LBOUND(rsgrid%r) == rsgrid%lb_local(:)))
+      CPASSERT(ALL(UBOUND(rsgrid%r) == rsgrid%ub_local(:)))
 
       ! While the rsgrid code assumes that the grid starts at rsgrid%lb,
       ! the collocate code assumes that the grid starts at (1,1,1) in Fortran, or (0,0,0) in C.
@@ -542,6 +560,44 @@ CONTAINS
          ENDIF
       ENDDO
    END SUBROUTINE get_rsgrid_properties
+
+! **************************************************************************************************
+!> \brief Helper routines for getting pwgrid properties and asserting underlying assumptions.
+!> \param pwgrid ...
+!> \param npts_global ...
+!> \param npts_local ...
+!> \param shift_local ...
+!> \param border_width ...
+!> \author Ole Schuett
+! **************************************************************************************************
+   SUBROUTINE get_pwgrid_properties(pwgrid, npts_global, npts_local, shift_local, border_width)
+      TYPE(pw_type), INTENT(IN)                          :: pwgrid
+      INTEGER, DIMENSION(:)                              :: npts_global, npts_local, shift_local, &
+                                                            border_width
+
+      ! See pw_create() in ./src/pw/pw_types.F.
+      CPASSERT(ALL(LBOUND(pwgrid%cr3d) == pwgrid%pw_grid%bounds_local(1, :)))
+      CPASSERT(ALL(UBOUND(pwgrid%cr3d) == pwgrid%pw_grid%bounds_local(2, :)))
+
+      ! While the pwgrid code assumes that the grid starts at pwgrid%bounds_local(1,:),
+      ! the collocate code assumes that the grid starts at (1,1,1) in Fortran, or (0,0,0) in C.
+      ! So, a point rp(:) gets the following grid coordinates MODULO(rp(:)/dr(:),npts_global(:))
+
+      ! Number of global grid points in each direction.
+      !npts_global = pwgrid%pw_grid%bounds(2,:) - pwgrid%pw_grid%bounds(1,:) + 1
+
+      ! TODO: Hacky way of disabeling periodic boundary conditions.
+      npts_global = HUGE(npts_global)/10
+
+      ! Number of local grid points in each direction.
+      npts_local = pwgrid%pw_grid%bounds_local(2, :) - pwgrid%pw_grid%bounds_local(1, :) + 1
+
+      ! Number of points the local grid is shifted wrt global grid.
+      shift_local = pwgrid%pw_grid%bounds_local(1, :) - pwgrid%pw_grid%bounds(1, :)
+
+      ! rsgrids don't have halo regions.
+      border_width(:) = 0
+   END SUBROUTINE get_pwgrid_properties
 
 ! **************************************************************************************************
 !> \brief Allocates a basis set which can be passed to grid_create_task_list.

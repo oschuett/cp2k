@@ -6,13 +6,13 @@
 !--------------------------------------------------------------------------------------------------!
 
 ! **************************************************************************************************
-MODULE qmmm_per_elpot
-
-! **************************************************************************************************
 !> \brief Setting up the potential for QM/MM periodic boundary conditions calculations
 !> \par History
 !>      07.2005 created [tlaino]
 !> \author Teodoro Laino
+! **************************************************************************************************
+MODULE qmmm_per_elpot
+
    USE ao_util,                         ONLY: exp_radius
    USE cell_types,                      ONLY: cell_type
    USE cp_log_handling,                 ONLY: cp_get_default_logger,&

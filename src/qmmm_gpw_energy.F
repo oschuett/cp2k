@@ -12,6 +12,7 @@
 !> \author Teodoro Laino
 ! **************************************************************************************************
 MODULE qmmm_gpw_energy
+   USE ao_util,                         ONLY: exp_radius
    USE cell_types,                      ONLY: cell_type,&
                                               pbc
    USE cp_control_types,                ONLY: dft_control_type
@@ -27,6 +28,8 @@ MODULE qmmm_gpw_energy
                                               spline3_nopbc_interp,&
                                               spline3_pbc_interp
    USE cube_utils,                      ONLY: cube_info_type
+   USE grid_api,                        ONLY: GRID_FUNC_AB,&
+                                              collocate_pgf_product
    USE input_constants,                 ONLY: do_par_atom,&
                                               do_qmmm_coulomb,&
                                               do_qmmm_gauss,&
@@ -394,14 +397,19 @@ CONTAINS
 
       CHARACTER(len=*), PARAMETER :: routineN = 'qmmm_elec_with_gaussian_low', &
          routineNb = 'qmmm_elec_gaussian_low'
+      LOGICAL, PARAMETER                                 :: validate = .FALSE.
 
-      INTEGER                                            :: handle, handle2, IGauss, ilevel, Imm, &
-                                                            IndMM, IRadTyp, LIndMM, myind, &
-                                                            n_rep_real(3)
+      INTEGER                                            :: handle, handle2, i, IGauss, ilevel, Imm, &
+                                                            IndMM, IRadTyp, ix, iy, iz, j, k, &
+                                                            LIndMM, myind, n_rep_real(3)
       INTEGER, DIMENSION(2, 3)                           :: bo2
-      REAL(KIND=dp)                                      :: alpha, height, sph_chrg_factor, W
-      REAL(KIND=dp), DIMENSION(3)                        :: ra
+      REAL(KIND=dp)                                      :: alpha, diff, height, radius, ref_value, &
+                                                            rel_diff, sph_chrg_factor, test_value, &
+                                                            W
+      REAL(KIND=dp), DIMENSION(3)                        :: my_shift, ra, rp
       REAL(KIND=dp), DIMENSION(:), POINTER               :: xdat, ydat, zdat
+      REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
+      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid_new, grid_orig
       TYPE(qmmm_gaussian_type), POINTER                  :: pgf
       TYPE(qmmm_per_pot_type), POINTER                   :: per_pot
       TYPE(qmmm_pot_type), POINTER                       :: pot
@@ -413,8 +421,9 @@ CONTAINS
       ALLOCATE (xdat(bo2(1, 1):bo2(2, 1)))
       ALLOCATE (ydat(bo2(1, 2):bo2(2, 2)))
       ALLOCATE (zdat(bo2(1, 3):bo2(2, 3)))
+      ALLOCATE (pab(1, 1))
       IF (par_scheme == do_par_atom) myind = 0
-      Radius: DO IRadTyp = 1, SIZE(pgfs)
+      DO IRadTyp = 1, SIZE(pgfs)
          pgf => pgfs(IRadTyp)%pgf
          pot => potentials(IRadTyp)%pot
          n_rep_real = 0
@@ -422,15 +431,15 @@ CONTAINS
             per_pot => per_potentials(IRadTyp)%pot
             n_rep_real = per_pot%n_rep_real
          END IF
-         Gaussian: DO IGauss = 1, pgf%Number_of_Gaussians
+         DO IGauss = 1, pgf%Number_of_Gaussians
             alpha = 1.0_dp/pgf%Gk(IGauss)
             alpha = alpha*alpha
             height = pgf%Ak(IGauss)
             ilevel = pgf%grid_level(IGauss)
-            Atoms: DO Imm = 1, SIZE(pot%mm_atom_index)
+            DO Imm = 1, SIZE(pot%mm_atom_index)
                IF (par_scheme == do_par_atom) THEN
                   myind = myind + 1
-                  IF (MOD(myind, para_env%num_pe) /= para_env%mepos) CYCLE Atoms
+                  IF (MOD(myind, para_env%num_pe) /= para_env%mepos) CYCLE ! skip atom
                END IF
                LIndMM = pot%mm_atom_index(Imm)
                IndMM = mm_atom_index(LIndMM)
@@ -445,23 +454,78 @@ CONTAINS
                   CALL spherical_cutoff_factor(qmmm_spherical_cutoff, ra, sph_chrg_factor)
                   W = W*sph_chrg_factor
                END IF
-               IF (ABS(W) <= EPSILON(0.0_dp)) CYCLE Atoms
-               CALL collocate_gf_rspace_NoPBC(zetp=alpha, &
-                                              rp=ra, &
-                                              scale=-1.0_dp, &
-                                              W=W, &
-                                              pwgrid=tmp_grid(ilevel)%pw, &
-                                              cube_info=cube_info(ilevel), &
-                                              eps_mm_rspace=eps_mm_rspace, &
-                                              xdat=xdat, &
-                                              ydat=ydat, &
-                                              zdat=zdat, &
-                                              bo2=bo2, &
-                                              n_rep_real=n_rep_real, &
-                                              mm_cell=mm_cell)
-            END DO Atoms
-         END DO Gaussian
-      END DO Radius
+               IF (ABS(W) <= EPSILON(0.0_dp)) CYCLE ! skip atom
+
+               IF (validate) THEN
+                  ALLOCATE (grid_orig, SOURCE=tmp_grid(ilevel)%pw%cr3d)
+                  tmp_grid(ilevel)%pw%cr3d = 0.0_dp
+               ENDIF
+
+               pab(1, 1) = -1.0_dp*W
+               radius = exp_radius(0, alpha, eps_mm_rspace, pab(1, 1))
+               DO iz = -n_rep_real(3), n_rep_real(3)
+                  my_shift(3) = mm_cell%hmat(3, 3)*REAL(iz, KIND=dp)
+                  DO iy = -n_rep_real(2), n_rep_real(2)
+                     my_shift(2) = mm_cell%hmat(2, 2)*REAL(iy, KIND=dp)
+                     DO ix = -n_rep_real(1), n_rep_real(1)
+                        my_shift(1) = mm_cell%hmat(1, 1)*REAL(ix, KIND=dp)
+                        rp = ra + my_shift(:)
+                        CALL collocate_pgf_product(la_max=0, zeta=alpha, la_min=0, &
+                                                   lb_max=0, zetb=0.0_dp, lb_min=0, &
+                                                   ra=rp, &
+                                                   rab=(/0.0_dp, 0.0_dp, 0.0_dp/), &
+                                                   scale=1.0_dp, &
+                                                   pab=pab, &
+                                                   o1=0, o2=0, &
+                                                   pwgrid=tmp_grid(ilevel)%pw, &
+                                                   cell=mm_cell, &
+                                                   cube_info=cube_info(ilevel), &
+                                                   ga_gb_function=GRID_FUNC_AB, &
+                                                   radius=radius, use_subpatch=.TRUE., subpatch_pattern=0)
+                     END DO
+                  END DO
+               END DO
+
+               IF (validate) THEN
+                  ALLOCATE (grid_new, SOURCE=tmp_grid(ilevel)%pw%cr3d)
+                  tmp_grid(ilevel)%pw%cr3d = 0.0_dp
+
+                  CALL collocate_gf_rspace_NoPBC(zetp=alpha, &
+                                                 rp=ra, &
+                                                 scale=-1.0_dp, &
+                                                 W=W, &
+                                                 pwgrid=tmp_grid(ilevel)%pw, &
+                                                 cube_info=cube_info(ilevel), &
+                                                 eps_mm_rspace=eps_mm_rspace, &
+                                                 xdat=xdat, &
+                                                 ydat=ydat, &
+                                                 zdat=zdat, &
+                                                 bo2=bo2, &
+                                                 n_rep_real=n_rep_real, &
+                                                 mm_cell=mm_cell)
+
+                  DO i = LBOUND(grid_orig, 1), UBOUND(grid_orig, 1)
+                  DO j = LBOUND(grid_orig, 2), UBOUND(grid_orig, 2)
+                  DO k = LBOUND(grid_orig, 3), UBOUND(grid_orig, 3)
+                     ref_value = tmp_grid(ilevel)%pw%cr3d(i, j, k)
+                     test_value = grid_new(i, j, k)
+                     diff = ABS(test_value - ref_value); 
+                     rel_diff = diff/MAX(1.0_dp, ABS(ref_value))
+                     IF (rel_diff > 1e-9) THEN
+                        WRITE (*, *) "OLE ijk", i, j, k, "ref:", ref_value, &
+                           "test:", test_value, "diff: ", diff, "rel_diff:", rel_diff
+                        CPABORT("rel_diff too hight")
+                     ENDIF
+                  ENDDO
+                  ENDDO
+                  ENDDO
+                  tmp_grid(ilevel)%pw%cr3d = tmp_grid(ilevel)%pw%cr3d+grid_orig
+                  DEALLOCATE (grid_new, grid_orig)
+               ENDIF
+            END DO
+         END DO
+      END DO
+      DEALLOCATE (pab)
       IF (ASSOCIATED(xdat)) THEN
          DEALLOCATE (xdat)
       ENDIF
