@@ -27,7 +27,8 @@ MODULE qmmm_gpw_energy
    USE cp_spline_utils,                 ONLY: pw_prolongate_s3,&
                                               spline3_nopbc_interp,&
                                               spline3_pbc_interp
-   USE cube_utils,                      ONLY: cube_info_type
+   USE cube_utils,                      ONLY: cube_info_type, &
+                                              return_cube
    USE grid_api,                        ONLY: GRID_FUNC_AB,&
                                               collocate_pgf_product
    USE input_constants,                 ONLY: do_par_atom,&
@@ -402,14 +403,19 @@ CONTAINS
       INTEGER                                            :: handle, handle2, i, IGauss, ilevel, Imm, &
                                                             IndMM, IRadTyp, ix, iy, iz, j, k, &
                                                             LIndMM, myind, n_rep_real(3)
-      INTEGER, DIMENSION(2, 3)                           :: bo2
+      INTEGER, DIMENSION(2, 3)                           :: bo2, bo, gbo, bo3
       REAL(KIND=dp)                                      :: alpha, diff, height, radius, ref_value, &
                                                             rel_diff, sph_chrg_factor, test_value, &
                                                             W
-      REAL(KIND=dp), DIMENSION(3)                        :: my_shift, ra, rp
+      INTEGER, DIMENSION(3)                              :: cubecenter, lb_cube, ub_cube
+      INTEGER, DIMENSION(:), POINTER                     :: sphere_bounds
+      INTEGER                                            :: zub, zlb, yub, ylb, xub, xlb
+      INTEGER                                            :: zud, zld, yud, yld, xud, xld
+      LOGICAL                                            :: with_subpatch = .FALSE.
+      REAL(KIND=dp), DIMENSION(3)                        :: my_shift, ra, rp, dr, rpl
       REAL(KIND=dp), DIMENSION(:), POINTER               :: xdat, ydat, zdat
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: pab
-      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid_new, grid_orig
+      REAL(KIND=dp), DIMENSION(:, :, :), POINTER         :: grid_new, grid_orig, grid
       TYPE(qmmm_gaussian_type), POINTER                  :: pgf
       TYPE(qmmm_per_pot_type), POINTER                   :: per_pot
       TYPE(qmmm_pot_type), POINTER                       :: pot
@@ -436,7 +442,7 @@ CONTAINS
             alpha = alpha*alpha
             height = pgf%Ak(IGauss)
             ilevel = pgf%grid_level(IGauss)
-            DO Imm = 1, SIZE(pot%mm_atom_index)
+            atoms: DO Imm = 1, SIZE(pot%mm_atom_index)
                IF (par_scheme == do_par_atom) THEN
                   myind = myind + 1
                   IF (MOD(myind, para_env%num_pe) /= para_env%mepos) CYCLE ! skip atom
@@ -460,9 +466,15 @@ CONTAINS
                   ALLOCATE (grid_orig, SOURCE=tmp_grid(ilevel)%pw%cr3d)
                   tmp_grid(ilevel)%pw%cr3d = 0.0_dp
                ENDIF
-
                pab(1, 1) = -1.0_dp*W
                radius = exp_radius(0, alpha, eps_mm_rspace, pab(1, 1))
+               IF (radius==0.0_dp) CYCLE
+
+               dr(:) = tmp_grid(ilevel)%pw%pw_grid%dr(:)
+               bo = tmp_grid(ilevel)%pw%pw_grid%bounds_local
+               gbo = tmp_grid(ilevel)%pw%pw_grid%bounds
+               CALL return_cube(cube_info(ilevel), radius, lb_cube, ub_cube, sphere_bounds)
+
                DO iz = -n_rep_real(3), n_rep_real(3)
                   my_shift(3) = mm_cell%hmat(3, 3)*REAL(iz, KIND=dp)
                   DO iy = -n_rep_real(2), n_rep_real(2)
@@ -470,6 +482,37 @@ CONTAINS
                      DO ix = -n_rep_real(1), n_rep_real(1)
                         my_shift(1) = mm_cell%hmat(1, 1)*REAL(ix, KIND=dp)
                         rp = ra + my_shift(:)
+
+                        !   *** get the sub grid properties for the given radius ***
+                        rpl = rp
+                        cubecenter(:) = FLOOR(rpl(:)/dr(:)) + gbo(1, :)
+                        zub = MIN(bo(2, 3), cubecenter(3) + ub_cube(3))
+                        zlb = MAX(bo(1, 3), cubecenter(3) + lb_cube(3))
+                        yub = MIN(bo(2, 2), cubecenter(2) + ub_cube(2))
+                        ylb = MAX(bo(1, 2), cubecenter(2) + lb_cube(2))
+                        xub = MIN(bo(2, 1), cubecenter(1) + ub_cube(1))
+                        xlb = MAX(bo(1, 1), cubecenter(1) + lb_cube(1))
+                        IF (zlb .GT. zub .OR. ylb .GT. yub .OR. xlb .GT. xub) CYCLE
+
+                        ! find if gaussain is completely within the box
+                        !IF cubecenter(3) + lb_cube(3) > bo(1,3) and cubecenter(3) + ub_cube(3) < bo(2,3) 
+
+                        zud = bo(2,3) - (cubecenter(3) + ub_cube(3))
+                        zld = (cubecenter(3) + lb_cube(3)) - bo(1,3)
+                        yud = bo(2,2) - (cubecenter(2) + ub_cube(2))
+                        yld = (cubecenter(2) + lb_cube(2)) - bo(1,2)
+                        xud = bo(2,1) - (cubecenter(1) + ub_cube(1))
+                        xld = (cubecenter(1) + lb_cube(1)) - bo(1,1)
+
+                        ! Gaussian intersecting call with subpatch = true
+                        IF (zud .LT. 0.0_dp .OR. zld .LT. 0.0_dp .OR. &
+                            yud .LT. 0.0_dp .OR. yld .LT. 0.0_dp .OR. &
+                            xud .LT. 0.0_dp .OR. xld .LT. 0.0_dp) THEN
+                            with_subpatch = .TRUE.
+                        ELSE
+                            with_subpatch = .FALSE.
+                        END IF
+
                         CALL collocate_pgf_product(la_max=0, zeta=alpha, la_min=0, &
                                                    lb_max=0, zetb=0.0_dp, lb_min=0, &
                                                    ra=rp, &
@@ -481,7 +524,7 @@ CONTAINS
                                                    cell=mm_cell, &
                                                    cube_info=cube_info(ilevel), &
                                                    ga_gb_function=GRID_FUNC_AB, &
-                                                   radius=radius, use_subpatch=.TRUE., subpatch_pattern=0)
+                                                   radius=radius,use_subpatch=with_subpatch, subpatch_pattern=0)
                      END DO
                   END DO
                END DO
@@ -522,7 +565,7 @@ CONTAINS
                   tmp_grid(ilevel)%pw%cr3d = tmp_grid(ilevel)%pw%cr3d+grid_orig
                   DEALLOCATE (grid_new, grid_orig)
                ENDIF
-            END DO
+            END DO atoms
          END DO
       END DO
       DEALLOCATE (pab)
