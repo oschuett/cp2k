@@ -217,11 +217,12 @@ __global__ static void process_batch_kernel(const double alpha,
  * \brief TODO
  * \author Ole Schuett
  ******************************************************************************/
-__global__ static void extract_sort_keys_kernel(const int ntasks,
+__global__ static void compute_sort_keys_kernel(const int ntasks,
                                                 const dbm_task_t *batch,
                                                 unsigned int *keys) {
+  // Distribute roughly evenly across 1024 bins.
   for (int i = threadIdx.x; i < ntasks; i += blockDim.x) {
-    keys[i] = batch[blockIdx.x].offset_c;
+    keys[i] = (509 * batch[blockIdx.x].offset_c) % 1024;
   }
 }
 
@@ -316,19 +317,6 @@ void dbm_multiply_gpu_upload_packs(const dbm_pack_t *pack_a,
 }
 
 /*******************************************************************************
- * \brief Computes most significant bit of given number.
- * \author Ole Schuett
- ******************************************************************************/
-static inline int most_significant_bit(unsigned int number) {
-  int msb = 0;
-  while (number != 0) {
-    number = number >> 1;
-    msb++;
-  }
-  return msb;
-}
-
-/*******************************************************************************
  * \brief Internal routine for executing the tasks in given batch on the GPU.
  * \author Ole Schuett
  ******************************************************************************/
@@ -354,9 +342,9 @@ void dbm_multiply_gpu_process_batch(const int ntasks, const dbm_task_t *batch,
   offloadEventCreate(&batch_uploaded);
   offloadEventRecord(batch_uploaded, shard_c_dev->stream);
 
-  // Extract sort keys.
+  // Compute sort keys.
   unsigned int *keys_dev = &ctx->keys_dev[kshard * ctx->max_batch_size];
-  extract_sort_keys_kernel<<<1, 128, 0, shard_c_dev->stream>>>(
+  compute_sort_keys_kernel<<<1, 128, 0, shard_c_dev->stream>>>(
       ntasks, batch_dev, keys_dev);
 
   // Sort batch.
@@ -366,7 +354,7 @@ void dbm_multiply_gpu_process_batch(const int ntasks, const dbm_task_t *batch,
       &ctx->batches_sorted_dev[kshard * ctx->max_batch_size];
   char *tmp_dev = &ctx->tmps_dev[kshard * ctx->tmp_size];
   const int begin_bit = 0;
-  const int end_bit = most_significant_bit(shard_c_host->nblocks);
+  const int end_bit = 10; // 1024 bins
   OFFLOAD_CHECK(cub::DeviceRadixSort::SortPairs(
       tmp_dev, ctx->tmp_size, keys_dev, keys_sorted_dev, batch_dev,
       batch_sorted_dev, ntasks, begin_bit, end_bit, shard_c_dev->stream));
@@ -394,13 +382,13 @@ void dbm_multiply_gpu_process_batch(const int ntasks, const dbm_task_t *batch,
     shard_c_dev->data_size = shard_c_host->data_promised;
   }
 
-  // Launch kernel.
+  // Launch multiplication kernel.
   const int nblocks = ntasks; // TODO tune launch parameters.
   const int threads_per_block = NUM_THREADS;
   const size_t smem_per_block = 0;
   process_batch_kernel<<<nblocks, threads_per_block, smem_per_block,
                          shard_c_dev->stream>>>(
-      alpha, batch_dev, ctx->pack_a_dev.data, ctx->pack_b_dev.data,
+      alpha, batch_sorted_dev, ctx->pack_a_dev.data, ctx->pack_b_dev.data,
       shard_c_dev->data);
   OFFLOAD_CHECK(offloadGetLastError());
 
