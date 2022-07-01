@@ -14,8 +14,17 @@
 #include "dbm_mempool.h"
 #include "dbm_multiply_gpu.h"
 
+#define CUB_IGNORE_DEPRECATED_CPP_DIALECT
+#include <cub/device/device_radix_sort.cuh>
+
 #include <assert.h>
 #include <stdio.h>
+
+/*******************************************************************************
+ * \brief Returns the larger of two given integer (missing from the C standard)
+ * \author Ole Schuett
+ ******************************************************************************/
+__device__ static inline int imax(int x, int y) { return (x > y ? x : y); }
 
 /*******************************************************************************
  * \brief Atomic add for doubles that also works prior to compute capability 6.
@@ -45,22 +54,24 @@ __device__ static void atomicAddDouble(double *address, double val) {
 
 #define TILE_DIM 8
 
+#define ELEMENTS_PER_THREAD 4
+#define NUM_THREADS 256
+
 /*******************************************************************************
  * \brief A generic matrix multiplication kernel.
  * \author Ole Schuett
  ******************************************************************************/
-__global__ static void process_batch_kernel(const double alpha,
-                                            const dbm_task_t *batch,
-                                            const double *pack_a_data,
-                                            const double *pack_b_data,
-                                            double *shard_c_data) {
+__device__ static void
+process_batch_kernel_old(const dbm_task_t task, const double alpha,
+                         const double *pack_a_data, const double *pack_b_data,
+                         double *shard_c_data, double *shared_memory) {
 
-  __shared__ double tile_a[TILE_DIM][TILE_DIM], tile_b[TILE_DIM][TILE_DIM];
-
-  const dbm_task_t task = batch[blockIdx.x];
   const double *block_a = &pack_a_data[task.offset_a];
   const double *block_b = &pack_b_data[task.offset_b];
   double *block_c = &shard_c_data[task.offset_c];
+
+  double *tile_a = shared_memory;
+  double *tile_b = &shared_memory[TILE_DIM * TILE_DIM];
 
   for (int i_tile = 0; i_tile < task.m; i_tile += TILE_DIM) {
     for (int j_tile = 0; j_tile < task.n; j_tile += TILE_DIM) {
@@ -74,18 +85,21 @@ __global__ static void process_batch_kernel(const double alpha,
         // Load tile_a from global into shared memory.
         const int idx_a = l * task.m + i; // transa = "N"
         const bool load_a = (l < task.k && i < task.m);
-        tile_a[threadIdx.y][threadIdx.x] = (load_a) ? block_a[idx_a] : 0.0;
+        tile_a[threadIdx.y * TILE_DIM + threadIdx.x] =
+            (load_a) ? block_a[idx_a] : 0.0;
 
         // Load tile_b from global into shared memory.
         const int idx_b = l * task.n + j; // transb = "T"
         const bool load_b = (l < task.k && j < task.n);
-        tile_b[threadIdx.y][threadIdx.x] = (load_b) ? block_b[idx_b] : 0.0;
+        tile_b[threadIdx.y * TILE_DIM + threadIdx.x] =
+            (load_b) ? block_b[idx_b] : 0.0;
 
         // Multiply tiles from shared memory.
         __syncthreads();
 #pragma unroll
         for (int z = 0; z < TILE_DIM; z++) {
-          result += tile_a[z][threadIdx.x] * tile_b[z][threadIdx.y];
+          result += tile_a[z * TILE_DIM + threadIdx.x] *
+                    tile_b[z * TILE_DIM + threadIdx.y];
         }
         __syncthreads();
       }
@@ -99,6 +113,115 @@ __global__ static void process_batch_kernel(const double alpha,
         atomicAddDouble(&block_c[idx_c], alpha * result);
       }
     }
+  }
+}
+/*******************************************************************************
+ * \brief A generic matrix multiplication kernel.
+ * \author Ole Schuett
+ ******************************************************************************/
+__device__ static void
+process_batch_kernel_new(const dbm_task_t task, const double alpha,
+                         const double *pack_a_data, const double *pack_b_data,
+                         double *shard_c_data, double *shared_memory) {
+  /* Total number of elements in block matrices */
+  const int mk = task.m * task.k; /* a_block */
+  const int kn = task.n * task.k; /* b_block */
+  const int mn = task.m * task.n; /* c_block */
+
+  const double *data_a = &pack_a_data[task.offset_a];
+  const double *data_b = &pack_b_data[task.offset_b];
+  double *data_c = &shard_c_data[task.offset_c];
+
+  double *buffer_a = shared_memory;
+  double *buffer_b = &shared_memory[mk];
+
+  // Load tile_a from global into shared memory.
+  for (int i = threadIdx.x; i < mk; i += blockDim.x) {
+    buffer_a[i] = __ldg(&data_a[i]);
+  }
+
+  // Load tile_b from global into shared memory.
+  for (int i = threadIdx.x; i < kn; i += blockDim.x) {
+    buffer_b[i] = __ldg(&data_b[i]);
+  }
+
+  double tile_c[ELEMENTS_PER_THREAD] = {1.0};
+
+  __syncthreads();
+  //#pragma unroll
+  //  for (int z = 0; z < ELEMENTS_PER_THREAD; z++) {
+  //    const int ij = threadIdx.x * ELEMENTS_PER_THREAD + z;
+  //    if (ij < mn) {
+  //      const int i = ij / task.m; // TODO this might be too expensive.
+  //      const int j = ij - task.m*i;
+  //      for (int l = 0; l < task.k; l++) {
+  //        /* Compute c_ij = sum_k (a_ik * b_kj) in shared memory */
+  //        tile_c[z] += buffer_a[l * task.m + j] * buffer_b[l * task.n + i];
+  //      }
+  //    }
+  //  }
+
+#define N 2
+#define M 2
+  for (int l = 0; l < task.k; l++) {
+#pragma unroll
+    for (int i = 0; i < N; i++) {
+#pragma unroll
+      for (int j = 0; j < M; j++) {
+        tile_c[M * i + j] +=
+            buffer_a[l * task.m + j] * buffer_b[l * task.n + i];
+      }
+    }
+  }
+
+  // TODO maybe need __syncthreads(); later.
+
+  // Add result tile to block_c in global memory.
+#pragma unroll
+  for (int z = 0; z < ELEMENTS_PER_THREAD; z++) {
+    const int ij = threadIdx.x * ELEMENTS_PER_THREAD + z;
+    if (ij < mn) {
+      // Need atomics because other thread blocks might work on same block_c.
+      atomicAddDouble(&data_c[ij], alpha * tile_c[z]);
+    }
+  }
+}
+
+/*******************************************************************************
+ * \brief A generic matrix multiplication kernel.
+ * \author Ole Schuett
+ ******************************************************************************/
+__global__ static void process_batch_kernel(const double alpha,
+                                            const dbm_task_t *batch,
+                                            const double *pack_a_data,
+                                            const double *pack_b_data,
+                                            double *shard_c_data) {
+
+  const dbm_task_t task = batch[blockIdx.x]; // TODO load via shared memory
+
+  /* Total number of elements in block matrices */
+  const int mk = task.m * task.k; /* a_block */
+  const int kn = task.n * task.k; /* b_block */
+  const int mn = task.m * task.n; /* c_block */
+
+  assert(mk + kn <= 2 * NUM_THREADS * ELEMENTS_PER_THREAD);
+  assert(mn <= NUM_THREADS * ELEMENTS_PER_THREAD);
+
+  __shared__ double shared_memory[2 * ELEMENTS_PER_THREAD * NUM_THREADS];
+
+  process_batch_kernel_new(task, alpha, pack_a_data, pack_b_data, shard_c_data,
+                           shared_memory);
+}
+
+/*******************************************************************************
+ * \brief TODO
+ * \author Ole Schuett
+ ******************************************************************************/
+__global__ static void extract_sort_keys_kernel(const int ntasks,
+                                                const dbm_task_t *batch,
+                                                unsigned int *keys) {
+  for (int i = threadIdx.x; i < ntasks; i += blockDim.x) {
+    keys[i] = batch[blockIdx.x].offset_c;
   }
 }
 
@@ -120,6 +243,18 @@ void dbm_multiply_gpu_start(const int max_batch_size, const int nshards,
   // Allocate device storage for batches.
   const size_t size = nshards * max_batch_size * sizeof(dbm_task_t);
   ctx->batches_dev = (dbm_task_t *)dbm_mempool_device_malloc(size);
+  ctx->batches_sorted_dev = (dbm_task_t *)dbm_mempool_device_malloc(size);
+
+  // Allocate device storage for sort keys.
+  const size_t keys_size = nshards * max_batch_size * sizeof(unsigned int);
+  ctx->keys_dev = (unsigned int *)dbm_mempool_device_malloc(keys_size);
+  ctx->keys_sorted_dev = (unsigned int *)dbm_mempool_device_malloc(keys_size);
+
+  // Allocate temporal device storage for SortPairs.
+  OFFLOAD_CHECK(cub::DeviceRadixSort::SortPairs(
+      NULL, ctx->tmp_size, ctx->keys_dev, ctx->keys_sorted_dev,
+      ctx->batches_dev, ctx->batches_sorted_dev, max_batch_size));
+  ctx->tmps_dev = (char *)dbm_mempool_device_malloc(ctx->tmp_size * nshards);
 
   // Allocate and upload shards of result matrix C.
   ctx->shards_c_dev =
@@ -181,6 +316,19 @@ void dbm_multiply_gpu_upload_packs(const dbm_pack_t *pack_a,
 }
 
 /*******************************************************************************
+ * \brief Computes most significant bit of given number.
+ * \author Ole Schuett
+ ******************************************************************************/
+static inline int most_significant_bit(unsigned int number) {
+  int msb = 0;
+  while (number != 0) {
+    number = number >> 1;
+    msb++;
+  }
+  return msb;
+}
+
+/*******************************************************************************
  * \brief Internal routine for executing the tasks in given batch on the GPU.
  * \author Ole Schuett
  ******************************************************************************/
@@ -205,6 +353,23 @@ void dbm_multiply_gpu_process_batch(const int ntasks, const dbm_task_t *batch,
   offloadEvent_t batch_uploaded;
   offloadEventCreate(&batch_uploaded);
   offloadEventRecord(batch_uploaded, shard_c_dev->stream);
+
+  // Extract sort keys.
+  unsigned int *keys_dev = &ctx->keys_dev[kshard * ctx->max_batch_size];
+  extract_sort_keys_kernel<<<1, 128, 0, shard_c_dev->stream>>>(
+      ntasks, batch_dev, keys_dev);
+
+  // Sort batch.
+  unsigned int *keys_sorted_dev =
+      &ctx->keys_sorted_dev[kshard * ctx->max_batch_size];
+  dbm_task_t *batch_sorted_dev =
+      &ctx->batches_sorted_dev[kshard * ctx->max_batch_size];
+  char *tmp_dev = &ctx->tmps_dev[kshard * ctx->tmp_size];
+  const int begin_bit = 0;
+  const int end_bit = most_significant_bit(shard_c_host->nblocks);
+  OFFLOAD_CHECK(cub::DeviceRadixSort::SortPairs(
+      tmp_dev, ctx->tmp_size, keys_dev, keys_sorted_dev, batch_dev,
+      batch_sorted_dev, ntasks, begin_bit, end_bit, shard_c_dev->stream));
 
   // Reallocate shard_c_dev->data if nessecary.
   if (shard_c_host->data_promised > shard_c_dev->data_allocated) {
@@ -231,7 +396,7 @@ void dbm_multiply_gpu_process_batch(const int ntasks, const dbm_task_t *batch,
 
   // Launch kernel.
   const int nblocks = ntasks; // TODO tune launch parameters.
-  const dim3 threads_per_block(TILE_DIM, TILE_DIM, 1);
+  const int threads_per_block = NUM_THREADS;
   const size_t smem_per_block = 0;
   process_batch_kernel<<<nblocks, threads_per_block, smem_per_block,
                          shard_c_dev->stream>>>(
@@ -288,6 +453,10 @@ void dbm_multiply_gpu_stop(dbm_multiply_gpu_context_t *ctx) {
   dbm_mempool_free(ctx->pack_a_dev.data);
   dbm_mempool_free(ctx->pack_b_dev.data);
   dbm_mempool_free(ctx->batches_dev);
+  dbm_mempool_free(ctx->batches_sorted_dev);
+  dbm_mempool_free(ctx->keys_dev);
+  dbm_mempool_free(ctx->keys_sorted_dev);
+  dbm_mempool_free(ctx->tmps_dev);
   offloadStreamDestroy(ctx->main_stream);
 }
 

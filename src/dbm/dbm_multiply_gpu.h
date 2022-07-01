@@ -46,6 +46,12 @@ typedef struct {
 
   int max_batch_size;
   dbm_task_t *batches_dev;
+  dbm_task_t *batches_sorted_dev;
+  unsigned int *keys_dev;
+  unsigned int *keys_sorted_dev;
+
+  size_t tmp_size;
+  char *tmps_dev;
 } dbm_multiply_gpu_context_t;
 
 /*******************************************************************************
