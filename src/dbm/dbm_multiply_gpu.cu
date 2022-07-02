@@ -52,7 +52,6 @@ __device__ static void atomicAddDouble(double *address, double val) {
 __device__ constexpr static inline int imax(int x, int y) {
   return (x > y ? x : y);
 }
-
 /*******************************************************************************
  * \brief A generic matrix multiplication kernel.
  * \author Ole Schuett
@@ -150,52 +149,47 @@ __global__ static void process_batch_kernel(const double alpha,
   const double *blk_b = &pack_b_data[task.offset_b];
   double *blk_c = &shard_c_data[task.offset_c];
 
-  // 16 elements per tile
   if (m <= 4 && n <= 4) {
     process_task<4, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
 
-    // 32 elements per tile
   } else if (m <= 4 && n <= 8) {
     process_task<4, 8>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
 
-  } else if (m <= 8 && n <= 4) {
-    process_task<8, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
-
-    // 64 elements per tile
   } else if (m <= 4 && n <= 16) {
     process_task<4, 16>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
-
-  } else if (m <= 16 && n <= 4) {
-    process_task<16, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
-
-  } else if (m <= 8 && n <= 8) {
-    process_task<8, 8>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
-
-    // 128 elements per tile
-  } else if (m <= 32 && n <= 4) {
-    process_task<32, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
 
   } else if (m <= 4 && n <= 32) {
     process_task<4, 32>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
 
+  } else if (m <= 4) {
+    process_task<4, 64>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
+
+  } else if (m <= 8 && n <= 4) {
+    process_task<8, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
+
+  } else if (m <= 16 && n <= 4) {
+    process_task<16, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
+
+  } else if (m <= 32 && n <= 4) {
+    process_task<32, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
+
+  } else if (n <= 4) {
+    process_task<64, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
+
+  } else if (m <= 8 && n <= 8) {
+    process_task<8, 8>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
+
   } else if (m <= 8 && n <= 16) {
     process_task<8, 16>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
+
+  } else if (m <= 8) {
+    process_task<8, 32>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
 
   } else if (m <= 16 && n <= 8) {
     process_task<16, 8>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
 
-    // 256 elements per tile
-  } else if (n <= 4) {
-    process_task<64, 4>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
-
-  } else if (m <= 4) {
-    process_task<4, 64>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
-
   } else if (n <= 8) {
     process_task<32, 8>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
-
-  } else if (m <= 8) {
-    process_task<8, 32>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
 
   } else {
     process_task<16, 16>(m, n, k, alpha, blk_a, blk_b, blk_c, shared_mem);
