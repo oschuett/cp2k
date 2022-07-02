@@ -210,6 +210,8 @@ int main(int argc, char *argv[]) {
   bechmark_multiply(128, 128, 4, comm);
   bechmark_multiply(128, 128, 128, comm);
 
+  bechmark_multiply(32, 32, 32, comm);
+
   dbm_library_print_stats(dbm_mpi_comm_c2f(comm), &print_func, 0);
   dbm_library_finalize();
   dbm_mpi_comm_free(&comm);
