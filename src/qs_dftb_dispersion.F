@@ -110,7 +110,7 @@ CONTAINS
 
       INTEGER                                            :: atom_a, atom_b, handle, iatom, ikind, &
                                                             jatom, jkind, natom, nkind
-      INTEGER, DIMENSION(:), POINTER                     :: atom_of_kind
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind
       LOGICAL                                            :: use_virial
       LOGICAL, ALLOCATABLE, DIMENSION(:)                 :: define_kind
       REAL(dp), ALLOCATABLE, DIMENSION(:)                :: rc_kind
@@ -159,8 +159,6 @@ CONTAINS
             CALL get_qs_env(qs_env=qs_env, &
                             particle_set=particle_set, &
                             force=force)
-            natom = SIZE(particle_set)
-            ALLOCATE (atom_of_kind(natom))
             CALL get_atomic_kind_set(atomic_kind_set=atomic_kind_set, atom_of_kind=atom_of_kind)
             use_virial = virial%pv_availability .AND. (.NOT. virial%pv_numer)
          ELSE
@@ -250,10 +248,6 @@ CONTAINS
             END IF
          END DO
          CALL neighbor_list_iterator_release(nl_iterator)
-
-         IF (calculate_forces) THEN
-            DEALLOCATE (atom_of_kind)
-         END IF
 
          ! set dispersion energy
          CALL mp_sum(evdw, para_env%group)

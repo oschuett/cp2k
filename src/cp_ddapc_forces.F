@@ -264,8 +264,6 @@ CONTAINS
                       atomic_kind_set=atomic_kind_set, &
                       para_env=para_env, &
                       force=force)
-      ALLOCATE (atom_of_kind(natom))
-      ALLOCATE (kind_of(natom))
       ALLOCATE (chf(3, natom))
       CALL get_atomic_kind_set(atomic_kind_set=atomic_kind_set, &
                                atom_of_kind=atom_of_kind, &
@@ -285,8 +283,6 @@ CONTAINS
          i = atom_of_kind(iatom)
          force(ikind)%ch_pulay(1:3, i) = force(ikind)%ch_pulay(1:3, i) + chf(1:3, iatom) + d_el(1:3, iatom)
       END DO
-      DEALLOCATE (atom_of_kind)
-      DEALLOCATE (kind_of)
       DEALLOCATE (chf)
       DEALLOCATE (uv)
       CALL timestop(handle)
@@ -418,8 +414,6 @@ CONTAINS
                       atomic_kind_set=atomic_kind_set, &
                       para_env=para_env, &
                       force=force)
-      ALLOCATE (atom_of_kind(natom))
-      ALLOCATE (kind_of(natom))
       ALLOCATE (chf(3, natom))
       CALL get_atomic_kind_set(atomic_kind_set=atomic_kind_set, &
                                atom_of_kind=atom_of_kind, &
@@ -441,8 +435,6 @@ CONTAINS
          i = atom_of_kind(iatom)
          force(ikind)%ch_pulay(1:3, i) = force(ikind)%ch_pulay(1:3, i) + chf(1:3, iatom)
       END DO
-      DEALLOCATE (atom_of_kind)
-      DEALLOCATE (kind_of)
       DEALLOCATE (chf)
       DEALLOCATE (uv)
       CALL timestop(handle)

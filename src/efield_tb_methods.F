@@ -181,7 +181,6 @@ CONTAINS
 
          IF (calculate_forces) THEN
             CALL get_qs_env(qs_env=qs_env, atomic_kind_set=atomic_kind_set, force=force)
-            ALLOCATE (atom_of_kind(natom), kind_of(natom))
             CALL get_atomic_kind_set(atomic_kind_set, atom_of_kind=atom_of_kind, kind_of=kind_of)
             IF (para_env%mepos == 0) THEN
                DO ia = 1, natom
@@ -250,7 +249,6 @@ CONTAINS
             DO ikind = 1, SIZE(atomic_kind_set)
                CALL mp_sum(force(ikind)%efield, para_env%group)
             END DO
-            DEALLOCATE (atom_of_kind, kind_of)
          END IF
 
       END IF
@@ -364,7 +362,6 @@ CONTAINS
 
          IF (calculate_forces) THEN
             CALL get_qs_env(qs_env=qs_env, atomic_kind_set=atomic_kind_set, force=force)
-            ALLOCATE (atom_of_kind(natom), kind_of(natom))
             CALL get_atomic_kind_set(atomic_kind_set, atom_of_kind=atom_of_kind, kind_of=kind_of)
             IF (para_env%mepos == 0) THEN
                DO ia = 1, natom
@@ -576,7 +573,6 @@ CONTAINS
             DO ikind = 1, SIZE(atomic_kind_set)
                CALL mp_sum(force(ikind)%efield, para_env%group)
             END DO
-            DEALLOCATE (atom_of_kind, kind_of)
          END IF
 
       END IF
@@ -740,7 +736,6 @@ CONTAINS
 
          IF (calculate_forces) THEN
             CALL get_qs_env(qs_env=qs_env, atomic_kind_set=atomic_kind_set, force=force)
-            ALLOCATE (atom_of_kind(natom), kind_of(natom))
             CALL get_atomic_kind_set(atomic_kind_set, atom_of_kind=atom_of_kind, kind_of=kind_of)
             IF (para_env%mepos == 0) THEN
                DO ia = 1, natom
@@ -865,10 +860,6 @@ CONTAINS
 
             END DO
             CALL neighbor_list_iterator_release(nl_iterator)
-         END IF
-
-         IF (calculate_forces) THEN
-            DEALLOCATE (atom_of_kind, kind_of)
          END IF
 
       END IF

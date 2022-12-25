@@ -99,9 +99,9 @@ CONTAINS
       INTEGER :: atom_i, atom_j, blk, ewald_type, handle, i, ia, iatom, icol, ikind, iounit, irow, &
          j, jatom, jkind, la, lb, lmaxa, lmaxb, natom, natorb_a, natorb_b, ni, nimg, nj, nkind, &
          nmat, za, zb
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind, kind_of
       INTEGER, DIMENSION(25)                             :: laoa, laob
       INTEGER, DIMENSION(3)                              :: cellind, periodic
-      INTEGER, DIMENSION(:), POINTER                     :: atom_of_kind, kind_of
       LOGICAL                                            :: calculate_forces, defined, do_ewald, &
                                                             found, just_energy, use_virial
       REAL(KIND=dp)                                      :: alpha, deth, dr, etaa, etab, fi, gmij0, &
@@ -312,7 +312,6 @@ CONTAINS
          END IF
       END IF
 
-      ALLOCATE (atom_of_kind(natom), kind_of(natom))
       CALL get_atomic_kind_set(atomic_kind_set=atomic_kind_set, &
                                kind_of=kind_of, &
                                atom_of_kind=atom_of_kind)
@@ -451,7 +450,6 @@ CONTAINS
       END IF
 
       DEALLOCATE (gmcharge0, gchrg0, gmcharge1, gchrg1)
-      DEALLOCATE (atom_of_kind, kind_of)
 
       CALL timestop(handle)
 
@@ -477,8 +475,8 @@ CONTAINS
       CHARACTER(len=*), PARAMETER :: routineN = 'dftb3_diagonal_hessian_force'
 
       INTEGER                                            :: atom_i, atom_j, blk, handle, i, icol, &
-                                                            ikind, irow, jkind, natom
-      INTEGER, DIMENSION(:), POINTER                     :: atom_of_kind, kind_of
+                                                            ikind, irow, jkind
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind, kind_of
       LOGICAL                                            :: found
       REAL(KIND=dp)                                      :: fi, gmijp, gmijq, ui, uj
       REAL(KIND=dp), DIMENSION(:, :), POINTER            :: dsblock, p0block, p1block, sblock
@@ -488,8 +486,7 @@ CONTAINS
       TYPE(qs_force_type), DIMENSION(:), POINTER         :: force
 
       CALL timeset(routineN, handle)
-      CALL get_qs_env(qs_env=qs_env, matrix_s=matrix_s, natom=natom)
-      ALLOCATE (atom_of_kind(natom), kind_of(natom))
+      CALL get_qs_env(qs_env=qs_env, matrix_s=matrix_s)
       CALL get_qs_env(qs_env=qs_env, atomic_kind_set=atomic_kind_set)
       CALL get_atomic_kind_set(atomic_kind_set=atomic_kind_set, &
                                kind_of=kind_of, atom_of_kind=atom_of_kind)
@@ -527,7 +524,6 @@ CONTAINS
          END DO
       END DO
       CALL dbcsr_iterator_stop(iter)
-      DEALLOCATE (atom_of_kind, kind_of)
 
       CALL timestop(handle)
 

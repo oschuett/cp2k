@@ -1382,8 +1382,6 @@ CONTAINS
       strength(:) = cdft_control%strength(:)
       cutoffs => cdft_control%becke_control%cutoffs
       eps_cavity = cdft_control%becke_control%eps_cavity
-      ALLOCATE (atom_of_kind(natom))
-      ALLOCATE (kind_of(natom))
 
       CALL get_atomic_kind_set(atomic_kind_set=atomic_kind_set, &
                                atom_of_kind=atom_of_kind, &
@@ -1583,8 +1581,6 @@ CONTAINS
       END IF
 
       DEALLOCATE (strength)
-      DEALLOCATE (atom_of_kind)
-      DEALLOCATE (kind_of)
       DO igroup = 1, SIZE(group)
          DEALLOCATE (group(igroup)%integrated)
       END DO

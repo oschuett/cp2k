@@ -105,8 +105,8 @@ CONTAINS
       INTEGER :: after, atom_a, atom_b, handle, i, iatom, ic, icol, ikind, img, irow, iw, jatom, &
          jkind, l1, l2, la, lb, llm, lmaxi, lmaxj, m, n1, n2, n_urpoly, natom, natorb_a, natorb_b, &
          nderivatives, ngrd, ngrdcut, nimg, nkind, spdim
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: atom_of_kind
       INTEGER, DIMENSION(3)                              :: cell
-      INTEGER, DIMENSION(:), POINTER                     :: atom_of_kind
       INTEGER, DIMENSION(:, :, :), POINTER               :: cell_to_index
       LOGICAL                                            :: defined, found, omit_headers, use_virial
       REAL(KIND=dp)                                      :: ddr, dgrd, dr, erep, erepij, f0, f1, &
@@ -210,10 +210,7 @@ CONTAINS
                               alpha_scalar=1.0_dp, beta_scalar=1.0_dp)
             END DO
          END IF
-         natom = SIZE(particle_set)
-         ALLOCATE (atom_of_kind(natom))
-         CALL get_atomic_kind_set(atomic_kind_set=atomic_kind_set, &
-                                  atom_of_kind=atom_of_kind)
+         CALL get_atomic_kind_set(atomic_kind_set=atomic_kind_set, atom_of_kind=atom_of_kind)
          use_virial = virial%pv_availability .AND. (.NOT. virial%pv_numer)
       END IF
       ! atomic energy decomposition
@@ -492,7 +489,6 @@ CONTAINS
                               beta_scalar=-1.0_dp)
             END DO
          END IF
-         DEALLOCATE (atom_of_kind)
       END IF
 
       CALL timestop(handle)
