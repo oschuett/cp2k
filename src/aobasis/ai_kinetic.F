@@ -166,26 +166,45 @@ CONTAINS
                END DO
             END DO
 
-            DO lb = lb_min, lb_max
-            DO bx = 0, lb
-            DO by = 0, lb - bx
-               bz = lb - bx - by
-               cob = coset(bx, by, bz) - ofb
-               ib = mb + cob
-               DO la = la_min, la_max
-               DO ax = 0, la
-               DO ay = 0, la - ax
-                  az = la - ax - ay
-                  coa = coset(ax, ay, az) - ofa
-                  ia = ma + coa
-                  ! integrals
-                  IF (PRESENT(kab)) THEN
+            ! integrals
+            IF (PRESENT(kab)) THEN
+               DO lb = lb_min, lb_max
+               DO bx = 0, lb
+               DO by = 0, lb - bx
+                  bz = lb - bx - by
+                  cob = coset(bx, by, bz) - ofb
+                  ib = mb + cob
+                  DO la = la_min, la_max
+                  DO ax = 0, la
+                  DO ay = 0, la - ax
+                     az = la - ax - ay
+                     coa = coset(ax, ay, az) - ofa
+                     ia = ma + coa
                      kab(ia, ib) = f0*(tt(ax, bx, 1)*rr(ay, by, 2)*rr(az, bz, 3) + &
                                        rr(ax, bx, 1)*tt(ay, by, 2)*rr(az, bz, 3) + &
                                        rr(ax, bx, 1)*rr(ay, by, 2)*tt(az, bz, 3))
-                  END IF
-                  ! first derivatives
-                  IF (PRESENT(dab)) THEN
+                  END DO
+                  END DO
+                  END DO !la
+               END DO
+               END DO
+               END DO !lb
+            END IF
+
+            ! first derivatives
+            IF (PRESENT(dab)) THEN
+               DO lb = lb_min, lb_max
+               DO bx = 0, lb
+               DO by = 0, lb - bx
+                  bz = lb - bx - by
+                  cob = coset(bx, by, bz) - ofb
+                  ib = mb + cob
+                  DO la = la_min, la_max
+                  DO ax = 0, la
+                  DO ay = 0, la - ax
+                     az = la - ax - ay
+                     coa = coset(ax, ay, az) - ofa
+                     ia = ma + coa
                      ! dx
                      dsx = 2.0_dp*a*rr(ax + 1, bx, 1)
                      IF (ax > 0) dsx = dsx - REAL(ax, dp)*rr(ax - 1, bx, 1)
@@ -209,14 +228,13 @@ CONTAINS
                                         dsz*(tt(ax, bx, 1)*rr(ay, by, 2) + rr(ax, bx, 1)*tt(ay, by, 2))
                      ! scale
                      dab(ia, ib, 1:3) = f0*dab(ia, ib, 1:3)
-                  END IF
-                  !
+                  END DO
+                  END DO
+                  END DO !la
                END DO
                END DO
-               END DO !la
-            END DO
-            END DO
-            END DO !lb
+               END DO !lb
+            END IF
 
             mb = mb + nb
          END DO
