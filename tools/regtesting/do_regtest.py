@@ -50,6 +50,7 @@ async def main() -> None:
     parser.add_argument("--maxerrors", type=int, default=50)
     parser.add_argument("--mpiexec", default="mpiexec")
     parser.add_argument("--keepalive", dest="keepalive", action="store_true")
+    parser.add_argument("--valgrind", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--restrictdir", action="append")
     parser.add_argument("--skipdir", action="append")
@@ -80,6 +81,7 @@ async def main() -> None:
     print(f"Work base dir:  {cfg.work_base_dir}")
     print(f"MPI exec:       {cfg.mpiexec}")
     print(f"Keepalive:      {cfg.keepalive}")
+    print(f"Valgrind:       {cfg.valgrind}")
     print(f"Debug:          {cfg.debug}")
     print(f"ARCH:           {cfg.arch}")
     print(f"VERSION:        {cfg.version}")
@@ -209,6 +211,7 @@ class Config:
         self.keepalive = args.keepalive
         self.arch = args.arch
         self.version = args.version
+        self.valgrind = args.valgrind
         self.debug = args.debug
         self.max_errors = args.maxerrors
         self.restrictdirs = args.restrictdir if args.restrictdir else [".*"]
@@ -249,8 +252,11 @@ class Config:
             env["CUDA_VISIBLE_DEVICES"] = ",".join(visible_gpu_devices)
             env["HIP_VISIBLE_DEVICES"] = ",".join(visible_gpu_devices)
         env["OMP_NUM_THREADS"] = str(self.ompthreads)
-        exe = str(self.cp2k_root / "exe" / self.arch / f"{exe_stem}.{self.version}")
-        cmd = self.mpiexec + ["-n", str(self.mpiranks), exe] if self.use_mpi else [exe]
+        cmd = [str(self.cp2k_root / "exe" / self.arch / f"{exe_stem}.{self.version}")]
+        if self.valgrind:
+            cmd = ["valgrind", "--error-exitcode=42", "--exit-on-first-error=yes"] + cmd
+        if self.use_mpi:
+            cmd = self.mpiexec + ["-n", str(self.mpiranks)] + cmd
         if self.debug:
             print(f"Creating subprocess: {cmd} {args}")
         return asyncio.create_subprocess_exec(
