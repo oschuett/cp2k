@@ -1081,21 +1081,42 @@ CONTAINS
                      az2 = la2 - ax2 - ay2
                      coa2 = coset(ax2, ay2, az2) - ofa2
                      ia2 = ma2 + coa2
-                     DO la1 = la1_min, la1_max
-                     DO ax1 = 0, la1
-                     DO ay1 = 0, la1 - ax1
-                        az1 = la1 - ax1 - ay1
-                        coa1 = coset(ax1, ay1, az1) - ofa1
-                        ia1 = ma1 + coa1
-                        ! integrals
-                        IF (PRESENT(saab)) THEN
+
+                     ! integrals
+                     IF (PRESENT(saab)) THEN
+                        DO la1 = la1_min, la1_max
+                        DO ax1 = 0, la1
+                        DO ay1 = 0, la1 - ax1
+                           az1 = la1 - ax1 - ay1
+                           coa1 = coset(ax1, ay1, az1) - ofa1
+                           ia1 = ma1 + coa1
                            saab(ia1, ia2, ib) = f0*rr(ax1 + ax2, bx, 1)*rr(ay1 + ay2, by, 2)*rr(az1 + az2, bz, 3)
-                        END IF
-                        IF (PRESENT(saba)) THEN
+                        END DO
+                        END DO
+                        END DO !la1
+                     END IF
+
+                     IF (PRESENT(saba)) THEN
+                        DO la1 = la1_min, la1_max
+                        DO ax1 = 0, la1
+                        DO ay1 = 0, la1 - ax1
+                           az1 = la1 - ax1 - ay1
+                           coa1 = coset(ax1, ay1, az1) - ofa1
+                           ia1 = ma1 + coa1
                            saba(ia1, ib, ia2) = f0*rr(ax1 + ax2, bx, 1)*rr(ay1 + ay2, by, 2)*rr(az1 + az2, bz, 3)
-                        END IF
-                        ! first derivatives
-                        IF (PRESENT(daab)) THEN
+                        END DO
+                        END DO
+                        END DO !la1
+                     END IF
+
+                     ! first derivatives
+                     IF (PRESENT(daab)) THEN
+                        DO la1 = la1_min, la1_max
+                        DO ax1 = 0, la1
+                        DO ay1 = 0, la1 - ax1
+                           az1 = la1 - ax1 - ay1
+                           coa1 = coset(ax1, ay1, az1) - ofa1
+                           ia1 = ma1 + coa1
                            ax = ax1 + ax2
                            ay = ay1 + ay2
                            az = az1 + az2
@@ -1112,8 +1133,18 @@ CONTAINS
                            dumz = 2.0_dp*a*rr(az + 1, bz, 3)
                            IF (az > 0) dumz = dumz - REAL(az, dp)*rr(az - 1, bz, 3)
                            daab(ia1, ia2, ib, 3) = f0*rr(ax, bx, 1)*rr(ay, by, 2)*dumz
-                        END IF
-                        IF (PRESENT(daba)) THEN
+                        END DO
+                        END DO
+                        END DO !la1
+                     END IF
+
+                     IF (PRESENT(daba)) THEN
+                        DO la1 = la1_min, la1_max
+                        DO ax1 = 0, la1
+                        DO ay1 = 0, la1 - ax1
+                           az1 = la1 - ax1 - ay1
+                           coa1 = coset(ax1, ay1, az1) - ofa1
+                           ia1 = ma1 + coa1
                            ax = ax1 + ax2
                            ay = ay1 + ay2
                            az = az1 + az2
@@ -1130,11 +1161,11 @@ CONTAINS
                            dumz = 2.0_dp*a*rr(az + 1, bz, 3)
                            IF (az > 0) dumz = dumz - REAL(az, dp)*rr(az - 1, bz, 3)
                            daba(ia1, ib, ia2, 3) = f0*rr(ax, bx, 1)*rr(ay, by, 2)*dumz
-                        END IF
-                        !
-                     END DO
-                     END DO
-                     END DO !la1
+                        END DO
+                        END DO
+                        END DO !la1
+                     END IF
+
                   END DO
                   END DO
                   END DO !la2
@@ -1281,18 +1312,27 @@ CONTAINS
                      bz1 = lb1 - bx1 - by1
                      cob1 = coset(bx1, by1, bz1) - ofb1
                      ib1 = mb1 + cob1
-                     DO la = la_min, la_max
-                     DO ax = 0, la
-                     DO ay = 0, la - ax
-                        az = la - ax - ay
-                        coa = coset(ax, ay, az) - ofa
-                        ia = ma + coa
-                        ! integrals
-                        IF (PRESENT(sabb)) THEN
+                     ! integrals
+                     IF (PRESENT(sabb)) THEN
+                        DO la = la_min, la_max
+                        DO ax = 0, la
+                        DO ay = 0, la - ax
+                           az = la - ax - ay
+                           coa = coset(ax, ay, az) - ofa
+                           ia = ma + coa
                            sabb(ia, ib1, ib2) = f0*rr(ax, bx1 + bx2, 1)*rr(ay, by1 + by2, 2)*rr(az, bz1 + bz2, 3)
-                        END IF
-                        ! first derivatives
-                        IF (PRESENT(dabb)) THEN
+                        END DO
+                        END DO
+                        END DO !la
+                     END IF
+                     ! first derivatives
+                     IF (PRESENT(dabb)) THEN
+                        DO la = la_min, la_max
+                        DO ax = 0, la
+                        DO ay = 0, la - ax
+                           az = la - ax - ay
+                           coa = coset(ax, ay, az) - ofa
+                           ia = ma + coa
                            bx = bx1 + bx2
                            by = by1 + by2
                            bz = bz1 + bz2
@@ -1309,11 +1349,10 @@ CONTAINS
                            dumz = 2.0_dp*a*rr(az + 1, bz, 3)
                            IF (az > 0) dumz = dumz - REAL(az, dp)*rr(az - 1, bz, 3)
                            dabb(ia, ib1, ib2, 3) = f0*rr(ax, bx, 1)*rr(ay, by, 2)*dumz
-                        END IF
-                        !
-                     END DO
-                     END DO
-                     END DO !la
+                        END DO
+                        END DO
+                        END DO !la
+                     END IF
                   END DO
                   END DO
                   END DO !lb1
