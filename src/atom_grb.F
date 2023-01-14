@@ -628,6 +628,8 @@ CONTAINS
       END DO
 
       ! Quickstep normalization polarization basis
+      CPASSERT(ALLOCATED(pbasis)) !TODO fix
+      CPASSERT(ALLOCATED(alp))    !TODO fix
       DO l = 0, 7
          expzet = 0.25_dp*REAL(2*l + 3, dp)
          prefac = SQRT(SQRT(pi)/2._dp**(l + 2)*dfac(2*l + 1))
