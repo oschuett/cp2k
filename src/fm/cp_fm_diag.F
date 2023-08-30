@@ -203,7 +203,7 @@ CONTAINS
          END IF
 
       ELSE IF (diag_type == FM_DIAG_TYPE_CUSOLVER) THEN
-         IF (SIZE(eigenvalues) < 64) THEN
+         IF (SIZE(eigenvalues) < 128) THEN
             ! We don't trust cuSolver with very small matrices.
             CALL cp_fm_syevd(matrix, eigenvectors, eigenvalues, info)
          ELSE

@@ -560,11 +560,23 @@ ENV CUDA_CACHE_DISABLE 1
 
 # Install Ubuntu packages.
 RUN apt-get update -qq && apt-get install -qq --no-install-recommends \
+    wget                                                              \
+    automake                                                          \
+    libtool                                                           \
     gfortran                                                          \
     mpich                                                             \
     libmpich-dev                                                      \
+    python3                                                           \
+    python3-aiohttp                                                   \
+    python3-fsspec                                                    \
+    python3-indexed-gzip                                              \
+    python3-requests                                                  \
    && rm -rf /var/lib/apt/lists/*
 
+# Install cusolverMp library.
+WORKDIR /opt
+COPY ./tools/docker/scripts/install_cusolvermp.sh .
+RUN ./install_cusolvermp.sh {gpu_ver}
 """ + install_toolchain(
         base_image="ubuntu", mpi_mode="mpich", enable_cuda="yes", gpu_ver=gpu_ver
     )
