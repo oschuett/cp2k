@@ -35,6 +35,8 @@ MODULE pao_input
    USE string_utilities,                ONLY: s2a
 #include "./base/base_uses.f90"
 
+#:include "./input/input_macros.fypp"
+
    IMPLICIT NONE
    PRIVATE
 
@@ -552,17 +554,26 @@ CONTAINS
       CALL section_add_keyword(section, keyword)
       CALL keyword_release(keyword)
 
-      CALL keyword_create(keyword, __LOCATION__, name="CG_INIT_STEPS", &
-                          description="Number of steepest descent steps before starting the"// &
-                          " conjugate gradients optimization.", &
-                          default_i_val=2)
+
+
+      CALL keyword_create(keyword, __LOCATION__, name="CG_INIT_STEPS", default_i_val=2, &
+                          #:block description
+                              Number of steepest descent steps before starting the
+                              conjugate gradients optimization.
+                          #:endblock
+                          )
       CALL section_add_keyword(section, keyword)
       CALL keyword_release(keyword)
 
-      CALL keyword_create(keyword, __LOCATION__, name="CG_RESET_LIMIT", &
-                          description="The CG is reseted if the cosine of the angle between the last "// &
-                          "search direction and the new gradient is larger that the limit.", &
-                          default_r_val=0.1_dp)
+
+      CALL keyword_create(keyword, __LOCATION__, name="CG_RESET_LIMIT", default_r_val=0.1_dp, &
+      #:block description
+            The CG is reseted if the cosine of the angle between the last
+              - asdf
+              - 123asdf
+         search direction and the new gradient is larger that the limit.
+      #:endblock
+      )
       CALL section_add_keyword(section, keyword)
       CALL keyword_release(keyword)
 

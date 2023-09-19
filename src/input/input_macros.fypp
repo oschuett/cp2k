@@ -1,0 +1,24 @@
+#!-------------------------------------------------------------------------------------------------!
+#!   CP2K: A general program to perform molecular dynamics simulations                             !
+#!   Copyright 2000-2023 CP2K developers group <https://cp2k.org>                                  !
+#!                                                                                                 !
+#!   SPDX-License-Identifier: GPL-2.0-or-later                                                     !
+#!-------------------------------------------------------------------------------------------------!
+
+#:mute
+
+#:def description(text)
+   #:set first_line = text.split("\n")[0]
+   #:set indent = len(first_line) - len(first_line.lstrip())
+   description="" &
+   #:for pos, line in enumerate(text.split("\n"))
+      #:set head_len = len(line[:indent].strip())
+      #:if head_len != 0
+         #:stop f'Wrong indentation of description in {_FILE_}:{_LINE_ + pos + 1}:\n' + &
+                f'"{line}"\n {" " * (indent-head_len)}{"^"*(head_len)}\n'
+      #:endif
+      // "${line[indent:]}$" // NEW_LINE('A') &
+   #:endfor
+#:enddef description
+
+#:endmute
