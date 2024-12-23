@@ -238,11 +238,16 @@ CONTAINS
          m = SIZE(block_A, 2) ! size of pao basis
          block_A = RESHAPE(block_X, (/n, m/))
 
-         ! restrain pao basis vectors to unit norm
          IF (PRESENT(penalty)) THEN
+            ! restrain pao basis vectors to unit norm
             DO i = 1, m
                w = 1.0_dp - SUM(block_A(:, i)**2)
                penalty = penalty + pao%penalty_strength*w**2
+            END DO
+            ! introduce some asymmetrisch between the primary basis functions
+            DO j = 1, n
+               w = j * SUM(block_A(j, :)**2)
+               penalty = penalty + pao%regularization*w
             END DO
          END IF
 
@@ -283,9 +288,15 @@ CONTAINS
             G(:, :) = 0.0_dp
 
             IF (PRESENT(penalty)) THEN
+               ! penalty gradient
                DO i = 1, m
                   w = 1.0_dp - SUM(block_A(:, i)**2)
-                  G(:, i) = -4.0_dp*pao%penalty_strength*w*block_A(:, i)
+                  G(:, i) = G(:, i) -4.0_dp*pao%penalty_strength*w*block_A(:, i)
+               END DO
+               ! regularization gradient
+               DO j = 1, n
+                  w = j * SUM(block_A(j, :)**2)
+                  G(j, :) = G(j, :) + 2.0_dp*pao%regularization*w*block_A(j, :)
                END DO
             END IF
 
