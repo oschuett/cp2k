@@ -51,9 +51,14 @@ MODULE cp_dbcsr_api
         dbcsr_valid_index_prv => dbcsr_valid_index, &
         dbcsr_verify_matrix_prv => dbcsr_verify_matrix, dbcsr_work_create_prv => dbcsr_work_create
    USE dbm_api,                         ONLY: &
-        dbm_add, dbm_clear, dbm_copy, dbm_distribution_obj, dbm_iterator, dbm_redistribute, &
-        dbm_scale, dbm_type, dbm_zero
-   USE kinds,                           ONLY: dp,&
+        dbm_add, dbm_clear, dbm_copy, dbm_create, dbm_distribution_col_dist, &
+        dbm_distribution_hold, dbm_distribution_obj, dbm_distribution_release, &
+        dbm_distribution_row_dist, dbm_filter, dbm_get_block_p, dbm_get_num_blocks, dbm_get_nze, &
+        dbm_get_stored_coordinates, dbm_iterator, dbm_iterator_blocks_left, &
+        dbm_iterator_next_block, dbm_iterator_stop, dbm_multiply, dbm_put_block, dbm_redistribute, &
+        dbm_release, dbm_reserve_blocks, dbm_scale, dbm_type, dbm_zero
+   USE kinds,                           ONLY: default_string_length,&
+                                              dp,&
                                               int_8
    USE message_passing,                 ONLY: mp_comm_type
 #include "../base/base_uses.f90"
@@ -193,7 +198,7 @@ MODULE cp_dbcsr_api
       MODULE PROCEDURE dbcsr_create_new, dbcsr_create_template
    END INTERFACE
 
-   LOGICAL, PARAMETER, PRIVATE :: USE_DBCSR_BACKEND = .TRUE.
+   LOGICAL, PARAMETER, PRIVATE :: USE_DBCSR_BACKEND = .FALSE.
 
 CONTAINS
 
@@ -255,8 +260,13 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_add_prv(matrix_a%dbcsr, matrix_b%dbcsr, alpha_scalar, beta_scalar)
       ELSE
-         IF (alpha_scalar /= 1.0_dp .OR. beta_scalar /= 1.0_dp) CPABORT("Not yet implemented for DBM.")
+         IF (alpha_scalar /= 1.0_dp .OR. beta_scalar /= 1.0_dp) THEN
+            CALL dbm_scale(matrix_a%dbm, alpha_scalar/beta_scalar)
+         END IF
          CALL dbm_add(matrix_a%dbm, matrix_b%dbm)
+         IF (beta_scalar /= 1.0_dp) THEN
+            CALL dbm_scale(matrix_a%dbm, beta_scalar)
+         END IF
       END IF
    END SUBROUTINE dbcsr_add
 
@@ -362,19 +372,17 @@ CONTAINS
 !> \param matrix_a ...
 !> \param name ...
 !> \param keep_sparsity ...
-!> \param keep_imaginary ...
 ! **************************************************************************************************
-   SUBROUTINE dbcsr_copy(matrix_b, matrix_a, name, keep_sparsity, keep_imaginary)
+   SUBROUTINE dbcsr_copy(matrix_b, matrix_a, name, keep_sparsity)
       TYPE(dbcsr_type), INTENT(INOUT)                    :: matrix_b
       TYPE(dbcsr_type), INTENT(IN)                       :: matrix_a
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL             :: name
-      LOGICAL, INTENT(IN), OPTIONAL                      :: keep_sparsity, keep_imaginary
+      LOGICAL, INTENT(IN), OPTIONAL                      :: keep_sparsity
 
       IF (USE_DBCSR_BACKEND) THEN
-         CALL dbcsr_copy_prv(matrix_b%dbcsr, matrix_a%dbcsr, name=name, &
-                             keep_sparsity=keep_sparsity, keep_imaginary=keep_imaginary)
+         CALL dbcsr_copy_prv(matrix_b%dbcsr, matrix_a%dbcsr, name=name, keep_sparsity=keep_sparsity)
       ELSE
-         IF (PRESENT(name) .OR. PRESENT(keep_sparsity) .OR. PRESENT(keep_imaginary)) THEN
+         IF (PRESENT(name) .OR. PRESENT(keep_sparsity)) THEN
             CPABORT("Not yet implemented for DBM.")
          END IF
          CALL dbm_copy(matrix_b%dbm, matrix_a%dbm)
@@ -407,7 +415,11 @@ CONTAINS
                                col_blk_size=col_blk_size, nze=0, data_type=dbcsr_type_real_8, &
                                reuse_arrays=reuse_arrays, mutable_work=mutable_work)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         IF (matrix_type /= "N") THEN
+            CPABORT("Not yet implemented for DBM.")
+         END IF
+         CALL dbm_create(matrix%dbm, name=name, dist=dist%dbm, &
+                         row_block_sizes=row_blk_size, col_block_sizes=col_blk_size)
       END IF
    END SUBROUTINE dbcsr_create_new
 
@@ -435,6 +447,11 @@ CONTAINS
          POINTER                                         :: row_blk_size, col_blk_size
       LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays, mutable_work
 
+      CHARACTER                                          :: my_matrix_type
+      CHARACTER(len=default_string_length)               :: my_name
+      INTEGER, DIMENSION(:), POINTER                     :: my_col_blk_size, my_row_blk_size
+      TYPE(dbcsr_distribution_type)                      :: my_dist
+
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_create_prv(matrix=matrix%dbcsr, name=name, template=template%dbcsr, &
                                dist=dist%dbcsr, matrix_type=matrix_type, &
@@ -442,7 +459,18 @@ CONTAINS
                                nze=0, data_type=dbcsr_type_real_8, reuse_arrays=reuse_arrays, &
                                mutable_work=mutable_work)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbcsr_get_info(template, name=my_name, matrix_type=my_matrix_type, distribution=my_dist, &
+                             row_blk_size=my_row_blk_size, col_blk_size=my_col_blk_size)
+         IF (PRESENT(name)) my_name = name
+         IF (PRESENT(dist)) my_dist = dist
+         IF (PRESENT(matrix_type)) my_matrix_type = matrix_type
+         IF (PRESENT(row_blk_size)) my_row_blk_size => row_blk_size
+         IF (PRESENT(col_blk_size)) my_col_blk_size => col_blk_size
+         IF (my_matrix_type /= "N") THEN
+            CPABORT("Not yet implemented for DBM.")
+         END IF
+         CALL dbm_create(matrix%dbm, name=my_name, dist=my_dist%dbm, &
+                         row_block_sizes=my_row_blk_size, col_block_sizes=my_col_blk_size)
       END IF
    END SUBROUTINE dbcsr_create_template
 
@@ -576,7 +604,21 @@ CONTAINS
                                          group, mynode, numnodes, nprows, npcols, myprow, mypcol, &
                                          pgrid, subgroups_defined, prow_group, pcol_group)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(row_dist)) row_dist => dbm_distribution_row_dist(dist%dbm)
+         IF (PRESENT(col_dist)) col_dist => dbm_distribution_col_dist(dist%dbm)
+         IF (PRESENT(nrows)) nrows = SIZE(dbm_distribution_row_dist(dist%dbm))
+         IF (PRESENT(ncols)) ncols = SIZE(dbm_distribution_row_dist(dist%dbm))
+         IF (PRESENT(has_threads)) has_threads = .TRUE.
+         IF (PRESENT(mynode)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(numnodes)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(nprows)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(npcols)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(myprow)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(mypcol)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(pgrid)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(subgroups_defined)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(prow_group)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(pcol_group)) CPABORT("Not yet implemented for DBM.")
       END IF
    END SUBROUTINE dbcsr_distribution_get
 
@@ -590,7 +632,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_distribution_hold_prv(dist%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_distribution_hold(dist%dbm)
       END IF
    END SUBROUTINE dbcsr_distribution_hold
 
@@ -631,7 +673,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_distribution_release_prv(dist%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_distribution_release(dist%dbm)
       END IF
    END SUBROUTINE dbcsr_distribution_release
 
@@ -647,7 +689,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_filter_prv(matrix%dbcsr, eps)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_filter(matrix%dbm, eps=eps)
       END IF
    END SUBROUTINE dbcsr_filter
 
@@ -661,7 +703,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_finalize_prv(matrix%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         ! Does not apply to DBM.
       END IF
    END SUBROUTINE dbcsr_finalize
 
@@ -685,7 +727,9 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_get_block_p_prv(matrix%dbcsr, row, col, block, found, row_size, col_size)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_get_block_p(matrix%dbm, row=row, col=col, block=block, &
+                              row_size=row_size, col_size=col_size)
+         found = ASSOCIATED(block)
       END IF
    END SUBROUTINE dbcsr_get_block_p
 
@@ -709,18 +753,14 @@ CONTAINS
 
       TYPE(dbcsr_type), POINTER                          :: matrix_p
 
-      MARK_USED(matrix)
-      MARK_USED(row)
-      MARK_USED(col)
-      MARK_USED(block)
-      MARK_USED(found)
-      MARK_USED(row_size)
-      MARK_USED(col_size)
+      matrix_p => matrix ! Hacky workaround to shake the INTENT(IN).
+
       IF (USE_DBCSR_BACKEND) THEN
-         matrix_p => matrix ! Hacky workaround to shake the INTENT(IN).
          CALL dbcsr_get_block_p_prv(matrix_p%dbcsr, row, col, block, found, row_size, col_size)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_get_block_p(matrix_p%dbm, row=row, col=col, block=block, &
+                              row_size=row_size, col_size=col_size)
+         found = ASSOCIATED(block)
       END IF
    END SUBROUTINE dbcsr_get_readonly_block_p
 
@@ -739,7 +779,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          res => dbcsr_get_data_p_prv(matrix%dbcsr, select_data_type=0.0_dp, lb=lb, ub=ub)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CPABORT("Not yet implemented for DBM.") ! Remove subroutine.
       END IF
    END FUNCTION dbcsr_get_data_p
 
@@ -755,7 +795,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          data_size = dbcsr_get_data_size_prv(matrix%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         data_size = dbm_get_nze(matrix%dbm)
       END IF
    END FUNCTION dbcsr_get_data_size
 
@@ -866,7 +906,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          num_blocks = dbcsr_get_num_blocks_prv(matrix%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         num_blocks = dbm_get_num_blocks(matrix%dbm)
       END IF
    END FUNCTION dbcsr_get_num_blocks
 
@@ -879,10 +919,13 @@ CONTAINS
       TYPE(dbcsr_type), INTENT(IN)                       :: matrix
       REAL(KIND=dp)                                      :: occupation
 
+      INTEGER                                            :: nfullcols_total, nfullrows_total
+
+      CALL dbcsr_get_info(matrix, nfullrows_total=nfullrows_total, nfullcols_total=nfullcols_total)
+      occupation = REAL(nfullrows_total*nfullcols_total, dp)/REAL(dbcsr_get_data_size(matrix), dp)
+
       IF (USE_DBCSR_BACKEND) THEN
-         occupation = dbcsr_get_occupation_prv(matrix%dbcsr)
-      ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CPASSERT(ABS(occupation - dbcsr_get_occupation_prv(matrix%dbcsr))/occupation < 1e-6)
       END IF
    END FUNCTION dbcsr_get_occupation
 
@@ -901,7 +944,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_get_stored_coordinates_prv(matrix%dbcsr, row, column, processor)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_get_stored_coordinates(matrix%dbm, row=row, column=column, processor=processor)
       END IF
    END SUBROUTINE dbcsr_get_stored_coordinates
 
@@ -917,6 +960,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          has_symmetry = dbcsr_has_symmetry_prv(matrix%dbcsr)
       ELSE
+         has_symmetry = .FALSE.
          CPABORT("Not yet implemented for DBM.")
       END IF
    END FUNCTION dbcsr_has_symmetry
@@ -933,7 +977,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          blocks_left = dbcsr_iterator_blocks_left_prv(iterator%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         blocks_left = dbm_iterator_blocks_left(iterator%dbm)
       END IF
    END FUNCTION dbcsr_iterator_blocks_left
 
@@ -973,7 +1017,8 @@ CONTAINS
          IF (PRESENT(row)) row = my_row
          IF (PRESENT(column)) column = my_column
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_iterator_next_block(iterator%dbm, row=row, column=column, block=block, &
+                                      row_size=row_size, col_size=col_size)
       END IF
    END SUBROUTINE dbcsr_iterator_next_block
 
@@ -1029,7 +1074,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_iterator_stop_prv(iterator%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_iterator_stop(iterator%dbm)
       END IF
    END SUBROUTINE dbcsr_iterator_stop
 
@@ -1086,7 +1131,14 @@ CONTAINS
                                  matrix_c%dbcsr, first_row, last_row, first_column, last_column, &
                                  first_k, last_k, retain_sparsity, filter_eps=filter_eps, flop=flop)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(first_row) .OR. PRESENT(last_row) .OR. PRESENT(first_column) .OR. &
+             PRESENT(last_column) .OR. PRESENT(first_k) .OR. PRESENT(last_k)) THEN
+            CPABORT("Not yet implemented for DBM.")
+         END IF
+         CALL dbm_multiply(transa=(transa == "T"), transb=(transb == "T"), &
+                           alpha=alpha, matrix_a=matrix_a%dbm, matrix_b=matrix_b%dbm, beta=beta, &
+                           matrix_c=matrix_c%dbm, &
+                           retain_sparsity=retain_sparsity, filter_eps=filter_eps, flop=flop)
       END IF
    END SUBROUTINE dbcsr_multiply
 
@@ -1107,7 +1159,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_put_block_prv(matrix%dbcsr, row, col, block, summation=summation)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_put_block(matrix%dbm, row=row, col=col, block=block, summation=summation)
       END IF
    END SUBROUTINE dbcsr_put_block
 
@@ -1121,7 +1173,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_release_prv(matrix%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_release(matrix%dbm)
       END IF
    END SUBROUTINE dbcsr_release
 
@@ -1152,7 +1204,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_reserve_blocks_prv(matrix%dbcsr, rows, cols)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         CALL dbm_reserve_blocks(matrix%dbm, rows=rows, cols=cols)
       END IF
    END SUBROUTINE dbcsr_reserve_blocks
 

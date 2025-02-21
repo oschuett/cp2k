@@ -293,8 +293,7 @@ CONTAINS
       TYPE(dbm_type), INTENT(INOUT)                      :: matrix
       CHARACTER(len=*), INTENT(IN)                       :: name
       TYPE(dbm_distribution_obj), INTENT(IN)             :: dist
-      INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN), &
-         POINTER                                         :: row_block_sizes, col_block_sizes
+      INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN)      :: row_block_sizes, col_block_sizes
 
       INTERFACE
          SUBROUTINE dbm_create_c(matrix, dist, name, nrows, ncols, row_sizes, col_sizes) &
@@ -1293,9 +1292,8 @@ CONTAINS
    SUBROUTINE dbm_distribution_new(dist, mp_comm, row_dist_block, col_dist_block)
       TYPE(dbm_distribution_obj), INTENT(OUT)            :: dist
 
-      CLASS(mp_comm_type), INTENT(IN)                     :: mp_comm
-      INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN), &
-         POINTER                                         :: row_dist_block, col_dist_block
+      CLASS(mp_comm_type), INTENT(IN)                    :: mp_comm
+      INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN)      :: row_dist_block, col_dist_block
 
       INTERFACE
          SUBROUTINE dbm_distribution_new_c(dist, fortran_comm, nrows, ncols, row_dist, col_dist) &
@@ -1334,9 +1332,8 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE dbcsr_distribution_new_wrapper(dist, mp_comm, row_dist_block, col_dist_block)
       TYPE(dbm_distribution_obj), INTENT(INOUT)          :: dist
-      TYPE(mp_cart_type), INTENT(IN)                                :: mp_comm
-      INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN), &
-         POINTER                                         :: row_dist_block, col_dist_block
+      TYPE(mp_cart_type), INTENT(IN)                     :: mp_comm
+      INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN)      :: row_dist_block, col_dist_block
 
 #if defined(DBM_VALIDATE_AGAINST_DBCSR)
       INTEGER                                            :: mynode, numnodes, pcol, prow
