@@ -115,6 +115,7 @@ MODULE dbm_api
    PUBLIC :: dbm_get_col_block_sizes
    PUBLIC :: dbm_get_local_rows
    PUBLIC :: dbm_get_local_cols
+   PUBLIC :: dbm_is_created
 
    PUBLIC :: dbm_library_init
    PUBLIC :: dbm_library_finalize
@@ -329,6 +330,19 @@ CONTAINS
       CALL validate(matrix)
 #endif
    END SUBROUTINE dbm_create
+
+! **************************************************************************************************
+!> \brief ....
+!> \param matrix ...
+!> \return ...
+!> \author Ole Schuett
+! **************************************************************************************************
+   FUNCTION dbm_is_created(matrix) RESULT(res)
+      TYPE(dbm_type), INTENT(IN)                         :: matrix
+      LOGICAL                                            :: res
+
+      res = C_ASSOCIATED(matrix%c_ptr)
+   END FUNCTION dbm_is_created
 
 ! **************************************************************************************************
 !> \brief Needed to be called for DBCSR after blocks where inserted. For DBM it's a no-opt.
@@ -1293,7 +1307,7 @@ CONTAINS
    SUBROUTINE dbm_distribution_new(dist, mp_comm, row_dist_block, col_dist_block)
       TYPE(dbm_distribution_obj), INTENT(OUT)            :: dist
 
-      CLASS(mp_comm_type), INTENT(IN)                    :: mp_comm
+      CLASS(mp_cart_type), INTENT(IN)                    :: mp_comm
       INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN)      :: row_dist_block, col_dist_block
 
       INTERFACE
@@ -1333,7 +1347,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE dbcsr_distribution_new_wrapper(dist, mp_comm, row_dist_block, col_dist_block)
       TYPE(dbm_distribution_obj), INTENT(INOUT)          :: dist
-      TYPE(mp_cart_type), INTENT(IN)                     :: mp_comm
+      CLASS(mp_cart_type), INTENT(IN)                    :: mp_comm
       INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN)      :: row_dist_block, col_dist_block
 
 #if defined(DBM_VALIDATE_AGAINST_DBCSR)
@@ -1483,9 +1497,10 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE dbm_distribution_get(dist, row_dist, col_dist, mp_comm)
       TYPE(dbm_distribution_obj), INTENT(IN)             :: dist
-      INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(OUT), &
-         OPTIONAL, POINTER                               :: row_dist, col_dist
-      TYPE(mp_comm_type), INTENT(OUT), OPTIONAL          :: mp_comm
+      INTEGER, DIMENSION(:), INTENT(OUT), OPTIONAL, &
+         POINTER                                         :: row_dist, col_dist
+
+      CLASS(mp_cart_type), INTENT(OUT), OPTIONAL         :: mp_comm
 
       INTEGER                                            :: fortran_comm, ncols, nrows
       TYPE(C_PTR)                                        :: col_dist_c, row_dist_c
@@ -1506,7 +1521,7 @@ CONTAINS
 
       IF (PRESENT(row_dist)) CALL C_F_POINTER(row_dist_c, row_dist, shape=(/nrows/))
       IF (PRESENT(col_dist)) CALL C_F_POINTER(col_dist_c, col_dist, shape=(/ncols/))
-      IF (PRESENT(mp_comm)) CALL mp_comm%set_handle(fortran_comm)
+      IF (PRESENT(mp_comm)) CALL mp_comm%set_handle(fortran_comm, ndims=2)
 
    END SUBROUTINE dbm_distribution_get
 
@@ -1545,7 +1560,7 @@ CONTAINS
 !> \author Ole Schuett
 ! **************************************************************************************************
    SUBROUTINE dbm_library_print_stats(mpi_comm, output_unit)
-      TYPE(mp_comm_type), INTENT(IN)                     :: mpi_comm
+      CLASS(mp_comm_type), INTENT(IN)                    :: mpi_comm
       INTEGER, INTENT(IN)                                :: output_unit
 
       INTERFACE

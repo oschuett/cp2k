@@ -6,6 +6,8 @@
 !--------------------------------------------------------------------------------------------------!
 
 MODULE cp_dbcsr_api
+   USE OMP_LIB,                         ONLY: omp_get_num_threads,&
+                                              omp_get_thread_num
    USE dbcsr_api,                       ONLY: &
         convert_csr_to_dbcsr_prv => dbcsr_convert_csr_to_dbcsr, &
         convert_dbcsr_to_csr_prv => dbcsr_convert_dbcsr_to_csr, dbcsr_add_prv => dbcsr_add, &
@@ -51,17 +53,19 @@ MODULE cp_dbcsr_api
         dbcsr_valid_index_prv => dbcsr_valid_index, &
         dbcsr_verify_matrix_prv => dbcsr_verify_matrix, dbcsr_work_create_prv => dbcsr_work_create
    USE dbm_api,                         ONLY: &
-        dbm_add, dbm_clear, dbm_copy, dbm_create, dbm_distribution_col_dist, dbm_distribution_get, &
+        dbm_add, dbm_clear, dbm_copy, dbm_create, dbm_create_from_template, dbm_distribution_get, &
         dbm_distribution_hold, dbm_distribution_new, dbm_distribution_obj, &
-        dbm_distribution_release, dbm_distribution_row_dist, dbm_filter, dbm_get_block_p, &
-        dbm_get_num_blocks, dbm_get_nze, dbm_get_stored_coordinates, dbm_iterator, &
-        dbm_iterator_blocks_left, dbm_iterator_next_block, dbm_iterator_stop, dbm_multiply, &
-        dbm_put_block, dbm_redistribute, dbm_release, dbm_reserve_blocks, dbm_scale, dbm_type, &
-        dbm_zero
+        dbm_distribution_release, dbm_filter, dbm_get_block_p, dbm_get_col_block_sizes, &
+        dbm_get_distribution, dbm_get_local_cols, dbm_get_local_rows, dbm_get_name, &
+        dbm_get_num_blocks, dbm_get_nze, dbm_get_row_block_sizes, dbm_get_stored_coordinates, &
+        dbm_is_created, dbm_iterator, dbm_iterator_blocks_left, dbm_iterator_next_block, &
+        dbm_iterator_start, dbm_iterator_stop, dbm_multiply, dbm_put_block, dbm_redistribute, &
+        dbm_release, dbm_reserve_blocks, dbm_scale, dbm_type, dbm_zero
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
                                               int_8
-   USE message_passing,                 ONLY: mp_comm_type
+   USE message_passing,                 ONLY: mp_cart_type,&
+                                              mp_comm_type
 #include "../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -179,6 +183,7 @@ MODULE cp_dbcsr_api
 
    TYPE dbcsr_type
       PRIVATE
+      CHARACTER :: matrix_type = "N"
       TYPE(dbcsr_type_prv)  :: dbcsr = dbcsr_type_prv()
       TYPE(dbm_type) :: dbm = dbm_type()
    END TYPE dbcsr_type
@@ -383,8 +388,11 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_copy_prv(matrix_b%dbcsr, matrix_a%dbcsr, name=name, keep_sparsity=keep_sparsity)
       ELSE
-         IF (PRESENT(name) .OR. PRESENT(keep_sparsity)) THEN
-            CPABORT("Not yet implemented for DBM.")
+         !IF (PRESENT(name) .OR. PRESENT(keep_sparsity)) THEN
+         !   CPABORT("Not yet implemented for DBM.")
+         !END IF
+         IF (.NOT. dbm_is_created(matrix_b%dbm)) THEN
+            CALL dbm_create_from_template(matrix_b%dbm, template=matrix_a%dbm, name=name)
          END IF
          CALL dbm_copy(matrix_b%dbm, matrix_a%dbm)
       END IF
@@ -416,10 +424,8 @@ CONTAINS
                                col_blk_size=col_blk_size, nze=0, data_type=dbcsr_type_real_8, &
                                reuse_arrays=reuse_arrays, mutable_work=mutable_work)
       ELSE
-         IF (matrix_type /= "N") THEN
-            CPABORT("Not yet implemented for DBM.")
-         END IF
          ! ignoring reuse_array and mutable_work
+         matrix%matrix_type = matrix_type
          CALL dbm_create(matrix%dbm, name=name, dist=dist%dbm, &
                          row_block_sizes=row_blk_size, col_block_sizes=col_blk_size)
       END IF
@@ -449,7 +455,6 @@ CONTAINS
          POINTER                                         :: row_blk_size, col_blk_size
       LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays, mutable_work
 
-      CHARACTER                                          :: my_matrix_type
       CHARACTER(len=default_string_length)               :: my_name
       INTEGER, DIMENSION(:), POINTER                     :: my_col_blk_size, my_row_blk_size
       TYPE(dbcsr_distribution_type)                      :: my_dist
@@ -461,16 +466,15 @@ CONTAINS
                                nze=0, data_type=dbcsr_type_real_8, reuse_arrays=reuse_arrays, &
                                mutable_work=mutable_work)
       ELSE
-         CALL dbcsr_get_info(template, name=my_name, matrix_type=my_matrix_type, distribution=my_dist, &
-                             row_blk_size=my_row_blk_size, col_blk_size=my_col_blk_size)
+         CALL dbcsr_get_info(template, name=my_name, distribution=my_dist, &
+                             row_blk_size=my_row_blk_size, col_blk_size=my_col_blk_size, &
+                             matrix_type=matrix%matrix_type)
          IF (PRESENT(name)) my_name = name
          IF (PRESENT(dist)) my_dist = dist
-         IF (PRESENT(matrix_type)) my_matrix_type = matrix_type
          IF (PRESENT(row_blk_size)) my_row_blk_size => row_blk_size
          IF (PRESENT(col_blk_size)) my_col_blk_size => col_blk_size
-         IF (my_matrix_type /= "N") THEN
-            CPABORT("Not yet implemented for DBM.")
-         END IF
+         IF (PRESENT(matrix_type)) matrix%matrix_type = matrix_type
+
          ! ignoring reuse_array and mutable_work
          CALL dbm_create(matrix%dbm, name=my_name, dist=my_dist%dbm, &
                          row_block_sizes=my_row_blk_size, col_block_sizes=my_col_blk_size)
@@ -602,22 +606,27 @@ CONTAINS
       LOGICAL, INTENT(OUT), OPTIONAL                     :: subgroups_defined
       INTEGER, INTENT(OUT), OPTIONAL                     :: prow_group, pcol_group
 
+      INTEGER, DIMENSION(:), POINTER                     :: my_col_dist, my_row_dist
+      TYPE(mp_cart_type)                                 :: mp_comm
+
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_distribution_get_prv(dist%dbcsr, row_dist, col_dist, nrows, ncols, has_threads, &
                                          group, mynode, numnodes, nprows, npcols, myprow, mypcol, &
                                          pgrid, subgroups_defined, prow_group, pcol_group)
       ELSE
-         IF (PRESENT(row_dist)) row_dist => dbm_distribution_row_dist(dist%dbm)
-         IF (PRESENT(col_dist)) col_dist => dbm_distribution_col_dist(dist%dbm)
-         IF (PRESENT(nrows)) nrows = SIZE(dbm_distribution_row_dist(dist%dbm))
-         IF (PRESENT(ncols)) ncols = SIZE(dbm_distribution_row_dist(dist%dbm))
+         CALL dbm_distribution_get(dist%dbm, row_dist=my_row_dist, col_dist=my_col_dist, mp_comm=mp_comm)
+         IF (PRESENT(row_dist)) row_dist => my_row_dist
+         IF (PRESENT(col_dist)) col_dist => my_col_dist
+         IF (PRESENT(nrows)) nrows = SIZE(my_row_dist)
+         IF (PRESENT(ncols)) ncols = SIZE(my_col_dist)
          IF (PRESENT(has_threads)) has_threads = .TRUE.
-         IF (PRESENT(mynode)) CPABORT("Not yet implemented for DBM.")
-         IF (PRESENT(numnodes)) CPABORT("Not yet implemented for DBM.")
-         IF (PRESENT(nprows)) CPABORT("Not yet implemented for DBM.")
-         IF (PRESENT(npcols)) CPABORT("Not yet implemented for DBM.")
-         IF (PRESENT(myprow)) CPABORT("Not yet implemented for DBM.")
-         IF (PRESENT(mypcol)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(group)) group = mp_comm%get_handle()
+         IF (PRESENT(mynode)) mynode = mp_comm%mepos
+         IF (PRESENT(numnodes)) numnodes = mp_comm%num_pe
+         IF (PRESENT(nprows)) nprows = mp_comm%num_pe_cart(1)
+         IF (PRESENT(npcols)) npcols = mp_comm%num_pe_cart(2)
+         IF (PRESENT(myprow)) myprow = mp_comm%mepos_cart(1)
+         IF (PRESENT(mypcol)) mypcol = mp_comm%mepos_cart(2)
          IF (PRESENT(pgrid)) CPABORT("Not yet implemented for DBM.")
          IF (PRESENT(subgroups_defined)) CPABORT("Not yet implemented for DBM.")
          IF (PRESENT(prow_group)) CPABORT("Not yet implemented for DBM.")
@@ -658,7 +667,7 @@ CONTAINS
       INTEGER, DIMENSION(:), INTENT(INOUT), POINTER      :: row_dist, col_dist
       LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays
 
-      TYPE(mp_comm_type)                                 :: mp_comm
+      TYPE(mp_cart_type)                                 :: mp_comm
 
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_distribution_new_prv(dist%dbcsr, template%dbcsr, group, pgrid, &
@@ -668,9 +677,9 @@ CONTAINS
             CALL dbm_distribution_get(template%dbm, mp_comm=mp_comm)
          ELSE
             CPASSERT(PRESENT(group))
-            CALL mp_comm%set_handle(group)
+            CALL mp_comm%set_handle(group, ndims=2)
          END IF
-         IF (PRESENT(pgrid)) CPABORT("Not yet implemented for DBM.")
+         ! TODO maybe not important IF (PRESENT(pgrid)) CPABORT("Not yet implemented for DBM.")
          ! ignoring reuse_array
          CALL dbm_distribution_new(dist%dbm, mp_comm, row_dist, col_dist)
       END IF
@@ -854,10 +863,16 @@ CONTAINS
          OPTIONAL                                        :: distribution
       CHARACTER(len=*), INTENT(OUT), OPTIONAL            :: name
       CHARACTER, INTENT(OUT), OPTIONAL                   :: matrix_type
-      TYPE(mp_comm_type), INTENT(OUT), OPTIONAL          :: group
 
-      INTEGER                                            :: group_handle
-      TYPE(dbcsr_distribution_type_prv)                  :: my_distribution
+      CLASS(mp_comm_type), INTENT(OUT), OPTIONAL         :: group
+
+      INTEGER                                            :: group_handle, i
+      INTEGER, ALLOCATABLE, DIMENSION(:)                 :: my_local_cols, my_local_rows
+      INTEGER, DIMENSION(:), POINTER                     :: my_col_blk_size, my_row_blk_size
+      TYPE(dbcsr_distribution_type_prv)                  :: my_dbscr_dist
+      TYPE(dbm_distribution_obj)                         :: my_dbm_dist
+
+      TYPE(mp_cart_type)                                 :: cart
 
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_get_info_prv(matrix=matrix%dbcsr, &
@@ -879,15 +894,52 @@ CONTAINS
                                  col_blk_size=col_blk_size, &
                                  row_blk_offset=row_blk_offset, &
                                  col_blk_offset=col_blk_offset, &
-                                 distribution=my_distribution, &
+                                 distribution=my_dbscr_dist, &
                                  name=name, &
                                  matrix_type=matrix_type, &
                                  group=group_handle)
 
-         IF (PRESENT(distribution)) distribution%dbcsr = my_distribution
+         IF (PRESENT(distribution)) distribution%dbcsr = my_dbscr_dist
          IF (PRESENT(group)) CALL group%set_handle(group_handle)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         my_row_blk_size => dbm_get_row_block_sizes(matrix%dbm)
+         my_col_blk_size => dbm_get_col_block_sizes(matrix%dbm)
+         CALL dbm_get_local_rows(matrix%dbm, my_local_rows)
+         CALL dbm_get_local_cols(matrix%dbm, my_local_cols)
+         my_dbm_dist = dbm_get_distribution(matrix%dbm)
+         CALL dbm_distribution_get(my_dbm_dist, mp_comm=cart)
+         IF (PRESENT(nblkrows_total)) nblkrows_total = SIZE(my_row_blk_size)
+         IF (PRESENT(nblkcols_total)) nblkcols_total = SIZE(my_col_blk_size)
+         IF (PRESENT(nfullrows_total)) nfullrows_total = SUM(my_row_blk_size)
+         IF (PRESENT(nfullcols_total)) nfullcols_total = SUM(my_col_blk_size)
+         IF (PRESENT(nblkrows_local)) nblkrows_local = SIZE(my_local_rows)
+         IF (PRESENT(nblkcols_local)) nblkcols_local = SIZE(my_local_cols)
+         IF (PRESENT(nfullrows_local)) THEN
+            nfullrows_local = 0
+            DO i = 1, SIZE(my_local_rows)
+               nfullrows_local = nfullrows_local + my_row_blk_size(my_local_rows(i))
+            END DO
+         END IF
+         IF (PRESENT(nfullcols_local)) THEN
+            nfullcols_local = 0
+            DO i = 1, SIZE(my_local_rows)
+               nfullcols_local = nfullcols_local + my_col_blk_size(my_local_cols(i))
+            END DO
+         END IF
+         IF (PRESENT(my_prow)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(my_pcol)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(local_rows)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(local_cols)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(proc_row_dist)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(proc_col_dist)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(row_blk_size)) row_blk_size => my_row_blk_size
+         IF (PRESENT(col_blk_size)) col_blk_size => my_col_blk_size
+         IF (PRESENT(row_blk_offset)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(col_blk_offset)) CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(distribution)) distribution%dbm = my_dbm_dist
+         IF (PRESENT(name)) name = dbm_get_name(matrix%dbm)
+         IF (PRESENT(matrix_type)) matrix_type = matrix%matrix_type
+         IF (PRESENT(group)) CALL group%set_handle(cart%get_handle())
       END IF
    END SUBROUTINE dbcsr_get_info
 
@@ -903,7 +955,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          matrix_type = dbcsr_get_matrix_type_prv(matrix%dbcsr)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         matrix_type = matrix%matrix_type
       END IF
    END FUNCTION dbcsr_get_matrix_type
 
@@ -973,8 +1025,7 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          has_symmetry = dbcsr_has_symmetry_prv(matrix%dbcsr)
       ELSE
-         has_symmetry = .FALSE.
-         CPABORT("Not yet implemented for DBM.")
+         has_symmetry = matrix%matrix_type /= "N"
       END IF
    END FUNCTION dbcsr_has_symmetry
 
@@ -1051,7 +1102,8 @@ CONTAINS
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_iterator_start_prv(iterator%dbcsr, matrix%dbcsr, shared, dynamic, dynamic_byrows)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         ! ignoring shared, dynamic, dynamic_byrows
+         CALL dbm_iterator_start(iterator%dbm, matrix%dbm)
       END IF
    END SUBROUTINE dbcsr_iterator_start
 
@@ -1073,7 +1125,8 @@ CONTAINS
          CALL dbcsr_iterator_start_prv(iterator%dbcsr, matrix%dbcsr, shared, dynamic, &
                                        dynamic_byrows, read_only=.TRUE.)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         ! ignoring shared, dynamic, dynamic_byrows
+         CALL dbm_iterator_start(iterator%dbm, matrix%dbm)
       END IF
    END SUBROUTINE dbcsr_iterator_readonly_start
 
@@ -1214,10 +1267,21 @@ CONTAINS
       TYPE(dbcsr_type), INTENT(INOUT)                    :: matrix
       INTEGER, DIMENSION(:), INTENT(IN)                  :: rows, cols
 
+      INTEGER                                            :: lb, stride, ub
+
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_reserve_blocks_prv(matrix%dbcsr, rows, cols)
       ELSE
-         CALL dbm_reserve_blocks(matrix%dbm, rows=rows, cols=cols)
+         IF (omp_get_num_threads() == 1) THEN
+            !$OMP PARALLEL DEFAULT(NONE) SHARED(matrix,rows,cols) PRIVATE(stride,lb,ub)
+            stride = SIZE(rows)/omp_get_num_threads() + 1
+            lb = omp_get_thread_num()*stride + 1
+            ub = MIN(lb + stride, SIZE(rows))
+            CALL dbm_reserve_blocks(matrix%dbm, rows=rows(lb:ub), cols=cols(lb:ub))
+            !$OMP END PARALLEL
+         ELSE
+            CALL dbm_reserve_blocks(matrix%dbm, rows=rows, cols=cols)
+         END IF
       END IF
    END SUBROUTINE dbcsr_reserve_blocks
 
