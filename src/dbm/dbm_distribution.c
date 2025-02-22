@@ -177,6 +177,21 @@ void dbm_distribution_col_dist(const dbm_distribution_t *dist, int *ncols,
 }
 
 /*******************************************************************************
+ * \brief Returns various properties of the given distribution.
+ * \author Ole Schuett
+ ******************************************************************************/
+void dbm_distribution_get(const dbm_distribution_t *dist, int *nrows,
+                          const int **row_dist, int *ncols,
+                          const int **col_dist, int *fortran_comm) {
+  assert(dist->ref_count > 0);
+  *nrows = dist->rows.length;
+  *row_dist = dist->rows.index2coord;
+  *ncols = dist->cols.length;
+  *col_dist = dist->cols.index2coord;
+  *fortran_comm = dbm_mpi_comm_c2f(dist->comm);
+}
+
+/*******************************************************************************
  * \brief Returns the MPI rank on which the given block should be stored.
  * \author Ole Schuett
  ******************************************************************************/

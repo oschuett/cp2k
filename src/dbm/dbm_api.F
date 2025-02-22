@@ -79,6 +79,7 @@ MODULE dbm_api
    PUBLIC :: dbm_distribution_release
    PUBLIC :: dbm_distribution_col_dist
    PUBLIC :: dbm_distribution_row_dist
+   PUBLIC :: dbm_distribution_get
 
    PUBLIC :: dbm_iterator
    PUBLIC :: dbm_iterator_start
@@ -1471,6 +1472,43 @@ CONTAINS
       CPASSERT(ALL(res == dbcsr_distribution_col_dist(dist%dbcsr)))
 #endif
    END FUNCTION dbm_distribution_col_dist
+
+! **************************************************************************************************
+!> \brief ...
+!> \param dist ...
+!> \param row_dist ...
+!> \param col_dist ...
+!> \param mp_comm ...
+!> \author Ole Schuett
+! **************************************************************************************************
+   SUBROUTINE dbm_distribution_get(dist, row_dist, col_dist, mp_comm)
+      TYPE(dbm_distribution_obj), INTENT(IN)             :: dist
+      INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(OUT), &
+         OPTIONAL, POINTER                               :: row_dist, col_dist
+      TYPE(mp_comm_type), INTENT(OUT), OPTIONAL          :: mp_comm
+
+      INTEGER                                            :: fortran_comm, ncols, nrows
+      TYPE(C_PTR)                                        :: col_dist_c, row_dist_c
+      INTERFACE
+         SUBROUTINE dbm_distribution_get_c(dist, nrows, row_dist, ncols, col_dist, fortran_comm) &
+            BIND(C, name="dbm_distribution_get")
+            IMPORT :: C_PTR, C_INT
+            TYPE(C_PTR), VALUE                        :: dist
+            INTEGER(C_INT)                            :: nrows
+            TYPE(C_PTR)                               :: row_dist
+            INTEGER(C_INT)                            :: ncols
+            TYPE(C_PTR)                               :: col_dist
+            INTEGER(C_INT)                            :: fortran_comm
+         END SUBROUTINE dbm_distribution_get_c
+      END INTERFACE
+
+      CALL dbm_distribution_get_c(dist%c_ptr, nrows, row_dist_c, ncols, col_dist_c, fortran_comm)
+
+      IF (PRESENT(row_dist)) CALL C_F_POINTER(row_dist_c, row_dist, shape=(/nrows/))
+      IF (PRESENT(col_dist)) CALL C_F_POINTER(col_dist_c, col_dist, shape=(/ncols/))
+      IF (PRESENT(mp_comm)) CALL mp_comm%set_handle(fortran_comm)
+
+   END SUBROUTINE dbm_distribution_get
 
 ! **************************************************************************************************
 !> \brief Initialize DBM library

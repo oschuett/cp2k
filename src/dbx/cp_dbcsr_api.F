@@ -51,12 +51,13 @@ MODULE cp_dbcsr_api
         dbcsr_valid_index_prv => dbcsr_valid_index, &
         dbcsr_verify_matrix_prv => dbcsr_verify_matrix, dbcsr_work_create_prv => dbcsr_work_create
    USE dbm_api,                         ONLY: &
-        dbm_add, dbm_clear, dbm_copy, dbm_create, dbm_distribution_col_dist, &
-        dbm_distribution_hold, dbm_distribution_obj, dbm_distribution_release, &
-        dbm_distribution_row_dist, dbm_filter, dbm_get_block_p, dbm_get_num_blocks, dbm_get_nze, &
-        dbm_get_stored_coordinates, dbm_iterator, dbm_iterator_blocks_left, &
-        dbm_iterator_next_block, dbm_iterator_stop, dbm_multiply, dbm_put_block, dbm_redistribute, &
-        dbm_release, dbm_reserve_blocks, dbm_scale, dbm_type, dbm_zero
+        dbm_add, dbm_clear, dbm_copy, dbm_create, dbm_distribution_col_dist, dbm_distribution_get, &
+        dbm_distribution_hold, dbm_distribution_new, dbm_distribution_obj, &
+        dbm_distribution_release, dbm_distribution_row_dist, dbm_filter, dbm_get_block_p, &
+        dbm_get_num_blocks, dbm_get_nze, dbm_get_stored_coordinates, dbm_iterator, &
+        dbm_iterator_blocks_left, dbm_iterator_next_block, dbm_iterator_stop, dbm_multiply, &
+        dbm_put_block, dbm_redistribute, dbm_release, dbm_reserve_blocks, dbm_scale, dbm_type, &
+        dbm_zero
    USE kinds,                           ONLY: default_string_length,&
                                               dp,&
                                               int_8
@@ -418,6 +419,7 @@ CONTAINS
          IF (matrix_type /= "N") THEN
             CPABORT("Not yet implemented for DBM.")
          END IF
+         ! ignoring reuse_array and mutable_work
          CALL dbm_create(matrix%dbm, name=name, dist=dist%dbm, &
                          row_block_sizes=row_blk_size, col_block_sizes=col_blk_size)
       END IF
@@ -469,6 +471,7 @@ CONTAINS
          IF (my_matrix_type /= "N") THEN
             CPABORT("Not yet implemented for DBM.")
          END IF
+         ! ignoring reuse_array and mutable_work
          CALL dbm_create(matrix%dbm, name=my_name, dist=my_dist%dbm, &
                          row_block_sizes=my_row_blk_size, col_block_sizes=my_col_blk_size)
       END IF
@@ -655,11 +658,21 @@ CONTAINS
       INTEGER, DIMENSION(:), INTENT(INOUT), POINTER      :: row_dist, col_dist
       LOGICAL, INTENT(IN), OPTIONAL                      :: reuse_arrays
 
+      TYPE(mp_comm_type)                                 :: mp_comm
+
       IF (USE_DBCSR_BACKEND) THEN
          CALL dbcsr_distribution_new_prv(dist%dbcsr, template%dbcsr, group, pgrid, &
                                          row_dist, col_dist, reuse_arrays)
       ELSE
-         CPABORT("Not yet implemented for DBM.")
+         IF (PRESENT(template)) THEN
+            CALL dbm_distribution_get(template%dbm, mp_comm=mp_comm)
+         ELSE
+            CPASSERT(PRESENT(group))
+            CALL mp_comm%set_handle(group)
+         END IF
+         IF (PRESENT(pgrid)) CPABORT("Not yet implemented for DBM.")
+         ! ignoring reuse_array
+         CALL dbm_distribution_new(dist%dbm, mp_comm, row_dist, col_dist)
       END IF
    END SUBROUTINE dbcsr_distribution_new
 

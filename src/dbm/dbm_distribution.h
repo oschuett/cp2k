@@ -73,6 +73,14 @@ void dbm_distribution_col_dist(const dbm_distribution_t *dist, int *ncols,
                                const int **col_dist);
 
 /*******************************************************************************
+ * \brief Returns various properties of the given distribution.
+ * \author Ole Schuett
+ ******************************************************************************/
+void dbm_distribution_get(const dbm_distribution_t *dist, int *nrows,
+                          const int **row_dist, int *ncols,
+                          const int **col_dist, int *fortran_comm);
+
+/*******************************************************************************
  * \brief Returns the MPI rank on which the given block should be stored.
  * \author Ole Schuett
  ******************************************************************************/
