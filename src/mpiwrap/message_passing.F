@@ -253,7 +253,7 @@ MODULE message_passing
       GENERIC, PUBLIC :: operator(.NE.) => mp_comm_op_neq
 
       ! Cart routines.
-      !PROCEDURE, PUBLIC, PASS(comm_cart), NON_OVERRIDABLE :: cart_create => mp_cart_create
+      PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: cart_create => mp_cart_create
       !PROCEDURE, PUBLIC, PASS(sub_comm), NON_OVERRIDABLE :: cart_sub => mp_cart_sub
       PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: cart_get => mp_cart_get
       PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: cart_coords => mp_cart_coords
@@ -1468,7 +1468,7 @@ CONTAINS
    SUBROUTINE mp_cart_get(comm, dims, coords, periods)
       CLASS(mp_comm_type), INTENT(IN)                              :: comm
       INTEGER, DIMENSION(:), INTENT(INOUT)                         :: dims, coords
-      LOGICAL, DIMENSION(:), INTENT(INOUT)                        :: periods
+      LOGICAL, DIMENSION(:), INTENT(INOUT)                         :: periods
 
       CHARACTER(len=*), PARAMETER :: routineN = 'mp_cart_get'
 
@@ -1494,56 +1494,56 @@ CONTAINS
 
    END SUBROUTINE mp_cart_get
 
-!! **************************************************************************************************
-!!> \brief creates a cartesian communicator from any communicator
-!!> \param comm_old ...
-!!> \param ndims ...
-!!> \param dims ...
-!!> \param pos ...
-!!> \param comm_cart ...
-!! **************************************************************************************************
-!   SUBROUTINE mp_cart_create(comm_old, ndims, dims, comm_cart)
-!
-!      CLASS(mp_comm_type), INTENT(IN)          :: comm_old
-!      INTEGER, INTENT(IN)                      :: ndims
-!      INTEGER, INTENT(INOUT)                   :: dims(ndims)
-!      CLASS(mp_cart_type), INTENT(OUT)         :: comm_cart
-!
-!      CHARACTER(len=*), PARAMETER :: routineN = 'mp_cart_create'
-!
-!      INTEGER                                  :: handle, ierr
-!#if defined(__parallel)
-!      LOGICAL, DIMENSION(1:ndims)              :: period
-!      LOGICAL                                  :: reorder
-!#endif
-!
-!      ierr = 0
-!      CALL mp_timeset(routineN, handle)
-!
-!      comm_cart%handle = comm_old%handle
-!#if defined(__parallel)
-!
-!      IF (ANY(dims == 0)) CALL mpi_dims_create(comm_old%num_pe, ndims, dims, ierr)
-!      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_dims_create @ mp_cart_create")
-!
-!      ! FIX ME.  Quick hack to avoid problems with realspace grids for compilers
-!      ! like IBM that actually reorder the processors when creating the new
-!      ! communicator
-!      reorder = .FALSE.
-!      period = .TRUE.
-!      CALL mpi_cart_create(comm_old%handle, ndims, dims, period, reorder, comm_cart%handle, ierr)
-!      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_cart_create @ mp_cart_create")
-!      CALL add_perf(perf_id=1, count=1)
-!#else
-!      dims = 1
-!      comm_cart%handle = mp_comm_default_handle
-!#endif
-!      comm_cart%ndims = ndims
-!      debug_comm_count = debug_comm_count + 1
-!      CALL comm_cart%init()
-!      CALL mp_timestop(handle)
-!
-!   END SUBROUTINE mp_cart_create
+! **************************************************************************************************
+!> \brief creates a cartesian communicator from any communicator
+!> \param comm ...
+!> \param ndims ...
+!> \param dims ...
+!> \param pos ...
+!> \param comm_cart ...
+! **************************************************************************************************
+   SUBROUTINE mp_cart_create(comm, dims, comm_cart)
+
+      CLASS(mp_comm_type), INTENT(IN)          :: comm
+      INTEGER, DIMENSION(:), INTENT(INOUT)     :: dims
+      CLASS(mp_comm_type), INTENT(OUT)         :: comm_cart
+
+      CHARACTER(len=*), PARAMETER :: routineN = 'mp_cart_create'
+
+      INTEGER                                  :: handle, ierr
+#if defined(__parallel)
+      LOGICAL, DIMENSION(1:ndims)              :: period
+      LOGICAL                                  :: reorder
+#endif
+
+      ierr = 0
+      CALL mp_timeset(routineN, handle)
+
+      comm_cart%handle = comm%handle
+#if defined(__parallel)
+
+      IF (ANY(dims == 0)) THEN
+         CALL mpi_dims_create(comm%num_pe, SIZE(dims), dims, ierr)
+         IF (ierr /= 0) CALL mp_stop(ierr, "mpi_dims_create @ mp_cart_create")
+      ENDIF
+
+      ! FIX ME.  Quick hack to avoid problems with realspace grids for compilers
+      ! like IBM that actually reorder the processors when creating the new
+      ! communicator
+      reorder = .FALSE.
+      period = .TRUE.
+      CALL mpi_cart_create(comm%handle, SIZE(dims), dims, period, reorder, comm_cart%handle, ierr)
+      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_cart_create @ mp_cart_create")
+      CALL add_perf(perf_id=1, count=1)
+#else
+      dims(:) = 1
+      comm_cart%handle = mp_comm_default_handle
+#endif
+      debug_comm_count = debug_comm_count + 1
+      CALL comm_cart%init()
+      CALL mp_timestop(handle)
+
+   END SUBROUTINE mp_cart_create
 
 ! **************************************************************************************************
 !> \brief wrapper to MPI_Cart_coords

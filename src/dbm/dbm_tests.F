@@ -15,8 +15,7 @@ MODULE dbm_tests
    USE kinds,                           ONLY: dp,&
                                               int_8
    USE machine,                         ONLY: m_flush
-   USE message_passing,                 ONLY: mp_cart_type,&
-                                              mp_comm_type,&
+   USE message_passing,                 ONLY: mp_comm_type,&
                                               mp_dims_create
 #include "../base/base_uses.f90"
 
@@ -72,15 +71,13 @@ CONTAINS
       INTEGER, DIMENSION(2)                              :: npdims
       TYPE(dbm_distribution_obj)                         :: dist_a, dist_b, dist_c
       TYPE(dbm_type), TARGET                             :: matrix_a, matrix_b, matrix_c
-      TYPE(mp_cart_type)                                 :: cart_group
+      TYPE(mp_comm_type)                                 :: cart_group
 
       CALL timeset(routineN, handle)
 
       ! Create MPI processor grid.
       npdims(:) = 0
-      CALL mp_dims_create(mp_group%num_pe, npdims)
-      CALL cart_group%create(mp_group, 2, npdims)
-      npdims = cart_group%num_pe_cart
+      CALL mp_group%cart_create(npdims, cart_group)
 
       ! Initialize random number generator.
       randmat_counter = 12341313

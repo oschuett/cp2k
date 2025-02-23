@@ -11,8 +11,7 @@ MODULE dbm_api
    USE kinds, ONLY: default_string_length, &
                     dp, &
                     int_8
-   USE message_passing, ONLY: mp_cart_type, &
-                              mp_comm_type
+   USE message_passing, ONLY: mp_comm_type
    USE string_utilities, ONLY: strlcpy_c2f
 
 ! Uncomment the following line to enable validation.
@@ -1334,7 +1333,7 @@ CONTAINS
 ! **************************************************************************************************
    SUBROUTINE dbcsr_distribution_new_wrapper(dist, mp_comm, row_dist_block, col_dist_block)
       TYPE(dbm_distribution_obj), INTENT(INOUT)          :: dist
-      TYPE(mp_cart_type), INTENT(IN)                                :: mp_comm
+      TYPE(mp_comm_type), INTENT(IN)                     :: mp_comm
       INTEGER, CONTIGUOUS, DIMENSION(:), INTENT(IN), &
          POINTER                                         :: row_dist_block, col_dist_block
 
@@ -1342,10 +1341,11 @@ CONTAINS
       INTEGER                                            :: mynode, numnodes, pcol, prow
       INTEGER, ALLOCATABLE, DIMENSION(:, :)              :: pgrid
       INTEGER, DIMENSION(2)                              :: coord, mycoord, npdims
+      LOGICAL, DIMENSION(2)                              :: periods
       TYPE(dbcsr_mp_obj)                                 :: mp_env
 
       ! Create a dbcsr mp environment from communicator
-      CALL mp_comm%get_info_cart(npdims, mycoord)
+      CALL mp_comm%cart_get(npdims, mycoord, periods)
       CALL mp_comm%get_size(numnodes)
       CALL mp_comm%get_rank(mynode)
       ALLOCATE (pgrid(0:npdims(1) - 1, 0:npdims(2) - 1))
