@@ -164,16 +164,66 @@ MODULE message_passing
    INTEGER, PARAMETER, PUBLIC :: file_amode_excl = 64
    INTEGER, PARAMETER, PUBLIC :: file_amode_append = 128
 #endif
+   CHARACTER(LEN=*), PARAMETER, PRIVATE :: moduleN = 'message_passing'
+
+   ! internal reference counter used to debug communicator leaks
+   INTEGER, PRIVATE, SAVE :: debug_comm_count
+   LOGICAL, PUBLIC, SAVE :: mp_collect_timings = .FALSE.
+
+   ! Constants to compare communicators
+   INTEGER, PARAMETER, PUBLIC :: mp_comm_ident = 0
+   INTEGER, PARAMETER, PUBLIC :: mp_comm_congruent = 1
+   INTEGER, PARAMETER, PUBLIC :: mp_comm_similar = 2
+   INTEGER, PARAMETER, PUBLIC :: mp_comm_unequal = 3
+   INTEGER, PARAMETER, PUBLIC :: mp_comm_compare_default = -1
 
    ! we need to fix this to a given number (crossing fingers)
    ! so that the serial code using Fortran stream IO and the MPI have the same sizes.
    INTEGER, PARAMETER, PUBLIC :: mpi_character_size = 1
    INTEGER, PARAMETER, PUBLIC :: mpi_integer_size = 4
 
-   CHARACTER(LEN=*), PARAMETER, PRIVATE :: moduleN = 'message_passing'
+   ! we make some assumptions on the length of INTEGERS, REALS and LOGICALS
+   INTEGER, PARAMETER :: intlen = BIT_SIZE(0)/8
+   INTEGER, PARAMETER :: reallen = 8
+   INTEGER, PARAMETER :: loglen = BIT_SIZE(0)/8
+   INTEGER, PARAMETER :: charlen = 1
 
-   ! internal reference counter used to debug communicator leaks
-   INTEGER, PRIVATE, SAVE :: debug_comm_count
+   ! init and error
+   PUBLIC :: mp_world_init, mp_world_finalize
+   PUBLIC :: mp_abort
+
+   ! informational / generation of sub comms
+   PUBLIC :: mp_dims_create
+   PUBLIC :: cp2k_is_parallel
+   PUBLIC :: mp_get_node_global_rank
+
+   ! message passing
+   PUBLIC :: mp_waitall, mp_waitany
+   PUBLIC :: mp_testall, mp_testany
+
+   ! Memory management
+   PUBLIC :: mp_allocate, mp_deallocate
+
+   ! I/O
+   PUBLIC :: mp_file_delete
+   PUBLIC :: mp_file_get_amode
+
+   ! some 'advanced types' currently only used for dbcsr
+   PUBLIC :: mp_type_descriptor_type
+   PUBLIC :: mp_type_make
+   PUBLIC :: mp_type_size
+
+   ! vector types
+   PUBLIC :: mp_type_indexed_make_r, mp_type_indexed_make_d
+   PUBLIC :: mp_type_indexed_make_c, mp_type_indexed_make_z
+
+   ! More I/O types and routines: variable spaced data using bytes for spacings
+   PUBLIC :: mp_file_descriptor_type
+   PUBLIC :: mp_file_type_free
+   PUBLIC :: mp_file_type_hindexed_make_chv
+   PUBLIC :: mp_file_type_set_view_chv
+
+   PUBLIC :: mp_get_library_version
 
    PUBLIC :: mp_comm_type
    PUBLIC :: mp_request_type
@@ -183,8 +233,8 @@ MODULE message_passing
    PUBLIC :: mp_cart_type
 
    PUBLIC :: mp_para_env_type, mp_para_env_p_type, mp_para_cart_type
-   PUBLIC :: mp_para_env_create, mp_para_env_release, &
-             mp_para_cart_create, mp_para_cart_release
+   PUBLIC :: mp_para_env_create, mp_para_env_release
+   PUBLIC :: mp_para_cart_create, mp_para_cart_release
 
 ! **************************************************************************************************
 !> \brief ...
@@ -825,7 +875,9 @@ MODULE message_passing
       PROCEDURE, PUBLIC, PASS(cart), NON_OVERRIDABLE :: is_valid => mp_para_cart_is_valid
    END TYPE mp_para_cart_type
 
-   ! Create the constants from the corresponding handles
+! **************************************************************************************************
+!> \brief Create the constants from the corresponding handles
+! **************************************************************************************************
    TYPE(mp_comm_type), PARAMETER, PUBLIC :: mp_comm_null = mp_comm_type(mp_comm_null_handle)
    TYPE(mp_comm_type), PARAMETER, PUBLIC :: mp_comm_self = mp_comm_type(mp_comm_self_handle)
    TYPE(mp_comm_type), PARAMETER, PUBLIC :: mp_comm_world = mp_comm_type(mp_comm_world_handle)
@@ -833,56 +885,11 @@ MODULE message_passing
    TYPE(mp_win_type), PARAMETER, PUBLIC :: mp_win_null = mp_win_type(mp_win_null_handle)
    TYPE(mp_file_type), PARAMETER, PUBLIC :: mp_file_null = mp_file_type(mp_file_null_handle)
    TYPE(mp_info_type), PARAMETER, PUBLIC :: mp_info_null = mp_info_type(mp_info_null_handle)
-
 #if !defined(__parallel)
    ! This communicator is to be used in serial mode to emulate a valid communicator which is not a compiler constant
    INTEGER, PARAMETER, PRIVATE :: mp_comm_default_handle = 1
    TYPE(mp_comm_type), PARAMETER, PRIVATE :: mp_comm_default = mp_comm_type(mp_comm_default_handle)
 #endif
-
-   ! Constants to compare communicators
-   INTEGER, PARAMETER, PUBLIC :: mp_comm_ident = 0
-   INTEGER, PARAMETER, PUBLIC :: mp_comm_congruent = 1
-   INTEGER, PARAMETER, PUBLIC :: mp_comm_similar = 2
-   INTEGER, PARAMETER, PUBLIC :: mp_comm_unequal = 3
-   INTEGER, PARAMETER, PUBLIC :: mp_comm_compare_default = -1
-
-   ! init and error
-   PUBLIC :: mp_world_init, mp_world_finalize
-   PUBLIC :: mp_abort
-
-   ! informational / generation of sub comms
-   PUBLIC :: mp_dims_create
-   PUBLIC :: cp2k_is_parallel
-   PUBLIC :: mp_get_node_global_rank
-
-   ! message passing
-   PUBLIC :: mp_waitall, mp_waitany
-   PUBLIC :: mp_testall, mp_testany
-
-   ! Memory management
-   PUBLIC :: mp_allocate, mp_deallocate
-
-   ! I/O
-   PUBLIC :: mp_file_delete
-   PUBLIC :: mp_file_get_amode
-
-   ! some 'advanced types' currently only used for dbcsr
-   PUBLIC :: mp_type_descriptor_type
-   PUBLIC :: mp_type_make
-   PUBLIC :: mp_type_size
-
-   ! vector types
-   PUBLIC :: mp_type_indexed_make_r, mp_type_indexed_make_d, &
-             mp_type_indexed_make_c, mp_type_indexed_make_z
-
-   ! More I/O types and routines: variable spaced data using bytes for spacings
-   PUBLIC :: mp_file_descriptor_type
-   PUBLIC :: mp_file_type_free
-   PUBLIC :: mp_file_type_hindexed_make_chv
-   PUBLIC :: mp_file_type_set_view_chv
-
-   PUBLIC :: mp_get_library_version
 
 ! **************************************************************************************************
 !> \brief ...
@@ -1010,14 +1017,6 @@ MODULE message_passing
       LOGICAL                          :: has_indexing = .FALSE.
       TYPE(mp_file_indexing_meta_type) :: index_descriptor = mp_file_indexing_meta_type()
    END TYPE
-
-   ! we make some assumptions on the length of INTEGERS, REALS and LOGICALS
-   INTEGER, PARAMETER :: intlen = BIT_SIZE(0)/8
-   INTEGER, PARAMETER :: reallen = 8
-   INTEGER, PARAMETER :: loglen = BIT_SIZE(0)/8
-   INTEGER, PARAMETER :: charlen = 1
-
-   LOGICAL, PUBLIC, SAVE :: mp_collect_timings = .FALSE.
 
 CONTAINS
 
