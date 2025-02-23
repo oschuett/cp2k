@@ -230,11 +230,9 @@ MODULE message_passing
    PUBLIC :: mp_win_type
    PUBLIC :: mp_file_type
    PUBLIC :: mp_info_type
-   PUBLIC :: mp_cart_type
 
-   PUBLIC :: mp_para_env_type, mp_para_env_p_type, mp_para_cart_type
+   PUBLIC :: mp_para_env_type, mp_para_env_p_type
    PUBLIC :: mp_para_env_create, mp_para_env_release
-   PUBLIC :: mp_para_cart_create, mp_para_cart_release
 
 ! **************************************************************************************************
 !> \brief ...
@@ -242,9 +240,7 @@ MODULE message_passing
    TYPE mp_comm_type
       PRIVATE
       MPI_COMM_TYPE :: handle = mp_comm_null_handle
-      ! Number of dimensions within a Cartesian topology (useful with mp_cart_type)
-      INTEGER :: ndims = 1
-      ! Meta data to the communicator
+      ! Meta data of the communicator
       INTEGER, PUBLIC :: mepos = -1, source = -1, num_pe = -1
    CONTAINS
       ! Setters/Getters
@@ -255,6 +251,14 @@ MODULE message_passing
       PROCEDURE, PRIVATE, PASS, NON_OVERRIDABLE :: mp_comm_op_neq
       GENERIC, PUBLIC :: operator(.EQ.) => mp_comm_op_eq
       GENERIC, PUBLIC :: operator(.NE.) => mp_comm_op_neq
+
+      ! Cart routines.
+      !PROCEDURE, PUBLIC, PASS(comm_cart), NON_OVERRIDABLE :: cart_create => mp_cart_create
+      !PROCEDURE, PUBLIC, PASS(sub_comm), NON_OVERRIDABLE :: cart_sub => mp_cart_sub
+      PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: cart_get => mp_cart_get
+      PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: cart_coords => mp_cart_coords
+      PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: cart_rank => mp_cart_rank
+
       ! Communication routines
       PROCEDURE, PRIVATE, PASS(comm), NON_OVERRIDABLE :: &
          mp_sendrecv_i, mp_sendrecv_l, mp_sendrecv_r, mp_sendrecv_d, &
@@ -652,7 +656,6 @@ MODULE message_passing
 
       PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: get_size => mp_comm_size
       PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: get_rank => mp_comm_rank
-      PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: get_ndims => mp_comm_get_ndims
       PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: is_source => mp_comm_is_source
 
       ! Creation routines
@@ -803,22 +806,6 @@ MODULE message_passing
    END TYPE
 
 ! **************************************************************************************************
-!> \brief ...
-! **************************************************************************************************
-   TYPE, EXTENDS(mp_comm_type) :: mp_cart_type
-      INTEGER, DIMENSION(:), ALLOCATABLE, PUBLIC :: mepos_cart, num_pe_cart
-      LOGICAL, DIMENSION(:), ALLOCATABLE, PUBLIC :: periodic
-   CONTAINS
-      PROCEDURE, PUBLIC, PASS(comm_cart), NON_OVERRIDABLE :: create => mp_cart_create
-      PROCEDURE, PUBLIC, PASS(sub_comm), NON_OVERRIDABLE :: from_sub => mp_cart_sub
-
-      PROCEDURE, PRIVATE, PASS(comm), NON_OVERRIDABLE :: get_info_cart => mp_cart_get
-
-      PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: coords => mp_cart_coords
-      PROCEDURE, PUBLIC, PASS(comm), NON_OVERRIDABLE :: rank_cart => mp_cart_rank
-   END TYPE
-
-! **************************************************************************************************
 !> \brief stores all the informations relevant to an mpi environment
 !> \param owns_group if it owns the group (and thus should free it when
 !>        this object is deallocated)
@@ -848,32 +835,6 @@ MODULE message_passing
    TYPE mp_para_env_p_type
       TYPE(mp_para_env_type), POINTER :: para_env => NULL()
    END TYPE mp_para_env_p_type
-
-! **************************************************************************************************
-!> \brief represent a multidimensional parallel environment
-!> \param mepos_cart the position of the actual processor
-!> \param num_pe_cart number of processors in the group in each dimension
-!> \param source_cart id of a special processor (for example the one for i-o,
-!>        or the master
-!> \param owns_group if it owns the group (and thus should free it when
-!>        this object is deallocated)
-!> \param ref_count the reference count, when it is zero this object gets
-!>        deallocated
-!> \note
-!>      not yet implemented for mpi
-!> \par History
-!>      08.2002 created [fawzi]
-!> \author Fawzi Mohamed
-! **************************************************************************************************
-   TYPE, EXTENDS(mp_cart_type) :: mp_para_cart_type
-      PRIVATE
-      ! We set it to true to have less initialization steps in case we create a new communicator
-      LOGICAL :: owns_group = .TRUE.
-      INTEGER :: ref_count = -1
-   CONTAINS
-      PROCEDURE, PUBLIC, PASS(cart), NON_OVERRIDABLE :: retain => mp_para_cart_retain
-      PROCEDURE, PUBLIC, PASS(cart), NON_OVERRIDABLE :: is_valid => mp_para_cart_is_valid
-   END TYPE mp_para_cart_type
 
 ! **************************************************************************************************
 !> \brief Create the constants from the corresponding handles
@@ -1083,10 +1044,9 @@ CONTAINS
 ! **************************************************************************************************
 !> \brief ...
 ! **************************************************************************************************
-   ELEMENTAL IMPURE SUBROUTINE mp_comm_type_set_handle(this, handle, ndims)
+   ELEMENTAL IMPURE SUBROUTINE mp_comm_type_set_handle(this, handle)
       CLASS(mp_comm_type), INTENT(INOUT) :: this
-      INTEGER, INTENT(IN) :: handle
-      INTEGER, INTENT(IN), OPTIONAL :: ndims
+      INTEGER, INTENT(IN)                :: handle
 
 #if defined(__parallel) && defined(__MPI_F08)
       this%handle%mpi_val = handle
@@ -1094,15 +1054,7 @@ CONTAINS
       this%handle = handle
 #endif
 
-      SELECT TYPE (this)
-      CLASS IS (mp_cart_type)
-         IF (.NOT. PRESENT(ndims)) &
-            CALL cp_abort(__LOCATION__, &
-                          "Setup of a cartesian communicator requires information on the number of dimensions!")
-      END SELECT
-      IF (PRESENT(ndims)) this%ndims = ndims
       CALL this%init()
-
    END SUBROUTINE mp_comm_type_set_handle
 
 ! **************************************************************************************************
@@ -1513,97 +1465,85 @@ CONTAINS
 !> \param task_coor ...
 !> \param periods ...
 ! **************************************************************************************************
-   SUBROUTINE mp_cart_get(comm, dims, task_coor, periods)
-
-      CLASS(mp_cart_type), INTENT(IN)                    :: comm
-      INTEGER, INTENT(OUT), OPTIONAL                               :: dims(comm%ndims), task_coor(comm%ndims)
-      LOGICAL, INTENT(out), OPTIONAL                               :: periods(comm%ndims)
+   SUBROUTINE mp_cart_get(comm, dims, coords, periods)
+      CLASS(mp_comm_type), INTENT(IN)                              :: comm
+      INTEGER, DIMENSION(:), INTENT(INOUT)                         :: dims, coords
+      LOGICAL, DIMENSION(:), INTENT(INOUT)                        :: periods
 
       CHARACTER(len=*), PARAMETER :: routineN = 'mp_cart_get'
 
       INTEGER                                            :: handle
 #if defined(__parallel)
-      INTEGER :: ierr
-      INTEGER                               :: my_dims(comm%ndims), my_task_coor(comm%ndims)
-      LOGICAL                               :: my_periods(comm%ndims)
+      INTEGER                                            :: ierr
 #endif
 
       CALL mp_timeset(routineN, handle)
+      CPASSERT(SIZE(dims) == SIZE(coords))
+      CPASSERT(SIZE(dims) == SIZE(periods))
 
 #if defined(__parallel)
-      CALL mpi_cart_get(comm%handle, comm%ndims, my_dims, my_periods, my_task_coor, ierr)
+      CALL mpi_cart_get(comm%handle, SIZE(dims), dims, periods, coords, ierr)
       IF (ierr /= 0) CALL mp_stop(ierr, "mpi_cart_get @ mp_cart_get")
-      IF (PRESENT(dims)) dims = my_dims
-      IF (PRESENT(task_coor)) task_coor = my_task_coor
-      IF (PRESENT(periods)) periods = my_periods
 #else
       MARK_USED(comm)
-      IF (PRESENT(task_coor)) task_coor = 0
-      IF (PRESENT(dims)) dims = 1
-      IF (PRESENT(periods)) periods = .FALSE.
+      coords(:) = 0
+      dims(:) = 1
+      periods(:) = .FALSE.
 #endif
       CALL mp_timestop(handle)
 
    END SUBROUTINE mp_cart_get
 
-   INTEGER ELEMENTAL FUNCTION mp_comm_get_ndims(comm)
-      CLASS(mp_comm_type), INTENT(IN) :: comm
-
-      mp_comm_get_ndims = comm%ndims
-
-   END FUNCTION
-
-! **************************************************************************************************
-!> \brief creates a cartesian communicator from any communicator
-!> \param comm_old ...
-!> \param ndims ...
-!> \param dims ...
-!> \param pos ...
-!> \param comm_cart ...
-! **************************************************************************************************
-   SUBROUTINE mp_cart_create(comm_old, ndims, dims, comm_cart)
-
-      CLASS(mp_comm_type), INTENT(IN) :: comm_old
-      INTEGER, INTENT(IN)                      :: ndims
-      INTEGER, INTENT(INOUT)                   :: dims(ndims)
-      CLASS(mp_cart_type), INTENT(OUT) :: comm_cart
-
-      CHARACTER(len=*), PARAMETER :: routineN = 'mp_cart_create'
-
-      INTEGER                                  :: handle, ierr
-#if defined(__parallel)
-      LOGICAL, DIMENSION(1:ndims)              :: period
-      LOGICAL                                  :: reorder
-#endif
-
-      ierr = 0
-      CALL mp_timeset(routineN, handle)
-
-      comm_cart%handle = comm_old%handle
-#if defined(__parallel)
-
-      IF (ANY(dims == 0)) CALL mpi_dims_create(comm_old%num_pe, ndims, dims, ierr)
-      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_dims_create @ mp_cart_create")
-
-      ! FIX ME.  Quick hack to avoid problems with realspace grids for compilers
-      ! like IBM that actually reorder the processors when creating the new
-      ! communicator
-      reorder = .FALSE.
-      period = .TRUE.
-      CALL mpi_cart_create(comm_old%handle, ndims, dims, period, reorder, comm_cart%handle, &
-                           ierr)
-      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_cart_create @ mp_cart_create")
-      CALL add_perf(perf_id=1, count=1)
-#else
-      dims = 1
-      comm_cart%handle = mp_comm_default_handle
-#endif
-      comm_cart%ndims = ndims
-      debug_comm_count = debug_comm_count + 1
-      CALL comm_cart%init()
-      CALL mp_timestop(handle)
-
-   END SUBROUTINE mp_cart_create
+!! **************************************************************************************************
+!!> \brief creates a cartesian communicator from any communicator
+!!> \param comm_old ...
+!!> \param ndims ...
+!!> \param dims ...
+!!> \param pos ...
+!!> \param comm_cart ...
+!! **************************************************************************************************
+!   SUBROUTINE mp_cart_create(comm_old, ndims, dims, comm_cart)
+!
+!      CLASS(mp_comm_type), INTENT(IN)          :: comm_old
+!      INTEGER, INTENT(IN)                      :: ndims
+!      INTEGER, INTENT(INOUT)                   :: dims(ndims)
+!      CLASS(mp_cart_type), INTENT(OUT)         :: comm_cart
+!
+!      CHARACTER(len=*), PARAMETER :: routineN = 'mp_cart_create'
+!
+!      INTEGER                                  :: handle, ierr
+!#if defined(__parallel)
+!      LOGICAL, DIMENSION(1:ndims)              :: period
+!      LOGICAL                                  :: reorder
+!#endif
+!
+!      ierr = 0
+!      CALL mp_timeset(routineN, handle)
+!
+!      comm_cart%handle = comm_old%handle
+!#if defined(__parallel)
+!
+!      IF (ANY(dims == 0)) CALL mpi_dims_create(comm_old%num_pe, ndims, dims, ierr)
+!      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_dims_create @ mp_cart_create")
+!
+!      ! FIX ME.  Quick hack to avoid problems with realspace grids for compilers
+!      ! like IBM that actually reorder the processors when creating the new
+!      ! communicator
+!      reorder = .FALSE.
+!      period = .TRUE.
+!      CALL mpi_cart_create(comm_old%handle, ndims, dims, period, reorder, comm_cart%handle, ierr)
+!      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_cart_create @ mp_cart_create")
+!      CALL add_perf(perf_id=1, count=1)
+!#else
+!      dims = 1
+!      comm_cart%handle = mp_comm_default_handle
+!#endif
+!      comm_cart%ndims = ndims
+!      debug_comm_count = debug_comm_count + 1
+!      CALL comm_cart%init()
+!      CALL mp_timestop(handle)
+!
+!   END SUBROUTINE mp_cart_create
 
 ! **************************************************************************************************
 !> \brief wrapper to MPI_Cart_coords
@@ -1612,8 +1552,7 @@ CONTAINS
 !> \param coords ...
 ! **************************************************************************************************
    SUBROUTINE mp_cart_coords(comm, rank, coords)
-
-      CLASS(mp_cart_type), INTENT(IN) :: comm
+      CLASS(mp_comm_type), INTENT(IN)                    :: comm
       INTEGER, INTENT(IN)                                :: rank
       INTEGER, DIMENSION(:), INTENT(OUT)                 :: coords
 
@@ -1681,41 +1620,41 @@ CONTAINS
 
    END FUNCTION mp_comm_compare
 
-! **************************************************************************************************
-!> \brief wrapper to MPI_Cart_sub
-!> \param comm ...
-!> \param rdim ...
-!> \param sub_comm ...
-! **************************************************************************************************
-   SUBROUTINE mp_cart_sub(comm, rdim, sub_comm)
-
-      CLASS(mp_cart_type), INTENT(IN)                                :: comm
-      LOGICAL, DIMENSION(:), CONTIGUOUS, INTENT(IN)                  :: rdim
-      CLASS(mp_cart_type), INTENT(OUT)                               :: sub_comm
-
-      CHARACTER(len=*), PARAMETER :: routineN = 'mp_cart_sub'
-
-      INTEGER                                            :: handle
-#if defined(__parallel)
-      INTEGER :: ierr
-#endif
-
-      CALL mp_timeset(routineN, handle)
-
-#if defined(__parallel)
-      CALL mpi_cart_sub(comm%handle, rdim, sub_comm%handle, ierr)
-      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_cart_sub @ mp_cart_sub")
-#else
-      MARK_USED(comm)
-      MARK_USED(rdim)
-      sub_comm%handle = mp_comm_default_handle
-#endif
-      sub_comm%ndims = COUNT(rdim)
-      debug_comm_count = debug_comm_count + 1
-      CALL sub_comm%init()
-      CALL mp_timestop(handle)
-
-   END SUBROUTINE mp_cart_sub
+!! **************************************************************************************************
+!!> \brief wrapper to MPI_Cart_sub
+!!> \param comm ...
+!!> \param rdim ...
+!!> \param sub_comm ...
+!! **************************************************************************************************
+!   SUBROUTINE mp_cart_sub(comm, rdim, sub_comm)
+!
+!      CLASS(mp_cart_type), INTENT(IN)                                :: comm
+!      LOGICAL, DIMENSION(:), CONTIGUOUS, INTENT(IN)                  :: rdim
+!      CLASS(mp_cart_type), INTENT(OUT)                               :: sub_comm
+!
+!      CHARACTER(len=*), PARAMETER :: routineN = 'mp_cart_sub'
+!
+!      INTEGER                                            :: handle
+!#if defined(__parallel)
+!      INTEGER :: ierr
+!#endif
+!
+!      CALL mp_timeset(routineN, handle)
+!
+!#if defined(__parallel)
+!      CALL mpi_cart_sub(comm%handle, rdim, sub_comm%handle, ierr)
+!      IF (ierr /= 0) CALL mp_stop(ierr, "mpi_cart_sub @ mp_cart_sub")
+!#else
+!      MARK_USED(comm)
+!      MARK_USED(rdim)
+!      sub_comm%handle = mp_comm_default_handle
+!#endif
+!      sub_comm%ndims = COUNT(rdim)
+!      debug_comm_count = debug_comm_count + 1
+!      CALL sub_comm%init()
+!      CALL mp_timestop(handle)
+!
+!   END SUBROUTINE mp_cart_sub
 
 ! **************************************************************************************************
 !> \brief wrapper to MPI_Comm_free
@@ -1743,14 +1682,6 @@ CONTAINS
          IF (comm%ref_count <= 0) THEN
             free_comm = comm%owns_group
          END IF
-      CLASS IS (mp_para_cart_type)
-         free_comm = .FALSE.
-         IF (comm%ref_count <= 0) &
-            CPABORT("para_cart%ref_count <= 0")
-         comm%ref_count = comm%ref_count - 1
-         IF (comm%ref_count <= 0) THEN
-            free_comm = comm%owns_group
-         END IF
       END SELECT
 
       CALL mp_timeset(routineN, handle)
@@ -1764,11 +1695,6 @@ CONTAINS
 #endif
          debug_comm_count = debug_comm_count - 1
       END IF
-
-      SELECT TYPE (comm)
-      CLASS IS (mp_cart_type)
-         DEALLOCATE (comm%periodic, comm%mepos_cart, comm%num_pe_cart)
-      END SELECT
 
       CALL mp_timestop(handle)
 
@@ -1798,29 +1724,6 @@ CONTAINS
    END SUBROUTINE mp_para_env_retain
 
 ! **************************************************************************************************
-!> \brief check whether the given environment is valid, i.e. existent
-!> \param cart ...
-!> \return ...
-! **************************************************************************************************
-   ELEMENTAL LOGICAL FUNCTION mp_para_cart_is_valid(cart)
-      CLASS(mp_para_cart_type), INTENT(IN) :: cart
-
-      mp_para_cart_is_valid = cart%ref_count > 0
-
-   END FUNCTION mp_para_cart_is_valid
-
-! **************************************************************************************************
-!> \brief increase the reference counter, don't forget to free it later
-!> \param cart ...
-! **************************************************************************************************
-   ELEMENTAL SUBROUTINE mp_para_cart_retain(cart)
-      CLASS(mp_para_cart_type), INTENT(INOUT) :: cart
-
-      cart%ref_count = cart%ref_count + 1
-
-   END SUBROUTINE mp_para_cart_retain
-
-! **************************************************************************************************
 !> \brief wrapper to MPI_Comm_dup
 !> \param comm1 ...
 !> \param comm2 ...
@@ -1846,7 +1749,6 @@ CONTAINS
       MARK_USED(comm1)
       comm2%handle = mp_comm_default_handle
 #endif
-      comm2%ndims = comm1%ndims
       debug_comm_count = debug_comm_count + 1
       CALL comm2%init()
       CALL mp_timestop(handle)
@@ -1863,7 +1765,6 @@ CONTAINS
       CLASS(mp_comm_type), INTENT(OUT) :: comm_new
 
       comm_new%handle = comm_old%handle
-      comm_new%ndims = comm_old%ndims
       CALL comm_new%init(.FALSE.)
    END SUBROUTINE
 
@@ -1894,30 +1795,7 @@ CONTAINS
       END IF
 
       SELECT TYPE (comm)
-      CLASS IS (mp_cart_type)
-         IF (ALLOCATED(comm%periodic)) DEALLOCATE (comm%periodic)
-         IF (ALLOCATED(comm%mepos_cart)) DEALLOCATE (comm%mepos_cart)
-         IF (ALLOCATED(comm%num_pe_cart)) DEALLOCATE (comm%num_pe_cart)
-
-         ASSOCIATE (ndims => comm%ndims)
-
-            ALLOCATE (comm%periodic(ndims), comm%mepos_cart(ndims), &
-                      comm%num_pe_cart(ndims))
-         END ASSOCIATE
-
-         comm%mepos_cart = 0
-         comm%periodic = .FALSE.
-         IF (comm%handle MPI_GET_COMP .NE. mp_comm_null_handle MPI_GET_COMP) THEN
-            CALL comm%get_info_cart(comm%num_pe_cart, comm%mepos_cart, &
-                                    comm%periodic)
-         END IF
-      END SELECT
-
-      SELECT TYPE (comm)
       CLASS IS (mp_para_env_type)
-         IF (PRESENT(owns_group)) comm%owns_group = owns_group
-         comm%ref_count = 1
-      CLASS IS (mp_para_cart_type)
          IF (PRESENT(owns_group)) comm%owns_group = owns_group
          comm%ref_count = 1
       END SELECT
@@ -1963,39 +1841,6 @@ CONTAINS
       END IF
       NULLIFY (para_env)
    END SUBROUTINE mp_para_env_release
-
-! **************************************************************************************************
-!> \brief creates a cart (multidimensional parallel environment)
-!> \param cart the cart environment to create
-!> \param group the mpi communicator
-!> \author fawzi
-! **************************************************************************************************
-   SUBROUTINE mp_para_cart_create(cart, group)
-      TYPE(mp_para_cart_type), POINTER, INTENT(OUT)                   :: cart
-      CLASS(mp_comm_type), INTENT(in)                     :: group
-
-      IF (ASSOCIATED(cart)) &
-         CPABORT("The passed para_cart must not be associated!")
-      ALLOCATE (cart)
-      cart%mp_cart_type = group
-      CALL cart%init()
-
-   END SUBROUTINE mp_para_cart_create
-
-! **************************************************************************************************
-!> \brief releases the given cart
-!> \param cart the cart to release
-!> \author fawzi
-! **************************************************************************************************
-   SUBROUTINE mp_para_cart_release(cart)
-      TYPE(mp_para_cart_type), POINTER                   :: cart
-
-      IF (ASSOCIATED(cart)) THEN
-         CALL cart%free()
-         IF (.NOT. cart%is_valid()) DEALLOCATE (cart)
-      END IF
-      NULLIFY (cart)
-   END SUBROUTINE mp_para_cart_release
 
 ! **************************************************************************************************
 !> \brief wrapper to MPI_Group_translate_ranks
@@ -2092,7 +1937,7 @@ CONTAINS
 !> \param rank ...
 ! **************************************************************************************************
    SUBROUTINE mp_cart_rank(comm, pos, rank)
-      CLASS(mp_cart_type), INTENT(IN)                                :: comm
+      CLASS(mp_comm_type), INTENT(IN)                    :: comm
       INTEGER, DIMENSION(:), INTENT(IN)                  :: pos
       INTEGER, INTENT(OUT)                               :: rank
 
