@@ -1,0 +1,76 @@
+#!/bin/bash -e
+
+# author: Ole Schuett
+
+# shellcheck disable=SC1091
+source /opt/cp2k-toolchain/install/setup
+
+echo -e "\n========== Installing Dependencies =========="
+apt-get update -qq
+apt-get install -qq --no-install-recommends meson ninja-build
+rm -rf /var/lib/apt/lists/*
+
+echo -e "\n========== Installing Newton-X =========="
+wget -q https://www.cp2k.org/static/downloads/newtonx-v3.5.3.tar.gz
+echo "85a5fd7739856fb720a5ba939b722d91fced9180a8acfd15dfd132ab77077044  newtonx-v3.5.3.tar.gz" | sha256sum --check
+
+tar -xvzf newtonx-v3.5.3.tar.gz
+cd newtonx-v3.5.3
+
+meson setup -Dlapack=openblas -Dprefix=/opt/newtonx build
+meson compile -C build -j 32
+meson install -C build
+
+
+
+
+
+
+#echo -e "\n========== Installing Dependencies =========="
+#apt-get update -qq
+#apt-get install -qq --no-install-recommends \
+#  git \
+#  python3 \
+#  python3-venv \
+#  python3-pip \
+#  python3-wheel \
+#  python3-setuptools
+#rm -rf /var/lib/apt/lists/*
+#
+## Create and activate a virtual environment for Python packages.
+#python3 -m venv /opt/venv
+#export PATH="/opt/venv/bin:$PATH"
+#
+#echo -e "\n========== Installing Phonopy =========="
+#git clone --quiet --depth=1 --single-branch -b develop https://github.com/phonopy/phonopy.git /opt/phonopy
+#cd /opt/phonopy/
+#pip3 install ".[cp2k]"
+#
+## Workaround https://github.com/hgrecco/pint/issues/1974
+#pip3 install Pint==0.24.4
+#
+#echo -e "\n========== Running Phonopy Test =========="
+#mkdir tmp
+#cd tmp
+#cp ../example/Si-CP2K/Si.inp .
+#
+#set +e # disable error trapping for remainder of script
+#(
+#  set -e # abort on error
+#  # Following example/Si-CP2K/README.md
+#  phonopy --cp2k -c Si.inp -d --dim="2 2 2"
+#  OMP_NUM_THREADS=2 /opt/cp2k/build/bin/cp2k.ssmp Si-supercell-001.inp &> cp2k.out
+#  phonopy --cp2k -f Si-supercell-001-forces-1_0.xyz
+#)
+#EXIT_CODE=$?
+#
+#PHONOPY_REVISION=$(git rev-parse --short HEAD)
+#if ((EXIT_CODE)); then
+#  echo -e "\nSummary: Something is wrong with Phonopy commit ${PHONOPY_REVISION}."
+#  echo -e "Status: FAILED\n"
+#else
+#  echo -e "\nSummary: Phonopy commit ${PHONOPY_REVISION} works fine."
+#  echo -e "Status: OK\n"
+#fi
+#
+#EOF
