@@ -26,7 +26,6 @@ MODULE dimer_methods
    USE dimer_utils,                     ONLY: get_theta
    USE force_env_methods,               ONLY: force_env_calc_energy_force
    USE force_env_types,                 ONLY: force_env_get
-   USE geo_opt,                         ONLY: cp_rot_opt
    USE gopt_f_types,                    ONLY: gopt_f_type
    USE input_constants,                 ONLY: do_first_rotation_step,&
                                               do_second_rotation_step,&
@@ -37,6 +36,17 @@ MODULE dimer_methods
    USE motion_utils,                    ONLY: rot_ana,&
                                               thrs_motion
    USE particle_list_types,             ONLY: particle_list_type
+!TODO fix circular dependency.
+!
+!   dimer_methods::cp_eval_at_ts ->
+!   geo_opt::cp_rot_opt ->
+!   geo_opt::cp_geo_opt_low ->
+!   cg_optimizer::geoopt_cg ->
+!   cg_optimizer::cp_cg_main ->
+!   gopt_f_methods::cp_eval_at ->
+!   dimer_methods::cp_eval_at_ts
+!
+!USE geo_opt,                         ONLY: cp_rot_opt
 #include "../base/base_uses.f90"
 
    IMPLICIT NONE
@@ -161,8 +171,9 @@ CONTAINS
                WRITE (iw, '(A)') "G0 vector:"
                WRITE (iw, '(3F15.9)') dimer_env%rot%g0
             END IF
-            CALL cp_rot_opt(gopt_env%gopt_dimer_env, x, gopt_env%gopt_dimer_param, &
-                            gopt_env%gopt_dimer_env%geo_section)
+            !TODO fix circular dependency.
+            !CALL cp_rot_opt(gopt_env%gopt_dimer_env, x, gopt_env%gopt_dimer_param, &
+            !                gopt_env%gopt_dimer_env%geo_section)
             dimer_env%rot%rotation_step = do_first_rotation_step
          END IF
 
