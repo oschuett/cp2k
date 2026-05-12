@@ -1555,6 +1555,9 @@ CONTAINS
             abc(i) = cp_unit_to_cp2k(abc(i), "angstrom")
             albega(i) = cp_unit_to_cp2k(albega(i), "deg")
          END DO
+         CALL set_cell_param(cell, cell_length=abc, cell_angle=albega, do_init_cell=.TRUE.)
+      ELSE IF (INDEX(reftraj_env%info%traj_parser%input_line, 'Lattice=') > 60) THEN
+         traj_has_cell_info = .TRUE.
       ELSE
          traj_has_cell_info = .FALSE.
          READ (reftraj_env%info%traj_parser%input_line, FMT="(T6,I8,T23,F12.3,T41,F20.10)", ERR=999) &
@@ -1562,6 +1565,8 @@ CONTAINS
       END IF
       test_ok = .TRUE.
 999   IF (.NOT. test_ok) THEN
+      WRITE (*,*) "Could not parse reftraj: ", reftraj_env%info%traj_parser%input_line
+      WRITE (*,*) "indeX:", INDEX(reftraj_env%info%traj_parser%input_line, 'Lattice=')
          ! Handling properly the error when reading the title of an XYZ
          CALL get_md_env(md_env, itimes=itimes)
          trj_itimes = itimes
@@ -1629,7 +1634,8 @@ CONTAINS
       ! Read cell parameters from cell file if requested and if not yet available
       IF (reftraj_env%info%variable_volume .AND. (.NOT. traj_has_cell_info)) THEN
          CALL parser_get_next_line(reftraj_env%info%cell_parser, 1, at_end=my_end)
-         CALL parse_cell_line(reftraj_env%info%cell_parser%input_line, cell_itimes, cell_time, h, vol)
+         CALL parse_cell_line(reftraj_env%info%cell_parser%input_line, cell_itimes, cell_time, cell%hmat, vol)
+         CALL init_cell(cell)
          CPASSERT(trj_itimes == cell_itimes)
          ! Check if we reached the end of the file and provide some info..
          IF (my_end) THEN
@@ -1653,13 +1659,6 @@ CONTAINS
       reftraj_env%time = trj_time/femtoseconds
       CALL get_md_env(md_env, t=time)
       time = reftraj_env%time
-
-      IF (traj_has_cell_info) THEN
-         CALL set_cell_param(cell, cell_length=abc, cell_angle=albega, do_init_cell=.TRUE.)
-      ELSE IF (reftraj_env%info%variable_volume) THEN
-         cell%hmat = h
-         CALL init_cell(cell)
-      END IF
 
       ![ADAPT] update input structure with new coordinates, make new labels
       CALL qmmmx_update_force_env(force_env, force_env%root_section)

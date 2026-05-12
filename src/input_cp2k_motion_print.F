@@ -305,7 +305,7 @@ CONTAINS
          CALL keyword_create( &
             keyword, __LOCATION__, name="FORMAT", &
             description=description, usage="FORMAT (ATOMIC|DCD|PDB|XMOL|XYZ|EXTXYZ)", &
-            default_i_val=dump_xmol, &
+            default_i_val=dump_extxyz, &
             enum_c_vals=s2a("ATOMIC", "DCD", "DCD_ALIGNED_CELL", "PDB", "XMOL", "XYZ", "EXTXYZ"), &
             enum_i_vals=[dump_atomic, dump_dcd, dump_dcd_aligned_cell, dump_pdb, dump_xmol, dump_xmol, dump_extxyz], &
             enum_desc=s2a("Write only the coordinates X,Y,Z without element symbols to a formatted file", &
@@ -349,7 +349,7 @@ CONTAINS
 
          CALL keyword_create(keyword, __LOCATION__, name="FORMAT", &
                              description=description, usage="FORMAT (ATOMIC|DCD|XMOL|XYZ|EXTXYZ)", &
-                             default_i_val=dump_xmol, &
+                             default_i_val=dump_extxyz, &
                              enum_c_vals=s2a("ATOMIC", "DCD", "XMOL", "XYZ", "EXTXYZ"), &
                              enum_i_vals=[dump_atomic, dump_dcd, dump_xmol, dump_xmol, dump_extxyz], &
                              enum_desc=s2a("Write only the coordinates X,Y,Z without element symbols to a formatted file", &

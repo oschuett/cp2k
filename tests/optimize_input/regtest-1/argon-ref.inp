@@ -28,11 +28,13 @@
       &END EACH
     &END CELL
     &FORCES
+      FORMAT XYZ
       &EACH
         MD 2
       &END EACH
     &END FORCES
     &TRAJECTORY
+      FORMAT XYZ
       &EACH
         MD 2
       &END EACH

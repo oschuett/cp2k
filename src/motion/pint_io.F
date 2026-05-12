@@ -30,6 +30,7 @@ MODULE pint_io
    USE input_constants,                 ONLY: dump_atomic,&
                                               dump_dcd,&
                                               dump_dcd_aligned_cell,&
+                                              dump_extxyz,&
                                               dump_xmol
    USE input_section_types,             ONLY: section_vals_get_subs_vals,&
                                               section_vals_type,&
@@ -170,13 +171,13 @@ CONTAINS
          CASE (dump_atomic)
             form = "FORMATTED"
             ext = ""
-         CASE (dump_xmol)
+         CASE (dump_xmol, dump_extxyz)
             CALL section_vals_val_get(print_key, "PRINT_ATOM_KIND", &
                                       l_val=print_kind)
             form = "FORMATTED"
             ext = ".xyz"
          CASE default
-            CPABORT("")
+            CPABORT("Unknown format in: "//TRIM(sect_path(id)))
          END SELECT
 
          NULLIFY (f_env, cell, subsys)
@@ -321,11 +322,11 @@ CONTAINS
          CASE (dump_atomic)
             form = "FORMATTED"
             ext = ""
-         CASE (dump_xmol)
+         CASE (dump_xmol, dump_extxyz)
             form = "FORMATTED"
             ext = ".xyz"
          CASE default
-            CPABORT("")
+            CPABORT("Unknown format in: "//TRIM(sect_path(id)))
          END SELECT
 
          NULLIFY (f_env, cell, subsys)
