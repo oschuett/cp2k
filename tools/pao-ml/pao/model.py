@@ -7,6 +7,7 @@ from e3nn import o3  # type: ignore
 from e3nn.o3._linear import Linear  # type: ignore
 from nequip.data import AtomicDataDict  # type: ignore
 from nequip.nn import GraphModel, SequentialGraphNetwork, ConvNetLayer, GraphModuleMixin  # type: ignore
+from torch.nn.parameter import Parameter
 from nequip.nn.embedding import (  # type: ignore
     NodeTypeEmbed,
     PolynomialCutoff,
@@ -168,6 +169,7 @@ class PaoReadout(GraphModuleMixin, torch.nn.Module):  # type: ignore
         )
         self.pao_basis_size = pao_basis_size
         self.matrix = SymmetricMatrix(irreps_prim_basis)  # auxiliary Hamiltonian
+        self.h_atomic = Parameter(torch.zeros(self.matrix.shape))  # atomic Hamiltonian
         self.linear = Linear(
             irreps_in=self.irreps_in["node_features"], irreps_out=self.matrix.irreps_in  # type: ignore
         )
@@ -182,7 +184,7 @@ class PaoReadout(GraphModuleMixin, torch.nn.Module):  # type: ignore
         central_atom_features = data["node_features"].index_select(0, central_atoms)
         h_aux_vec = self.linear(central_atom_features)
         h_aux_matrix = self.matrix(h_aux_vec)
-        u_matrix = torch.linalg.eigh(h_aux_matrix)[1]
+        u_matrix = torch.linalg.eigh(h_aux_matrix + self.h_atomic)[1]
         xblock = u_matrix[..., : self.pao_basis_size].transpose(-2, -1)
         outputs = {"xblock": xblock @ self.D_yzx_to_xyz}
         return outputs
@@ -208,6 +210,8 @@ class SymmetricMatrix(torch.nn.Module):
         super().__init__()
         self.irreps_prim_basis = irreps_prim_basis
         self.irreps_prim_basis_ls: List[int] = irreps_prim_basis.ls
+        self.prim_basis_size = sum(dim(l) for l in self.irreps_prim_basis_ls)
+        self.shape = (self.prim_basis_size, self.prim_basis_size)
 
         # Compute irreps required to represent a matrix
         self.irreps_in = o3.Irreps()
@@ -227,10 +231,9 @@ class SymmetricMatrix(torch.nn.Module):
     # ----------------------------------------------------------------------------------
     def forward(self, vector: torch.Tensor) -> torch.Tensor:
         assert vector.shape[-1] == sum(dim(l) for l in self.irreps_in_ls)
-        basis_size = sum(dim(l) for l in self.irreps_prim_basis_ls)
-        matrix = torch.zeros(vector.shape[:-1] + (basis_size, basis_size))
+        matrix = torch.zeros(vector.shape[:-1] + self.shape)
         # Ensure matrix has distinct eigenvalues as needed for grad of torch.linalg.eigh().
-        matrix[..., :, :] = torch.diag(torch.arange(1, basis_size + 1))
+        matrix[..., :, :] = torch.diag(torch.arange(1, self.prim_basis_size + 1))
         c = 0  # position in vector
         z = 0  # position in self.wigner_blocks
         for i, li in enumerate(self.irreps_prim_basis_ls):
