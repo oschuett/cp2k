@@ -24,8 +24,8 @@ def main() -> None:
 
     assert a.kinds == b.kinds
     assert a.atom2kind == b.atom2kind
-    assert np.all(a.cell == b.cell)
-    assert np.all(a.coords == b.coords)
+    assert np.max(np.abs(a.cell - b.cell)) < 1e-14
+    assert np.max(np.abs(a.coords - b.coords)) < 1e-14
 
     for iatom in range(len(a.atom2kind)):
         xa = prepare_xblock(a.xblocks[iatom])
